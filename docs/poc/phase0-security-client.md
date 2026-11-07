@@ -10,7 +10,7 @@
 - 原生集成回归现在执行两次完整的本机服务启动→Swift 健康握手→有界关闭，再用新端口和新短期 token 重启并握手；测试验证旧 token 不出现在 Swift 子进程输出中。该项仅证明集成 harness 的服务重启/重新握手，不证明正式 App 拥有或管理后端子进程。
 - Swift `LocalAPIClient` 仅允许 HTTP `127.0.0.1` / `::1`，使用内存 token，拒绝 HTTP redirect；SwiftUI POC 连接视图只展示状态并提供主动检查按钮。
 - API Key POC 使用 macOS Keychain generic-password，`AfterFirstUnlockThisDeviceOnly`；外部可见的凭据管理 API 只提供写入、删除、存在状态查询，不提供明文读取。
-- 凭据写入/删除先经过 `LocalAuthentication` Touch ID 授权门；测试通过 fake authorizer 验证拒绝路径不会变更 Keychain。实际 Touch ID 提示未触发。
+- 凭据写入/删除先经过 `LocalAuthentication` 敏感操作授权门；认证策略为 `.deviceOwnerAuthentication`，允许系统按可用性使用 Touch ID 或设备密码。测试通过 fake authorizer 验证拒绝路径不会变更 Keychain，并有策略常量回归测试。真实系统认证提示未触发。
 - Consent/Policy 只允许精确匹配 Provider、Model、Region、Purpose、数据等级和期限的 grant；无 grant 默认拒绝、L3 永远拒绝，支持撤销。没有实现或调用任何云 Provider。
 - 当前 POC 没有数据库 schema 变更；FastAPI/Uvicorn 版本已锁定到 `0.159.1` / `0.54.0`。
 
@@ -29,7 +29,7 @@ swift test
 ## 未解决/未验收
 
 - SwiftUI View 目前只完成编译及连接状态模型单测，未在 GUI 中实机交互，也不是完整产品 UI。
-- Touch ID API 接入已实现，但测试使用 fake authorizer；真实 biometric prompt/拒绝/取消尚未实测。
+- LocalAuthentication API 接入已实现，默认策略覆盖生物识别或设备密码；单测不等于真实系统交互。真实 Touch ID/设备密码提示、拒绝/取消仍未实测。
 - 真实 App 启动后端的进程所有权、随机端口重试/生命周期、锁屏行为尚未完成；当前重启用例由测试 harness 负责启动/关闭 FastAPI，并经 pipe 将新 token 交给 Swift CLI。
 - Host/Origin、token 和无云出站策略经过 POC 测试；真实用户 Consent UI、完整数据分类/脱敏/审计与撤销竞态未实现。
 - 未做崩溃、重启、磁盘不足、备份恢复故障注入，也未验证静态加密方案；不得将本工作包视为 POC-05 完成。

@@ -6,11 +6,15 @@ public protocol SensitiveActionAuthorizing: AnyObject {
 }
 
 public enum SensitiveActionAuthorizationError: Error {
+    case authenticationUnavailable
+    /// Kept for source compatibility with the earlier biometric-only POC.
     case touchIDUnavailable
 }
 
 @MainActor
 public final class TouchIDAuthorizer: SensitiveActionAuthorizing {
+    static let authenticationPolicy: LAPolicy = .deviceOwnerAuthentication
+
     private let context: LAContext
 
     public init(context: LAContext = LAContext()) {
@@ -19,12 +23,12 @@ public final class TouchIDAuthorizer: SensitiveActionAuthorizing {
 
     public func authorize(reason: String) async throws {
         var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+        guard context.canEvaluatePolicy(Self.authenticationPolicy, error: &error)
         else {
-            throw SensitiveActionAuthorizationError.touchIDUnavailable
+            throw SensitiveActionAuthorizationError.authenticationUnavailable
         }
         try await context.evaluatePolicy(
-            .deviceOwnerAuthenticationWithBiometrics,
+            Self.authenticationPolicy,
             localizedReason: reason
         )
     }
