@@ -5,6 +5,7 @@
 **/.pytest_cache/
 **/.ruff_cache/
 **/.build/
+**/*.egg-info/
 **/*.py[cod]
 backups/
 runtime-data/
