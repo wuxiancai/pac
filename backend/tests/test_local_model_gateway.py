@@ -68,6 +68,45 @@ def test_gateway_denies_nonlocal_adapter_before_request() -> None:
     assert remote.calls == 0
 
 
+def test_gateway_denies_nonlocal_adapter_before_opening_stream() -> None:
+    remote = StaticLocalAdapter("must not be returned")
+    remote.is_local = False
+    gateway = ModelGateway(adapters={"remote": remote}, policy=LocalOnlyPolicy())
+
+    async def collect() -> list[str]:
+        return [chunk async for chunk in gateway.stream(request("remote"))]
+
+    with pytest.raises(PolicyDenied):
+        asyncio.run(collect())
+
+    assert remote.calls == 0
+
+
+def test_closing_gateway_stream_closes_adapter_stream() -> None:
+    class CleanupAdapter(StaticLocalAdapter):
+        def __init__(self) -> None:
+            super().__init__("unused")
+            self.closed = False
+
+        async def stream(self, request: LocalModelRequest):
+            try:
+                yield "first"
+                await asyncio.Event().wait()
+            finally:
+                self.closed = True
+
+    adapter = CleanupAdapter()
+    gateway = ModelGateway(adapters={"local": adapter}, policy=LocalOnlyPolicy())
+
+    async def consume_then_close() -> tuple[str, bool]:
+        stream = gateway.stream(request("local"))
+        first = await anext(stream)
+        await stream.aclose()
+        return first, adapter.closed
+
+    assert asyncio.run(consume_then_close()) == ("first", True)
+
+
 def test_ollama_adapter_rejects_non_loopback_endpoint() -> None:
     with pytest.raises(ValueError, match="loopback"):
         OllamaAdapter(base_url="https://example.com")

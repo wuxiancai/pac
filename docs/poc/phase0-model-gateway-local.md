@@ -28,6 +28,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q
 - 全量 Python 测试：17 项通过。
 - 两个本地适配器可用相同请求契约独立路由。
 - 非本地适配器在调用前被拒绝。
+- Gateway 的非本地流式请求在打开 adapter stream 前拒绝；关闭下游 stream 会关闭 adapter 的 async generator，避免本地流在消费者取消后继续占用资源。此项由本地契约测试验证，不代表每个供应商都支持远端请求取消。
 - Ollama JSON 响应和 NDJSON 流事件可标准化。
 - 公网/非 loopback Ollama URL 被构造器拒绝。
 
@@ -35,7 +36,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q
 
 - v1.2 阶段 0 所要求的 2–3 家真实 Provider 文本、流、工具、JSON、区域、价格、错误和取消验证未做。本轮“本机开发/测试/使用”约束下只做本地验证。
 - 未比较 LiteLLM/Bifrost/Portkey，也未形成 ADR。
-- 未实现 Provider capability registry、usage/cost、取消传播、重试或 fallback。
+- Provider capability registry 已在单独的 POC 报告实现；本地 Gateway 现有取消语义只验证了本地 async stream 的关闭传播，未实现/验证远端供应商取消、usage/cost、重试或 fallback。
 - 云端 Provider 在 Consent Manager、Policy Engine 及用户授权流程完成前保持不可用。
 
 ## 安全/范围边界

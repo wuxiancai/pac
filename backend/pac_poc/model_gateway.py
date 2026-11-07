@@ -58,8 +58,14 @@ class ModelGateway:
 
     async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
         adapter = self._get_authorized_adapter(request)
-        async for chunk in adapter.stream(request):
-            yield chunk
+        stream = adapter.stream(request)
+        try:
+            async for chunk in stream:
+                yield chunk
+        finally:
+            close = getattr(stream, "aclose", None)
+            if close is not None:
+                await close()
 
     def _get_authorized_adapter(self, request: LocalModelRequest) -> LocalProviderAdapter:
         try:
