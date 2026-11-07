@@ -1,6 +1,36 @@
 import LocalAuthentication
 
 @MainActor
+protocol DeviceAuthenticationEvaluating: AnyObject {
+    func canEvaluate(policy: LAPolicy) -> Bool
+    func evaluate(policy: LAPolicy, reason: String) async throws
+}
+
+@MainActor
+private final class LAContextAuthenticationEvaluator: DeviceAuthenticationEvaluating {
+    private let context: LAContext
+
+    init(context: LAContext) {
+        self.context = context
+    }
+
+    func canEvaluate(policy: LAPolicy) -> Bool {
+        var error: NSError?
+        return context.canEvaluatePolicy(policy, error: &error)
+    }
+
+    func evaluate(policy: LAPolicy, reason: String) async throws {
+        let authenticated = try await context.evaluatePolicy(
+            policy,
+            localizedReason: reason
+        )
+        guard authenticated else {
+            throw SensitiveActionAuthorizationError.authenticationUnavailable
+        }
+    }
+}
+
+@MainActor
 public protocol SensitiveActionAuthorizing: AnyObject {
     func authorize(reason: String) async throws
 }
@@ -15,22 +45,21 @@ public enum SensitiveActionAuthorizationError: Error {
 public final class TouchIDAuthorizer: SensitiveActionAuthorizing {
     static let authenticationPolicy: LAPolicy = .deviceOwnerAuthentication
 
-    private let context: LAContext
+    private let evaluator: any DeviceAuthenticationEvaluating
 
     public init(context: LAContext = LAContext()) {
-        self.context = context
+        self.evaluator = LAContextAuthenticationEvaluator(context: context)
+    }
+
+    init(evaluator: any DeviceAuthenticationEvaluating) {
+        self.evaluator = evaluator
     }
 
     public func authorize(reason: String) async throws {
-        var error: NSError?
-        guard context.canEvaluatePolicy(Self.authenticationPolicy, error: &error)
-        else {
+        guard evaluator.canEvaluate(policy: Self.authenticationPolicy) else {
             throw SensitiveActionAuthorizationError.authenticationUnavailable
         }
-        try await context.evaluatePolicy(
-            Self.authenticationPolicy,
-            localizedReason: reason
-        )
+        try await evaluator.evaluate(policy: Self.authenticationPolicy, reason: reason)
     }
 }
 
