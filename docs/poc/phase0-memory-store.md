@@ -21,11 +21,11 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python -m compileall -q pac_poc 
 
 - 先写测试；初次执行因实现缺失而失败。实现后工作包测试 4 项通过。
 - 全量 Python 测试 25 项通过；compileall 通过。
-- 这里的 Embedding 行使用测试 fixture 向量验证派生索引清理；尚未集成或评测真实本地 Embedding 模型。
+- 这里的 Embedding 行使用测试 fixture 向量验证派生索引清理。真实候选下载状态见 `docs/poc/phase0-local-embedding.md`；尚无真实模型向量用于检索验证。
 
 ## 未解决/未验收
 
-- 本地多语言 Embedding 候选、中文记忆数据集检索评估及模型资源占用未验证。
+- 本地多语言 Embedding 候选权重未成功下载；中文语义记忆检索及模型资源占用未验证。
 - 冲突发现策略、正式 Schema、敏感级别、时间有效语义、派生数据全生命周期和备份加密尚未确定。
 - 恢复演练仅覆盖同一进程内存序列化，未覆盖加密备份、进程重启或磁盘故障。
 - 本工作包和阶段 0 均未验收；不可用于产品数据。

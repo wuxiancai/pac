@@ -17,6 +17,9 @@ phase0-security = [
     "sqlalchemy>=2.0,<3",
     "sqlcipher3==0.6.3",
 ]
+phase0-embedding = [
+    "fastembed==0.9.1",
+]
 
 [build-system]
 requires = ["setuptools>=80,<81"]

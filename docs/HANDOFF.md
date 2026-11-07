@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-阶段 0 POC；0B 本地语音实机验证已完成当前可执行项；0C Gateway/Agent Registry 模拟已提交；0D 记忆存储 POC 已提交但 Embedding 子项未验证；0E 本机安全与 Swift/FastAPI 集成、0F SQLCipher/ORM/Alembic 候选 POC 进行中。阶段 0 尚未验收，阶段 1 未开始。
+阶段 0 POC；0B 本地语音实机验证已完成当前可执行项；0C Gateway/Agent Registry 模拟已提交；0D 记忆存储/0F SQLCipher 兼容 POC 已提交；0G Embedding 真实模型下载未完成；0E 本机安全与 Swift/FastAPI 集成仍有 Touch ID/完整生命周期/恢复项。阶段 0 尚未验收，阶段 1 未开始。
 
 ## 已完成
 
@@ -23,17 +23,18 @@
 - 开始记忆存储 POC：进程内 SQLite + FTS5、来源/claim/观察时间、纠错版本链、FTS 与 fixture embedding 删除、内存备份恢复；测试 4 项与当前全量 25 项通过。产品 schema 未改动。
 - 开始 POC-05 本机安全集成：Keychain 凭据管理 + Touch ID gate、loopback FastAPI/token、Swift URLSession/SwiftUI 状态样例、Consent/Policy 默认拒绝；本机 Swift CLI 对真实 loopback FastAPI 的跨语言冒烟成功，具体测试见 `docs/poc/phase0-security-client.md`。
 - 开始 SQLCipher 静态加密兼容性 POC：ARM64/Python 3.12 上 FTS5、错误 key 拒绝、独立密钥加密备份/恢复、SQLAlchemy/Alembic migration upgrade/downgrade 通过；候选尚未定案，详见 `docs/poc/phase0-sqlcipher-compat.md`。
+- 建立 FastEmbed 多语言 Embedding 候选接口和测试。真实权重下载停滞并中断；未计算真实向量或检索准确性，详情见 `docs/poc/phase0-local-embedding.md`。
 
 ## 当前限制
 
 - ASR 仅在当前中文模型上验证；本机麦克风已实测可录音，但英文识别未解决。不得静默改用云 ASR。
 - 尚未验证 SwiftUI 麦克风链路、中英混合识别质量、P50/P95、资源占用、AEC、TTS 与 ASR 同时工作和锁屏/休眠处理。
-- Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始；POC-05 真实 Touch ID、完整 App 生命周期/握手、故障恢复未验证；POC-06 尚未评估密钥生命周期、WAL、崩溃和性能，也未作 ADR。记忆 POC 尚未评测真实本地 Embedding、加密/重启恢复。
+- Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始；POC-05 真实 Touch ID、完整 App 生命周期/握手、故障恢复未验证；POC-06 尚未评估密钥生命周期、WAL、崩溃和性能，也未作 ADR。记忆 POC 尚未评测真实本地 Embedding；模型下载被中断，不能标记通过。
 - 所有产品待决策项继续保持未定；本地 ASR 模型是临时 POC 候选。
 
 ## 下一步
 
-继续阶段 0：收尾 POC-05/06 未完成项，完成本地 Embedding 候选和恢复/故障注入 POC；同时逐项更新阶段 0 验收矩阵。英文 ASR 不作为阻塞项继续投入，保持明确未解决状态。真实云 Provider 仅在用户要求本机之外测试时才推进；当前云策略默认拒绝。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：继续本地 Embedding 候选验证；收尾 POC-05/06 未完成项及恢复/故障注入 POC，同时逐项更新阶段 0 验收矩阵。英文 ASR 不作为阻塞项继续投入，保持明确未解决状态。真实云 Provider 仅在用户要求本机之外测试时才推进；当前云策略默认拒绝。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 
