@@ -10,18 +10,21 @@
 - 将三份基线文档纳入 Git 初始提交 `769d4a4`。
 - 记录本机 Apple M1/16 GiB、macOS 26.5.1、Xcode 26.6、Swift 6.3.3、Python 3.12 和音频设备。
 - 建立本地 ASR 事件契约与 sherpa-onnx 适配器。
-- 单元测试 4 项通过；锁定环境复跑通过；使用本地中文合成语音与本地模型完成分帧 partial/final 冒烟验证。
+- 使用本地中文合成语音与本地模型完成分帧 partial/final 冒烟验证。
+- 建立交互式麦克风捕获 CLI、有界内存帧队列和溢出清理；加入 sounddevice 0.5.6。
+- 建立 AVSpeechSynthesizer 播放/立即打断 POC；实际打断返回 `interrupted=true speaking=false`。
+- Python 测试 9 项、Swift 测试 3 项通过；uv 锁文件检查和本机默认输入参数支持检查通过。
 
 ## 当前限制
 
-- 当前实现只处理本地 WAV 流，不是 SwiftUI 麦克风实时链路。
-- 尚未验证中英混合质量、识别率、P50/P95、资源占用、TTS/AEC/打断和音频清理。
+- 麦克风 CLI 已实现但需要用户在交互终端按回车后才会开始；本轮未执行真实采集，因此没有实际麦克风识别结果。
+- 尚未验证 SwiftUI 麦克风链路、中英混合识别质量、P50/P95、资源占用、AEC、TTS 与 ASR 同时工作和锁屏/休眠处理。
 - Model Gateway、Consent/Policy、Keychain、静态加密、记忆、备份和 Provider POC 未开始。
 - 所有产品待决策项继续保持未定；本地 ASR 模型是临时 POC 候选。
 
 ## 下一步
 
-先完成工作包 0B 的真实设备麦克风流与本机 TTS/打断验证，再输出阶段 0B 验收记录；然后按规格顺序推进 Gateway、记忆/安全和集成/恢复 POC。阶段 0 验收前不得进入阶段 1。
+请在本机交互式终端运行 `backend` 下的 `run_live_microphone_poc.py`，按提示明确开始并说一段中文/中英混合句，验证真实 partial/final；再记录测试集和设备结果。随后按规格推进 Gateway、记忆/安全和集成/恢复 POC。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 
