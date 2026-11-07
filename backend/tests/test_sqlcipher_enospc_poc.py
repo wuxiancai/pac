@@ -49,7 +49,10 @@ def test_workspace_rejects_symlink_escape(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS hdiutil")
-def test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup() -> None:
+@pytest.mark.parametrize(("filesystem", "image_size_mb"), [("HFS+", 32), ("APFS", 128)])
+def test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup(
+    filesystem: str, image_size_mb: int
+) -> None:
     backend = Path(__file__).resolve().parents[1]
     allowed_root = backend / ".poc-data"
     allowed_root.mkdir(exist_ok=True)
@@ -61,7 +64,9 @@ def test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup() -> 
                 "--work-dir",
                 workspace,
                 "--image-size-mb",
-                "32",
+                str(image_size_mb),
+                "--filesystem",
+                filesystem,
             ],
             cwd=backend,
             capture_output=True,
@@ -73,6 +78,7 @@ def test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup() -> 
     assert completed.returncode == 0, completed.stderr + completed.stdout
     report = json.loads(completed.stdout)
     assert report["disk_full_observed"] is True
+    assert report["filesystem"] == filesystem
     assert report["source_integrity"] == "ok"
     assert report["backup_integrity"] == "ok"
     assert report["source_baseline_rows"] == 1

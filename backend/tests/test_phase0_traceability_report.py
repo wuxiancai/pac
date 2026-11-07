@@ -66,7 +66,8 @@ def test_failure_recovery_report_distinguishes_reader_contention_from_crash_mid_
     assert "活动 WAL reader" in report
     assert "busy=1" in report
     assert "释放并关闭 reader 后" in report
-    assert "checkpoint 执行中 SIGKILL" in report
+    assert "等待 reader 锁期间被终止" in report
+    assert "checkpoint 正在写数据库页时 SIGKILL" in report
     assert "活动 WAL reader 下 `busy=1` 可见" in traceability
 
 
@@ -89,9 +90,9 @@ def test_sqlcipher_compat_report_reflects_latest_recovery_evidence() -> None:
 
     assert "WAL 数据库备份/恢复" in report
     assert "SIGKILL" in report
-    assert "SQLCipher 专项测试：15 项通过" in report
+    assert "SQLCipher 专项测试：19 项通过" in report
     assert "48 MiB 临时 HFS+ 映像 ENOSPC POC" in report
-    assert "APFS/外接介质 ENOSPC" in report
+    assert "APFS 系统卷/外接介质 ENOSPC" in report
 
 
 def test_bounded_enospc_report_records_recovery_and_remaining_scope() -> None:

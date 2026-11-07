@@ -51,6 +51,8 @@ XDG_CACHE_HOME=.poc-data/xdg-cache HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 
 两次执行均返回 4 个合成 query 全部 top-1 命中（`top1_matches=4/4`；脚本原始字段为 `top1_matches=4`）。第一次记录 1.95 秒 real、851,804,160 bytes 最大 RSS；offline 环境下的第二次记录 1.54 秒 real、868,909,056 bytes 最大 RSS。以上为两次单次进程级观察，不是稳定基准。
 
+2026-11-07 再执行三次独立离线进程：三次均 4/4 top-1；real time 分别 1.19、0.81、0.81 秒；最大 RSS 分别 883,490,816、883,261,440、883,130,368 bytes。三次执行均设置 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1`，不下载权重。这仍是 4 条合成 query，不构成真实检索质量或产品资源验收。
+
 检索集只有 4 条人工构造记忆和 4 个对应 query。该 top-1 结果不能外推到真实用户记忆、中文或多语言召回率、一般排序质量、长时间运行或产品性能门槛。记录 RSS 是这两次命令的 observed max RSS，产品资源目标尚未确认。
 
 新增文档契约测试：
@@ -64,5 +66,5 @@ UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q t
 
 - 需要真实、有代表性的中英文记忆/query 标注集与重复测量，才能评价 Recall@k、排序、CPU/RSS、冷启动和资源目标；当前用户数据没有参与。
 - 尚未与持久 memory repository/SQLCipher schema 集成，也未评估模型版本变化、embedding 重算和索引迁移。
-- 产品 Embedding 型号、格式/维度、保留策略和默认实现继续待决策；FastEmbed 仅可选候选，不得因为这次 4/4 合成命中而默认选型。
-- 候选许可与模型卡需在冻结/产品采用前重新核验。
+- 产品 Embedding 型号、格式/维度、保留策略和默认实现继续待决策；FastEmbed 仅可选候选，不得因为合成命中而默认选型。
+- 2026-11-07 对照 pinned revision `faf4aa4225822f3bc6376869cb1164e8e3feedd0` 的 [Qdrant 模型卡](https://huggingface.co/Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q/tree/faf4aa4225822f3bc6376869cb1164e8e3feedd0) 和上游 [Sentence Transformers 模型卡](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2)：两者均标注 Apache-2.0。当前安装 FastEmbed 0.9.1 的本地包 metadata 也标注 Apache-2.0。该核对仅覆盖候选模型卡和直接运行库，不等同于完整依赖 SBOM、法律审查或产品选型批准；全项目许可证闭包仍待确认。

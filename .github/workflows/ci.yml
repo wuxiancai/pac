@@ -1,0 +1,46 @@
+name: Phase 0 checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase0-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python and Swift tests
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: 0.11.17
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install locked Python dependencies
+        working-directory: backend
+        run: uv sync --locked --extra phase0-security --extra phase0-embedding --group dev
+
+      - name: Run Python tests
+        working-directory: backend
+        run: uv run --locked pytest -q
+
+      - name: Compile Python sources
+        working-directory: backend
+        run: uv run --locked python -m compileall -q pac_poc scripts tests
+
+      - name: Run Swift tests
+        working-directory: poc/macos-audio
+        run: swift test

@@ -7,9 +7,15 @@
 ## 最近交接（2026-11-07）
 
 - 建立 `PROJECT_CONTEXT.md`、`DECISIONS.md`、`TASKS.md` 文档入口；阶段 0 证据权威来源仍是 `poc/phase0-traceability.md` 和各 POC 报告。
-- 继续 0H：新增 SQLCipher WAL 备份逐页复制期间的独立 writer 注入。writer 在 progress callback 中提交 memory/FTS 后，源库与恢复备份均含并发提交和已有记录，完整性检查通过。专项回归 `uv run --extra phase0-security --group dev pytest -q tests/test_sqlcipher_compat_poc.py`：16 passed。
-- 本轮修改：`docs/PROJECT_CONTEXT.md`、`docs/DECISIONS.md`、`docs/TASKS.md`、`docs/HANDOFF.md`、`docs/poc/phase0-failure-recovery.md`、`docs/poc/phase0-traceability.md`、`backend/tests/test_sqlcipher_compat_poc.py`。
-- 继续顺序：0H 活动 reader/持续 writer 下备份；staging 遗留清理规则待产品决定；随后完成 0B/0E/0F/0G 的证据和决策门禁。阶段 0 未验收，阶段 1 未开始。
+- 继续 0H：WAL backup progress callback 中独立 writer 提交一条及活动 reader 固定 snapshot 下三次 writer 提交，源库/备份检索与完整性检查均通过。SQLCipher 专项现为 19 项通过。
+- 继续 0H：在 WAL TRUNCATE checkpoint 等待读锁期间对隔离子进程 SIGKILL；释放 reader 后源库两条已提交记录均可检索，完整性检查通过，checkpoint 重试成功。备份复制期间 SIGKILL 现覆盖 DELETE/WAL 两种 journal mode。
+- 扩展 ENOSPC POC 到 APFS 临时映像。首轮试跑发现 APFS `hdiutil` 返回多个设备项且填充阶段可能先遇到文件级 `ENOSPC`；现按实际挂载点选择卷设备，并让填充器安全停在 ENOSPC，再独立验证数据库写入失败。48 MiB HFS+ 和 128 MiB APFS 测试均通过。
+- 补记当前设备快照：MacBook Air `MacBookAir10,1` / M1 / 16 GiB，macOS 26.5.1，Xcode 26.6，Swift 6.3.3，uv Python 3.12.13，检查时数据卷可用约 18 GiB，内建麦克风/扬声器 48 kHz；主力设备身份仍待确认。
+- 离线 Embedding 评估新增三次，4/4 合成 query 均命中，observed max RSS 为 883,130,368–883,490,816 bytes。Embedding 权重/上游模型页和 FastEmbed metadata 标注 Apache-2.0 初核完成；中文 ASR 上游要求接受访问条件，公开分发条款仍未核实，证据见 `phase0-model-license-review.md`。
+- 新增根 `README.md`、`AGENTS.md` 和 macOS arm64 GitHub Actions workflow；本机等价 Python 125 项、Swift 27 项通过，`uv lock --check`、`compileall`、锁定依赖安装和 workflow YAML 语法通过。仓库没有 Git remote，因此 GitHub Actions 尚未实际运行。
+- ENOSPC 额外尝试“满卷时覆盖既有备份”时，HFS+/APFS 结果不稳定，未纳入验收证据；保留稳定的源库 ENOSPC 回滚与事先生成备份恢复证据。备份目标自身 ENOSPC 仍为缺口。
+- 本轮修改还包括根 `AGENTS.md`、`README.md`、`.github/workflows/ci.yml`，SQLCipher checkpoint crash helper、APFS ENOSPC 支持，以及相关 POC 报告、追踪/任务/决策记录。
+- 下一步：0H 原子替换中断证据可复现性评估；随后需用户实际完成 0B 麦克风验收，并提供 ASR 许可条款、Provider 选择/凭据授权、性能/加密/Embedding 决策或明确延期。阶段 0 未验收，阶段 1 未开始。
 
 ## 当前阶段
 

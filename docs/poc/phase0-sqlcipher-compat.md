@@ -14,7 +14,7 @@
 
 ## 后续补充验证（截至 2026-11-07）
 
-- **WAL 数据库备份/恢复**：SQLCipher WAL 下已验证 checkpoint、活动 reader 导致 checkpoint `busy=1` 后释放/重试，以及 WAL 源库以独立密钥备份、恢复 memory/FTS 并检查完整性。WAL 备份用例没有并发 writer/reader。
+- **WAL 数据库备份/恢复**：SQLCipher WAL 下已验证 checkpoint、活动 reader 导致 checkpoint `busy=1` 后释放/重试、活动 reader snapshot 下三次独立 writer 提交期间备份的一致性，以及 checkpoint 等待读锁时子进程 SIGKILL 后恢复。WAL 源库用独立密钥备份并恢复 memory/FTS，数据可检索且完整性检查通过；详见 `phase0-failure-recovery.md`。
 - 已验证事务在 `os._exit`、DELETE/WAL 模式 SIGKILL 后恢复；备份 staging 已复制部分页面时对隔离子进程 SIGKILL，旧目标备份仍可恢复、源库完整。进程被杀后会遗留加密 `.partial`；产品生命周期/清理策略仍未决，POC 不扫描目录。
 - 备份复制失败、staging 校验失败、`os.replace` 返回错误三种注入路径均保留原目标备份并保持源库可用。成功路径先校验 staging，再原子替换目标。
 - 页数上限可模拟事务写入失败；另有 48 MiB 临时 HFS+ 映像 ENOSPC POC 触发真实 `SQLITE_FULL`，源库回滚和加密备份恢复通过，详见 `phase0-enospc-recovery.md`。
@@ -29,15 +29,15 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security python -
 uv lock --check
 ```
 
-- SQLCipher 专项测试：15 项通过（包含 WAL 备份/恢复及进程中断故障注入）。
-- 当前全量本机 Python 测试：120 项通过，包含 `phase0-security` 与 `phase0-embedding` extras。
+- SQLCipher 专项测试：19 项通过（2026-11-07；包含 WAL 并发 reader/writer 期间备份、checkpoint 等待读锁 SIGKILL、DELETE/WAL 备份复制 SIGKILL）。
+- 全量本机 Python 测试：125 项通过（2026-11-07，包含 `phase0-security` 与 `phase0-embedding` extras）；最新结果以 `docs/HANDOFF.md` 为准。
 - `compileall`、`uv lock --check` 与 `git diff --check` 通过。
 - 已有一项相同合成工作负载的 SQLite/SQLCipher + FTS5 三轮本机观察，详见 `phase0-sqlcipher-performance.md`；它不是完整 App 或产品负载性能验收。
 
 ## 未解决/未验收
 
 - 没有评估 key 生命周期、Keychain/Touch ID 解锁、密钥轮换、丢失恢复、备份密钥独立保存的用户流程；测试 passphrase 不是用户凭据。
-- 并发连接池、并发写/读期间备份、恢复失败回滚、APFS/外接介质 ENOSPC、macOS 发布打包签名/notarization、x86_64/universal2 及最低系统版本尚未验证；有界 HFS+ 映像 ENOSPC POC 见 `phase0-enospc-recovery.md`。
+- 并发连接池、持续高频写/读期间备份、恢复失败回滚、APFS 系统卷/外接介质 ENOSPC、macOS 发布打包签名/notarization、x86_64/universal2 及最低系统版本尚未验证；有界 HFS+/APFS 映像 ENOSPC POC 见 `phase0-enospc-recovery.md`。
 - 真实用户规模、冷/热启动、长期运行、并发负载、CPU/RSS 及外接盘/NAS 性能未测；当前仅有三轮合成工作负载对照，未据此做产品取舍。
 - 尚未完成其他成熟加密候选比较、最终 ADR 和恢复演练，因此不得宣告静态加密验收完成。
 

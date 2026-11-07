@@ -14,12 +14,12 @@
 
 ## 本机环境
 
-- 设备：Apple M1，统一内存 16 GiB。
+- 设备快照（2026-11-07）：MacBook Air `MacBookAir10,1`、Apple M1（8 核）、统一内存 16 GiB；此快照不单独认定为产品主力设备。
 - macOS：26.5.1（build 25F80）。
-- Xcode：26.6；Swift：6.3.3（arm64）。
-- 可用系统卷空间：采集时约 18 GiB。
-- Python：POC 使用 uv 管理的 Python 3.12；系统 Python 3.9 不用于项目。
-- 音频：系统提供 Tingting 中文合成语音；设备枚举见本机采集记录。
+- Xcode：26.6（build 17F113）；Swift：6.3.3（arm64）。
+- 项目 uv Python：3.12.13。
+- 可用空间：检查时数据卷剩余约 18 GiB；属于时点数据。
+- 音频：系统提供 Tingting 中文合成语音；检查时内建麦克风和内建扬声器均为 48 kHz。外部设备名称未记录。
 - sherpa-onnx：2.0.1（arm64 CPU wheel）。
 - sounddevice：0.5.6（macOS arm64 wheel）；默认输入设备的 16 kHz、单声道、PCM16 配置检查通过，未启动采集流。
 - 模型候选：`sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30`，仅存于忽略的 `backend/.poc-data/`。
@@ -87,7 +87,8 @@ swift run tts-interrupt-poc
 - ASR + LLM 并发目前只有一条合成音频/本机模型观察；需要重复轮次、负载时段、GPU 和冷/热启动分开测量，才能评估资源与性能。
 - 需要与 FastAPI、SwiftUI 音频采集及独立 TTS 配置集成验证；当前为本机 CLI POC。
 - 此模型的许可、分发方式和用户设备内存压力仍需单独记录。
-- 静态加密、Keychain、Consent/Policy、云端 ASR、Gateway、记忆和备份 POC 均未开始。
+- 本中文 ASR 权重的公开上游仓库要求接受访问条件，公开页面未展示许可条款；具体证据与待核验范围见 [`phase0-model-license-review.md`](phase0-model-license-review.md)。
+- 其他阶段 0 工作包状态见 [`phase0-traceability.md`](phase0-traceability.md)。
 
 ## 基线约束
 

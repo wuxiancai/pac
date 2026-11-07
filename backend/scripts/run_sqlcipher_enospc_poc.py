@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
 import plistlib
@@ -28,31 +29,54 @@ def _attach_image(image: Path, mountpoint: Path) -> str:
         "attach", "-plist", "-nobrowse", "-mountpoint", str(mountpoint), str(image)
     )
     attachment = plistlib.loads(result.stdout)
+    expected_mountpoint = mountpoint.resolve()
     for entity in attachment.get("system-entities", []):
         device = entity.get("dev-entry")
-        if device:
-            return str(device)
-    raise RuntimeError("hdiutil did not report an attached device")
+        attached_mountpoint = entity.get("mount-point")
+        if device and attached_mountpoint:
+            if Path(str(attached_mountpoint)).resolve() == expected_mountpoint:
+                return str(device)
+    raise RuntimeError("hdiutil did not report the requested mounted volume")
 
 
-def _fill_volume(mountpoint: Path, reserve_bytes: int) -> int:
+def _fill_volume(mountpoint: Path, reserve_bytes: int) -> tuple[int, bool]:
     filler = mountpoint / ".capacity-poc-fill"
-    written = 0
+    written = filler.stat().st_size if filler.exists() else 0
+    reached_full = False
     chunk = b"P" * (64 * 1024)
-    with filler.open("wb") as stream:
+    descriptor = os.open(filler, os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o600)
+    try:
         while shutil.disk_usage(mountpoint).free > reserve_bytes:
-            stream.write(chunk)
-            stream.flush()
-            os.fsync(stream.fileno())
-            written += len(chunk)
-    return written
+            try:
+                chunk_written = os.write(descriptor, chunk)
+            except OSError as exc:
+                if exc.errno == errno.ENOSPC:
+                    reached_full = True
+                    break
+                raise
+            if chunk_written == 0:
+                break
+            written += chunk_written
+            os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    if shutil.disk_usage(mountpoint).free == 0:
+        reached_full = True
+    return written, reached_full
 
 
-def run_poc(workspace: Path, *, image_size_mb: int = 48) -> dict[str, object]:
+def run_poc(
+    workspace: Path, *, image_size_mb: int = 48, filesystem: str = "HFS+"
+) -> dict[str, object]:
     if sys.platform != "darwin":
         raise RuntimeError("this bounded disk-image POC requires macOS")
-    if image_size_mb < 32 or image_size_mb > 256:
-        raise ValueError("image size must be between 32 and 256 MiB")
+    if filesystem not in {"HFS+", "APFS"}:
+        raise ValueError("filesystem must be HFS+ or APFS")
+    minimum_size_mb = 64 if filesystem == "APFS" else 32
+    if image_size_mb < minimum_size_mb or image_size_mb > 256:
+        raise ValueError(
+            f"image size must be between {minimum_size_mb} and 256 MiB for {filesystem}"
+        )
 
     image = workspace / "capacity.dmg"
     mountpoint = workspace / "volume"
@@ -68,7 +92,7 @@ def run_poc(workspace: Path, *, image_size_mb: int = 48) -> dict[str, object]:
             "-size",
             f"{image_size_mb}m",
             "-fs",
-            "HFS+",
+            filesystem,
             "-type",
             "UDIF",
             "-volname",
@@ -85,7 +109,7 @@ def run_poc(workspace: Path, *, image_size_mb: int = 48) -> dict[str, object]:
         source.close()
         source = None
 
-        filler_bytes = _fill_volume(mountpoint, reserve_bytes=512 * 1024)
+        filler_bytes, _ = _fill_volume(mountpoint, reserve_bytes=512 * 1024)
         write_error: BaseException | None = None
         attempted_content = "capacity overflow token " * 100_000
         candidate = SQLCipherFTSDatabase.open_existing(path=database_path, key=source_key)
@@ -135,6 +159,7 @@ def run_poc(workspace: Path, *, image_size_mb: int = 48) -> dict[str, object]:
             "source_rejected_rows": len(rejected_rows),
             "backup_baseline_rows": len(backup_rows),
             "image_size_mb": image_size_mb,
+            "filesystem": filesystem,
             "filler_bytes_written": filler_bytes,
             "record_content_or_key_logged": False,
         }
@@ -162,6 +187,7 @@ def main() -> int:
         help="temporary workspace under backend/.poc-data; created files are removed",
     )
     parser.add_argument("--image-size-mb", type=int, default=48)
+    parser.add_argument("--filesystem", choices=("HFS+", "APFS"), default="HFS+")
     args = parser.parse_args()
     backend = Path(__file__).resolve().parents[1]
     allowed_root = backend / ".poc-data"
@@ -169,7 +195,11 @@ def main() -> int:
         workspace = validate_workspace(args.work_dir, allowed_root)
         workspace.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="run-", dir=workspace) as run_directory:
-            payload = run_poc(Path(run_directory), image_size_mb=args.image_size_mb)
+            payload = run_poc(
+                Path(run_directory),
+                image_size_mb=args.image_size_mb,
+                filesystem=args.filesystem,
+            )
     except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
         print(json.dumps({"status": "error", "error_type": type(exc).__name__}))
         return 1

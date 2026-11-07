@@ -155,6 +155,153 @@ def test_wal_backup_includes_commit_from_concurrent_writer(database_paths) -> No
         database.close()
 
 
+def test_wal_backup_with_active_reader_and_repeated_writer_commits(
+    database_paths,
+) -> None:
+    path, backup = database_paths
+    source_key = "wal-reader-writer-backup-source-key"
+    backup_key = "wal-reader-writer-backup-key"
+    database = SQLCipherFTSDatabase(path=path, key=source_key)
+    database.enable_wal_for_poc()
+    reader = SQLCipherFTSDatabase.open_existing(path=path, key=source_key)
+    try:
+        for index in range(80):
+            database.add(f"snapshot seed {index} " + ("payload " * 90))
+
+        reader._connection.execute("BEGIN")
+        assert reader.search('"snapshot seed 79"') == [
+            f"snapshot seed 79 {'payload ' * 90}"
+        ]
+        progress_calls = 0
+        writes = 0
+
+        def copy_with_repeated_writes(destination) -> None:
+            def on_progress(_status: int, remaining: int, total: int) -> None:
+                nonlocal progress_calls, writes
+                progress_calls += 1
+                if remaining <= 0 or progress_calls % 3 != 0 or writes >= 3:
+                    return
+                writer = SQLCipherFTSDatabase.open_existing(path=path, key=source_key)
+                try:
+                    writes += 1
+                    writer.add(f"concurrent writer marker {writes}")
+                finally:
+                    writer.close()
+
+            database._connection.backup(destination, pages=1, progress=on_progress)
+
+        database._copy_backup_to = copy_with_repeated_writes
+        database.backup_to(backup, backup_key=backup_key)
+        assert writes == 3
+        assert reader.search('"snapshot seed 79"') == [
+            f"snapshot seed 79 {'payload ' * 90}"
+        ]
+        assert reader.search('"concurrent writer marker"') == []
+        for index in range(1, 4):
+            assert database.search(f'"concurrent writer marker {index}"') == [
+                f"concurrent writer marker {index}"
+            ]
+        assert database.integrity_check() == "ok"
+
+        restored = SQLCipherFTSDatabase.open_existing(path=backup, key=backup_key)
+        try:
+            for index in range(1, 4):
+                assert restored.search(f'"concurrent writer marker {index}"') == [
+                    f"concurrent writer marker {index}"
+                ]
+            assert restored.search('"snapshot seed 79"') == [
+                f"snapshot seed 79 {'payload ' * 90}"
+            ]
+            assert restored.integrity_check() == "ok"
+        finally:
+            restored.close()
+    finally:
+        reader.close()
+        database.close()
+
+
+def test_sigkill_during_blocked_wal_checkpoint_recovers_committed_rows(
+    database_paths,
+) -> None:
+    path, _ = database_paths
+    source_key = "wal-checkpoint-crash-source-key"
+    source = SQLCipherFTSDatabase(path=path, key=source_key)
+    assert source.enable_wal_for_poc() == "wal"
+    source.add("checkpoint crash committed baseline")
+    source.close()
+
+    reader = SQLCipherFTSDatabase.open_existing(path=path, key=source_key)
+    reader._connection.execute("BEGIN")
+    assert reader.search('"checkpoint crash committed baseline"') == [
+        "checkpoint crash committed baseline"
+    ]
+    source = SQLCipherFTSDatabase.open_existing(path=path, key=source_key)
+    source.add("checkpoint crash committed during reader snapshot")
+    source.close()
+    assert reader.search('"committed during reader snapshot"') == []
+
+    backend = Path(__file__).resolve().parents[1]
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "scripts/crash_sqlcipher_checkpoint_poc.py",
+            str(path.resolve()),
+        ],
+        cwd=backend,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert process.stdin is not None
+        process.stdin.write(f"{source_key}\n")
+        process.stdin.flush()
+        assert process.stdout is not None
+        ready, _, _ = select.select([process.stdout], [], [], 15)
+        assert ready, "checkpoint injector did not announce its operation"
+        assert process.stdout.readline().strip() == "CHECKPOINT_BEGIN"
+        with pytest.raises(subprocess.TimeoutExpired):
+            process.wait(timeout=0.5)
+        process.send_signal(signal.SIGKILL)
+        stdout, stderr = process.communicate(timeout=10)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate(timeout=10)
+        reader.close()
+
+    assert process.returncode == -signal.SIGKILL
+    assert "CHECKPOINT_RETURNED" not in stdout + stderr
+    assert source_key not in stdout + stderr
+
+    recovered = SQLCipherFTSDatabase.open_existing(path=path, key=source_key)
+    try:
+        assert recovered.search('"checkpoint crash committed baseline"') == [
+            "checkpoint crash committed baseline"
+        ]
+        assert recovered.search('"committed during reader snapshot"') == [
+            "checkpoint crash committed during reader snapshot"
+        ]
+        assert recovered.integrity_check() == "ok"
+        busy, log_frames, checkpointed_frames = recovered.checkpoint_wal_for_poc(
+            "TRUNCATE"
+        )
+        assert busy == 0
+        assert checkpointed_frames == log_frames
+    finally:
+        recovered.close()
+
+    reopened = SQLCipherFTSDatabase.open_existing(path=path, key=source_key)
+    try:
+        assert reopened.search('"committed during reader snapshot"') == [
+            "checkpoint crash committed during reader snapshot"
+        ]
+        assert reopened.integrity_check() == "ok"
+    finally:
+        reopened.close()
+
+
 def test_wal_truncate_checkpoint_preserves_encrypted_memory_and_fts(database_paths) -> None:
     path, _ = database_paths
     database = SQLCipherFTSDatabase(path=path, key="wal-checkpoint-poc-key")
@@ -355,10 +502,15 @@ def test_atomic_backup_replace_failure_preserves_previous_valid_backup(
         database.close()
 
 
-def test_sigkill_during_backup_copy_preserves_previous_backup(database_paths) -> None:
+@pytest.mark.parametrize("journal_mode", ["DELETE", "WAL"])
+def test_sigkill_during_backup_copy_preserves_previous_backup(
+    database_paths, journal_mode: str
+) -> None:
     source_path, backup_path = database_paths
     source = SQLCipherFTSDatabase(path=source_path, key="backup-crash-source-key")
     try:
+        if journal_mode == "WAL":
+            assert source.enable_wal_for_poc() == "wal"
         for index in range(80):
             source.add(f"source marker {index} " + ("payload " * 350))
     finally:
@@ -415,6 +567,8 @@ def test_sigkill_during_backup_copy_preserves_previous_backup(database_paths) ->
         path=source_path, key="backup-crash-source-key"
     )
     try:
+        row = recovered_source._connection.execute("PRAGMA journal_mode").fetchone()
+        assert row is not None and str(row[0]).upper() == journal_mode
         assert recovered_source.search('"source marker 79"') == [
             f"source marker 79 {'payload ' * 350}"
         ]

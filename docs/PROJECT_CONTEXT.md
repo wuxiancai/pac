@@ -12,7 +12,8 @@
 - 实现形态：macOS SwiftUI 客户端 + 本机 Python/FastAPI 服务；仓库内各工作包的当前状态和证据见 [阶段 0 追踪矩阵](poc/phase0-traceability.md)。
 - 本机语音：中文 Streaming ASR、麦克风捕获 CLI、TTS 打断已有 POC 和部分实测；SwiftUI 语音闭环、真人端到端质量与性能验收仍未完成。当前 ASR 模型是中文专用，用户计划后续补充多语言模型。
 - Gateway、安全、记忆、Embedding、SQLCipher 和后端生命周期均有 POC；它们不等同于产品功能验收。详情按需查阅 [`docs/poc/`](poc/)。
-- 最近 Git 基线：`e4002b4`（磁盘写满恢复 POC）。工作开始前先检查 `git status`，保护已有改动。
+- 根目录现有 `README.md`、`AGENTS.md` 和 `.github/workflows/ci.yml`；本机 CI 等价命令已通过，GitHub Actions 尚未执行（当前仓库无 remote）。
+- 每次工作的 Git 基线以 `git log -1` 为准；工作开始前先检查 `git status`，保护已有改动。
 
 ## 架构和安全边界
 
@@ -35,6 +36,8 @@
 
 | 文档 | 用途 |
 |---|---|
+| [`../AGENTS.md`](../AGENTS.md) | 每轮开发必须遵循的仓库工作流、范围和安全边界 |
+| [`../README.md`](../README.md) | 仓库入口、结构和本机验证命令 |
 | [`TASKS.md`](TASKS.md) | 阶段工作包、优先级、阻塞、下一步和完成条件 |
 | [`DECISIONS.md`](DECISIONS.md) | 已确认的项目决策、待决产品事项和 ADR 状态入口 |
 | [`HANDOFF.md`](HANDOFF.md) | 最新工作摘要和下一位执行者的起点 |
