@@ -1,0 +1,146 @@
+from __future__ import annotations
+
+import ipaddress
+import json
+from collections.abc import AsyncIterator, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Protocol
+from urllib.parse import urlparse
+
+import httpx
+
+
+@dataclass(frozen=True)
+class LocalModelRequest:
+    provider: str
+    model: str
+    messages: Sequence[Mapping[str, str]]
+
+
+class LocalProviderAdapter(Protocol):
+    is_local: bool
+
+    async def generate(self, request: LocalModelRequest) -> str: ...
+
+    def stream(self, request: LocalModelRequest) -> AsyncIterator[str]: ...
+
+
+class PolicyDenied(PermissionError):
+    """The request violates the local-only POC egress policy."""
+
+
+class ProviderNotFound(LookupError):
+    """The requested provider is not registered in the local Gateway."""
+
+
+class LocalOnlyPolicy:
+    def authorize(self, adapter: LocalProviderAdapter, request: LocalModelRequest) -> None:
+        del request
+        if not adapter.is_local:
+            raise PolicyDenied("local-only POC denies non-local providers")
+
+
+class ModelGateway:
+    """Small local-only routing seam used by the Phase 0 provider POC."""
+
+    def __init__(
+        self,
+        *,
+        adapters: Mapping[str, LocalProviderAdapter],
+        policy: LocalOnlyPolicy,
+    ) -> None:
+        self._adapters = dict(adapters)
+        self._policy = policy
+
+    async def generate(self, request: LocalModelRequest) -> str:
+        adapter = self._get_authorized_adapter(request)
+        return await adapter.generate(request)
+
+    async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
+        adapter = self._get_authorized_adapter(request)
+        async for chunk in adapter.stream(request):
+            yield chunk
+
+    def _get_authorized_adapter(self, request: LocalModelRequest) -> LocalProviderAdapter:
+        try:
+            adapter = self._adapters[request.provider]
+        except KeyError as exc:
+            raise ProviderNotFound(request.provider) from exc
+        self._policy.authorize(adapter, request)
+        return adapter
+
+
+class OllamaAdapter:
+    """HTTP adapter for an Ollama server bound to this Mac's loopback interface."""
+
+    is_local = True
+
+    def __init__(self, *, base_url: str = "http://127.0.0.1:11434", client: httpx.AsyncClient | None = None) -> None:
+        parsed = urlparse(base_url)
+        host = parsed.hostname
+        if parsed.scheme != "http" or host is None or not self._is_loopback(host):
+            raise ValueError("Ollama endpoint must use HTTP on a loopback address")
+        self._base_url = base_url.rstrip("/")
+        self._client = client
+
+    async def generate(self, request: LocalModelRequest) -> str:
+        response = await self._post(request, stream=False)
+        payload = response.json()
+        try:
+            return payload["message"]["content"]
+        except (KeyError, TypeError) as exc:
+            raise RuntimeError("Ollama returned an invalid chat response") from exc
+
+    async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
+        client = self._client or httpx.AsyncClient(timeout=120.0)
+        owns_client = self._client is None
+        try:
+            async with client.stream(
+                "POST",
+                f"{self._base_url}/api/chat",
+                json=self._payload(request, stream=True),
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                        content = event.get("message", {}).get("content", "")
+                    except (json.JSONDecodeError, AttributeError) as exc:
+                        raise RuntimeError("Ollama returned an invalid stream event") from exc
+                    if content:
+                        yield content
+        finally:
+            if owns_client:
+                await client.aclose()
+
+    async def _post(self, request: LocalModelRequest, *, stream: bool) -> httpx.Response:
+        if self._client is not None:
+            response = await self._client.post(
+                f"{self._base_url}/api/chat", json=self._payload(request, stream=stream)
+            )
+        else:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    f"{self._base_url}/api/chat", json=self._payload(request, stream=stream)
+                )
+        response.raise_for_status()
+        return response
+
+    @staticmethod
+    def _payload(request: LocalModelRequest, *, stream: bool) -> dict[str, object]:
+        return {
+            "model": request.model,
+            "messages": list(request.messages),
+            "stream": stream,
+        }
+
+    @staticmethod
+    def _is_loopback(host: str) -> bool:
+        if host.lower() == "localhost":
+            return True
+        try:
+            return ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            return False

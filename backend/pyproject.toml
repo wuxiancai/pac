@@ -3,7 +3,7 @@ name = "personal-ai-assistant-phase0-poc"
 version = "0.1.0"
 description = "Local-only Phase 0 proof of concept"
 requires-python = ">=3.11,<3.14"
-dependencies = ["sherpa-onnx==2.0.1", "sounddevice==0.5.6"]
+dependencies = ["httpx==0.28.1", "sherpa-onnx==2.0.1", "sounddevice==0.5.6"]
 
 [build-system]
 requires = ["setuptools>=80,<81"]
