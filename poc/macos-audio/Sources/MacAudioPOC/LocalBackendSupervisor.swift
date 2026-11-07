@@ -46,7 +46,12 @@ public final class LocalBackendSupervisor: @unchecked Sendable {
     }
 
     public func start() throws -> LocalBackendHandshake {
-        guard process == nil else { throw LocalBackendSupervisorError.alreadyRunning }
+        if let process {
+            guard !process.isRunning else { throw LocalBackendSupervisorError.alreadyRunning }
+            inputPipe?.fileHandleForWriting.closeFile()
+            self.process = nil
+            inputPipe = nil
+        }
         guard FileManager.default.isExecutableFile(atPath: pythonExecutableURL.path),
               FileManager.default.fileExists(
                 atPath: backendDirectoryURL.appendingPathComponent("pac_poc/local_service.py").path
@@ -102,10 +107,8 @@ public final class LocalBackendSupervisor: @unchecked Sendable {
 
     public func stop() throws {
         guard let child = process else { return }
-        if let inputPipe {
-            try? inputPipe.fileHandleForWriting.write(contentsOf: Data("stop\n".utf8))
-            inputPipe.fileHandleForWriting.closeFile()
-        }
+        // EOF is the graceful stop signal and cannot raise SIGPIPE if the child exited.
+        inputPipe?.fileHandleForWriting.closeFile()
         guard Self.waitForExit(child, timeout: shutdownTimeout) else {
             child.terminate()
             guard Self.waitForExit(child, timeout: 1) else {

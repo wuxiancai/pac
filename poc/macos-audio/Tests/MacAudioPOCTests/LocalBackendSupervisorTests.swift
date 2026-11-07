@@ -76,6 +76,32 @@ import Testing
     #expect(!supervisor.isRunning)
 }
 
+@available(macOS 12.0, *)
+@Test func supervisorAllowsExplicitRestartAfterChildExited() throws {
+    let handshake = #"{"base_url":"http://127.0.0.1:49152","token":"01234567890123456789012345678901"}"#
+    let (python, fixtureDirectory) = try localBackendFixture(
+        moduleSource: "print('''\(handshake)''', flush=True)\n"
+    )
+    defer { try? FileManager.default.removeItem(at: fixtureDirectory) }
+    let supervisor = LocalBackendSupervisor(
+        pythonExecutableURL: python,
+        backendDirectoryURL: fixtureDirectory
+    )
+
+    _ = try supervisor.start()
+    let deadline = ProcessInfo.processInfo.systemUptime + 2
+    while supervisor.isRunning && ProcessInfo.processInfo.systemUptime < deadline {
+        usleep(10_000)
+    }
+    #expect(!supervisor.isRunning)
+    do {
+        _ = try supervisor.start()
+    } catch {
+        #expect(Bool(false))
+    }
+    try supervisor.stop()
+}
+
 private func localBackendFixture() throws -> (URL, URL) {
     var repositoryRoot = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 {
