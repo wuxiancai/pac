@@ -12,8 +12,9 @@
 
 ## 当前真实本机证据边界
 
-- `ollama-local / qwen3.5:0.8b` 有本地文本生成与流式 smoke 记录（见 `phase0-model-gateway-local.md`）。这只支持把文本和流式登记为候选已验证能力。
-- 工具调用、并行工具、严格 JSON Schema、vision/audio、Embedding、rerank、取消、区域、费用及供应商数据政策都仍是 `UNKNOWN`，不能用于产品决策或费用估算。
+- `ollama-local / qwen3.5:0.8b` 有本地文本生成与流式 smoke；新增一次经 Model Gateway 返回固定 `lookup(key=phase0-probe)` 工具提议的本机观察。该 proposal 未执行任何工具，证据见 `phase0-model-gateway-local.md`。此证据仅覆盖该精确型号的一次基础 tool call 往返。
+- `TOOLS` 可记录为一次验证的基础能力；并行工具、严格 JSON Schema、vision/audio、Embedding、rerank、取消、区域、费用及供应商数据政策仍是 `UNKNOWN`。工具提议仍须由 Tool Gateway 做权限/schema/风险/审计校验。
+- 复核命令：`UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked python scripts/probe_local_tool_calls.py`。2026-11-07 的合成提示实际返回一个 `lookup` 提议；脚本输出显式标注 `executed=false`。
 - Fake provider 测试只验证应用契约，不证明任何具体模型支持上述能力。
 
 ## 测试
@@ -24,11 +25,11 @@ UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q t
 ```
 
 - 4 项通过：默认未知、精确型号匹配、明确不支持与未知区分、支持结论需要证据、重复记录拒绝。
-- 当前全量 Python 测试（含安全/SQLCipher 与 Embedding extras）48 项通过；compileall、`uv lock --check` 通过。
+- 当前 capability registry 单元测试 4 项通过；当前全量 Python 测试结果以交接文档最新记录为准。
 - 本工作包没有远程 Provider 调用。
 
 ## 未解决/未验收
 
-- POC-02 的 2–3 家供应商端到端能力矩阵、费用/错误/取消和 Gateway 开源方案比较尚未完成；本机使用边界下不调用云端供应商。
+- POC-02 的 2–3 家供应商端到端能力矩阵、费用/错误/取消和 Gateway 开源方案比较尚未完成。云端调用需先有精确 Consent/Policy、合成输入和 Keychain 凭据。
 - Registry 目前是进程内 POC；未持久化、未绑定模型配置 UI，也未由 Gateway `generate/stream` 自动消费。
 - Gateway 能力差异仍需由后续实现按能力拒绝/降级并重新验证 Consent/Policy；任何 fallback 不得扩大数据范围或费用权限。

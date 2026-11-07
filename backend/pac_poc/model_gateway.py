@@ -20,6 +20,19 @@ class LocalModelRequest:
     region: str = ""
     purpose: str = ""
     data_level: DataLevel = DataLevel.L0
+    tools: Sequence[Mapping[str, object]] = ()
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    name: str
+    arguments: Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class ToolCallResult:
+    text: str
+    tool_calls: tuple[ToolCall, ...] = ()
 
 
 class LocalProviderAdapter(Protocol):
@@ -28,6 +41,8 @@ class LocalProviderAdapter(Protocol):
     async def generate(self, request: LocalModelRequest) -> str: ...
 
     def stream(self, request: LocalModelRequest) -> AsyncIterator[str]: ...
+
+    async def call_with_tools(self, request: LocalModelRequest) -> ToolCallResult: ...
 
 
 class ModelRequestPolicy(Protocol):
@@ -40,6 +55,10 @@ class PolicyDenied(PermissionError):
 
 class ProviderNotFound(LookupError):
     """The requested provider is not registered in the local Gateway."""
+
+
+class ProviderCapabilityUnsupported(RuntimeError):
+    """The selected adapter does not implement the requested capability."""
 
 
 class LocalOnlyPolicy:
@@ -100,6 +119,15 @@ class ModelGateway:
             if close is not None:
                 await close()
 
+    async def call_with_tools(self, request: LocalModelRequest) -> ToolCallResult:
+        adapter = self._get_authorized_adapter(request)
+        call = getattr(adapter, "call_with_tools", None)
+        if not callable(call):
+            raise ProviderCapabilityUnsupported(
+                f"provider {request.provider} does not support tool calls"
+            )
+        return await call(request)
+
     def _get_authorized_adapter(self, request: LocalModelRequest) -> LocalProviderAdapter:
         try:
             adapter = self._adapters[request.provider]
@@ -129,6 +157,28 @@ class OllamaAdapter:
             return payload["message"]["content"]
         except (KeyError, TypeError) as exc:
             raise RuntimeError("Ollama returned an invalid chat response") from exc
+
+    async def call_with_tools(self, request: LocalModelRequest) -> ToolCallResult:
+        if not request.tools:
+            raise ValueError("tool call request must include at least one tool schema")
+        response = await self._post(request, stream=False)
+        try:
+            message = response.json()["message"]
+            text = message.get("content", "")
+            raw_calls = message.get("tool_calls", [])
+            if not isinstance(text, str) or not isinstance(raw_calls, list):
+                raise TypeError
+            calls: list[ToolCall] = []
+            for raw_call in raw_calls:
+                function = raw_call["function"]
+                name = function["name"]
+                arguments = function["arguments"]
+                if not isinstance(name, str) or not name or not isinstance(arguments, dict):
+                    raise TypeError
+                calls.append(ToolCall(name=name, arguments=arguments))
+            return ToolCallResult(text=text, tool_calls=tuple(calls))
+        except (KeyError, TypeError, AttributeError) as exc:
+            raise RuntimeError("Ollama returned an invalid tool-call response") from exc
 
     async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
         client = self._client or httpx.AsyncClient(timeout=120.0)
@@ -169,11 +219,14 @@ class OllamaAdapter:
 
     @staticmethod
     def _payload(request: LocalModelRequest, *, stream: bool) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "model": request.model,
             "messages": list(request.messages),
             "stream": stream,
         }
+        if request.tools:
+            payload["tools"] = list(request.tools)
+        return payload
 
     @staticmethod
     def _is_loopback(host: str) -> bool:

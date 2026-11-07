@@ -9,7 +9,7 @@
 - Ollama Adapter 只允许 HTTP loopback URL，并调用本机 `/api/chat`。
 - `LocalOnlyPolicy` 在适配器调用前拒绝非本地 Provider。
 - 独立工作包新增 `ConsentAwarePolicy`：对远端 adapter 要求精确、未过期、未撤销的 Consent 和 Policy；该测试使用 fake adapter，不发起网络请求，详见 `phase0-consent-aware-gateway.md`。
-- 没有云 Provider、Key、Fallback、工具调用、预算/费用归一或 Consent UI；没有任何请求离开本机。
+- 没有云 Provider、Key、Fallback、预算/费用归一或 Consent UI；真实工具不执行；除后续明确的本机 Ollama 请求外，没有请求离开本机。
 
 ## 本机实际验证
 
@@ -17,6 +17,7 @@
 - 模型：`qwen3.5:0.8b`，由本机 Ollama 管理，未在本次工作中下载模型。
 - 非流式调用从本机 Gateway 返回“只回复：本机 Gateway 正常”。
 - 流式调用由 Gateway 汇集本机 Ollama delta，返回“正常”。
+- 本机 `qwen3.5:0.8b` 经 `ModelGateway.call_with_tools` 对固定合成提示返回 `lookup(key="phase0-probe")` 工具提议；脚本只展示结构化提议，`executed=false`，没有调用任何工具。此结果只记录该型号一次基础工具调用往返，不涵盖复杂参数、严格 Schema 或可靠性。
 - 未记录性能数字；冷启动响应时间不作为性能承诺。
 
 ## 自动化测试
@@ -24,20 +25,23 @@
 ```bash
 cd backend
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q
+UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_local_tool_calls.py
 ```
 
 - 全量 Python 测试：17 项通过。
 - 两个本地适配器可用相同请求契约独立路由。
+- Ollama tool-call schema 传输与工具提议响应解析由 MockTransport 测试覆盖；模型能力额外通过一次本机 live smoke 观察。
 - 非本地适配器在调用前被拒绝。
 - Gateway 的非本地流式请求在打开 adapter stream 前拒绝；关闭下游 stream 会关闭 adapter 的 async generator，避免本地流在消费者取消后继续占用资源。此项由本地契约测试验证，不代表每个供应商都支持远端请求取消。
 - Ollama JSON 响应和 NDJSON 流事件可标准化。
+- tool-call 请求由 Ollama Adapter 通过 Gateway LocalOnlyPolicy 路由；响应仅解析为 `ToolCallResult` 数据，不提供执行函数；缺失能力或格式错误明确失败。
 - 公网/非 loopback Ollama URL 被构造器拒绝。
 
 ## 未解决/未验收
 
 - v1.2 阶段 0 所要求的 2–3 家真实 Provider 文本、流、工具、JSON、区域、价格、错误和取消验证未做。本轮“本机开发/测试/使用”约束下只做本地验证。
 - 未比较 LiteLLM/Bifrost/Portkey，也未形成 ADR。
-- Provider capability registry 已在单独的 POC 报告实现；本地 Gateway 现有取消语义只验证了本地 async stream 的关闭传播，未实现/验证远端供应商取消、usage/cost、重试或 fallback。
+- Provider capability registry 已在单独的 POC 报告实现；本地 Gateway 现有取消语义只验证了本地 async stream 的关闭传播，未实现/验证远端供应商取消、usage/cost、重试或 fallback。Consent gate 单独见 `phase0-consent-aware-gateway.md`。
 - 云端 Provider 在 Consent Manager、Policy Engine 及用户授权流程完成前保持不可用。
 
 ## 安全/范围边界

@@ -21,6 +21,7 @@ UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q t
 - 真实模型权重下载尝试 74 秒后仍只有 5 个文件中的 3 个完成，两个权重文件保持 0 字节 `.incomplete`；为避免无限等待已中止。中断产物已清理。
 - 后续重试最多运行约 2 分钟，仍停在 60% 文件数；发现旧下载进程仍存活并与重试争用同一锁。已停止本项目启动的两个下载进程，并清理 `backend/.poc-data/embedding-cache` 内的不完整候选权重。未产生向量或检索结果。
 - 下载时观察到 Python 网络栈还打开了 macOS 用户 Library 下的系统 HTTP 缓存数据库；这是本次脚本运行的副作用，超出仓库模型缓存目录。用显式代理变量重试后此副作用仍存在，下载进程已停止；不完整权重留在项目 `.poc-data` 中。下一次下载需换成不会读写 Documents 外缓存的受控传输方式。
+- 用户澄清模型下载可以并行进行。现改用三个 curl 进程、显式 loopback 代理、`--disable` 配置、断点续传，落盘目录为 `backend/.poc-data/embedding-staging`。Tokenzier（17,083,009 bytes）与 unigram（14,763,260 bytes）已下载完成；ONNX 权重（预期 235,052,644 bytes）仍在续传。curl 的打开文件检查只见项目 staging 文件；尚未校验 SHA256、安装至 FastEmbed cache 或运行模型。
 - 没有产生真实 embedding、没有跑合成检索准确性评估，也没有性能数据。
 
 ## 未解决/未验收
