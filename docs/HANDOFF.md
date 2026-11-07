@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-阶段 0 POC；0B 本地语音实机验证已完成当前可执行项；0C Gateway/Agent Registry 模拟已提交；0D 记忆存储/0F SQLCipher 兼容 POC 已提交；0G Embedding 真实模型权重未下载完成；0E 本机安全与 Swift/FastAPI 集成仍有 Touch ID/完整生命周期项；0H SQLCipher 崩溃/页数耗尽注入进行中。阶段 0 尚未验收，阶段 1 未开始。
+阶段 0 POC；0B 本地语音实机验证已完成当前可执行项；0C Gateway/Agent Registry/能力注册表模拟已提交；0D 记忆存储/0F SQLCipher 兼容 POC 已提交；0G Embedding 真实模型权重未下载完成；0E 本机安全与 Swift/FastAPI 集成仍有 Touch ID/完整生命周期项；0H SQLCipher 崩溃/页数耗尽注入已提交。阶段 0 尚未验收，阶段 1 未开始。
 
 ## 已完成
 
@@ -25,6 +25,7 @@
 - 开始 SQLCipher 静态加密兼容性 POC：ARM64/Python 3.12 上 FTS5、错误 key 拒绝、独立密钥加密备份/恢复、SQLAlchemy/Alembic migration upgrade/downgrade 通过；候选尚未定案，详见 `docs/poc/phase0-sqlcipher-compat.md`。
 - 建立 FastEmbed 多语言 Embedding 候选接口和测试。真实权重下载停滞并中断；未计算真实向量或检索准确性，详情见 `docs/poc/phase0-local-embedding.md`。
 - 开始恢复 POC：在 SQLCipher 临时 DB 上验证未提交事务遇进程立即退出后的恢复，以及页数上限触发数据库错误时 memory/FTS 事务回滚；报告见 `docs/poc/phase0-failure-recovery.md`。
+- 建立精确 Provider/Model capability registry POC；未知默认拒绝，支持状态要求证据，报告见 `docs/poc/phase0-model-capability-registry.md`。
 
 ## 当前限制
 
@@ -35,7 +36,7 @@
 
 ## 下一步
 
-继续阶段 0：收尾 POC-05/06/0H 未完成项和本地 Embedding 候选验证，同时逐项更新阶段 0 验收矩阵。英文 ASR 不作为阻塞项继续投入，保持明确未解决状态。真实云 Provider 仅在用户要求本机之外测试时才推进；当前云策略默认拒绝。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：收尾 POC-02/05/06/0G/0H 未完成项并更新完整阶段 0 验收矩阵。英文 ASR 不作为阻塞项继续投入，保持明确未解决状态。真实云 Provider 仅在用户要求本机之外测试时才推进；当前云策略默认拒绝。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 
