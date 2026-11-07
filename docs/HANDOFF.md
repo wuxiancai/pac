@@ -29,7 +29,7 @@
 - 为本地 ASR 新增测试先行的离线计时与峰值 RSS 测量脚本；使用现存合成 WAV 单次记录 ASR 分帧耗时、RTF、模型加载、进程 RSS 与事件计数。数据写入 `docs/poc/phase0-local-asr.md`，只作观察值，不等于麦克风链路性能验收。
 - 建立 `docs/poc/phase0-traceability.md`，按 v1.2 §13/§14 和 V1.1 §16 逐项列出阶段 0 证据、状态、缺口、模块依赖、未决项、后续阶段门禁与风险。矩阵判定阶段 0 未验收，阶段 1 未开始。
 - 补强本地 Model Gateway 流式关闭语义：非本地 adapter stream 在调用前拒绝；下游关闭时关闭 adapter async generator。测试先行捕获原有未关闭问题，现已修复并回归。
-- 当前最终回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）74 项通过；本机 Swift Testing 12 项通过；`compileall`、`uv lock --check`、本次提交文件的 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
+- 当前最终回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）77 项通过；本机 Swift Testing 12 项通过；`compileall`、`uv lock --check`、本次提交文件的 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
 - 用户澄清本机是软件开发、测试和运行设备，允许下载模型并行进行。Embedding 下载单独进程仍停滞于权重文件；显式设置项目级 HF/XDG cache 和代理后，Python 下载器仍打开 macOS Library HTTP 缓存，现已停止。权重不完整部分保留在 `.poc-data`；将改用受控传输方式后继续下载，不让下载阻塞开发。
 - 扩展 Swift↔FastAPI loopback 集成 POC：服务由测试 harness 停止后重新创建，Swift CLI 使用新随机端口/新短期 token 再次健康握手；这不是正式 App 后端子进程管理，真实 App 生命周期仍未验收。
 - SQLCipher 恢复 POC 新增真实子进程 `SIGKILL` 注入：在事务写入后、提交前强制杀进程，再开启 DB 验证已提交行、未提交 memory/FTS 行和 `integrity_check`；恢复测试只覆盖默认 rollback journal，不代表断电/WAL。
@@ -37,7 +37,7 @@
 - SQLCipher 备份 POC 增加目标父路径不可创建的故障测试。测试先发现 `mkdir` 异常会穿透 POC API，现统一转为不含敏感信息的安全错误；源数据库查询和完整性仍通过。未模拟真实介质故障。
 - 用户澄清“本机”指软件在本机开发、测试、运行，不排除后续本机客户端连接云 Provider；已据此修正阶段追踪矩阵。新建 Gateway `ConsentAwarePolicy` 工作包：对远端 generate/stream 默认拒绝，只有精确有效 Consent/Policy 才会调用 adapter；所有验证使用 fake adapter，不发网络请求。报告见 `docs/poc/phase0-consent-aware-gateway.md`。
 - 在工具调用始终不执行的前提下，新增 Ollama Gateway `call_with_tools` 契约与固定本机合成 probe。`qwen3.5:0.8b` 实际返回 `lookup(key=phase0-probe)`，已将精确型号/基础 tools 能力更新为有单次证据；不推断并行工具或严格 JSON Schema。
-- 多语言 Embedding 下载改为三个独立 `curl` 进程并行到项目 `.poc-data/embedding-staging`，禁用 curl 配置文件、显式 loopback 代理、不使用 Python/macOS HTTP cache。Tokenizer 和 unigram 已完成，ONNX 权重仍在续传；完整性校验与推理未开始。
+- 多语言 Embedding 候选权重已分段落在项目 `.poc-data/embedding-staging` 并逐个校验大小和 SHA-256；固定 revision ONNX、tokenizer、unigram 总体完整。最后一个 20 MB 分段的 curl 重试会回退长度，已保留失败尝试供审计，改用 20 个 1 MB 独立段完成。模型在项目 FastEmbed cache 本地加载，两次 4-query 合成检索均 top-1 命中 4/4；`HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1` 下再次加载通过。两次 `/usr/bin/time -l` 最大 RSS 为 851,804,160 与 868,909,056 bytes；这是小样本单次进程观察，不代表产品性能。完整证据和未决项见 `phase0-local-embedding.md`。
 - 按 v1.2 §POC-02 / V1.1 §4.5 完成 LiteLLM、Bifrost、Portkey 第一方资料对照报告与文档契约测试；仅桌面资料评估，没有安装 Gateway 或云端调用。ADR-020 仍 Deferred；报告明确本项目 Consent Manager/Policy Engine 默认拒绝、Keychain 凭据和 L3 隔离不可由候选 Gateway 代替。
 
 ## 当前限制
@@ -50,7 +50,7 @@
 
 ## 下一步
 
-继续阶段 0：收尾 POC-01/02/05/06/0G/0H。多语言 ASR 按用户安排留待后续模型补充；当前不当作代码 bug。Gateway 对照报告已完成桌面资料比较，真实 Provider/Gateway 实测尚缺；本机软件可连接云 Provider，但每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝；凭据只经 Keychain。Embedding 下载与开发并行，传输工具必须将文件缓存限定在 Documents。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：收尾 POC-01/02/05/06/0G/0H。多语言 ASR 按用户安排留待后续模型补充；当前不当作代码 bug。Gateway 对照报告已完成桌面资料比较，真实 Provider/Gateway 实测尚缺；本机软件可连接云 Provider，但每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝；凭据只经 Keychain。Embedding 候选已在本机离线推理，但真实检索集、资源目标与产品模型选择未验收。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 
