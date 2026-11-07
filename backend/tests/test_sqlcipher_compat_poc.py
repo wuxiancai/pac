@@ -74,6 +74,32 @@ def test_sqlcipher_backup_restores_fts_with_separate_key(database_paths) -> None
         SQLCipherFTSDatabase.open_existing(path=backup, key="wrong-key")
 
 
+def test_wal_truncate_checkpoint_preserves_encrypted_memory_and_fts(database_paths) -> None:
+    path, _ = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="wal-checkpoint-poc-key")
+    assert database.enable_wal_for_poc() == "wal"
+    database.add("checkpoint preserves encrypted search index")
+    database.add("a second committed memory record")
+    with pytest.raises(ValueError, match="unsupported WAL checkpoint mode"):
+        database.checkpoint_wal_for_poc("TRUNCATE); DROP TABLE poc_memories; --")
+
+    busy, log_frames, checkpointed_frames = database.checkpoint_wal_for_poc("TRUNCATE")
+
+    assert busy == 0
+    assert checkpointed_frames == log_frames
+    assert database.search("encrypted search") == [
+        "checkpoint preserves encrypted search index"
+    ]
+    database.close()
+
+    reopened = SQLCipherFTSDatabase.open_existing(path=path, key="wal-checkpoint-poc-key")
+    try:
+        assert reopened.search("committed memory") == ["a second committed memory record"]
+        assert reopened.integrity_check() == "ok"
+    finally:
+        reopened.close()
+
+
 def test_backup_target_failure_preserves_source_database(database_paths) -> None:
     path, _ = database_paths
     database = SQLCipherFTSDatabase(path=path, key="backup-failure-poc-key")

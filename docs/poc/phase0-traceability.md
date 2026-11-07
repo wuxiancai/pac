@@ -21,7 +21,7 @@
 | POC-05 / FR-SEC-006/009/014 | Keychain 凭据、Touch ID/设备密码 gate、本机认证/Loopback | PARTIAL | Swift Keychain 写/删/状态接口；LocalAuthentication `.deviceOwnerAuthentication` 策略常量测试；token/Host/Origin/loopback 测试；集成 harness 两次重启 FastAPI 后由 Swift CLI 用新端口/新 token 重新握手 | 真实系统认证提示、正式 App 子进程所有权/启动关闭/故障恢复未测；Secret scan 仅限 POC 范围 |
 | POC-05 / FR-SEC-001/002/003 | L0–L3、授权和撤销策略 | PARTIAL | 内存 Consent/Policy 测试覆盖 exact match、过期、L3 deny、撤销 | action/source scope 和持久审计未齐；无真实云出站验证 |
 | POC-05 / FR-SEC-007/008 | 静态加密兼容性、备份恢复及 ADR 证据 | PARTIAL | SQLCipher ARM64/Python 3.12、FTS5、错误密钥拒绝、加密备份/恢复、目标路径错误不损坏源 DB、临时 Alembic upgrade/downgrade | WAL、密钥生命周期、实际应用包分发、真 ENOSPC/断电/真实介质故障和性能未齐；产品加密方案 ADR 未冻结 |
-| 阶段 0 工程/恢复 | 崩溃、重启、磁盘不足和备份恢复故障注入 | PARTIAL | `os._exit` 与 DELETE/WAL 两种模式下子进程 SIGKILL 后未提交事务恢复；页数上限导致事务回滚；Integrity Check | page limit 不等于真实 ENOSPC；断电、WAL checkpoint、正式 App 重启、介质故障未测 |
+| 阶段 0 工程/恢复 | 崩溃、重启、磁盘不足和备份恢复故障注入 | PARTIAL | `os._exit` 与 DELETE/WAL 两种模式下子进程 SIGKILL 后未提交事务恢复；SQLCipher WAL TRUNCATE checkpoint 后重开检索与 Integrity Check；页数上限导致事务回滚 | page limit 不等于真实 ENOSPC；断电、checkpoint 中断、正式 App 重启、介质故障未测 |
 | POC-04 本地 Embedding | 候选权重、真实向量与检索质量 | PARTIAL | 固定 revision 权重 SHA-256 完整校验；本机 FastEmbed 真实推理，4 个合成 query top-1 命中 4/4；HF/Transformers offline 环境二次加载通过；单次 observed RSS 约 812–829 MiB，见 `phase0-local-embedding.md` | 仅 4 条合成记忆/query，不代表真实语义质量；真实检索集、重复性能测试、SQLCipher memory 集成、许可复核和模型选择未完成 |
 | 全阶段安全边界 | 不自动扫描；无任意 Shell/文件访问；无外部写/后台队列/专业 Agent 团队 | PASS（范围审计） | 当前 POC 结构无产品文件扫描、任意 Shell、外部写或后台任务；Agent 仅模拟 | 后续实现须持续做静态与集成门禁，当前不构成产品级验收 |
 

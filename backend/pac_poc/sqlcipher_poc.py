@@ -86,6 +86,30 @@ class SQLCipherFTSDatabase:
         row = self._connection.execute("PRAGMA page_count").fetchone()
         return int(row[0]) if row else 0
 
+    def enable_wal_for_poc(self) -> str:
+        try:
+            row = self._connection.execute("PRAGMA journal_mode = WAL").fetchone()
+        except sqlcipher.DatabaseError as exc:
+            raise SQLCipherPOCError("unable to enable WAL for SQLCipher POC") from exc
+        mode = str(row[0]).lower() if row and row[0] else ""
+        if mode != "wal":
+            raise SQLCipherPOCError("SQLCipher POC did not enter WAL mode")
+        return mode
+
+    def checkpoint_wal_for_poc(self, mode: str = "PASSIVE") -> tuple[int, int, int]:
+        normalized_mode = mode.upper()
+        if normalized_mode not in {"PASSIVE", "FULL", "RESTART", "TRUNCATE"}:
+            raise ValueError("unsupported WAL checkpoint mode")
+        try:
+            row = self._connection.execute(
+                f"PRAGMA wal_checkpoint({normalized_mode})"
+            ).fetchone()
+        except sqlcipher.DatabaseError as exc:
+            raise SQLCipherPOCError("SQLCipher POC WAL checkpoint failed") from exc
+        if row is None or len(row) != 3:
+            raise SQLCipherPOCError("SQLCipher POC WAL checkpoint returned invalid status")
+        return int(row[0]), int(row[1]), int(row[2])
+
     def set_max_page_count_for_poc(self, pages: int) -> int:
         if pages <= 0:
             raise ValueError("page limit must be positive")
