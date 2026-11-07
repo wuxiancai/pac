@@ -30,7 +30,7 @@ uv lock --check
 ```
 
 - SQLCipher 专项测试：15 项通过（包含 WAL 备份/恢复及进程中断故障注入）。
-- 当前全量本机 Python 测试：111 项通过，包含 `phase0-security` 与 `phase0-embedding` extras。
+- 当前全量本机 Python 测试：112 项通过，包含 `phase0-security` 与 `phase0-embedding` extras。
 - `compileall`、`uv lock --check` 与 `git diff --check` 通过。
 - 没有测量或推断 SQLCipher 性能数据。
 

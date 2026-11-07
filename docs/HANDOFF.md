@@ -42,12 +42,13 @@
 - 依 FR-SEC-006 修正敏感操作认证策略：由仅 biometric-only 改为 LocalAuthentication `.deviceOwnerAuthentication`（Touch ID 或设备密码）；先添加策略回归测试，验证通过。未触发真实系统提示；旧 `touchIDUnavailable` 错误 case 保留兼容，当前不可用路径抛出通用 `authenticationUnavailable`。
 - 为 POC-01 新增同步 barrier 并发测量 helper 与本机脚本；同一合成 WAV 的 ASR 与 Ollama `qwen3.5:0.8b` 请求确证重叠 0.785 秒。该次 ASR frame P95 52.17 ms / max 75.45 ms，ASR+Ollama 进程 RSS 采样峰值 702,267,392 bytes，CPU 增量约 10.95 秒；GPU 未测，只有一次样本且不是完整 Agent 或性能验收。详见 `phase0-local-asr.md`。
 - 同一条 6.94 秒合成 WAV 新增 3 次独立进程 ASR 资源测量；各次均为 15 partial/1 final，P50 16.01–16.51 ms、P95 17.22–31.78 ms、RTF 0.0527–0.0665、脚本峰值 RSS 462,159,872–471,318,528 bytes。第一轮帧尾延迟较高，报告保留完整范围。该重复不是独立语料，也不是麦克风/性能验收。
-- 本机重跑 8 条合成 ASR 集：8/8 final、59 partial、weighted CER 0.0；当前全量 Python 回归 111 项通过，ASR 测量与合成评测数据仅代表记录样本，性能门槛与真人麦克风验证仍未解决。
+- 本机重跑 8 条合成 ASR 集：8/8 final、59 partial、weighted CER 0.0；最新全量 Python 回归 112 项通过，ASR 测量与合成评测数据仅代表记录样本，性能门槛与真人麦克风验证仍未解决。
 - 为 0H SQLCipher POC 增加受限模式 WAL TRUNCATE checkpoint；已验证 checkpoint 前后 encrypted memory/FTS 可查询、checkpoint status 正常、重开 integrity check 通过，并拒绝未列入白名单的 mode 文本。不是进程中断/断电 checkpoint 可靠性证明。
 - SQLCipher POC 备份先写同目录加密 staging 文件、重新打开并执行 `integrity_check`，通过后才 `os.replace`。在复制错误与 staging 校验不通过两条注入路径中，旧目标备份均可用原密钥解密、查询且完整，源数据不变，正常异常路径清理 `.partial`。
 - 新增真实子进程备份中断 POC：通过 sqlite backup progress callback 确认 staging 已复制部分页面后，对子进程发送 SIGKILL；旧目标备份仍可解密、查询、integrity check 通过，源库 80 条合成记录仍完整。SIGKILL 后 `.partial` 会遗留，测试 teardown 清理；产品运行时 staging 文件保留/清理策略未决，POC 不自动扫描目录。SQLCipher 专项 13 项、全量 Python 107 项通过。详见 `phase0-failure-recovery.md`。
 - 增加 WAL 模式加密备份/恢复测试：源库在 WAL 下提交两条 memory/FTS 记录，以独立密钥备份并恢复，源库与恢复库的检索及完整性检查均通过。没有并发 writer/reader 下备份或 WAL 生命周期产品策略证据。SQLCipher 专项现 14 项；全量 Python 回归当时待执行。
-- 增加 `os.replace` 故障注入：原子替换抛错时旧目标仍可解密且完整，源库可查询，staging 清理；SQLCipher 专项 15 项、Python 全量 111 项通过。仍未测试 SIGKILL 恰好发生于 replace 系统调用内部。
+- 增加 `os.replace` 故障注入：原子替换抛错时旧目标仍可解密且完整，源库可查询，staging 清理；SQLCipher 专项 15 项通过。此项后续全量 Python 回归为 112 项。仍未测试 SIGKILL 恰好发生于 replace 系统调用内部。
+- 新增静态加密候选资料比较（SQLCipher、SQLite SEE、CryptoKit AES.GCM 容器）；只引用项目候选/官方第一方资料，明确区分实测与工程推论，未下载/集成 SEE 或实现 CryptoKit 容器。SQLCipher 目前有最多本项目实测证据，但 ADR-019 仍 Deferred；报告见 `docs/poc/phase0-encryption-candidates.md`。
 - 为 POC-01 新增字符级 CER 统计和显式 manifest 评估脚本，manifest 路径限制为同目录文件。固定 8 条本机合成中文语音重测为 8/8 final、59 partial、weighted CER 0.0；不是真人麦克风质量或英语能力证据。见 `phase0-local-asr.md`。
 - 新增固定 Python 后端模块进程协议 POC：随机 loopback 端口与短期 token 仅经 stdout 握手；owner 可通过 stdin stop/EOF 触发有界优雅关闭，未知命令也会先关服务。三项真实子进程测试覆盖认证握手、健康检查、关闭和异常命令清理；在该工作包完成时尚未接入 Swift `Foundation.Process`。
 - 新增 Swift `LocalBackendSupervisor`：Foundation `Process` 固定执行 `python -m pac_poc.local_service`，最小环境变量、不经 shell、限时解析 stdout 握手、loopback 健康检查和 stdin 优雅关闭；停止后可再次启动。Swift 本机集成测试验证有效/无效 token、重复启动保护与重启，以及无握手超时/非法握手清理；此时尚未接入正式 SwiftUI demo，未实现崩溃自动重启/退避和真实认证提示。

@@ -11,6 +11,7 @@ HANDOFF = Path(__file__).parents[2] / "docs" / "HANDOFF.md"
 MEMORY_EMBEDDING = Path(__file__).parents[2] / "docs" / "poc" / "phase0-memory-embedding.md"
 FAILURE_RECOVERY = Path(__file__).parents[2] / "docs" / "poc" / "phase0-failure-recovery.md"
 SQLCIPHER_COMPAT = Path(__file__).parents[2] / "docs" / "poc" / "phase0-sqlcipher-compat.md"
+ENCRYPTION_CANDIDATES = Path(__file__).parents[2] / "docs" / "poc" / "phase0-encryption-candidates.md"
 
 
 def test_phase0_traceability_matches_latest_local_poc_evidence_and_gate() -> None:
@@ -88,3 +89,19 @@ def test_sqlcipher_compat_report_reflects_latest_recovery_evidence() -> None:
     assert "SIGKILL" in report
     assert "SQLCipher 专项测试：15 项通过" in report
     assert "真实 ENOSPC" in report
+
+
+def test_encryption_candidate_report_compares_options_without_selecting_product_adr() -> None:
+    report = ENCRYPTION_CANDIDATES.read_text(encoding="utf-8")
+
+    for required in (
+        "SQLCipher",
+        "SQLite SEE",
+        "CryptoKit AES.GCM",
+        "未作产品选型",
+        "ADR-019 仍 `Deferred",
+        "https://www.zetetic.net/sqlcipher/design/",
+        "https://www.sqlite.org/see/doc/release/www/readme.wiki",
+        "https://developer.apple.com/documentation/cryptokit/aes/gcm",
+    ):
+        assert required in report
