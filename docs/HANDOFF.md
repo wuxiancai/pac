@@ -16,9 +16,9 @@
 - Python 测试 9 项、Swift 测试 3 项通过；uv 锁文件检查和本机默认输入参数支持检查通过。
 - 修复直接执行 ASR 脚本时 `pac_poc` 无法导入的问题：项目包现由 uv 环境安装，新增锁定的 setuptools 构建依赖和入口回归测试；Python 测试增至 10 项并通过。
 - 修复麦克风输入回调中误删 `frames` 后又读取该变量的问题；加入 PCM 帧长度回归测试，Python 测试现为 11 项通过。
-- 用户实机反馈中文专用 ASR 模型不能识别英文；已确认模型语言边界。双语候选压缩档约 458 MB，本轮未完成下载和评估，英文识别仍未解决。
+- 用户实机反馈当前中文专用 ASR 模型不能识别英文；用户澄清这是后续补下载多语言模型的安排，不是代码 bug，不影响当前使用。本轮不把英语模型替换列为阻塞。
 - 开始本机 Gateway POC：本机 Ollama Adapter、Loopback 校验、LocalOnlyPolicy、统一 generate/stream 契约；同机 qwen3.5:0.8b 的生成与流式 smoke 均成功，Python 全量测试 17 项通过。
-- 用户实机运行麦克风 CLI，确认可以录音；报告当前中文专用模型只能识别中文、无法识别英文。双语候选约 458 MB；因用户授权“轻松则修，否则跳过”，本轮跳过模型下载/替换，不将英文识别标记为已解决。
+- 用户实机运行麦克风 CLI，确认可以录音；当前模型是中文专用，英语覆盖留给后续多语言模型下载与验证，不视为实现 bug。
 - 完成 Agent Registry / 统一结果协议的 POC 模拟：额外条目必须显式标注模拟，权限只可取父权限交集，不创建产品 Agent run；工作包测试 4 项通过。
 - 开始记忆存储 POC：进程内 SQLite + FTS5、来源/claim/观察时间、纠错版本链、FTS 与 fixture embedding 删除、内存备份恢复；测试 4 项与当前全量 25 项通过。产品 schema 未改动。
 - 开始 POC-05 本机安全集成：Keychain 凭据管理 + Touch ID gate、loopback FastAPI/token、Swift URLSession/SwiftUI 状态样例、Consent/Policy 默认拒绝；本机 Swift CLI 对真实 loopback FastAPI 的跨语言冒烟成功，具体测试见 `docs/poc/phase0-security-client.md`。
@@ -29,23 +29,24 @@
 - 为本地 ASR 新增测试先行的离线计时与峰值 RSS 测量脚本；使用现存合成 WAV 单次记录 ASR 分帧耗时、RTF、模型加载、进程 RSS 与事件计数。数据写入 `docs/poc/phase0-local-asr.md`，只作观察值，不等于麦克风链路性能验收。
 - 建立 `docs/poc/phase0-traceability.md`，按 v1.2 §13/§14 和 V1.1 §16 逐项列出阶段 0 证据、状态、缺口、模块依赖、未决项、后续阶段门禁与风险。矩阵判定阶段 0 未验收，阶段 1 未开始。
 - 补强本地 Model Gateway 流式关闭语义：非本地 adapter stream 在调用前拒绝；下游关闭时关闭 adapter async generator。测试先行捕获原有未关闭问题，现已修复并回归。
-- 当前最终回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）57 项通过；本机 Swift Testing 12 项通过；`compileall`、`uv lock --check`、本次提交文件的 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
-- Embedding 权重重试停在 60%；发现此前下载进程仍在运行，已停止两条本项目下载进程并清理 `.poc-data/embedding-cache` 的不完整文件。运行期间观察到 Python 网络栈打开 macOS Library 下的 HTTP 缓存；报告已记录，未经缓存隔离验证不得再次联网下载。
+- 当前最终回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）68 项通过；本机 Swift Testing 12 项通过；`compileall`、`uv lock --check`、本次提交文件的 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
+- 用户澄清本机是软件开发、测试和运行设备，允许下载模型并行进行。Embedding 下载单独进程仍停滞于权重文件；显式设置项目级 HF/XDG cache 和代理后，Python 下载器仍打开 macOS Library HTTP 缓存，现已停止。权重不完整部分保留在 `.poc-data`；将改用受控传输方式后继续下载，不让下载阻塞开发。
 - 扩展 Swift↔FastAPI loopback 集成 POC：服务由测试 harness 停止后重新创建，Swift CLI 使用新随机端口/新短期 token 再次健康握手；这不是正式 App 后端子进程管理，真实 App 生命周期仍未验收。
 - SQLCipher 恢复 POC 新增真实子进程 `SIGKILL` 注入：在事务写入后、提交前强制杀进程，再开启 DB 验证已提交行、未提交 memory/FTS 行和 `integrity_check`；恢复测试只覆盖默认 rollback journal，不代表断电/WAL。
 - 同一 SIGKILL 恢复用例现分别在 SQLite DELETE journal 与 WAL 模式下运行通过；WAL checkpoint、断电和真 ENOSPC 仍未覆盖。
+- 用户澄清“本机”指软件在本机开发、测试、运行，不排除后续本机客户端连接云 Provider；已据此修正阶段追踪矩阵。新建 Gateway `ConsentAwarePolicy` 工作包：对远端 generate/stream 默认拒绝，只有精确有效 Consent/Policy 才会调用 adapter；所有验证使用 fake adapter，不发网络请求。报告见 `docs/poc/phase0-consent-aware-gateway.md`。
 
 ## 当前限制
 
-- ASR 仅在当前中文模型上验证；本机麦克风已实测可录音，但英文识别未解决。不得静默改用云 ASR。
+- ASR 仅在当前中文模型上验证；本机麦克风已实测可录音。多语言模型由用户安排后续补充，不属于当前代码 bug；不得静默改用云 ASR。
 - 尚未验证 SwiftUI 麦克风链路、中英混合识别质量、P50/P95、资源占用、AEC、TTS 与 ASR 同时工作和锁屏/休眠处理。
 - 目前仅有合成短音频单次 ASR 性能观测；真实麦克风端到端延迟、重复样本分布与可确认性能阈值仍未验证/未决。
-- Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始；POC-05 真实 Touch ID、完整 App 生命周期/握手未验证；POC-06 尚未评估密钥生命周期、WAL、真实 ENOSPC/断电、备份介质故障和性能，也未作 ADR。记忆 POC 尚未评测真实本地 Embedding；模型下载被中断，不能标记通过。
+- Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始，需在本地客户端连接外部服务时经 Consent/Policy、Keychain 和合成数据逐项测试；POC-05 真实 Touch ID、完整 App 生命周期/握手未验证；POC-06 尚未评估密钥生命周期、WAL checkpoint、真实 ENOSPC/断电、备份介质故障和性能，也未作 ADR。记忆 POC 尚未评测真实本地 Embedding。
 - 所有产品待决策项继续保持未定；本地 ASR 模型是临时 POC 候选。
 
 ## 下一步
 
-继续阶段 0：收尾 POC-01/02/05/06/0G/0H 的可本机验证项。英语 ASR 不作为阻塞项继续投入，保持明确未解决状态。真实云 Provider 仅在用户要求本机之外测试时才推进；当前云策略默认拒绝。多 Provider 验收缺口与本机限定的冲突已写入追踪矩阵，需在不改变当前授权范围的前提下取得产品决定。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：收尾 POC-01/02/05/06/0G/0H。多语言 ASR 按用户安排留待后续模型补充；当前不当作代码 bug。云 Provider 可由本机软件连接验证，但每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝；凭据只经 Keychain。Embedding 下载与开发并行，传输工具必须将文件缓存限定在 Documents。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 

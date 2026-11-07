@@ -2,20 +2,20 @@
 
 依据：`个人AI助理可执行开发规格书 v1.2.md` §13、§14、§15、§16、§20；`个人AI助理技术架构 V1.1.md` §16。该文档是阶段 0 的追踪记录，不修改产品决策或版本范围。
 
-状态定义：`PASS` 仅表示列出的 POC 证据已实际取得；`PARTIAL` 表示有部分本机证据但验收项未齐；`BLOCKED` 表示当前“开发、测试、使用均在本机”的约束使所需真实外部证据不能取得；`OPEN` 表示尚未测试或等待产品决策。模拟/契约测试不作为供应商端到端证据。
+状态定义：`PASS` 仅表示列出的 POC 证据已实际取得；`PARTIAL` 表示有部分证据但验收项未齐；`BLOCKED` 表示有明确的外部前置条件阻止推进；`OPEN` 表示尚未测试或等待产品决策。模拟/契约测试不作为供应商端到端证据。用户已澄清“本机”指交付软件在本机开发、测试、运行，不排除后续在 Consent/Policy 授权后验证云 Provider。
 
 ## 1. 阶段 0 需求追踪矩阵
 
 | 基线条目 | 阶段 0 要求 / 验收 | 状态 | 现有证据 | 缺口 / 下一步 |
 |---|---|---|---|---|
 | D-001、阶段 0 设备记录 | 记录型号、内存、macOS、磁盘、音频设备 | PARTIAL | M1/16 GiB、macOS 26.5.1、采集时空间约 18–19 GiB、系统音频设备，见 ASR 报告 | 设备空间与设备列表是时点记录；主力设备仍待产品负责人确认 |
-| POC-01 / FR-VOICE-002/004 | 本地流式 partial/final、语句端点 | PARTIAL | 合成 WAV 多个 partial、final；用户实机反馈麦克风可录音 | 固定真实语音集、重复轮次、麦克风 partial/final 停止/异常清理记录不完整；英语识别未解决并按用户指示暂缓 |
+| POC-01 / FR-VOICE-002/004 | 本地流式 partial/final、语句端点 | PARTIAL | 合成 WAV 多个 partial、final；用户实机反馈麦克风可录音 | 固定真实语音集、重复轮次、麦克风 partial/final 停止/异常清理记录不完整；当前加载中文模型，多语言模型由用户安排后续补充 |
 | POC-01 / FR-VOICE-005/008 | 本机 TTS 可打断；ASR/TTS 独立 | PARTIAL | AVSpeechSynthesizer CLI 实测打断；ASR、TTS POC 分开 | SwiftUI 集成与 ASR/TTS 并发未验证 |
 | POC-01 / FR-VOICE-006/007/010 | 本地默认；本地失败显式失败；不落盘、不静默云切换 | PARTIAL | ASR adapter 无云 fallback；麦克风仅内存队列；测试覆盖拒绝/溢出 | 麦克风真实异常与系统级出站监测未完整执行 |
 | POC-01 性能 | ASR 与 Agent 同时运行的延迟、内存、CPU/GPU | PARTIAL | 短合成 WAV 单次分帧耗时、RTF、CPU 时间、进程峰值 RSS 已记录 | 不是麦克风端到端或并发负载；没有重复样本分布；目标阈值未决 |
 | POC-02 / FR-MODEL-001/002 | Adapter、统一流式契约、精确型号能力注册 | PARTIAL | 本机 Ollama generate/stream；unknown-by-default capability registry；契约测试 | 工具调用、JSON Schema、费用、错误、取消、区域及每个型号能力仍无完整证据 |
-| POC-02 阶段验收 | 2–3 家 Provider 端到端、开源 Gateway 对照、跨 Provider 切换 | BLOCKED | 当前仅本机 Ollama 有真实请求证据；其他均未标为支持 | 本机限定下不发起云请求，不能满足真实多供应商端到端验收；开源 Gateway 的边界/集成比较未完成，不能用假 Provider 代替 |
-| POC-02 / FR-SEC-002/003/010 | 云请求严格 Consent + Policy，L3 默认拒绝 | PARTIAL | 精确匹配授权/撤销/过期/L3 拒绝的本机测试；无授权即拒绝 | 未通过真实 Provider 网络路径验证；V1 尚未实现 |
+| POC-02 阶段验收 | 2–3 家 Provider 端到端、开源 Gateway 对照、跨 Provider 切换 | PARTIAL | 当前仅本机 Ollama 有真实请求证据；fake local adapter 只覆盖路由契约；新增 ConsentAwarePolicy 在适配器调用前默认拒绝远端并校验精确授权 | 真实供应商测试需经 Consent/Policy 的合成请求、有效 Keychain 凭据和费用/区域核验；开源 Gateway 比较未完成，不能用假 Provider 代替 |
+| POC-02 / FR-SEC-002/003/010 | 云请求严格 Consent + Policy，L3 默认拒绝 | PARTIAL | 新增 Gateway `ConsentAwarePolicy`，无授权时 generate/stream 均在 adapter 前拒绝；精确匹配/撤销/过期/L3 路径测试，无真实外发 | 尚无真实 Provider 网络路径验证、action/source scope 和持久审计；V1 尚未实现，详见 `phase0-consent-aware-gateway.md` |
 | POC-03 / FR-AGENT-001/004 | Registry/Result 契约、权限不扩张、模拟与产品隔离 | PASS | 显式 simulation 标记、父权限交集、测试验证不运行产品 Agent | V1 总助理未实现；本项只限模拟接口验证 |
 | POC-04 / FR-MEMORY-002/003/006/007/008 | 来源/claim/时间、纠错、FTS/派生索引删除和恢复 | PARTIAL | 内存 SQLite/FTS5，纠错 supersede、FTS/fixture embedding 删除、内存备份恢复测试 | 无持久化产品 schema；真实 Embedding 未验证；无迁移/多次崩溃/大数据评估 |
 | POC-05 / FR-SEC-006/009/014 | Keychain 凭据、Touch ID gate、本机认证/Loopback | PARTIAL | Swift Keychain 写/删/状态接口、授权抽象；token/Host/Origin/loopback 测试；集成 harness 两次重启 FastAPI 后由 Swift CLI 用新端口/新 token 重新握手 | 真实 Touch ID UI 提示、正式 App 子进程所有权/启动关闭/故障恢复未测；Secret scan 仅限 POC 范围 |
@@ -52,8 +52,8 @@ flowchart TD
 以下均保留为问题，不以本 POC 代替产品决定：
 
 - 规格书 D-001–D-015：主力设备；最低 macOS；对话/日志/缓存/备份保留期限；音频缓存期限；月预算/币种/软硬阈值；备份 RPO/RTO/份数/目的地；应用静态加密方案；活动数据目录是否支持外接盘；固定专业 Agent 属 V2 还是 V3；V1 首批 2–3 Provider；云 ASR/TTS 供应商及区域；导入白名单/容量限制；性能目标；Embedding 型号/格式；导出格式/默认加密。
-- 英语识别：当前中文模型不支持用户实测英语；用户已明确“轻松则修，否则跳过”，故暂缓，不自动更换大模型或走云端。
-- 多 Provider 实测与开源 Gateway 对照：用户限定开发、测试、使用均在本机；真实云端测试不在当前执行范围。若此约束继续有效，POC-02 对应真实验收项必须由产品负责人决定是否延期/豁免，未决定前阶段 0 不可宣告完成。
+- 多语言 ASR：当前加载的是中文专用模型，不属于实现 bug；用户安排后续补下载多语言模型。当前不声称英语覆盖通过，也不把模型替换列为当前代码工作包。
+- 多 Provider 实测与开源 Gateway 对照：后续可在本机运行客户端/后端连接云供应商；任何真实出站请求仍须由 Consent Manager + Policy Engine 明确放行，凭据只从 Keychain 取得，未经授权不得发送。
 - 真实 Touch ID 提示、应用正式进程生命周期、SwiftUI 麦克风链路及 AEC/插话。
 - SQLCipher 产品 ADR 与密钥轮换/恢复体验、WAL、真实 ENOSPC、断电/杀进程/备份介质故障、发布打包和性能。
 - 本地 Embedding 权重传输与许可核验、真实中英文检索集、向量质量和资源占用。
@@ -92,9 +92,9 @@ V1.1 及 V2–V5 仅按规格书规划；当前不实施后台任务、专业 Ag
 
 | 风险 | 影响 | 当前缓解 | 剩余事项 |
 |---|---|---|---|
-| 中文专用模型语言覆盖不足 | 中英混合语音不满足需求 | 显式显示当前候选边界；不静默云 fallback | 英语候选按用户指示暂缓；阶段验收需记为限制 |
+| 当前 ASR 模型语言范围 | 暂不覆盖英语/中英混合 | 保持模型和 ASR 配置边界明确；不静默云 fallback | 用户计划后续补多语言模型；当前不是代码 bug，不伪报英语测试通过 |
 | 短合成样本无法代表真实语音 | 延迟/准确率/噪声鲁棒性被高估 | 报告只记单次观察，不设承诺 | 固定集、实机重复与产品阈值待定 |
-| 真实云 Provider 证据缺失 | 无法证明多 Provider/费用/取消/区域 | 能力默认 UNKNOWN；本机策略 deny non-local | 本机约束下需延期/豁免决策 |
+| 真实云 Provider 证据缺失 | 无法证明多 Provider/费用/取消/区域 | 能力默认 UNKNOWN；远端请求接入 ConsentAwarePolicy 默认拒绝 | 需合成请求的明确 Consent、Keychain 凭据及逐 Provider 端到端验证 |
 | Consent 仅内存、策略字段不全 | 重启/持久审计后授权可能无法证明 | POC 无云出站、默认拒绝 | 产品阶段实现完整 schema/migration/audit |
 | SQLCipher POC 不是发布形态验证 | DB/备份/打包或恢复失败 | ARM64 本机临时 migration 与错误 key 测试 | ADR、WAL、打包、灾难恢复和性能 |
 | Embedding 权重不可达或不完整 | 语义检索可能不可用，索引资源未知 | 权重缓存隔离；下载失败未伪装成功 | 受控下载重试、许可证与质量评估 |

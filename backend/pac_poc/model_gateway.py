@@ -9,12 +9,17 @@ from urllib.parse import urlparse
 
 import httpx
 
+from pac_poc.security_poc import DataLevel, OutboundPolicy, OutboundRequest
+
 
 @dataclass(frozen=True)
 class LocalModelRequest:
     provider: str
     model: str
     messages: Sequence[Mapping[str, str]]
+    region: str = ""
+    purpose: str = ""
+    data_level: DataLevel = DataLevel.L0
 
 
 class LocalProviderAdapter(Protocol):
@@ -23,6 +28,10 @@ class LocalProviderAdapter(Protocol):
     async def generate(self, request: LocalModelRequest) -> str: ...
 
     def stream(self, request: LocalModelRequest) -> AsyncIterator[str]: ...
+
+
+class ModelRequestPolicy(Protocol):
+    def authorize(self, adapter: LocalProviderAdapter, request: LocalModelRequest) -> None: ...
 
 
 class PolicyDenied(PermissionError):
@@ -40,6 +49,30 @@ class LocalOnlyPolicy:
             raise PolicyDenied("local-only POC denies non-local providers")
 
 
+class ConsentAwarePolicy:
+    """Allow local adapters; require exact active Consent/Policy for every remote adapter."""
+
+    def __init__(self, outbound_policy: OutboundPolicy) -> None:
+        self._outbound_policy = outbound_policy
+
+    def authorize(self, adapter: LocalProviderAdapter, request: LocalModelRequest) -> None:
+        if adapter.is_local:
+            return
+        if not request.region.strip() or not request.purpose.strip():
+            raise PolicyDenied("remote request requires an explicit region and purpose")
+        authorized = self._outbound_policy.authorize(
+            OutboundRequest(
+                provider=request.provider,
+                model=request.model,
+                region=request.region,
+                purpose=request.purpose,
+                data_level=request.data_level,
+            )
+        )
+        if not authorized:
+            raise PolicyDenied("remote request lacks matching active Consent and Policy")
+
+
 class ModelGateway:
     """Small local-only routing seam used by the Phase 0 provider POC."""
 
@@ -47,7 +80,7 @@ class ModelGateway:
         self,
         *,
         adapters: Mapping[str, LocalProviderAdapter],
-        policy: LocalOnlyPolicy,
+        policy: ModelRequestPolicy,
     ) -> None:
         self._adapters = dict(adapters)
         self._policy = policy

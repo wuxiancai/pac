@@ -8,6 +8,7 @@
 - 通过 Provider key 路由到不同适配器；fake local adapters 用于契约隔离测试。
 - Ollama Adapter 只允许 HTTP loopback URL，并调用本机 `/api/chat`。
 - `LocalOnlyPolicy` 在适配器调用前拒绝非本地 Provider。
+- 独立工作包新增 `ConsentAwarePolicy`：对远端 adapter 要求精确、未过期、未撤销的 Consent 和 Policy；该测试使用 fake adapter，不发起网络请求，详见 `phase0-consent-aware-gateway.md`。
 - 没有云 Provider、Key、Fallback、工具调用、预算/费用归一或 Consent UI；没有任何请求离开本机。
 
 ## 本机实际验证
