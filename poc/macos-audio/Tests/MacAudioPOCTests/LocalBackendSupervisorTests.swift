@@ -42,6 +42,40 @@ import Testing
     try supervisor.stop()
 }
 
+@available(macOS 12.0, *)
+@Test func supervisorTimesOutAndTerminatesBackendThatNeverHandshakes() throws {
+    let (python, fixtureDirectory) = try localBackendFixture(moduleSource: "import time\ntime.sleep(30)\n")
+    defer { try? FileManager.default.removeItem(at: fixtureDirectory) }
+    let supervisor = LocalBackendSupervisor(
+        pythonExecutableURL: python,
+        backendDirectoryURL: fixtureDirectory,
+        startupTimeout: 0.25,
+        shutdownTimeout: 0.5
+    )
+
+    let startedAt = ProcessInfo.processInfo.systemUptime
+    #expect(throws: LocalBackendSupervisorError.startupTimedOut) {
+        _ = try supervisor.start()
+    }
+    #expect(ProcessInfo.processInfo.systemUptime - startedAt < 3)
+    #expect(!supervisor.isRunning)
+}
+
+@available(macOS 12.0, *)
+@Test func supervisorRejectsMalformedHandshakeWithoutRetainingChild() throws {
+    let (python, fixtureDirectory) = try localBackendFixture(moduleSource: "print('not-json', flush=True)\n")
+    defer { try? FileManager.default.removeItem(at: fixtureDirectory) }
+    let supervisor = LocalBackendSupervisor(
+        pythonExecutableURL: python,
+        backendDirectoryURL: fixtureDirectory
+    )
+
+    #expect(throws: LocalBackendSupervisorError.invalidHandshake) {
+        _ = try supervisor.start()
+    }
+    #expect(!supervisor.isRunning)
+}
+
 private func localBackendFixture() throws -> (URL, URL) {
     var repositoryRoot = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 {
@@ -57,4 +91,22 @@ private func localBackendFixture() throws -> (URL, URL) {
         throw LocalBackendSupervisorError.backendRuntimeUnavailable
     }
     return (python, backend)
+}
+
+private func localBackendFixture(moduleSource: String) throws -> (URL, URL) {
+    var repositoryRoot = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 {
+        repositoryRoot.deleteLastPathComponent()
+    }
+    let backend = repositoryRoot.appendingPathComponent("backend", isDirectory: true)
+    let python = backend.appendingPathComponent(".venv/bin/python")
+    let fixture = repositoryRoot.appendingPathComponent(
+        ".poc-data/swift-supervisor-fixture-\(UUID().uuidString)",
+        isDirectory: true
+    )
+    let package = fixture.appendingPathComponent("pac_poc", isDirectory: true)
+    try FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
+    try Data().write(to: package.appendingPathComponent("__init__.py"))
+    try Data(moduleSource.utf8).write(to: package.appendingPathComponent("local_service.py"))
+    return (python, fixture)
 }
