@@ -12,7 +12,7 @@
 | POC-01 / FR-VOICE-002/004 | 本地流式 partial/final、语句端点 | PARTIAL | 合成 WAV 多个 partial、final；用户实机反馈麦克风可录音 | 固定真实语音集、重复轮次、麦克风 partial/final 停止/异常清理记录不完整；当前加载中文模型，多语言模型由用户安排后续补充 |
 | POC-01 / FR-VOICE-005/008 | 本机 TTS 可打断；ASR/TTS 独立 | PARTIAL | AVSpeechSynthesizer CLI 实测打断；ASR、TTS POC 分开 | SwiftUI 集成与 ASR/TTS 并发未验证 |
 | POC-01 / FR-VOICE-006/007/010 | 本地默认；本地失败显式失败；不落盘、不静默云切换 | PARTIAL | ASR adapter 无云 fallback；麦克风仅内存队列；测试覆盖拒绝/溢出 | 麦克风真实异常与系统级出站监测未完整执行 |
-| POC-01 性能 | ASR 与 Agent 同时运行的延迟、内存、CPU/GPU | PARTIAL | 短合成 WAV 单次分帧耗时、RTF、CPU 时间、进程峰值 RSS 已记录 | 不是麦克风端到端或并发负载；没有重复样本分布；目标阈值未决 |
+| POC-01 性能 | ASR 与 Agent 同时运行的延迟、内存、CPU/GPU | PARTIAL | 单独 ASR 与同步 barrier 的 ASR + 本机 Ollama LLM 生成各有一次单样本记录；后者实测重叠 0.785 秒、帧 P95 52.17 ms、Python + Ollama 进程 RSS 采样峰值 702,267,392 bytes、CPU 时间差约 10.95 秒；不是完整 Agent | 不是麦克风端到端或重复负载；采样间隔 1 秒；GPU 未测；目标阈值未决 |
 | POC-02 / FR-MODEL-001/002 | Adapter、统一流式契约、精确型号能力注册 | PARTIAL | 本机 Ollama generate/stream；qwen3.5:0.8b 一次真实本机 tool proposal；unknown-by-default registry；MockTransport 测试 schema 与解析 | 并行/严格 JSON Schema、费用、错误、远端取消、区域及其他型号能力仍无完整证据 |
 | POC-02 阶段验收 | 2–3 家 Provider 端到端、开源 Gateway 对照、跨 Provider 切换 | PARTIAL | 当前仅本机 Ollama 有真实请求证据；fake local adapter 只覆盖路由契约；新增 ConsentAwarePolicy 在适配器调用前默认拒绝远端并校验精确授权；LiteLLM/Bifrost/Portkey 第一方资料对照见 `phase0-gateway-comparison.md` | 真实供应商测试需经 Consent/Policy 的合成请求、有效 Keychain 凭据和费用/区域核验；Gateway 对照目前是桌面资料评估，不是安装/集成 POC，ADR-020 仍 Deferred |
 | POC-02 / FR-SEC-002/003/010 | 云请求严格 Consent + Policy，L3 默认拒绝 | PARTIAL | 新增 Gateway `ConsentAwarePolicy`，无授权时 generate/stream 均在 adapter 前拒绝；精确匹配/撤销/过期/L3 路径测试，无真实外发 | 尚无真实 Provider 网络路径验证、action/source scope 和持久审计；V1 尚未实现，详见 `phase0-consent-aware-gateway.md` |

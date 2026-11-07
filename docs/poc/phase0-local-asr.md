@@ -36,7 +36,10 @@
 - 16 kHz、单声道、PCM16 WAV 分为 200 ms 帧输入：通过。
 - 本地中文合成音频期间观察到多个增量 partial，序列号持续前进；静音尾段触发 final。
 - 测试文本“你好，今天天气很好。我想测试本地实时语音识别。”的最终识别为“你好今天天气很好我想测试本地实时语音识别”。这是单条合成样本观察，不构成准确率结论。
-- 未采集 P50/P95、内存/CPU、端到端麦克风延迟；不据此作性能承诺。
+- 原独立 ASR 单样本测量不包含 concurrent LLM；真实麦克风端到端延迟、固定集准确率及重复轮次尚未测。
+- 新增固定同步屏障的本机 ASR + Ollama 模型并发观察。对同一 6.94 秒合成 WAV 与 `qwen3.5:0.8b` 一次本机合成请求，在真实重叠期间处理 35 帧，ASR wall 0.785 秒、帧 P50 21.78 ms、P95 52.17 ms、最大 75.45 ms，15 partial / 1 final，ASR worker thread CPU 0.626 秒。本机模型请求 wall 20.326 秒，与 ASR 重叠 0.785 秒。
+- 以 1 秒间隔采样 Python ASR 进程和 Ollama serve/runner 进程，本次观察到进程 RSS 合计峰值 702,267,392 bytes、合计 CPU 时间差约 10.95 秒；不是全系统资源统计。GPU 未测。进程采样、单样本、同步请求和调度抖动都会影响观测；P95 抖动高于独立 ASR 的单次观察，不是产品性能验收或稳定分布。
+- 并发 probe 不输出 transcript 或模型正文，只输出指标和正文长度；此处是 LLM 生成而非完整 Agent，工具未执行，网络目标固定为本机 loopback。
 - 新增可重复的离线资源测量命令 `scripts/measure_local_asr_poc.py`；它只读取用户明确传入的 WAV、只输出统计指标，不输出识别文本或另存音频。
 - 对已有本机合成样本单次实测：处理音频 6.94 秒（含 1.6 秒端点静音）、35 帧；ASR 阶段 wall time 0.397 秒、RTF 0.057；模型加载 1.901 秒；进程峰值 RSS 461,209,600 bytes；帧处理延迟 P50 16.34 ms、P95 20.78 ms、最大 25.79 ms；观察到 15 个 partial、1 个 final。以上为单机单样本单次观测，且峰值 RSS 是脚本进程峰值，不是 ASR 子组件增量；不构成麦克风实时链路、稳定性或性能承诺。
 - 麦克风 CLI 要求交互式终端，运行后还需用户按回车才会开始最多20秒采集；本次未按下启动键，未录制麦克风音频。
@@ -56,6 +59,9 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_local_asr_poc
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/measure_local_asr_poc.py \
   .poc-data/audio/mandarin-16k.wav \
   .poc-data/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30
+UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/measure_concurrent_asr_llm_poc.py \
+  .poc-data/audio/mandarin-16k.wav \
+  .poc-data/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_live_microphone_poc.py \
   .poc-data/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30 --seconds 20
 cd ../poc/macos-audio
@@ -70,7 +76,8 @@ swift run tts-interrupt-poc
 ## 尚未解决
 
 - 需要由用户明确启动真实麦克风测试，验证 partial/final、VAD、背压、停止和异常后的缓冲清理。
-- 用户后续补齐多语言模型后，可按需用中英混合固定样本测识别质量；这不阻塞当前代码开发。真实麦克风端到端重复测量和 P50/P95 阈值仍待产品负责人确认；当前测量仅是单条合成 WAV 的 ASR 分帧耗时。
+- 用户后续补齐多语言模型后，可按需用中英混合固定样本测识别质量；这不阻塞当前代码开发。真实麦克风端到端重复测量和 P50/P95 阈值仍待产品负责人确认。
+- ASR + LLM 并发目前只有一条合成音频/本机模型观察；需要重复轮次、负载时段、GPU 和冷/热启动分开测量，才能评估资源与性能。
 - 需要与 FastAPI、SwiftUI 音频采集及独立 TTS 配置集成验证；当前为本机 CLI POC。
 - 此模型的许可、分发方式和用户设备内存压力仍需单独记录。
 - 静态加密、Keychain、Consent/Policy、云端 ASR、Gateway、记忆和备份 POC 均未开始。
