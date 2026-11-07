@@ -62,3 +62,22 @@ def test_microphone_cli_requires_interactive_user_start() -> None:
 
     assert result.returncode == 2
     assert "interactive local terminal" in result.stderr
+
+
+def test_microphone_script_entrypoint_imports_project_package() -> None:
+    backend_dir = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/run_live_microphone_poc.py",
+            "unused-model-dir",
+            "--help",
+        ],
+        cwd=backend_dir,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Explicitly started, local-only microphone" in result.stdout

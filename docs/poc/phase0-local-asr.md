@@ -27,7 +27,7 @@
 ## 结果
 
 - 初始 ASR 事件契约测试：4 项通过（2026-11-07）。
-- Python 全量测试：9 项通过；包括麦克风缓冲、PCM 转换和非交互环境拒绝采集。
+- Python 全量测试：10 项通过；包括麦克风缓冲、PCM 转换、非交互环境拒绝采集和直接脚本入口导入回归。
 - Swift TTS 控制器单元测试：3 项通过；Swift 包构建通过。
 - AVSpeechSynthesizer 本机播放后按回车中断，返回 `interrupted=true speaking=false`。
 - `uv lock --check` 通过；sounddevice 默认输入设备检查支持 16 kHz、单声道、PCM16。
@@ -47,10 +47,10 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q
 mkdir -p .poc-data/audio
 say -v Tingting -o .poc-data/audio/mandarin.aiff '你好，今天天气很好。我想测试本地实时语音识别。'
 afconvert -f WAVE -d LEI16@16000 -c 1 .poc-data/audio/mandarin.aiff .poc-data/audio/mandarin-16k.wav
-PYTHONPATH=. UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_local_asr_poc.py \
+UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_local_asr_poc.py \
   .poc-data/audio/mandarin-16k.wav \
   .poc-data/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30
-PYTHONPATH=. UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_live_microphone_poc.py \
+UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_live_microphone_poc.py \
   .poc-data/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30 --seconds 20
 cd ../poc/macos-audio
 swift test
