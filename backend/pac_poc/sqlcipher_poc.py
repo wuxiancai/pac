@@ -141,12 +141,8 @@ class SQLCipherFTSDatabase:
             destination.close()
             destination = None
 
-            verified = self.open_existing(path=staging_path, key=validated_key)
-            try:
-                if verified.integrity_check() != "ok":
-                    raise SQLCipherPOCError("encrypted backup validation failed")
-            finally:
-                verified.close()
+            if not self._validate_staging_backup(staging_path, validated_key):
+                raise SQLCipherPOCError("encrypted backup validation failed")
             os.replace(staging_path, target)
         except (OSError, sqlcipher.DatabaseError, SQLCipherPOCError) as exc:
             raise SQLCipherPOCError("encrypted backup operation failed") from exc
@@ -161,6 +157,13 @@ class SQLCipherFTSDatabase:
 
     def _copy_backup_to(self, destination) -> None:
         self._connection.backup(destination)
+
+    def _validate_staging_backup(self, path: Path, key: str) -> bool:
+        verified = self.open_existing(path=path, key=key)
+        try:
+            return verified.integrity_check() == "ok"
+        finally:
+            verified.close()
 
     def close(self) -> None:
         self._connection.close()

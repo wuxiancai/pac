@@ -11,7 +11,7 @@
 - **磁盘页数耗尽模拟**：将 SQLCipher POC DB 的 `max_page_count` 限制到当前页数 + 1，插入大记录触发 DBAPI 数据库错误。事务回滚后旧记忆和 FTS 仍可检索，失败记录不存在，完整性检查为 `ok`。
 - **Alembic 回滚**：工作包 0F 已验证 POC migration `upgrade`/`downgrade`；这不是进程崩溃注入。
 - **备份目标不可创建**：将 backup 的父路径预置为普通文件，模拟目标目录不可用；接口返回不含凭据的 `SQLCipherPOCError`，源 DB 查询与完整性检查仍通过。该故障注入验证错误目标路径，不等同真实备份介质 I/O 故障。
-- **已有备份时复制失败**：预置一个可解密的旧目标备份，在 backup 调用边界注入 SQLite 数据库错误；接口显式失败，旧备份仍可用原密钥解密、查询和通过 `integrity_check`，源数据库也保持可查询/完整，临时 `.partial` 文件清理。正常成功路径先将数据写入同目录加密 staging 文件、重新打开并完整性校验，再通过 `os.replace` 原子替换目标。此故障测试未模拟部分页写入后的真实进程 SIGKILL，也不证明所有文件系统/介质上的断电原子性。
+- **已有备份时复制/校验失败**：分别在 backup 调用边界注入 SQLite 数据库错误，及注入 staging 校验不通过；两种情况下接口均显式失败，旧备份仍可用原密钥解密、查询和通过 `integrity_check`，源数据库也保持可查询/完整，临时 `.partial` 文件清理。正常成功路径先将数据写入同目录加密 staging 文件、重新打开并完整性校验，再通过 `os.replace` 原子替换目标。注入校验失败不是损坏介质测试，也不证明所有文件系统/介质上的断电原子性。
 - **备份复制期间子进程 SIGKILL**：测试构造 80 条带较大索引内容的加密源记录及可解密旧目标备份。故障注入子进程经 stdin 接收源/备份 key，在 SQLCipher backup progress callback 确认 staging 已复制部分页面后发出 `BACKUP_COPY_PROGRESS`；测试向该子进程发送 SIGKILL。旧目标仍能用旧密钥检索并通过 `integrity_check`；源库全部记录仍在且完整。SIGKILL 绕过正常 finally 清理，测试观察到加密 `.partial` 遗留并在 teardown 清除。此项仅证明本机临时数据库在该注入点的进程终止恢复，不代表断电、设备缓存或其他文件系统语义。
 - 子进程凭据只通过 stdin 传递，不在 argv、环境变量、stdout/stderr。临时 DB、rollback journal 与备份只写在仓库 `.poc-data` 并由测试清理。
 

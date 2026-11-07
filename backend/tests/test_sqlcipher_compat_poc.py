@@ -206,6 +206,42 @@ def test_failed_backup_preserves_previous_valid_backup(database_paths, monkeypat
         database.close()
 
 
+def test_backup_validation_failure_preserves_previous_valid_backup(
+    database_paths, monkeypatch
+) -> None:
+    path, backup = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="backup-validation-source-key")
+    database.add("new data awaiting backup")
+    previous = SQLCipherFTSDatabase(path=backup, key="backup-validation-old-key")
+    previous.add("previous backup survives validation failure")
+    previous.close()
+
+    monkeypatch.setattr(
+        database,
+        "_validate_staging_backup",
+        lambda _path, _key: False,
+        raising=False,
+    )
+    try:
+        with pytest.raises(SQLCipherPOCError, match="backup operation failed"):
+            database.backup_to(backup, backup_key="backup-validation-new-key")
+
+        preserved = SQLCipherFTSDatabase.open_existing(
+            path=backup, key="backup-validation-old-key"
+        )
+        try:
+            assert preserved.search("previous backup survives") == [
+                "previous backup survives validation failure"
+            ]
+            assert preserved.integrity_check() == "ok"
+        finally:
+            preserved.close()
+        assert database.search("new data") == ["new data awaiting backup"]
+        assert list(backup.parent.glob(f".{backup.name}.*.partial")) == []
+    finally:
+        database.close()
+
+
 def test_sigkill_during_backup_copy_preserves_previous_backup(database_paths) -> None:
     source_path, backup_path = database_paths
     source = SQLCipherFTSDatabase(path=source_path, key="backup-crash-source-key")
