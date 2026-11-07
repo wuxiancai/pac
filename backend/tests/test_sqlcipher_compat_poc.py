@@ -11,6 +11,7 @@ from alembic import command
 from alembic.config import Config
 import pytest
 import sqlcipher3.dbapi2 as sqlcipher
+import pac_poc.sqlcipher_poc as sqlcipher_poc
 
 pytest.importorskip("sqlcipher3")
 pytest.importorskip("sqlalchemy")
@@ -263,6 +264,41 @@ def test_backup_validation_failure_preserves_previous_valid_backup(
         finally:
             preserved.close()
         assert database.search("new data") == ["new data awaiting backup"]
+        assert list(backup.parent.glob(f".{backup.name}.*.partial")) == []
+    finally:
+        database.close()
+
+
+def test_atomic_backup_replace_failure_preserves_previous_valid_backup(
+    database_paths, monkeypatch
+) -> None:
+    path, backup = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="backup-replace-source-key")
+    database.add("new source before replace failure")
+    previous = SQLCipherFTSDatabase(path=backup, key="backup-replace-old-key")
+    previous.add("previous backup before replace failure")
+    previous.close()
+
+    def fail_replace(_source, _target) -> None:
+        raise OSError("simulated atomic replace failure")
+
+    monkeypatch.setattr(sqlcipher_poc.os, "replace", fail_replace)
+    try:
+        with pytest.raises(SQLCipherPOCError, match="backup operation failed"):
+            database.backup_to(backup, backup_key="backup-replace-new-key")
+
+        preserved = SQLCipherFTSDatabase.open_existing(
+            path=backup, key="backup-replace-old-key"
+        )
+        try:
+            assert preserved.search("previous backup before") == [
+                "previous backup before replace failure"
+            ]
+            assert preserved.integrity_check() == "ok"
+        finally:
+            preserved.close()
+        assert database.search("new source") == ["new source before replace failure"]
+        assert database.integrity_check() == "ok"
         assert list(backup.parent.glob(f".{backup.name}.*.partial")) == []
     finally:
         database.close()
