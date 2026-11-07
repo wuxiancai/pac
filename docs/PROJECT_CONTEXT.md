@@ -1,0 +1,41 @@
+# 项目上下文
+
+最后核对：2026-11-07（Asia/Shanghai）
+
+## 项目目标
+
+依据 [个人 AI 助理开发规格 v1.2](../个人AI助理可执行开发规格书%20v1.2.md)，建设本机优先的个人 AI 助理。当前处于阶段 0：验证关键技术路径和工程基线；阶段 0 未验收前，不进入阶段 1 的完整产品实现。
+
+## 当前状态
+
+- 当前阶段：阶段 0 POC，未验收；阶段 1 未开始。
+- 实现形态：macOS SwiftUI 客户端 + 本机 Python/FastAPI 服务；仓库内各工作包的当前状态和证据见 [阶段 0 追踪矩阵](poc/phase0-traceability.md)。
+- 本机语音：中文 Streaming ASR、麦克风捕获 CLI、TTS 打断已有 POC 和部分实测；SwiftUI 语音闭环、真人端到端质量与性能验收仍未完成。当前 ASR 模型是中文专用，用户计划后续补充多语言模型。
+- Gateway、安全、记忆、Embedding、SQLCipher 和后端生命周期均有 POC；它们不等同于产品功能验收。详情按需查阅 [`docs/poc/`](poc/)。
+- 最近 Git 基线：`e4002b4`（磁盘写满恢复 POC）。工作开始前先检查 `git status`，保护已有改动。
+
+## 架构和安全边界
+
+- UI 通过本机 Loopback API 与后端通信；服务由 Swift supervisor 固定启动，不经任意 shell 命令。
+- Model Gateway 使用 Adapter 和精确 Provider/Model capability registry；未知能力默认不支持。
+- 本地优先。远端模型调用必须在发送前通过 Consent Manager 与 Policy Engine；默认拒绝；凭据来自 Keychain。不得以 fallback 扩大授权。
+- Agent Registry 当前为模拟 POC；权限不得超出父权限，不实现 Agent 团队或任意执行器。
+- 记忆 POC 使用 disposable 内存 SQLite/FTS5；Embedding 显式 opt-in。不得把 POC schema 当作产品 schema。
+- ASR、TTS、LLM 分开配置；原始音频默认不持久化；本地 ASR 失败不得静默切到云端。
+- 规格限制的 V1 范围不包括后台任务、外部写操作、跨设备或多用户能力。
+
+## 记录规则
+
+- 稳定事实和架构边界写在本文件；产品或架构取舍写在 [DECISIONS.md](DECISIONS.md)；当前状态、负责人和验收条件写在 [TASKS.md](TASKS.md)；每次交接摘要写在 [HANDOFF.md](HANDOFF.md)。
+- 阶段验收的详细证据以 `docs/poc/phase0-traceability.md` 及其链接的 POC 报告为准。避免在多个文档复制长篇测试结果。
+- 每项工作记录状态和可复核证据。没有实际验证的能力不得标记为已验证；产品待决事项不得由实现者自行假定。
+- 每次变更后更新相关进度文档并提交 Git；交接或中断前更新 `HANDOFF.md`。
+
+## 项目文档索引
+
+| 文档 | 用途 |
+|---|---|
+| [`TASKS.md`](TASKS.md) | 阶段工作包、优先级、阻塞、下一步和完成条件 |
+| [`DECISIONS.md`](DECISIONS.md) | 已确认的项目决策、待决产品事项和 ADR 状态入口 |
+| [`HANDOFF.md`](HANDOFF.md) | 最新工作摘要和下一位执行者的起点 |
+| [`poc/phase0-traceability.md`](poc/phase0-traceability.md) | 阶段 0 要求、证据、缺口及门禁的权威追踪矩阵 |

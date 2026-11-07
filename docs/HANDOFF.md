@@ -1,5 +1,16 @@
 # HANDOFF
 
+> 文档入口：稳定项目约束见 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)，已确认/待决选择见 [DECISIONS.md](DECISIONS.md)，阶段任务与下一步见 [TASKS.md](TASKS.md)，阶段证据见 [追踪矩阵](poc/phase0-traceability.md)。本文件仅作为最近交接摘要；避免在这里重复维护完整任务和决策清单。
+
+最近更新：2026-11-07（Asia/Shanghai）
+
+## 最近交接（2026-11-07）
+
+- 建立 `PROJECT_CONTEXT.md`、`DECISIONS.md`、`TASKS.md` 文档入口；阶段 0 证据权威来源仍是 `poc/phase0-traceability.md` 和各 POC 报告。
+- 继续 0H：新增 SQLCipher WAL 备份逐页复制期间的独立 writer 注入。writer 在 progress callback 中提交 memory/FTS 后，源库与恢复备份均含并发提交和已有记录，完整性检查通过。专项回归 `uv run --extra phase0-security --group dev pytest -q tests/test_sqlcipher_compat_poc.py`：16 passed。
+- 本轮修改：`docs/PROJECT_CONTEXT.md`、`docs/DECISIONS.md`、`docs/TASKS.md`、`docs/HANDOFF.md`、`docs/poc/phase0-failure-recovery.md`、`docs/poc/phase0-traceability.md`、`backend/tests/test_sqlcipher_compat_poc.py`。
+- 继续顺序：0H 活动 reader/持续 writer 下备份；staging 遗留清理规则待产品决定；随后完成 0B/0E/0F/0G 的证据和决策门禁。阶段 0 未验收，阶段 1 未开始。
+
 ## 当前阶段
 
 阶段 0 POC；0B 本地语音实机验证已完成当前可执行项；0C Gateway/Agent Registry/能力注册表模拟已提交；0D 记忆存储/0F SQLCipher 兼容 POC 已提交；0G 候选权重已下载并离线评测，但产品选择/真实检索集未验收；0E SwiftUI demo 已接入 supervisor 并实测启动/握手/停止/退出清理，真实认证、异常自动恢复/退避和正式分发仍待验收；0H SQLCipher 崩溃/页数耗尽/WAL 恢复与备份故障注入持续补证。阶段 0 尚未验收，阶段 1 未开始。

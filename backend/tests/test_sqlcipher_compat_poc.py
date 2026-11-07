@@ -104,6 +104,57 @@ def test_wal_database_backup_restores_committed_memory_and_fts(database_paths) -
         restored.close()
 
 
+def test_wal_backup_includes_commit_from_concurrent_writer(database_paths) -> None:
+    path, backup = database_paths
+    source_key = "wal-concurrent-backup-source-key"
+    backup_key = "wal-concurrent-backup-key"
+    database = SQLCipherFTSDatabase(path=path, key=source_key)
+    database.enable_wal_for_poc()
+    try:
+        for index in range(60):
+            database.add(f"seed record {index} " + ("payload " * 100))
+
+        committed_during_backup = False
+
+        def copy_with_concurrent_writer(destination) -> None:
+            nonlocal committed_during_backup
+
+            def on_progress(_status: int, remaining: int, total: int) -> None:
+                nonlocal committed_during_backup
+                if committed_during_backup or not 0 < remaining < total:
+                    return
+                writer = SQLCipherFTSDatabase.open_existing(path=path, key=source_key)
+                try:
+                    writer.add("concurrent writer transaction marker")
+                finally:
+                    writer.close()
+                committed_during_backup = True
+
+            database._connection.backup(destination, pages=1, progress=on_progress)
+
+        database._copy_backup_to = copy_with_concurrent_writer
+        database.backup_to(backup, backup_key=backup_key)
+        assert committed_during_backup
+        assert database.search('"concurrent writer transaction marker"') == [
+            "concurrent writer transaction marker"
+        ]
+        assert database.integrity_check() == "ok"
+
+        restored = SQLCipherFTSDatabase.open_existing(path=backup, key=backup_key)
+        try:
+            assert restored.search('"concurrent writer transaction marker"') == [
+                "concurrent writer transaction marker"
+            ]
+            assert restored.search('"seed record 59"') == [
+                f"seed record 59 {'payload ' * 100}"
+            ]
+            assert restored.integrity_check() == "ok"
+        finally:
+            restored.close()
+    finally:
+        database.close()
+
+
 def test_wal_truncate_checkpoint_preserves_encrypted_memory_and_fts(database_paths) -> None:
     path, _ = database_paths
     database = SQLCipherFTSDatabase(path=path, key="wal-checkpoint-poc-key")
