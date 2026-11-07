@@ -73,3 +73,5 @@ def test_failure_recovery_report_records_atomic_backup_failure_protection() -> N
     assert "原子替换" in report
     assert "旧备份仍可用原密钥解密" in report
     assert "保留旧备份" in traceability
+    assert "备份复制期间子进程 SIGKILL" in report
+    assert "崩溃 staging" in traceability

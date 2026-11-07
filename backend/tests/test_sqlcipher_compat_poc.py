@@ -35,6 +35,9 @@ def database_paths():
         Path(f"{path}-wal").unlink(missing_ok=True)
         Path(f"{path}-shm").unlink(missing_ok=True)
         Path(f"{path}-journal").unlink(missing_ok=True)
+        for partial in path.parent.glob(f".{path.name}.*.partial"):
+            for suffix in ("", "-wal", "-shm", "-journal"):
+                Path(f"{partial}{suffix}").unlink(missing_ok=True)
 
 
 def test_sqlcipher_encrypts_fts_database_and_rejects_wrong_key(database_paths) -> None:
@@ -178,10 +181,10 @@ def test_failed_backup_preserves_previous_valid_backup(database_paths, monkeypat
     )
     previous.close()
 
-    def interrupted_copy(_destination) -> None:
-        raise sqlcipher.DatabaseError("simulated mid-copy I/O failure")
+    def failed_copy(_destination) -> None:
+        raise sqlcipher.DatabaseError("simulated backup operation I/O failure")
 
-    monkeypatch.setattr(database, "_copy_backup_to", interrupted_copy, raising=False)
+    monkeypatch.setattr(database, "_copy_backup_to", failed_copy, raising=False)
     try:
         with pytest.raises(SQLCipherPOCError, match="backup operation failed"):
             database.backup_to(backup, backup_key="separate-backup-key")
@@ -201,6 +204,80 @@ def test_failed_backup_preserves_previous_valid_backup(database_paths, monkeypat
         assert list(backup.parent.glob(f".{backup.name}.*.partial")) == []
     finally:
         database.close()
+
+
+def test_sigkill_during_backup_copy_preserves_previous_backup(database_paths) -> None:
+    source_path, backup_path = database_paths
+    source = SQLCipherFTSDatabase(path=source_path, key="backup-crash-source-key")
+    try:
+        for index in range(80):
+            source.add(f"source marker {index} " + ("payload " * 350))
+    finally:
+        source.close()
+
+    old_backup = SQLCipherFTSDatabase(path=backup_path, key="old-backup-key")
+    old_backup.add("previous backup marker")
+    old_backup.close()
+
+    backend = Path(__file__).resolve().parents[1]
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "scripts/crash_sqlcipher_backup_poc.py",
+            str(source_path.resolve()),
+            str(backup_path.resolve()),
+        ],
+        cwd=backend,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert process.stdin is not None
+        process.stdin.write("backup-crash-source-key\nnew-backup-key\n")
+        process.stdin.flush()
+        assert process.stdout is not None
+        ready, _, _ = select.select([process.stdout], [], [], 15)
+        assert ready, "backup injector did not enter a partial backup copy"
+        progress = process.stdout.readline().strip()
+        assert progress.startswith("BACKUP_COPY_PROGRESS ")
+        process.send_signal(signal.SIGKILL)
+        stdout, stderr = process.communicate(timeout=10)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate(timeout=10)
+
+    assert process.returncode == -signal.SIGKILL
+    assert "backup-crash-source-key" not in stdout + stderr
+    assert "new-backup-key" not in stdout + stderr
+
+    preserved = SQLCipherFTSDatabase.open_existing(
+        path=backup_path, key="old-backup-key"
+    )
+    try:
+        assert preserved.search("previous backup") == ["previous backup marker"]
+        assert preserved.integrity_check() == "ok"
+    finally:
+        preserved.close()
+
+    recovered_source = SQLCipherFTSDatabase.open_existing(
+        path=source_path, key="backup-crash-source-key"
+    )
+    try:
+        assert recovered_source.search('"source marker 79"') == [
+            f"source marker 79 {'payload ' * 350}"
+        ]
+        assert recovered_source.integrity_check() == "ok"
+    finally:
+        recovered_source.close()
+
+    partial_files = list(backup_path.parent.glob(f".{backup_path.name}.*.partial"))
+    assert partial_files, "SIGKILL should leave the interrupted staging file for cleanup"
+    for partial in partial_files:
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            Path(f"{partial}{suffix}").unlink(missing_ok=True)
 
 
 def test_sqlalchemy_and_alembic_migration_work_on_encrypted_fts_database(database_paths) -> None:

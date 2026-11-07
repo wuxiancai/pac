@@ -12,6 +12,7 @@
 - **Alembic 回滚**：工作包 0F 已验证 POC migration `upgrade`/`downgrade`；这不是进程崩溃注入。
 - **备份目标不可创建**：将 backup 的父路径预置为普通文件，模拟目标目录不可用；接口返回不含凭据的 `SQLCipherPOCError`，源 DB 查询与完整性检查仍通过。该故障注入验证错误目标路径，不等同真实备份介质 I/O 故障。
 - **已有备份时复制失败**：预置一个可解密的旧目标备份，在 backup 调用边界注入 SQLite 数据库错误；接口显式失败，旧备份仍可用原密钥解密、查询和通过 `integrity_check`，源数据库也保持可查询/完整，临时 `.partial` 文件清理。正常成功路径先将数据写入同目录加密 staging 文件、重新打开并完整性校验，再通过 `os.replace` 原子替换目标。此故障测试未模拟部分页写入后的真实进程 SIGKILL，也不证明所有文件系统/介质上的断电原子性。
+- **备份复制期间子进程 SIGKILL**：测试构造 80 条带较大索引内容的加密源记录及可解密旧目标备份。故障注入子进程经 stdin 接收源/备份 key，在 SQLCipher backup progress callback 确认 staging 已复制部分页面后发出 `BACKUP_COPY_PROGRESS`；测试向该子进程发送 SIGKILL。旧目标仍能用旧密钥检索并通过 `integrity_check`；源库全部记录仍在且完整。SIGKILL 绕过正常 finally 清理，测试观察到加密 `.partial` 遗留并在 teardown 清除。此项仅证明本机临时数据库在该注入点的进程终止恢复，不代表断电、设备缓存或其他文件系统语义。
 - 子进程凭据只通过 stdin 传递，不在 argv、环境变量、stdout/stderr。临时 DB、rollback journal 与备份只写在仓库 `.poc-data` 并由测试清理。
 
 ## 测试
@@ -28,5 +29,5 @@ UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra pha
 
 - `max_page_count` 是受控 SQLite 页数上限模拟，不是 macOS 文件系统真实 ENOSPC、配额耗尽或磁盘设备故障。
 - `os._exit` 与真实子进程 `SIGKILL` 均验证未提交事务恢复；WAL 下验证 SIGKILL 后恢复、正常 TRUNCATE checkpoint 及活动 reader 导致 busy 后的释放/重试。未覆盖断电、损坏 rollback journal、checkpoint 执行中 SIGKILL、后端自动拉起和 GUI 会话恢复。
-- 未覆盖真实备份介质读写错误、恢复中断回滚、真实进程在备份复制/原子替换时 SIGKILL、空间配额耗尽及文件系统权限错误。校验失败有完整性门禁，但尚未以损坏数据注入覆盖。
+- 未覆盖真实备份介质读写错误、恢复中断回滚、SIGKILL 恰好发生于原子替换系统调用、空间配额耗尽及文件系统权限错误。备份复制中 SIGKILL 会遗留 staging 文件；应用启动时的临时文件清理/保留策略尚未决定，当前 POC 不扫描目录。校验失败有完整性门禁，但尚未以损坏数据注入覆盖。
 - 此 POC 不能证明产品可安全恢复用户数据库；没有产品 schema、正式 Keychain 密钥生命周期或发布 ADR。
