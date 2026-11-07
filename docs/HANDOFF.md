@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-阶段 0 POC；0B 本地语音实机验证已完成当前可执行项；0C Gateway/Agent Registry/能力注册表模拟已提交；0D 记忆存储/0F SQLCipher 兼容 POC 已提交；0G Embedding 真实模型权重未下载完成；0E 本机安全与 Swift/FastAPI 集成仍有 Touch ID/完整生命周期项；0H SQLCipher 崩溃/页数耗尽注入已提交。阶段 0 尚未验收，阶段 1 未开始。
+阶段 0 POC；0B 本地语音实机验证已完成当前可执行项；0C Gateway/Agent Registry/能力注册表模拟已提交；0D 记忆存储/0F SQLCipher 兼容 POC 已提交；0G 候选权重已下载并离线评测，但产品选择/真实检索集未验收；0E 本机安全与 Swift/FastAPI 集成仍有真实认证和 Swift 进程生命周期项；0H SQLCipher 崩溃/页数耗尽注入已提交。阶段 0 尚未验收，阶段 1 未开始。
 
 ## 已完成
 
@@ -29,8 +29,8 @@
 - 为本地 ASR 新增测试先行的离线计时与峰值 RSS 测量脚本；使用现存合成 WAV 单次记录 ASR 分帧耗时、RTF、模型加载、进程 RSS 与事件计数。数据写入 `docs/poc/phase0-local-asr.md`，只作观察值，不等于麦克风链路性能验收。
 - 建立 `docs/poc/phase0-traceability.md`，按 v1.2 §13/§14 和 V1.1 §16 逐项列出阶段 0 证据、状态、缺口、模块依赖、未决项、后续阶段门禁与风险。矩阵判定阶段 0 未验收，阶段 1 未开始。
 - 补强本地 Model Gateway 流式关闭语义：非本地 adapter stream 在调用前拒绝；下游关闭时关闭 adapter async generator。测试先行捕获原有未关闭问题，现已修复并回归。
-- 当前最终回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）90 项通过；本机 Swift Testing 16 项通过；`compileall`、`uv lock --check`、本次提交文件的 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
-- 用户澄清本机是软件开发、测试和运行设备，允许下载模型并行进行。Embedding 下载单独进程仍停滞于权重文件；显式设置项目级 HF/XDG cache 和代理后，Python 下载器仍打开 macOS Library HTTP 缓存，现已停止。权重不完整部分保留在 `.poc-data`；将改用受控传输方式后继续下载，不让下载阻塞开发。
+- 当前全量回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）93 项通过；本机 Swift Testing 16 项通过；`compileall`、`uv lock --check`、本次工作包 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
+- 用户澄清本机是软件开发、测试和运行设备，允许下载模型并行进行。Embedding 下载曾出现停滞，后改用分段校验传输完成候选权重；下载不作为开发阻塞项。固定 revision 权重、离线加载与小型合成检索证据见 `phase0-local-embedding.md`。
 - 扩展 Swift↔FastAPI loopback 集成 POC：服务由测试 harness 停止后重新创建，Swift CLI 使用新随机端口/新短期 token 再次健康握手；这不是正式 App 后端子进程管理，真实 App 生命周期仍未验收。
 - SQLCipher 恢复 POC 新增真实子进程 `SIGKILL` 注入：在事务写入后、提交前强制杀进程，再开启 DB 验证已提交行、未提交 memory/FTS 行和 `integrity_check`；恢复测试只覆盖默认 rollback journal，不代表断电/WAL。
 - 同一 SIGKILL 恢复用例现分别在 SQLite DELETE journal 与 WAL 模式下运行通过；WAL checkpoint、断电和真 ENOSPC 仍未覆盖。
@@ -43,6 +43,7 @@
 - 为 POC-01 新增同步 barrier 并发测量 helper 与本机脚本；同一合成 WAV 的 ASR 与 Ollama `qwen3.5:0.8b` 请求确证重叠 0.785 秒。该次 ASR frame P95 52.17 ms / max 75.45 ms，ASR+Ollama 进程 RSS 采样峰值 702,267,392 bytes，CPU 增量约 10.95 秒；GPU 未测，只有一次样本且不是完整 Agent 或性能验收。详见 `phase0-local-asr.md`。
 - 为 0H SQLCipher POC 增加受限模式 WAL TRUNCATE checkpoint；已验证 checkpoint 前后 encrypted memory/FTS 可查询、checkpoint status 正常、重开 integrity check 通过，并拒绝未列入白名单的 mode 文本。不是进程中断/断电 checkpoint 可靠性证明。
 - 为 POC-01 新增字符级 CER 统计和显式 manifest 评估脚本，manifest 路径限制为同目录文件。固定 8 条本机合成中文语音重测为 8/8 final、59 partial、weighted CER 0.0；不是真人麦克风质量或英语能力证据。见 `phase0-local-asr.md`。
+- 新增固定 Python 后端模块进程协议 POC：随机 loopback 端口与短期 token 仅经 stdout 握手；owner 可通过 stdin stop/EOF 触发有界优雅关闭，未知命令也会先关服务。三项真实子进程测试覆盖认证握手、健康检查、关闭和异常命令清理。此项尚未把 Swift App/CLI 接入 `Foundation.Process`，不等于正式 App 生命周期完成。
 
 ## 当前限制
 
