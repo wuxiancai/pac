@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-阶段 0 POC；工作包 0B 本地语音实机验证已完成当前可执行项，工作包 0C 本机 Gateway 和 Agent Registry/结果协议模拟进行中。阶段 0 尚未验收，阶段 1 未开始。
+阶段 0 POC；工作包 0B 本地语音实机验证已完成当前可执行项；0C 本机 Gateway 与 Agent Registry/结果协议模拟已提交；0D 记忆存储 POC 进行中。阶段 0 尚未验收，阶段 1 未开始。
 
 ## 已完成
 
@@ -20,17 +20,18 @@
 - 开始本机 Gateway POC：本机 Ollama Adapter、Loopback 校验、LocalOnlyPolicy、统一 generate/stream 契约；同机 qwen3.5:0.8b 的生成与流式 smoke 均成功，Python 全量测试 17 项通过。
 - 用户实机运行麦克风 CLI，确认可以录音；报告当前中文专用模型只能识别中文、无法识别英文。双语候选约 458 MB；因用户授权“轻松则修，否则跳过”，本轮跳过模型下载/替换，不将英文识别标记为已解决。
 - 完成 Agent Registry / 统一结果协议的 POC 模拟：额外条目必须显式标注模拟，权限只可取父权限交集，不创建产品 Agent run；工作包测试 4 项通过。
+- 开始记忆存储 POC：进程内 SQLite + FTS5、来源/claim/观察时间、纠错版本链、FTS 与 fixture embedding 删除、内存备份恢复；测试 4 项与当前全量 25 项通过。产品 schema 未改动。
 
 ## 当前限制
 
 - ASR 仅在当前中文模型上验证；本机麦克风已实测可录音，但英文识别未解决。不得静默改用云 ASR。
 - 尚未验证 SwiftUI 麦克风链路、中英混合识别质量、P50/P95、资源占用、AEC、TTS 与 ASR 同时工作和锁屏/休眠处理。
-- Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始；Consent/Policy、Keychain、静态加密、记忆和备份 POC 未开始。
+- Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始；Consent/Policy、Keychain、静态加密 POC 未开始。记忆 POC 尚未评测真实本地 Embedding、加密/重启恢复。
 - 所有产品待决策项继续保持未定；本地 ASR 模型是临时 POC 候选。
 
 ## 下一步
 
-继续阶段 0：完成工作包 0C Gateway / Registry 模拟记录；随后推进记忆与安全、Swift/macOS 集成和恢复 POC。英文 ASR 不作为阻塞项继续投入，保持明确未解决状态。真实云 Provider 只有在授权/策略设计及用户明确要求下才能测试。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：收尾并提交工作包 0D；随后推进安全、Swift/macOS 集成与故障恢复 POC，并逐项更新阶段 0 验收矩阵。英文 ASR 不作为阻塞项继续投入，保持明确未解决状态。真实云 Provider 只有在授权/策略设计及用户明确要求下才能测试。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 
