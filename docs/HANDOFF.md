@@ -38,6 +38,7 @@
 - 用户澄清“本机”指软件在本机开发、测试、运行，不排除后续本机客户端连接云 Provider；已据此修正阶段追踪矩阵。新建 Gateway `ConsentAwarePolicy` 工作包：对远端 generate/stream 默认拒绝，只有精确有效 Consent/Policy 才会调用 adapter；所有验证使用 fake adapter，不发网络请求。报告见 `docs/poc/phase0-consent-aware-gateway.md`。
 - 在工具调用始终不执行的前提下，新增 Ollama Gateway `call_with_tools` 契约与固定本机合成 probe。`qwen3.5:0.8b` 实际返回 `lookup(key=phase0-probe)`，已将精确型号/基础 tools 能力更新为有单次证据；不推断并行工具或严格 JSON Schema。
 - 多语言 Embedding 下载改为三个独立 `curl` 进程并行到项目 `.poc-data/embedding-staging`，禁用 curl 配置文件、显式 loopback 代理、不使用 Python/macOS HTTP cache。Tokenizer 和 unigram 已完成，ONNX 权重仍在续传；完整性校验与推理未开始。
+- 按 v1.2 §POC-02 / V1.1 §4.5 完成 LiteLLM、Bifrost、Portkey 第一方资料对照报告与文档契约测试；仅桌面资料评估，没有安装 Gateway 或云端调用。ADR-020 仍 Deferred；报告明确本项目 Consent Manager/Policy Engine 默认拒绝、Keychain 凭据和 L3 隔离不可由候选 Gateway 代替。
 
 ## 当前限制
 
@@ -49,7 +50,7 @@
 
 ## 下一步
 
-继续阶段 0：收尾 POC-01/02/05/06/0G/0H。多语言 ASR 按用户安排留待后续模型补充；当前不当作代码 bug。云 Provider 可由本机软件连接验证，但每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝；凭据只经 Keychain。Embedding 下载与开发并行，传输工具必须将文件缓存限定在 Documents。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：收尾 POC-01/02/05/06/0G/0H。多语言 ASR 按用户安排留待后续模型补充；当前不当作代码 bug。Gateway 对照报告已完成桌面资料比较，真实 Provider/Gateway 实测尚缺；本机软件可连接云 Provider，但每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝；凭据只经 Keychain。Embedding 下载与开发并行，传输工具必须将文件缓存限定在 Documents。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 
