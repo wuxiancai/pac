@@ -27,7 +27,7 @@
 ## 结果
 
 - 初始 ASR 事件契约测试：4 项通过（2026-11-07）。
-- Python 全量测试：10 项通过；包括麦克风缓冲、PCM 转换、非交互环境拒绝采集和直接脚本入口导入回归。
+- Python 全量测试：11 项通过；包括麦克风缓冲、PCM 转换、回调 PCM 帧长度、非交互环境拒绝采集和直接脚本入口导入回归。
 - Swift TTS 控制器单元测试：3 项通过；Swift 包构建通过。
 - AVSpeechSynthesizer 本机播放后按回车中断，返回 `interrupted=true speaking=false`。
 - `uv lock --check` 通过；sounddevice 默认输入设备检查支持 16 kHz、单声道、PCM16。

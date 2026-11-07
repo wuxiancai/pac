@@ -13,6 +13,10 @@ from pac_poc.asr import AudioFrame, LocalStreamingASR, SherpaOnnxRecognizer
 from pac_poc.microphone import AudioBackpressure, MicrophoneFrameBuffer
 
 
+def is_complete_pcm16_frame(data: bytes, *, frames: int) -> bool:
+    return len(data) == frames * 2
+
+
 def pcm16le_to_float_samples(data: bytes) -> tuple[float, ...]:
     pcm = array("h")
     pcm.frombytes(data)
@@ -58,12 +62,12 @@ def main() -> None:
     capture_errors: list[str] = []
 
     def on_audio(indata: bytes, frames: int, time_info: object, status: object) -> None:
-        del frames, time_info
+        del time_info
         if status:
             capture_errors.append(f"audio input status: {status}")
             capture_stopped.set()
             raise sd.CallbackAbort
-        if len(indata) != frames * 2:
+        if not is_complete_pcm16_frame(bytes(indata), frames=frames):
             capture_errors.append("audio callback returned an incomplete PCM16 frame")
             capture_stopped.set()
             raise sd.CallbackAbort

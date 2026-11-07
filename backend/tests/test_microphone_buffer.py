@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from pac_poc.microphone import AudioBackpressure, MicrophoneFrameBuffer
-from scripts.run_live_microphone_poc import pcm16le_to_float_samples
+from scripts.run_live_microphone_poc import is_complete_pcm16_frame, pcm16le_to_float_samples
 
 
 def test_buffer_returns_frames_in_order() -> None:
@@ -47,6 +47,11 @@ def test_pcm16_little_endian_frames_convert_to_normalized_float_samples() -> Non
     samples = pcm16le_to_float_samples(struct.pack("<hh", 16384, -16384))
 
     assert samples == (0.5, -0.5)
+
+
+def test_pcm16_callback_frame_size_matches_reported_sample_count() -> None:
+    assert is_complete_pcm16_frame(b"\x00\x00" * 160, frames=160)
+    assert not is_complete_pcm16_frame(b"\x00\x00" * 159, frames=160)
 
 
 def test_microphone_cli_requires_interactive_user_start() -> None:
