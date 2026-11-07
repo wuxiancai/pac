@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 from uuid import uuid4
 
 from alembic import command
 from alembic.config import Config
 import pytest
+import sqlcipher3.dbapi2 as sqlcipher
 
 pytest.importorskip("sqlcipher3")
 pytest.importorskip("sqlalchemy")
@@ -29,6 +32,7 @@ def database_paths():
         path.unlink(missing_ok=True)
         Path(f"{path}-wal").unlink(missing_ok=True)
         Path(f"{path}-shm").unlink(missing_ok=True)
+        Path(f"{path}-journal").unlink(missing_ok=True)
 
 
 def test_sqlcipher_encrypts_fts_database_and_rejects_wrong_key(database_paths) -> None:
@@ -103,3 +107,51 @@ def test_sqlalchemy_and_alembic_migration_work_on_encrypted_fts_database(databas
     finally:
         engine.dispose()
     assert path.read_bytes()[:16] != b"SQLite format 3\x00"
+
+
+def test_process_crash_mid_transaction_preserves_committed_data(database_paths) -> None:
+    path, _ = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="crash-poc-key")
+    database.add("committed baseline memory")
+    database.close()
+
+    backend = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, "scripts/crash_sqlcipher_poc.py", str(path.resolve())],
+        cwd=backend,
+        input="crash-poc-key\n",
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+
+    assert result.returncode == 73
+    assert result.stdout == ""
+    assert "crash-poc-key" not in result.stderr
+
+    recovered = SQLCipherFTSDatabase.open_existing(path=path, key="crash-poc-key")
+    try:
+        assert recovered.search("baseline memory") == ["committed baseline memory"]
+        assert recovered.search("uncommitted crash marker") == []
+        assert recovered.integrity_check() == "ok"
+    finally:
+        recovered.close()
+
+
+def test_disk_full_rolls_back_new_memory_and_preserves_existing_fts(database_paths) -> None:
+    path, _ = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="disk-full-poc-key")
+    try:
+        database.add("committed prior record")
+        current_pages = database.page_count
+        database.set_max_page_count_for_poc(current_pages + 1)
+
+        with pytest.raises(sqlcipher.DatabaseError):
+            database.add("diskfullmarker " * 20000)
+
+        assert database.search("prior record") == ["committed prior record"]
+        assert database.search("diskfullmarker") == []
+        assert database.integrity_check() == "ok"
+    finally:
+        database.close()

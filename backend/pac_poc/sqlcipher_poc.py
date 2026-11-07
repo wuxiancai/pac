@@ -77,6 +77,21 @@ class SQLCipherFTSDatabase:
         ).fetchall()
         return [str(row[0]) for row in rows]
 
+    def integrity_check(self) -> str:
+        row = self._connection.execute("PRAGMA integrity_check").fetchone()
+        return str(row[0]) if row else ""
+
+    @property
+    def page_count(self) -> int:
+        row = self._connection.execute("PRAGMA page_count").fetchone()
+        return int(row[0]) if row else 0
+
+    def set_max_page_count_for_poc(self, pages: int) -> int:
+        if pages <= 0:
+            raise ValueError("page limit must be positive")
+        row = self._connection.execute(f"PRAGMA max_page_count = {pages}").fetchone()
+        return int(row[0]) if row else 0
+
     def backup_to(self, target: Path, *, backup_key: str) -> None:
         if target.resolve() == self._path.resolve():
             raise ValueError("backup target must differ from source database")
