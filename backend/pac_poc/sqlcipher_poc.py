@@ -95,7 +95,10 @@ class SQLCipherFTSDatabase:
     def backup_to(self, target: Path, *, backup_key: str) -> None:
         if target.resolve() == self._path.resolve():
             raise ValueError("backup target must differ from source database")
-        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise SQLCipherPOCError("encrypted backup destination is unavailable") from exc
         destination = self._open_connection(target, self._validate_key(backup_key))
         try:
             self._connection.backup(destination)

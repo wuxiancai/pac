@@ -74,6 +74,28 @@ def test_sqlcipher_backup_restores_fts_with_separate_key(database_paths) -> None
         SQLCipherFTSDatabase.open_existing(path=backup, key="wrong-key")
 
 
+def test_backup_target_failure_preserves_source_database(database_paths) -> None:
+    path, _ = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="backup-failure-poc-key")
+    database.add("source remains available after backup failure")
+    blocked_parent = path.parent / f"{path.stem}-not-a-directory"
+    blocked_parent.write_text("occupied path", encoding="utf-8")
+    try:
+        with pytest.raises(SQLCipherPOCError):
+            database.backup_to(
+                blocked_parent / "backup.db",
+                backup_key="separate-backup-key",
+            )
+
+        assert database.search("source remains") == [
+            "source remains available after backup failure"
+        ]
+        assert database.integrity_check() == "ok"
+    finally:
+        database.close()
+        blocked_parent.unlink(missing_ok=True)
+
+
 def test_sqlalchemy_and_alembic_migration_work_on_encrypted_fts_database(database_paths) -> None:
     path, _ = database_paths
     engine = create_sqlalchemy_compat_engine(path=path, key="poc-alembic-key")
