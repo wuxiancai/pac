@@ -20,7 +20,7 @@
 - 开始本机 Gateway POC：本机 Ollama Adapter、Loopback 校验、LocalOnlyPolicy、统一 generate/stream 契约；同机 qwen3.5:0.8b 的生成与流式 smoke 均成功，Python 全量测试 17 项通过。
 - 用户实机运行麦克风 CLI，确认可以录音；当前模型是中文专用，英语覆盖留给后续多语言模型下载与验证，不视为实现 bug。
 - 完成 Agent Registry / 统一结果协议的 POC 模拟：额外条目必须显式标注模拟，权限只可取父权限交集，不创建产品 Agent run；工作包测试 4 项通过。
-- 开始记忆存储 POC：进程内 SQLite + FTS5、来源/claim/观察时间、纠错版本链、FTS 与 fixture embedding 删除、内存备份恢复；测试 4 项与当前全量 25 项通过。产品 schema 未改动。
+- 开始记忆存储 POC：进程内 SQLite + FTS5、来源/claim/观察时间、纠错版本链、FTS 与 fixture embedding 删除、内存备份恢复；产品 schema 未改动。
 - 开始 POC-05 本机安全集成：Keychain 凭据管理 + Touch ID/设备密码 gate、loopback FastAPI/token、Swift URLSession/SwiftUI 状态样例、Consent/Policy 默认拒绝；本机 Swift CLI 对真实 loopback FastAPI 的跨语言冒烟成功，具体测试见 `docs/poc/phase0-security-client.md`。
 - 开始 SQLCipher 静态加密兼容性 POC：ARM64/Python 3.12 上 FTS5、错误 key 拒绝、独立密钥加密备份/恢复、SQLAlchemy/Alembic migration upgrade/downgrade 通过；候选尚未定案，详见 `docs/poc/phase0-sqlcipher-compat.md`。
 - 建立 FastEmbed 多语言 Embedding 候选接口和测试。初次权重下载曾停滞；随后以分段 SHA-256 校验完成固定 revision 权重下载，并在本机完成离线加载和小型合成检索。质量/产品选型仍开放，详情见 `docs/poc/phase0-local-embedding.md`。
@@ -29,7 +29,7 @@
 - 为本地 ASR 新增测试先行的离线计时与峰值 RSS 测量脚本；使用现存合成 WAV 单次记录 ASR 分帧耗时、RTF、模型加载、进程 RSS 与事件计数。数据写入 `docs/poc/phase0-local-asr.md`，只作观察值，不等于麦克风链路性能验收。
 - 建立 `docs/poc/phase0-traceability.md`，按 v1.2 §13/§14 和 V1.1 §16 逐项列出阶段 0 证据、状态、缺口、模块依赖、未决项、后续阶段门禁与风险。矩阵判定阶段 0 未验收，阶段 1 未开始。
 - 补强本地 Model Gateway 流式关闭语义：非本地 adapter stream 在调用前拒绝；下游关闭时关闭 adapter async generator。测试先行捕获原有未关闭问题，现已修复并回归。
-- 当前全量回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）94 项通过；本机 Swift Testing 27 项通过；`compileall`、`uv lock --check`、本次工作包 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
+- 当前全量回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）101 项通过；本机 Swift Testing 27 项通过；`compileall`、`uv lock --check`、本次工作包 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
 - 用户澄清本机是软件开发、测试和运行设备，允许下载模型并行进行。Embedding 下载曾出现停滞，后改用分段校验传输完成候选权重；下载不作为开发阻塞项。固定 revision 权重、离线加载与小型合成检索证据见 `phase0-local-embedding.md`。
 - 扩展 Swift↔FastAPI loopback 集成 POC：测试 harness 可重启服务；后续固定模块协议和 Swift Foundation `Process` supervisor 已接入独立 SwiftUI demo，随机端口/短期 token handshake、健康检查、停止、owner 释放和失败路径均有测试。本机 GUI 已实测启停；正式签名分发、锁屏策略和异常退出自动重启仍未验收。
 - SQLCipher 恢复 POC 新增真实子进程 `SIGKILL` 注入：在事务写入后、提交前强制杀进程，再开启 DB 验证已提交行、未提交 memory/FTS 行和 `integrity_check`；恢复测试只覆盖默认 rollback journal，不代表断电/WAL。
@@ -49,18 +49,19 @@
 - 为 supervisor 增加异常退出恢复回归；测试先捕获向已退出子进程写 stop 管道触发 SIGPIPE。现在使用 stdin EOF 作为优雅关闭信号，清理退出的 Process 后只允许调用方显式重新启动，不引入自动重启策略。
 - SwiftUI demo 已接入本机后端 supervisor：主动启动后才启动子进程，完成 loopback health 检查后显示 connected；用户可主动停止。旧 client-only initializer 保留；fake controller 覆盖启停与启动失败清理，GUI 实机交互另见下项。
 - 新增 `backend-lifecycle-poc` SwiftUI demo target 和 build/run scripts，要求显式提供本机 Python 与 backend 路径；SwiftUI demo 已实测启动/握手/停止/退出清理，本机 `.app` 显示健康连接且退出后后端无残留。deinit 清理有集成回归测试；真实认证、异常自动恢复/退避与休眠场景仍开放。
+- 为 POC-04 将 Embedding 作为默认禁用、显式注入的 provider 集成进 disposable 内存记忆仓库；FTS 不受影响，语义结果保留 source evidence，纠错/删除/备份恢复派生向量有回归测试。固定候选权重离线合成检索 3/3 top-1；不代表模型选型或真实记忆质量。详见 `phase0-memory-embedding.md`。
 
 ## 当前限制
 
 - ASR 仅在当前中文模型上验证；本机麦克风已实测可录音。多语言模型由用户安排后续补充，不属于当前代码 bug；不得静默改用云 ASR。
 - 尚未验证 SwiftUI 麦克风链路、中英混合识别质量、P50/P95、资源占用、AEC、TTS 与 ASR 同时工作和锁屏/休眠处理。
 - 目前仅有合成短音频单次 ASR 性能观测；真实麦克风端到端延迟、重复样本分布与可确认性能阈值仍未验证/未决。
-- Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始，需在本地客户端连接外部服务时经 Consent/Policy、Keychain 和合成数据逐项测试；POC-05 真实系统认证提示、异常自动恢复/退避、锁屏/休眠策略和正式分发仍未验证，SwiftUI demo 的进程握手/启停/退出清理已通过；POC-06 尚未评估密钥生命周期、真实 ENOSPC/断电、备份介质故障和性能，也未作 ADR。记忆 POC 尚未将真实 Embedding 集成到 repository。
+- Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始，需在本地客户端连接外部服务时经 Consent/Policy、Keychain 和合成数据逐项测试；POC-05 真实系统认证提示、异常自动恢复/退避、锁屏/休眠策略和正式分发仍未验证，SwiftUI demo 的进程握手/启停/退出清理已通过；POC-06 尚未评估密钥生命周期、真实 ENOSPC/断电、备份介质故障和性能，也未作 ADR。记忆 Embedding 只接入 disposable 内存 repository，产品 schema 与真实检索质量仍未验收。
 - 所有产品待决策项继续保持未定；本地 ASR 模型是临时 POC 候选。
 
 ## 下一步
 
-继续阶段 0：收尾 POC-01/02/05/06/0G/0H。多语言 ASR 按用户安排留待后续模型补充；当前不当作代码 bug。Gateway 对照报告已完成桌面资料比较，真实 Provider/Gateway 实测尚缺；本机软件可连接云 Provider，但每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝；凭据只经 Keychain。Embedding 候选已在本机离线推理，但真实检索集、资源目标与产品模型选择未验收。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：收尾 POC-01/02/04/05/06/0G/0H。多语言 ASR 按用户安排留待后续模型补充；当前不当作代码 bug。Gateway 对照报告已完成桌面资料比较，真实 Provider/Gateway 实测尚缺；本机软件可连接云 Provider，但每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝；凭据只经 Keychain。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 

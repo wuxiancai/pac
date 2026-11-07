@@ -17,7 +17,7 @@
 | POC-02 阶段验收 | 2–3 家 Provider 端到端、开源 Gateway 对照、跨 Provider 切换 | PARTIAL | 当前仅本机 Ollama 有真实请求证据；fake local adapter 只覆盖路由契约；新增 ConsentAwarePolicy 在适配器调用前默认拒绝远端并校验精确授权；LiteLLM/Bifrost/Portkey 第一方资料对照见 `phase0-gateway-comparison.md` | 真实供应商测试需经 Consent/Policy 的合成请求、有效 Keychain 凭据和费用/区域核验；Gateway 对照目前是桌面资料评估，不是安装/集成 POC，ADR-020 仍 Deferred |
 | POC-02 / FR-SEC-002/003/010 | 云请求严格 Consent + Policy，L3 默认拒绝 | PARTIAL | 新增 Gateway `ConsentAwarePolicy`，无授权时 generate/stream 均在 adapter 前拒绝；精确匹配/撤销/过期/L3 路径测试，无真实外发 | 尚无真实 Provider 网络路径验证、action/source scope 和持久审计；V1 尚未实现，详见 `phase0-consent-aware-gateway.md` |
 | POC-03 / FR-AGENT-001/004 | Registry/Result 契约、权限不扩张、模拟与产品隔离 | PASS | 显式 simulation 标记、父权限交集、测试验证不运行产品 Agent | V1 总助理未实现；本项只限模拟接口验证 |
-| POC-04 / FR-MEMORY-002/003/006/007/008 | 来源/claim/时间、纠错、FTS/派生索引删除和恢复 | PARTIAL | 内存 SQLite/FTS5，纠错 supersede、FTS/fixture embedding 删除、内存备份恢复测试；候选模型真实向量已单独离线推理 | 无持久化产品 schema；真实 Embedding 尚未集成进记忆 repository；无迁移/多次崩溃/大数据评估 |
+| POC-04 / FR-MEMORY-002/003/006/007/008 | 来源/claim/时间、纠错、FTS/派生索引删除和恢复 | PARTIAL | 内存 SQLite/FTS5，纠错 supersede、FTS/fixture embedding 删除、内存备份恢复测试；固定候选 provider 可显式注入 disposable `MemoryStore`；本机离线合成记忆检索 3/3 top-1 且返回来源，纠错/删除/恢复的派生向量测试通过，详见 `phase0-memory-embedding.md` | 无持久化产品 schema；Embedding 型号/许可/性能目标未决；检索集仅 3 条合成查询；无模型重建 migration/多次崩溃/大数据评估 |
 | POC-05 / FR-SEC-006/009/014 | Keychain 凭据、Touch ID/设备密码 gate、本机认证/Loopback | PARTIAL | Swift Keychain 写/删/状态接口；LocalAuthentication `.deviceOwnerAuthentication` 策略常量测试；token/Host/Origin/loopback 测试；集成 harness 两次重启 FastAPI 后由 Swift CLI 用新端口/新 token 重新握手；固定 Python 服务入口真实子进程测试；Swift `Foundation.Process` supervisor 实际启动固定模块、验证握手并经 LocalAPIClient 健康检查，再经 stdin stop/EOF 关闭，重复启动受保护且停止后可重启；无握手/非法 JSON 测试验证超时与子进程清理；异常退出后 caller 显式 restart 测试通过；owner deinit 后端不可访问测试通过；SwiftUI ViewModel 的启动/健康/停止 fake-controller 路径通过；本机 demo `.app` 实际点击启停、退出后无残留服务 | 真实系统认证提示、异常退出自动恢复/有限退避、锁屏策略、多轮/休眠 GUI 交互、正式分发配置未测；Secret scan 仅限 POC 范围 |
 | POC-05 / FR-SEC-001/002/003 | L0–L3、授权和撤销策略 | PARTIAL | 内存 Consent/Policy 测试覆盖 exact match、过期、L3 deny、撤销 | action/source scope 和持久审计未齐；无真实云出站验证 |
 | POC-05 / FR-SEC-007/008 | 静态加密兼容性、备份恢复及 ADR 证据 | PARTIAL | SQLCipher ARM64/Python 3.12、FTS5、错误密钥拒绝、加密备份/恢复、目标路径错误不损坏源 DB、临时 Alembic upgrade/downgrade | WAL、密钥生命周期、实际应用包分发、真 ENOSPC/断电/真实介质故障和性能未齐；产品加密方案 ADR 未冻结 |
@@ -40,7 +40,7 @@ flowchart TD
   Session --> TTS[独立本机 TTS]
   Session --> Gateway
   Memory[记忆 Repository POC] --> SQLite[内存 SQLite + FTS5]
-  Memory -. 真实向量候选未验证 .-> Embedding[Embedding Adapter POC]
+  Memory -. 可显式注入；默认禁用 .-> Embedding[Embedding Adapter POC]
   Vault[SQLCipher 候选] --> Backup[独立密钥加密备份 POC]
   Keychain[macOS Keychain 写/删/状态] --> Security
 ```
@@ -67,7 +67,7 @@ flowchart TD
 1. 0A 仓库审计与基线记录：完成，不改动原功能/章节/schema/API。
 2. 0B 本地语音链路：中文 Streaming ASR、partial/final、用户主动录音、TTS 打断；英语覆盖取决于用户后续补充多语言模型，不属于当前代码缺陷或实现阻塞；真实端到端验收仍未完成。
 3. 0C 本地 Gateway/能力注册/Agent 模拟：完成可测试骨架；真实多 Provider blocked。
-4. 0D 记忆 POC：SQLite/FTS/来源/纠错/删除/恢复；真实向量 OPEN。
+4. 0D 记忆 POC：SQLite/FTS/来源/纠错/删除/恢复已测；本地 Embedding 候选以 opt-in provider 接入内存仓库并完成 3 条合成查询；产品模型、持久化 schema 与真实检索质量仍 OPEN。
 5. 0E Swift/Loopback/Keychain/Consent：部分完成；策略支持 Touch ID 或设备密码，fake evaluator 路径已测；POC SwiftUI demo 启停/退出清理已实机验证；真实认证提示、异常自动恢复/退避、锁屏行为及正式分发配置仍 OPEN。
 6. 0F SQLCipher：兼容性与临时 migration POC 部分完成；产品 ADR 及故障面 OPEN。
 7. 0G Embedding：真实模型已下载并离线加载，固定 revision 权重完整性、FastEmbed 本机真实向量和 offline 二次加载已验证；4 条合成 query top-1 为 4/4；真实检索质量、重复性能和模型选择未验收。

@@ -8,6 +8,7 @@ REPORT = (
     / "phase0-traceability.md"
 )
 HANDOFF = Path(__file__).parents[2] / "docs" / "HANDOFF.md"
+MEMORY_EMBEDDING = Path(__file__).parents[2] / "docs" / "poc" / "phase0-memory-embedding.md"
 
 
 def test_phase0_traceability_matches_latest_local_poc_evidence_and_gate() -> None:
@@ -38,3 +39,16 @@ def test_handoff_does_not_leave_superseded_embedding_or_backend_status() -> None
     assert "SwiftUI demo 已接入本机后端 supervisor" in handoff
     assert "SwiftUI demo 已实测启动/握手/停止/退出清理" in handoff
     assert "POC-05 真实 Touch ID、完整 App 生命周期/握手未验证" not in handoff
+
+
+def test_memory_embedding_report_preserves_opt_in_and_non_product_scope() -> None:
+    report = MEMORY_EMBEDDING.read_text(encoding="utf-8")
+    traceability = REPORT.read_text(encoding="utf-8")
+    handoff = HANDOFF.read_text(encoding="utf-8")
+
+    assert "`PARTIAL`" in report
+    assert "默认不配置 embedding provider" in report
+    assert "没有修改产品 schema" in report
+    assert "top1_matches=3" in report
+    assert "产品模型、持久化 schema 与真实检索质量仍 OPEN" in traceability
+    assert "固定候选权重离线合成检索 3/3 top-1" in handoff
