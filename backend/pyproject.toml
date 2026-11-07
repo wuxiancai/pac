@@ -1,0 +1,16 @@
+[project]
+name = "personal-ai-assistant-phase0-poc"
+version = "0.1.0"
+description = "Local-only Phase 0 proof of concept"
+requires-python = ">=3.11,<3.14"
+dependencies = ["sherpa-onnx==2.0.1"]
+
+[dependency-groups]
+dev = ["pytest==8.4.2"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

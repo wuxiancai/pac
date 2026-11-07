@@ -1,0 +1,11 @@
+.DS_Store
+**/.poc-data/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/*.py[cod]
+backups/
+runtime-data/
+models/
+logs/
