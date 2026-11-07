@@ -23,6 +23,7 @@
 - sherpa-onnx：2.0.1（arm64 CPU wheel）。
 - sounddevice：0.5.6（macOS arm64 wheel）；默认输入设备的 16 kHz、单声道、PCM16 配置检查通过，未启动采集流。
 - 模型候选：`sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30`，仅存于忽略的 `backend/.poc-data/`。
+- 当前实录反馈：该中文专用模型可以识别中文，但不能识别英文。官方文档还列出中英双语 Streaming Zipformer 候选；其小模型 release 压缩包约 458 MB，本轮下载速度很慢，因此未完成下载/评测，也未替换当前模型。英文识别仍未解决。
 
 ## 结果
 

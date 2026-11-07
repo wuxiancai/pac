@@ -27,6 +27,40 @@ class ASREvent:
     revision_id: str
 
 
+@dataclass(frozen=True)
+class ModelFiles:
+    encoder: Path
+    decoder: Path
+    joiner: Path
+    tokens: Path
+
+
+def resolve_model_files(model_dir: Path) -> ModelFiles:
+    """Find supported sherpa-onnx streaming transducer filenames."""
+    layouts = (
+        ModelFiles(
+            encoder=model_dir / "encoder.int8.onnx",
+            decoder=model_dir / "decoder.onnx",
+            joiner=model_dir / "joiner.int8.onnx",
+            tokens=model_dir / "tokens.txt",
+        ),
+        ModelFiles(
+            encoder=model_dir / "encoder-epoch-99-avg-1.int8.onnx",
+            decoder=model_dir / "decoder-epoch-99-avg-1.onnx",
+            joiner=model_dir / "joiner-epoch-99-avg-1.int8.onnx",
+            tokens=model_dir / "tokens.txt",
+        ),
+    )
+    for files in layouts:
+        if all(path.is_file() for path in (files.encoder, files.decoder, files.joiner, files.tokens)):
+            return files
+    expected = " or ".join(
+        f"{files.encoder.name}, {files.decoder.name}, {files.joiner.name}, tokens.txt"
+        for files in layouts
+    )
+    raise FileNotFoundError(f"unsupported streaming model files in {model_dir}; expected {expected}")
+
+
 class StreamingRecognizer(Protocol):
     def accept(self, samples: Sequence[float], sample_rate_hz: int) -> None: ...
 

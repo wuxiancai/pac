@@ -9,7 +9,12 @@ from pathlib import Path
 from queue import Empty
 from threading import Event
 
-from pac_poc.asr import AudioFrame, LocalStreamingASR, SherpaOnnxRecognizer
+from pac_poc.asr import (
+    AudioFrame,
+    LocalStreamingASR,
+    SherpaOnnxRecognizer,
+    resolve_model_files,
+)
 from pac_poc.microphone import AudioBackpressure, MicrophoneFrameBuffer
 
 
@@ -78,12 +83,8 @@ def main() -> None:
             capture_stopped.set()
             raise sd.CallbackAbort
 
-    recognizer = SherpaOnnxRecognizer(
-        encoder=args.model_dir / "encoder.int8.onnx",
-        decoder=args.model_dir / "decoder.onnx",
-        joiner=args.model_dir / "joiner.int8.onnx",
-        tokens=args.model_dir / "tokens.txt",
-    )
+    model_files = resolve_model_files(args.model_dir)
+    recognizer = SherpaOnnxRecognizer(**model_files.__dict__)
     asr = LocalStreamingASR(recognizer, sample_rate_hz=args.sample_rate)
     sequence = 0
     started_at = time.monotonic()

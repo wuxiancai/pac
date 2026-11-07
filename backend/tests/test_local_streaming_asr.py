@@ -5,7 +5,7 @@ from typing import Protocol
 
 import pytest
 
-from pac_poc.asr import AudioFrame, LocalStreamingASR
+from pac_poc.asr import AudioFrame, LocalStreamingASR, resolve_model_files
 
 
 @dataclass(frozen=True)
@@ -87,3 +87,20 @@ def test_suppresses_duplicate_partial_text() -> None:
 
     assert first is not None and first.text == "你好"
     assert second is None
+
+
+def test_resolves_sherpa_onnx_epoch_named_bilingual_model_files(tmp_path) -> None:
+    for name in (
+        "encoder-epoch-99-avg-1.int8.onnx",
+        "decoder-epoch-99-avg-1.onnx",
+        "joiner-epoch-99-avg-1.int8.onnx",
+        "tokens.txt",
+    ):
+        (tmp_path / name).touch()
+
+    files = resolve_model_files(tmp_path)
+
+    assert files.encoder.name == "encoder-epoch-99-avg-1.int8.onnx"
+    assert files.decoder.name == "decoder-epoch-99-avg-1.onnx"
+    assert files.joiner.name == "joiner-epoch-99-avg-1.int8.onnx"
+    assert files.tokens.name == "tokens.txt"

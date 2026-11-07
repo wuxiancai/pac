@@ -6,7 +6,12 @@ import wave
 from array import array
 from pathlib import Path
 
-from pac_poc.asr import AudioFrame, LocalStreamingASR, SherpaOnnxRecognizer
+from pac_poc.asr import (
+    AudioFrame,
+    LocalStreamingASR,
+    SherpaOnnxRecognizer,
+    resolve_model_files,
+)
 
 
 def main() -> None:
@@ -30,12 +35,8 @@ def main() -> None:
     if samples.itemsize != 2:
         parser.error("this host's signed-short representation is not 16-bit")
 
-    recognizer = SherpaOnnxRecognizer(
-        encoder=args.model_dir / "encoder.int8.onnx",
-        decoder=args.model_dir / "decoder.onnx",
-        joiner=args.model_dir / "joiner.int8.onnx",
-        tokens=args.model_dir / "tokens.txt",
-    )
+    model_files = resolve_model_files(args.model_dir)
+    recognizer = SherpaOnnxRecognizer(**model_files.__dict__)
     asr = LocalStreamingASR(recognizer, sample_rate_hz=16_000)
     samples.extend([0] * (16_000 * args.tail_silence_ms // 1_000))
     frame_size = 16_000 * args.frame_ms // 1_000
