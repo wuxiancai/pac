@@ -12,6 +12,7 @@
 - 子进程集成测试验证动态端口、无 token 时拒绝、有效 token 健康检查、`stop`、owner 管道关闭和无效命令清理。它验证固定后端进程协议，不代表 Swift `Process` 集成或正式 App 生命周期完成。
 - Swift `LocalBackendSupervisor` 现以 Foundation `Process` 直接执行注入的 Python runtime，并固定参数为 `-m pac_poc.local_service`；runtime 与 backend 目录是本机打包配置接口，不接受 shell/附加命令。子进程环境仅含固定 PATH 和 Python 隔离开关，stderr 接 `/dev/null`，stdout 仅解析受限 JSON 握手。启动等待、优雅停止有界；停止超时会 terminate，随后必要时 SIGKILL。token 只保存在内存并用于 loopback `LocalAPIClient`。
 - Swift 本机集成测试实测 supervisor 启动→握手→正确 token 健康检查/错误 token 拒绝→关闭，并验证重复 start 被拒、停止后可重启。测试运行时从仓库 backend `.venv` 使用本机 Python。
+- SwiftUI 连接 POC 新增可选 backend-controller 接口与主动启动/停止按钮：点击启动后在 detached task 启动服务、创建本机客户端并执行健康检查，健康确认后才显示 connected；点击停止后关闭服务。旧的 `init(client:)` 与“检查本机服务”路径保留。ViewModel fake-controller 测试覆盖成功启停与启动失败清理；尚未在 GUI 中实机点击验收。
 - 失败路径测试在 `.poc-data` 临时夹具下运行固定模块入口：无握手服务在 250 ms 配置期限触发 `startupTimedOut` 并被清理；非法 JSON 握手返回 `invalidHandshake` 且不保留运行子进程。该时限是测试注入值，不是产品启动时限决策。
 - 子进程握手后立即异常退出的回归曾使 supervisor 在向已关闭 pipe 写 `stop` 时收到 SIGPIPE。停止协议已改为关闭 stdin 以发送 EOF；supervisor 会清理已退出的 `Process` 后允许调用方显式重启。测试验证该手动恢复路径，不实现或暗示自动重启。
 - Swift `LocalAPIClient` 仅允许 HTTP `127.0.0.1` / `::1`，使用内存 token，拒绝 HTTP redirect；SwiftUI POC 连接视图只展示状态并提供主动检查按钮。
@@ -30,11 +31,11 @@ cd ../poc/macos-audio
 swift test
 ```
 
-最近全量回归：Python（包含 `phase0-security` 与 `phase0-embedding` extras）93 项通过；`compileall`、`uv lock --check` 通过。Swift 测试 21 项通过。Python 测试包括实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 测试包含真实本机 Keychain dummy secret 写入/轮换/删除及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
+最近全量回归：Python（包含 `phase0-security` 与 `phase0-embedding` extras）93 项通过；`compileall`、`uv lock --check` 通过。Swift 测试 23 项通过。Python 测试包括实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 测试包含真实本机 Keychain dummy secret 写入/轮换/删除及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
 
 ## 未解决/未验收
 
-- SwiftUI View 目前只完成编译及连接状态模型单测，未在 GUI 中实机交互，也不是完整产品 UI。
+- SwiftUI View 已提供可选 backend 启停控制和健康状态，但只通过模型 fake 测试；未在 GUI 中实机交互，也不是完整产品 UI。
 - LocalAuthentication API 接入已实现，默认策略覆盖生物识别或设备密码；单测不等于真实系统交互。真实 Touch ID/设备密码提示、拒绝/取消仍未实测。
 - POC Swift supervisor 已验证本机后端进程所有权、随机端口 handshake、优雅关闭、手动停止后重启、启动超时与非法握手清理；未实现异常退出自动重启/退避、锁屏策略、正式 SwiftUI App 生命周期接线或面向用户的启动诊断 UI。
 - supervisor 的 stderr 当前定向 `/dev/null`，避免将意外服务日志并入普通输出；正式诊断/脱敏日志策略需在产品阶段设计。
