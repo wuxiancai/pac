@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from pathlib import Path
 
 import sqlcipher3.dbapi2 as sqlcipher
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "--wait-for-kill"):
         return 2
     key = sys.stdin.readline().rstrip("\r\n")
     if not key:
@@ -26,6 +27,10 @@ def main() -> int:
         "INSERT INTO poc_memories_fts(memory_id, content) VALUES (?, ?)",
         (int(cursor.lastrowid), "uncommitted crash marker"),
     )
+    if len(sys.argv) == 3:
+        print("READY", flush=True)
+        while True:
+            time.sleep(60)
     os._exit(73)
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import select
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -133,6 +135,55 @@ def test_process_crash_mid_transaction_preserves_committed_data(database_paths) 
     recovered = SQLCipherFTSDatabase.open_existing(path=path, key="crash-poc-key")
     try:
         assert recovered.search("baseline memory") == ["committed baseline memory"]
+        assert recovered.search("uncommitted crash marker") == []
+        assert recovered.integrity_check() == "ok"
+    finally:
+        recovered.close()
+
+
+def test_sigkill_mid_transaction_recovers_committed_data(database_paths) -> None:
+    path, _ = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="sigkill-poc-key")
+    database.add("committed before forced termination")
+    database.close()
+
+    backend = Path(__file__).resolve().parents[1]
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "scripts/crash_sqlcipher_poc.py",
+            str(path.resolve()),
+            "--wait-for-kill",
+        ],
+        cwd=backend,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert process.stdin is not None
+        process.stdin.write("sigkill-poc-key\n")
+        process.stdin.flush()
+        assert process.stdout is not None
+        ready, _, _ = select.select([process.stdout], [], [], 10)
+        assert ready, "crash injector did not reach the uncommitted transaction"
+        assert process.stdout.readline() == "READY\n"
+        process.send_signal(signal.SIGKILL)
+        stdout, stderr = process.communicate(timeout=10)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate(timeout=10)
+
+    assert process.returncode == -signal.SIGKILL
+    assert "sigkill-poc-key" not in stdout + stderr
+
+    recovered = SQLCipherFTSDatabase.open_existing(path=path, key="sigkill-poc-key")
+    try:
+        assert recovered.search("forced termination") == [
+            "committed before forced termination"
+        ]
         assert recovered.search("uncommitted crash marker") == []
         assert recovered.integrity_check() == "ok"
     finally:
