@@ -29,7 +29,7 @@
 - 为本地 ASR 新增测试先行的离线计时与峰值 RSS 测量脚本；使用现存合成 WAV 单次记录 ASR 分帧耗时、RTF、模型加载、进程 RSS 与事件计数。数据写入 `docs/poc/phase0-local-asr.md`，只作观察值，不等于麦克风链路性能验收。
 - 建立 `docs/poc/phase0-traceability.md`，按 v1.2 §13/§14 和 V1.1 §16 逐项列出阶段 0 证据、状态、缺口、模块依赖、未决项、后续阶段门禁与风险。矩阵判定阶段 0 未验收，阶段 1 未开始。
 - 补强本地 Model Gateway 流式关闭语义：非本地 adapter stream 在调用前拒绝；下游关闭时关闭 adapter async generator。测试先行捕获原有未关闭问题，现已修复并回归。
-- 当前全量回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）103 项通过；本机 Swift Testing 27 项通过；`compileall`、`uv lock --check`、本次工作包 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
+- 历史全量回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）103 项通过；本机 Swift Testing 27 项通过；`compileall`、`uv lock --check`、当时工作包 whitespace 检查通过。最新结果以新增的工作包记录为准。
 - 用户澄清本机是软件开发、测试和运行设备，允许下载模型并行进行。Embedding 下载曾出现停滞，后改用分段校验传输完成候选权重；下载不作为开发阻塞项。固定 revision 权重、离线加载与小型合成检索证据见 `phase0-local-embedding.md`。
 - 扩展 Swift↔FastAPI loopback 集成 POC：测试 harness 可重启服务；后续固定模块协议和 Swift Foundation `Process` supervisor 已接入独立 SwiftUI demo，随机端口/短期 token handshake、健康检查、停止、owner 释放和失败路径均有测试。本机 GUI 已实测启停；正式签名分发、锁屏策略和异常退出自动重启仍未验收。
 - SQLCipher 恢复 POC 新增真实子进程 `SIGKILL` 注入：在事务写入后、提交前强制杀进程，再开启 DB 验证已提交行、未提交 memory/FTS 行和 `integrity_check`；恢复测试只覆盖默认 rollback journal，不代表断电/WAL。
@@ -41,6 +41,8 @@
 - 按 v1.2 §POC-02 / V1.1 §4.5 完成 LiteLLM、Bifrost、Portkey 第一方资料对照报告与文档契约测试；仅桌面资料评估，没有安装 Gateway 或云端调用。ADR-020 仍 Deferred；报告明确本项目 Consent Manager/Policy Engine 默认拒绝、Keychain 凭据和 L3 隔离不可由候选 Gateway 代替。
 - 依 FR-SEC-006 修正敏感操作认证策略：由仅 biometric-only 改为 LocalAuthentication `.deviceOwnerAuthentication`（Touch ID 或设备密码）；先添加策略回归测试，验证通过。未触发真实系统提示；旧 `touchIDUnavailable` 错误 case 保留兼容，当前不可用路径抛出通用 `authenticationUnavailable`。
 - 为 POC-01 新增同步 barrier 并发测量 helper 与本机脚本；同一合成 WAV 的 ASR 与 Ollama `qwen3.5:0.8b` 请求确证重叠 0.785 秒。该次 ASR frame P95 52.17 ms / max 75.45 ms，ASR+Ollama 进程 RSS 采样峰值 702,267,392 bytes，CPU 增量约 10.95 秒；GPU 未测，只有一次样本且不是完整 Agent 或性能验收。详见 `phase0-local-asr.md`。
+- 同一条 6.94 秒合成 WAV 新增 3 次独立进程 ASR 资源测量；各次均为 15 partial/1 final，P50 16.01–16.51 ms、P95 17.22–31.78 ms、RTF 0.0527–0.0665、脚本峰值 RSS 462,159,872–471,318,528 bytes。第一轮帧尾延迟较高，报告保留完整范围。该重复不是独立语料，也不是麦克风/性能验收。
+- 本机重跑 8 条合成 ASR 集：8/8 final、59 partial、weighted CER 0.0；全量 Python 回归 109 项通过，ASR 测量与合成评测数据仅代表记录样本，性能门槛与真人麦克风验证仍未解决。
 - 为 0H SQLCipher POC 增加受限模式 WAL TRUNCATE checkpoint；已验证 checkpoint 前后 encrypted memory/FTS 可查询、checkpoint status 正常、重开 integrity check 通过，并拒绝未列入白名单的 mode 文本。不是进程中断/断电 checkpoint 可靠性证明。
 - SQLCipher POC 备份先写同目录加密 staging 文件、重新打开并执行 `integrity_check`，通过后才 `os.replace`。在复制错误与 staging 校验不通过两条注入路径中，旧目标备份均可用原密钥解密、查询且完整，源数据不变，正常异常路径清理 `.partial`。
 - 新增真实子进程备份中断 POC：通过 sqlite backup progress callback 确认 staging 已复制部分页面后，对子进程发送 SIGKILL；旧目标备份仍可解密、查询、integrity check 通过，源库 80 条合成记录仍完整。SIGKILL 后 `.partial` 会遗留，测试 teardown 清理；产品运行时 staging 文件保留/清理策略未决，POC 不自动扫描目录。SQLCipher 专项 13 项、全量 Python 107 项通过。详见 `phase0-failure-recovery.md`。
@@ -59,7 +61,7 @@
 
 - ASR 仅在当前中文模型上验证；本机麦克风已实测可录音。多语言模型由用户安排后续补充，不属于当前代码 bug；不得静默改用云 ASR。
 - 尚未验证 SwiftUI 麦克风链路、中英混合识别质量、P50/P95、资源占用、AEC、TTS 与 ASR 同时工作和锁屏/休眠处理。
-- 目前仅有合成短音频单次 ASR 性能观测；真实麦克风端到端延迟、重复样本分布与可确认性能阈值仍未验证/未决。
+- ASR 资源测量已对同一条合成 WAV 做 3 次独立进程重复，但没有独立语料或实时麦克风端到端统计；重复样本分布和可确认性能阈值仍未验证/未决。
 - Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始，需在本地客户端连接外部服务时经 Consent/Policy、Keychain 和合成数据逐项测试；POC-05 真实系统认证提示、异常自动恢复/退避、锁屏/休眠策略和正式分发仍未验证，SwiftUI demo 的进程握手/启停/退出清理已通过；POC-06 尚未评估密钥生命周期、真实 ENOSPC、断电/ checkpoint 执行中断、备份介质故障和性能，也未作 ADR。记忆 Embedding 只接入 disposable 内存 repository，产品 schema 与真实检索质量仍未验收。
 - 所有产品待决策项继续保持未定；本地 ASR 模型是临时 POC 候选。
 

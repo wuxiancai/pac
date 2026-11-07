@@ -12,7 +12,7 @@
 | POC-01 / FR-VOICE-002/004 | 本地流式 partial/final、语句端点 | PARTIAL | 8 条本机中文合成句在 3,000 ms 静音尾段下均产生 final，59 个 partial，weighted CER 0.0；用户实机反馈麦克风可录音 | 该结果仅为小型合成集；真人麦克风 partial/final、重复轮次、停止/异常清理仍不完整；英语取决于用户后续多语言模型，不是当前代码阻塞 |
 | POC-01 / FR-VOICE-005/008 | 本机 TTS 可打断；ASR/TTS 独立 | PARTIAL | AVSpeechSynthesizer CLI 实测打断；ASR、TTS POC 分开 | SwiftUI 集成与 ASR/TTS 并发未验证 |
 | POC-01 / FR-VOICE-006/007/010 | 本地默认；本地失败显式失败；不落盘、不静默云切换 | PARTIAL | ASR adapter 无云 fallback；麦克风仅内存队列；测试覆盖拒绝/溢出 | 麦克风真实异常与系统级出站监测未完整执行 |
-| POC-01 性能 | ASR 与 Agent 同时运行的延迟、内存、CPU/GPU | PARTIAL | 单独 ASR 与同步 barrier 的 ASR + 本机 Ollama LLM 生成各有一次单样本记录；后者实测重叠 0.785 秒、帧 P95 52.17 ms、Python + Ollama 进程 RSS 采样峰值 702,267,392 bytes、CPU 时间差约 10.95 秒；不是完整 Agent | 不是麦克风端到端或重复负载；采样间隔 1 秒；GPU 未测；目标阈值未决 |
+| POC-01 性能 | ASR 与 Agent 同时运行的延迟、内存、CPU/GPU | PARTIAL | 同一条本机合成 WAV 的独立 ASR 进程重复 3 次，帧 P50 16.01–16.51 ms、P95 17.22–31.78 ms、RTF 0.0527–0.0665；另有一次同步 barrier 的 ASR + 本机 Ollama LLM 生成，重叠 0.785 秒、帧 P95 52.17 ms、Python + Ollama 进程 RSS 采样峰值 702,267,392 bytes、CPU 时间差约 10.95 秒；不是完整 Agent | 同一短合成 WAV 重复不代表独立样本；并发只有单次；不是麦克风端到端；采样间隔 1 秒；GPU 未测；目标阈值未决 |
 | POC-02 / FR-MODEL-001/002 | Adapter、统一流式契约、精确型号能力注册 | PARTIAL | 本机 Ollama generate/stream；qwen3.5:0.8b 一次真实本机 tool proposal；unknown-by-default registry；MockTransport 测试 schema 与解析 | 并行/严格 JSON Schema、费用、错误、远端取消、区域及其他型号能力仍无完整证据 |
 | POC-02 阶段验收 | 2–3 家 Provider 端到端、开源 Gateway 对照、跨 Provider 切换 | PARTIAL | 当前仅本机 Ollama 有真实请求证据；fake local adapter 只覆盖路由契约；新增 ConsentAwarePolicy 在适配器调用前默认拒绝远端并校验精确授权；LiteLLM/Bifrost/Portkey 第一方资料对照见 `phase0-gateway-comparison.md` | 真实供应商测试需经 Consent/Policy 的合成请求、有效 Keychain 凭据和费用/区域核验；Gateway 对照目前是桌面资料评估，不是安装/集成 POC，ADR-020 仍 Deferred |
 | POC-02 / FR-SEC-002/003/010 | 云请求严格 Consent + Policy，L3 默认拒绝 | PARTIAL | 新增 Gateway `ConsentAwarePolicy`，无授权时 generate/stream 均在 adapter 前拒绝；精确匹配/撤销/过期/L3 路径测试，无真实外发 | 尚无真实 Provider 网络路径验证、action/source scope 和持久审计；V1 尚未实现，详见 `phase0-consent-aware-gateway.md` |
@@ -94,7 +94,7 @@ V1.1 及 V2–V5 仅按规格书规划；当前不实施后台任务、专业 Ag
 | 风险 | 影响 | 当前缓解 | 剩余事项 |
 |---|---|---|---|
 | 当前 ASR 模型语言范围 | 暂不覆盖英语/中英混合 | 保持模型和 ASR 配置边界明确；不静默云 fallback | 用户计划后续补多语言模型；当前不是代码 bug，不伪报英语测试通过 |
-| 短合成样本无法代表真实语音 | 延迟/准确率/噪声鲁棒性被高估 | 报告只记单次观察，不设承诺 | 固定集、实机重复与产品阈值待定 |
+| 短合成样本无法代表真实语音 | 延迟/准确率/噪声鲁棒性被高估 | 明确记录同一 WAV 三次的观察范围，不设承诺 | 独立语料、真人麦克风重复与产品阈值待定 |
 | 真实云 Provider 证据缺失 | 无法证明多 Provider/费用/取消/区域 | 能力默认 UNKNOWN；远端请求接入 ConsentAwarePolicy 默认拒绝 | 需合成请求的明确 Consent、Keychain 凭据及逐 Provider 端到端验证 |
 | Consent 仅内存、策略字段不全 | 重启/持久审计后授权可能无法证明 | POC 无云出站、默认拒绝 | 产品阶段实现完整 schema/migration/audit |
 | SQLCipher POC 不是发布形态验证 | DB/备份/打包或恢复失败；异常终止可能遗留加密 staging 文件 | ARM64 本机临时 migration；备份复制中 SIGKILL 后旧目标仍可恢复且源库完整 | ADR、WAL、打包、灾难恢复、staging 生命周期和性能；未测断电/介质故障 |
