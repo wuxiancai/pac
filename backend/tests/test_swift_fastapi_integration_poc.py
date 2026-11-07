@@ -17,5 +17,7 @@ def test_native_swift_client_connects_to_loopback_fastapi_without_logging_token(
     )
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "Swift client reached local FastAPI over loopback."
+    assert result.stdout.strip() == (
+        "Swift client reached local FastAPI over loopback; restart handshake passed."
+    )
     assert "Bearer " not in result.stdout + result.stderr

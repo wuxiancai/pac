@@ -7,6 +7,7 @@
 - FastAPI POC API 只提供无副作用 `/health`；OpenAPI 文档端点关闭。
 - `create_local_server` 固定 Uvicorn 单 worker、`127.0.0.1`、关闭 access log；API 校验 Host 为 loopback IP、拒绝任何 Origin、要求未过期 Bearer session token，并使用 constant-time 比较。响应不回显 token。
 - 本机短期 token 使用进程内对象保存。集成脚本将 token 通过受控 stdin pipe 交给 Swift CLI；token 不进命令参数、环境变量或输出。端口先由测试进程绑定到 loopback，避免测试时端口抢占。
+- 原生集成回归现在执行两次完整的本机服务启动→Swift 健康握手→有界关闭，再用新端口和新短期 token 重启并握手；测试验证旧 token 不出现在 Swift 子进程输出中。该项仅证明集成 harness 的服务重启/重新握手，不证明正式 App 拥有或管理后端子进程。
 - Swift `LocalAPIClient` 仅允许 HTTP `127.0.0.1` / `::1`，使用内存 token，拒绝 HTTP redirect；SwiftUI POC 连接视图只展示状态并提供主动检查按钮。
 - API Key POC 使用 macOS Keychain generic-password，`AfterFirstUnlockThisDeviceOnly`；外部可见的凭据管理 API 只提供写入、删除、存在状态查询，不提供明文读取。
 - 凭据写入/删除先经过 `LocalAuthentication` Touch ID 授权门；测试通过 fake authorizer 验证拒绝路径不会变更 Keychain。实际 Touch ID 提示未触发。
@@ -29,7 +30,7 @@ swift test
 
 - SwiftUI View 目前只完成编译及连接状态模型单测，未在 GUI 中实机交互，也不是完整产品 UI。
 - Touch ID API 接入已实现，但测试使用 fake authorizer；真实 biometric prompt/拒绝/取消尚未实测。
-- 真实 App 启动后端的进程所有权、短期 token 握手、随机端口重试/生命周期、锁屏行为尚未完成；集成脚本仅验证本地测试进程间 pipe。
+- 真实 App 启动后端的进程所有权、随机端口重试/生命周期、锁屏行为尚未完成；当前重启用例由测试 harness 负责启动/关闭 FastAPI，并经 pipe 将新 token 交给 Swift CLI。
 - Host/Origin、token 和无云出站策略经过 POC 测试；真实用户 Consent UI、完整数据分类/脱敏/审计与撤销竞态未实现。
 - 未做崩溃、重启、磁盘不足、备份恢复故障注入，也未验证静态加密方案；不得将本工作包视为 POC-05 完成。
 - 未验证真实云端 Provider，符合本轮本机使用边界；云请求仍保持不可用/默认拒绝。

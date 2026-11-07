@@ -18,7 +18,7 @@
 | POC-02 / FR-SEC-002/003/010 | 云请求严格 Consent + Policy，L3 默认拒绝 | PARTIAL | 精确匹配授权/撤销/过期/L3 拒绝的本机测试；无授权即拒绝 | 未通过真实 Provider 网络路径验证；V1 尚未实现 |
 | POC-03 / FR-AGENT-001/004 | Registry/Result 契约、权限不扩张、模拟与产品隔离 | PASS | 显式 simulation 标记、父权限交集、测试验证不运行产品 Agent | V1 总助理未实现；本项只限模拟接口验证 |
 | POC-04 / FR-MEMORY-002/003/006/007/008 | 来源/claim/时间、纠错、FTS/派生索引删除和恢复 | PARTIAL | 内存 SQLite/FTS5，纠错 supersede、FTS/fixture embedding 删除、内存备份恢复测试 | 无持久化产品 schema；真实 Embedding 未验证；无迁移/多次崩溃/大数据评估 |
-| POC-05 / FR-SEC-006/009/014 | Keychain 凭据、Touch ID gate、本机认证/Loopback | PARTIAL | Swift Keychain 写/删/状态接口、授权抽象；token/Host/Origin/loopback 测试；Swift↔FastAPI CLI 成功 | 真实 Touch ID UI 提示、App 全生命周期握手和故障恢复未测；Secret scan 仅限 POC 范围 |
+| POC-05 / FR-SEC-006/009/014 | Keychain 凭据、Touch ID gate、本机认证/Loopback | PARTIAL | Swift Keychain 写/删/状态接口、授权抽象；token/Host/Origin/loopback 测试；集成 harness 两次重启 FastAPI 后由 Swift CLI 用新端口/新 token 重新握手 | 真实 Touch ID UI 提示、正式 App 子进程所有权/启动关闭/故障恢复未测；Secret scan 仅限 POC 范围 |
 | POC-05 / FR-SEC-001/002/003 | L0–L3、授权和撤销策略 | PARTIAL | 内存 Consent/Policy 测试覆盖 exact match、过期、L3 deny、撤销 | action/source scope 和持久审计未齐；无真实云出站验证 |
 | POC-05 / FR-SEC-007/008 | 静态加密兼容性、备份恢复及 ADR 证据 | PARTIAL | SQLCipher ARM64/Python 3.12、FTS5、错误密钥拒绝、加密备份/恢复、临时 Alembic upgrade/downgrade | WAL、密钥生命周期、实际应用包分发、真 ENOSPC/断电/介质故障和性能未齐；产品加密方案 ADR 未冻结 |
 | 阶段 0 工程/恢复 | 崩溃、重启、磁盘不足和备份恢复故障注入 | PARTIAL | 未提交事务进程立即退出、页数上限导致事务回滚、Integrity Check | page limit 不等于真实 ENOSPC；SIGKILL/断电、WAL、App 重启、介质故障未测 |
