@@ -13,6 +13,7 @@ FAILURE_RECOVERY = Path(__file__).parents[2] / "docs" / "poc" / "phase0-failure-
 SQLCIPHER_COMPAT = Path(__file__).parents[2] / "docs" / "poc" / "phase0-sqlcipher-compat.md"
 ENCRYPTION_CANDIDATES = Path(__file__).parents[2] / "docs" / "poc" / "phase0-encryption-candidates.md"
 SQLCIPHER_PERFORMANCE = Path(__file__).parents[2] / "docs" / "poc" / "phase0-sqlcipher-performance.md"
+ENOSPC_RECOVERY = Path(__file__).parents[2] / "docs" / "poc" / "phase0-enospc-recovery.md"
 
 
 def test_phase0_traceability_matches_latest_local_poc_evidence_and_gate() -> None:
@@ -89,7 +90,23 @@ def test_sqlcipher_compat_report_reflects_latest_recovery_evidence() -> None:
     assert "WAL 数据库备份/恢复" in report
     assert "SIGKILL" in report
     assert "SQLCipher 专项测试：15 项通过" in report
-    assert "真实 ENOSPC" in report
+    assert "48 MiB 临时 HFS+ 映像 ENOSPC POC" in report
+    assert "APFS/外接介质 ENOSPC" in report
+
+
+def test_bounded_enospc_report_records_recovery_and_remaining_scope() -> None:
+    report = ENOSPC_RECOVERY.read_text(encoding="utf-8")
+
+    for required in (
+        "48 MiB HFS+",
+        "`SQLITE_FULL`",
+        "integrity_check=ok",
+        "事务回滚",
+        "APFS 系统卷",
+        "外接盘",
+        "不改 schema",
+    ):
+        assert required in report
 
 
 def test_encryption_candidate_report_compares_options_without_selecting_product_adr() -> None:

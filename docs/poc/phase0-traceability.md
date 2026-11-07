@@ -20,8 +20,8 @@
 | POC-04 / FR-MEMORY-002/003/006/007/008 | 来源/claim/时间、纠错、FTS/派生索引删除和恢复 | PARTIAL | 内存 SQLite/FTS5，纠错 supersede、FTS/fixture embedding 删除、内存备份恢复测试；固定候选 provider 可显式注入 disposable `MemoryStore`；本机离线合成记忆检索 3/3 top-1 且返回来源，纠错/删除/恢复的派生向量测试通过，详见 `phase0-memory-embedding.md` | 无持久化产品 schema；Embedding 型号/许可/性能目标未决；检索集仅 3 条合成查询；无模型重建 migration/多次崩溃/大数据评估 |
 | POC-05 / FR-SEC-006/009/014 | Keychain 凭据、Touch ID/设备密码 gate、本机认证/Loopback | PARTIAL | Swift Keychain 写/删/状态接口；LocalAuthentication `.deviceOwnerAuthentication` 策略常量测试；token/Host/Origin/loopback 测试；集成 harness 两次重启 FastAPI 后由 Swift CLI 用新端口/新 token 重新握手；固定 Python 服务入口真实子进程测试；Swift `Foundation.Process` supervisor 实际启动固定模块、验证握手并经 LocalAPIClient 健康检查，再经 stdin stop/EOF 关闭，重复启动受保护且停止后可重启；无握手/非法 JSON 测试验证超时与子进程清理；异常退出后 caller 显式 restart 测试通过；owner deinit 后端不可访问测试通过；SwiftUI ViewModel 的启动/健康/停止 fake-controller 路径通过；本机 demo `.app` 实际点击启停、退出后无残留服务 | 真实系统认证提示、异常退出自动恢复/有限退避、锁屏策略、多轮/休眠 GUI 交互、正式分发配置未测；Secret scan 仅限 POC 范围 |
 | POC-05 / FR-SEC-001/002/003 | L0–L3、授权和撤销策略 | PARTIAL | 内存 Consent/Policy 测试覆盖 exact match、过期、L3 deny、撤销 | action/source scope 和持久审计未齐；无真实云出站验证 |
-| POC-05 / FR-SEC-007/008 | 静态加密兼容性、备份恢复及 ADR 证据 | PARTIAL | SQLCipher ARM64/Python 3.12、FTS5、错误密钥拒绝、加密备份/恢复（含 WAL 数据库）；复制/校验/原子替换失败时保留旧备份，校验后原子替换；复制部分页面后子进程 SIGKILL，旧目标仍可恢复、源库完整；目标路径错误不损坏源 DB；临时 Alembic upgrade/downgrade；同工作量 SQLite/SQLCipher 合成性能三轮观察；候选资料对照见 `phase0-encryption-candidates.md` | 并发写/reader 时备份、WAL 生命周期、密钥管理、实际应用包分发、真实负载性能、真 ENOSPC/断电/真实介质故障未齐；SQLite SEE 与文件容器未本机集成；产品加密方案 ADR 未冻结；崩溃 staging 的产品清理策略未决 |
-| 阶段 0 工程/恢复 | 崩溃、重启、磁盘不足和备份恢复故障注入 | PARTIAL | `os._exit` 与 DELETE/WAL 两种模式下子进程 SIGKILL 后未提交事务恢复；SQLCipher WAL TRUNCATE checkpoint 后重开检索与 Integrity Check；活动 WAL reader 下 `busy=1` 可见、释放 reader 后 checkpoint 重试成功并重开完整性检查通过；页数上限导致事务回滚；复制错误和部分页后 SIGKILL 均证明保留旧备份 | page limit 不等于真实 ENOSPC；断电、checkpoint 执行中断电/SIGKILL、原子替换系统调用期间 SIGKILL、正式 App 重启及介质故障未测；崩溃 staging 清理策略待定 |
+| POC-05 / FR-SEC-007/008 | 静态加密兼容性、备份恢复及 ADR 证据 | PARTIAL | SQLCipher ARM64/Python 3.12、FTS5、错误密钥拒绝、加密备份/恢复（含 WAL 数据库）；复制/校验/原子替换失败时保留旧备份，校验后原子替换；复制部分页面后子进程 SIGKILL，旧目标仍可恢复、源库完整；目标路径错误不损坏源 DB；临时 Alembic upgrade/downgrade；同工作量 SQLite/SQLCipher 合成性能三轮观察；48 MiB HFS+ 临时映像真实触发 `SQLITE_FULL`，源库与先前加密备份重开完整，详见 `phase0-enospc-recovery.md`；候选资料对照见 `phase0-encryption-candidates.md` | 并发写/reader 时备份、WAL 生命周期、密钥管理、正式应用包分发、真实负载性能、APFS/外接介质/断电/介质故障未齐；SQLite SEE 与文件容器未本机集成；产品加密方案 ADR 未冻结；崩溃 staging 的产品清理策略待定 |
+| 阶段 0 工程/恢复 | 崩溃、重启、磁盘不足和备份恢复故障注入 | PARTIAL | `os._exit` 与 DELETE/WAL 两种模式下子进程 SIGKILL 后未提交事务恢复；SQLCipher WAL TRUNCATE checkpoint 后重开检索与 Integrity Check；活动 WAL reader 下 `busy=1` 可见、释放 reader 后 checkpoint 重试成功并重开完整性检查通过；页数上限和 48 MiB HFS+ 临时映像 `SQLITE_FULL` 均触发事务回滚；复制错误和部分页后 SIGKILL 均证明保留旧备份 | ENOSPC 只覆盖有界临时 HFS+ 映像，不代表 APFS/外接卷；断电、checkpoint 执行中断电/SIGKILL、原子替换系统调用期间 SIGKILL、正式 App 重启及介质故障未测；崩溃 staging 清理策略待定 |
 | POC-04 本地 Embedding | 候选权重、真实向量与检索质量 | PARTIAL | 固定 revision 权重 SHA-256 完整校验；本机 FastEmbed 真实推理，4 个合成 query top-1 命中 4/4；HF/Transformers offline 环境二次加载通过；单次 observed RSS 约 812–829 MiB，见 `phase0-local-embedding.md` | 仅 4 条合成记忆/query，不代表真实语义质量；真实检索集、重复性能测试、SQLCipher memory 集成、许可复核和模型选择未完成 |
 | 全阶段安全边界 | 不自动扫描；无任意 Shell/文件访问；无外部写/后台队列/专业 Agent 团队 | PASS（范围审计） | 当前 POC 结构无产品文件扫描、任意 Shell、外部写或后台任务；Agent 仅模拟 | 后续实现须持续做静态与集成门禁，当前不构成产品级验收 |
 
@@ -56,7 +56,7 @@ flowchart TD
 - 多 Provider 实测与开源 Gateway 对照：后续可在本机运行客户端/后端连接云供应商；任何真实出站请求仍须由 Consent Manager + Policy Engine 明确放行，凭据只从 Keychain 取得，未经授权不得发送。
 - 真实 Provider/Gateway 实测尚缺；LiteLLM、Bifrost、Portkey 第一方桌面资料对照已记录，但不代表运行集成或供应商端到端证据。
 - 真实 Touch ID 提示、应用正式进程生命周期、SwiftUI 麦克风链路及 AEC/插话。
-- SQLCipher 产品 ADR 与密钥轮换/恢复体验、WAL、真实 ENOSPC、断电/杀进程/备份介质故障、发布打包和性能。
+- SQLCipher 产品 ADR 与密钥轮换/恢复体验、并发 WAL 备份、APFS/外接介质 ENOSPC、断电/备份介质故障、发布打包和产品性能。
 - 本地 Embedding 候选许可复核、真实中英文检索集、向量质量和资源目标；当前仅有 4 条合成 query 的一次检索记录。
 - ASR/TTS/LLM 并发资源结果；P50/P95 门槛由产品负责人确认。
 
@@ -71,7 +71,7 @@ flowchart TD
 5. 0E Swift/Loopback/Keychain/Consent：部分完成；策略支持 Touch ID 或设备密码，fake evaluator 路径已测；POC SwiftUI demo 启停/退出清理已实机验证；真实认证提示、异常自动恢复/退避、锁屏行为及正式分发配置仍 OPEN。
 6. 0F SQLCipher：兼容性与临时 migration POC 部分完成；产品 ADR 及故障面 OPEN。
 7. 0G Embedding：真实模型已下载并离线加载，固定 revision 权重完整性、FastEmbed 本机真实向量和 offline 二次加载已验证；4 条合成 query top-1 为 4/4；真实检索质量、重复性能和模型选择未验收。
-8. 0H 故障注入/性能：事务崩溃、页数限制、WAL reader contention 与 checkpoint 重试已测；真实 ENOSPC、checkpoint 执行中断、介质故障和语音并发性能未验证。
+8. 0H 故障注入/性能：事务崩溃、页数限制、WAL reader contention/checkpoint 重试、48 MiB HFS+ 临时映像 ENOSPC 已测；APFS/外接介质 ENOSPC、checkpoint 执行中断、介质故障和语音并发性能未验证。
 9. 0I 阶段追踪与验收：本矩阵建立；待所有必须验收项有证据且待决项被确认或延期，才能评审阶段 0。
 
 阶段 0 未签收前禁止开始阶段 1 完整产品实现。
@@ -97,7 +97,7 @@ V1.1 及 V2–V5 仅按规格书规划；当前不实施后台任务、专业 Ag
 | 短合成样本无法代表真实语音 | 延迟/准确率/噪声鲁棒性被高估 | 明确记录同一 WAV 三次的观察范围，不设承诺 | 独立语料、真人麦克风重复与产品阈值待定 |
 | 真实云 Provider 证据缺失 | 无法证明多 Provider/费用/取消/区域 | 能力默认 UNKNOWN；远端请求接入 ConsentAwarePolicy 默认拒绝 | 需合成请求的明确 Consent、Keychain 凭据及逐 Provider 端到端验证 |
 | Consent 仅内存、策略字段不全 | 重启/持久审计后授权可能无法证明 | POC 无云出站、默认拒绝 | 产品阶段实现完整 schema/migration/audit |
-| SQLCipher POC 不是发布形态验证 | DB/备份/打包或恢复失败；异常终止可能遗留加密 staging 文件 | ARM64 本机 migration；备份复制中 SIGKILL 后旧目标仍可恢复且源库完整；三轮合成性能对照；候选资料对照已记录、未作选型 | ADR、SEE/文件容器实测、打包、灾难恢复、staging 生命周期和真实负载性能；未测断电/介质故障 |
+| SQLCipher POC 不是发布形态验证 | DB/备份/打包或恢复失败；异常终止可能遗留加密 staging 文件 | ARM64 本机 migration；备份复制中 SIGKILL 后旧目标仍可恢复且源库完整；三轮合成性能对照；有界 HFS+ 映像 `SQLITE_FULL` 后源库与备份均恢复；候选资料对照已记录、未作选型 | ADR、SEE/文件容器实测、打包、灾难恢复、staging 生命周期和真实负载性能；未测 APFS/外接介质 ENOSPC、断电/介质故障 |
 | Embedding 合成集过小且 observed RSS 较高 | 语义质量或资源占用不达产品目标 | 固定 revision 权重校验；离线加载；报告仅记两次观察值 | 真实标注检索集、重复性能分布、模型许可与产品阈值 |
 | 真实认证与正式运行策略未验收 | 敏感入口和进程恢复风险 | `.deviceOwnerAuthentication` fake evaluator 测试；SwiftUI POC demo 启停/退出清理实测；supervisor 超时/退出集成回归 | 系统认证提示、正式签名分发、自动恢复/退避、锁屏/休眠策略 |
 | POC 与产品容易混淆 | 误将模拟视为完成承诺 | 报告标 POC、能力需要证据 | 每项产品功能进入正式实现仍需独立契约与验收 |
