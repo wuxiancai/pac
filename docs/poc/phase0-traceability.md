@@ -65,7 +65,7 @@ flowchart TD
 ### 阶段 0（当前阶段，未验收）
 
 1. 0A 仓库审计与基线记录：完成，不改动原功能/章节/schema/API。
-2. 0B 本地语音链路：中文 Streaming ASR、partial/final、用户主动录音、TTS 打断；英语和真实 E2E 尚未完成。
+2. 0B 本地语音链路：中文 Streaming ASR、partial/final、用户主动录音、TTS 打断；英语覆盖取决于用户后续补充多语言模型，不属于当前代码缺陷或实现阻塞；真实端到端验收仍未完成。
 3. 0C 本地 Gateway/能力注册/Agent 模拟：完成可测试骨架；真实多 Provider blocked。
 4. 0D 记忆 POC：SQLite/FTS/来源/纠错/删除/恢复；真实向量 OPEN。
 5. 0E Swift/Loopback/Keychain/Consent：部分完成；策略支持 Touch ID 或设备密码，fake evaluator 路径已测；真实认证 UI 与正式 App lifecycle OPEN。
