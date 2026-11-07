@@ -30,15 +30,15 @@ uv lock --check
 ```
 
 - SQLCipher 专项测试：15 项通过（包含 WAL 备份/恢复及进程中断故障注入）。
-- 当前全量本机 Python 测试：112 项通过，包含 `phase0-security` 与 `phase0-embedding` extras。
+- 当前全量本机 Python 测试：115 项通过，包含 `phase0-security` 与 `phase0-embedding` extras。
 - `compileall`、`uv lock --check` 与 `git diff --check` 通过。
-- 没有测量或推断 SQLCipher 性能数据。
+- 已有一项相同合成工作负载的 SQLite/SQLCipher + FTS5 三轮本机观察，详见 `phase0-sqlcipher-performance.md`；它不是完整 App 或产品负载性能验收。
 
 ## 未解决/未验收
 
 - 没有评估 key 生命周期、Keychain/Touch ID 解锁、密钥轮换、丢失恢复、备份密钥独立保存的用户流程；测试 passphrase 不是用户凭据。
 - 并发连接池、并发写/读期间备份、恢复失败回滚、真实 ENOSPC、macOS 发布打包签名/notarization、x86_64/universal2 及最低系统版本尚未验证。
-- SQLCipher 与普通 SQLite 的性能、升级迁移以及外接盘/NAS行为未测；SQLAlchemy 官方说明其 SQLCipher dialect 需特殊连接设置且加密连接可能更慢，未据此做产品取舍。
+- 真实用户规模、冷/热启动、长期运行、并发负载、CPU/RSS 及外接盘/NAS 性能未测；当前仅有三轮合成工作负载对照，未据此做产品取舍。
 - 尚未完成其他成熟加密候选比较、最终 ADR 和恢复演练，因此不得宣告静态加密验收完成。
 
 ## 版本与安全边界

@@ -12,6 +12,7 @@ MEMORY_EMBEDDING = Path(__file__).parents[2] / "docs" / "poc" / "phase0-memory-e
 FAILURE_RECOVERY = Path(__file__).parents[2] / "docs" / "poc" / "phase0-failure-recovery.md"
 SQLCIPHER_COMPAT = Path(__file__).parents[2] / "docs" / "poc" / "phase0-sqlcipher-compat.md"
 ENCRYPTION_CANDIDATES = Path(__file__).parents[2] / "docs" / "poc" / "phase0-encryption-candidates.md"
+SQLCIPHER_PERFORMANCE = Path(__file__).parents[2] / "docs" / "poc" / "phase0-sqlcipher-performance.md"
 
 
 def test_phase0_traceability_matches_latest_local_poc_evidence_and_gate() -> None:
@@ -103,5 +104,20 @@ def test_encryption_candidate_report_compares_options_without_selecting_product_
         "https://www.zetetic.net/sqlcipher/design/",
         "https://www.sqlite.org/see/doc/release/www/readme.wiki",
         "https://developer.apple.com/documentation/cryptokit/aes/gcm",
+    ):
+        assert required in report
+
+
+def test_sqlcipher_performance_report_records_repeated_observations_and_limits() -> None:
+    report = SQLCIPHER_PERFORMANCE.read_text(encoding="utf-8")
+
+    for required in (
+        "2,000 条",
+        "100 次 FTS5 查询",
+        "连续测量 3 轮",
+        "25.91–26.39 ms",
+        "148.58–290.26 ms",
+        "不构成 ADR-019 选型或性能承诺",
+        "ADR-019 未定案",
     ):
         assert required in report
