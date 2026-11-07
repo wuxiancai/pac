@@ -127,6 +127,10 @@ public struct LocalAPIConnectionView: View {
         _model = State(initialValue: LocalAPIConnectionModel(client: client))
     }
 
+    public init(backendController: any LocalBackendControlling) {
+        _model = State(initialValue: LocalAPIConnectionModel(backendController: backendController))
+    }
+
     public var body: some View {
         VStack(spacing: 12) {
             Text(model.state.label)
