@@ -77,6 +77,32 @@ def test_sqlcipher_backup_restores_fts_with_separate_key(database_paths) -> None
         SQLCipherFTSDatabase.open_existing(path=backup, key="wrong-key")
 
 
+def test_wal_database_backup_restores_committed_memory_and_fts(database_paths) -> None:
+    path, backup = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="wal-backup-source-key")
+    assert database.enable_wal_for_poc() == "wal"
+    database.add("WAL first committed source memory")
+    database.add("WAL second committed source memory")
+    try:
+        database.backup_to(backup, backup_key="wal-backup-separate-key")
+        assert database.search("WAL first") == ["WAL first committed source memory"]
+        assert database.integrity_check() == "ok"
+    finally:
+        database.close()
+
+    restored = SQLCipherFTSDatabase.open_existing(
+        path=backup, key="wal-backup-separate-key"
+    )
+    try:
+        assert restored.search("WAL first") == ["WAL first committed source memory"]
+        assert restored.search("second committed") == [
+            "WAL second committed source memory"
+        ]
+        assert restored.integrity_check() == "ok"
+    finally:
+        restored.close()
+
+
 def test_wal_truncate_checkpoint_preserves_encrypted_memory_and_fts(database_paths) -> None:
     path, _ = database_paths
     database = SQLCipherFTSDatabase(path=path, key="wal-checkpoint-poc-key")

@@ -7,6 +7,7 @@
 - **进程异常退出**：子进程从 stdin 读取临时 key，打开加密数据库，在显式事务内写入 memory 与 FTS 行后用 `os._exit(73)` 突然退出。重新打开数据库后，已提交 baseline 仍可搜索，未提交 marker 不存在，`PRAGMA integrity_check` 返回 `ok`。
 - **OS SIGKILL**：测试启动隔离子进程，在未提交 memory/FTS 事务后通过 stdout `READY` 信号通知测试进程；测试对该 PID 发送 `SIGKILL`。进程退出码为 `-SIGKILL`，重新打开后提交数据存在、未提交 marker 不存在、完整性检查为 `ok`。DELETE rollback journal 与 WAL 两种配置分别通过。本项不代表断电、存储控制器缓存或真实硬件断电语义。
 - **WAL TRUNCATE checkpoint**：在 SQLCipher 加密 POC 数据库上启用 WAL，写入已提交 memory/FTS 记录，执行受限模式的 `PRAGMA wal_checkpoint(TRUNCATE)`，检查 busy=0 且 checkpointed frames 与 log frames 相等；关闭并重开后检索结果和 `integrity_check` 均通过。checkpoint API 对 mode 使用枚举白名单，拒绝任意 SQL 文本。仅验证该临时数据库路径，不代表 App 退出时的正式 checkpoint 调度。
+- **WAL 数据库备份/恢复**：在源 SQLCipher DB 启用 WAL 并提交两条 memory/FTS 记录，通过单独备份密钥生成加密备份；源库和恢复库均可检索提交数据且 `integrity_check=ok`。该测试未在并发写入、活动 reader 或 WAL checkpoint 受阻状态下执行备份，也不确定产品 WAL 生命周期策略。
 - **活动 WAL reader 下 checkpoint 受阻与重试**：reader 连接开启事务并固定 snapshot 后，writer 提交新 memory/FTS 行并尝试 `TRUNCATE` checkpoint；SQLCipher 返回 `busy=1`，writer 仍能检索新提交数据。释放并关闭 reader 后重试返回 `busy=0` 且 checkpointed frames 与 log frames 相等；关闭并重开数据库，两条记录均可检索且 `integrity_check=ok`。该用例证明受阻状态可见并能在读锁释放后恢复，不证明 checkpoint 执行中断电或 SIGKILL 的原子性。
 - **磁盘页数耗尽模拟**：将 SQLCipher POC DB 的 `max_page_count` 限制到当前页数 + 1，插入大记录触发 DBAPI 数据库错误。事务回滚后旧记忆和 FTS 仍可检索，失败记录不存在，完整性检查为 `ok`。
 - **Alembic 回滚**：工作包 0F 已验证 POC migration `upgrade`/`downgrade`；这不是进程崩溃注入。
