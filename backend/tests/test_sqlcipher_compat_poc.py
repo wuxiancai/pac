@@ -141,7 +141,8 @@ def test_process_crash_mid_transaction_preserves_committed_data(database_paths) 
         recovered.close()
 
 
-def test_sigkill_mid_transaction_recovers_committed_data(database_paths) -> None:
+@pytest.mark.parametrize("journal_mode", ["delete", "wal"])
+def test_sigkill_mid_transaction_recovers_committed_data(database_paths, journal_mode: str) -> None:
     path, _ = database_paths
     database = SQLCipherFTSDatabase(path=path, key="sigkill-poc-key")
     database.add("committed before forced termination")
@@ -154,6 +155,7 @@ def test_sigkill_mid_transaction_recovers_committed_data(database_paths) -> None
             "scripts/crash_sqlcipher_poc.py",
             str(path.resolve()),
             "--wait-for-kill",
+            "--wal" if journal_mode == "wal" else "--delete-journal",
         ],
         cwd=backend,
         stdin=subprocess.PIPE,
