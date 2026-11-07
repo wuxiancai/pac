@@ -10,6 +10,7 @@ REPORT = (
 HANDOFF = Path(__file__).parents[2] / "docs" / "HANDOFF.md"
 MEMORY_EMBEDDING = Path(__file__).parents[2] / "docs" / "poc" / "phase0-memory-embedding.md"
 FAILURE_RECOVERY = Path(__file__).parents[2] / "docs" / "poc" / "phase0-failure-recovery.md"
+SQLCIPHER_COMPAT = Path(__file__).parents[2] / "docs" / "poc" / "phase0-sqlcipher-compat.md"
 
 
 def test_phase0_traceability_matches_latest_local_poc_evidence_and_gate() -> None:
@@ -78,3 +79,12 @@ def test_failure_recovery_report_records_atomic_backup_failure_protection() -> N
     assert "复制/校验/替换失败" in report
     assert "复制/校验/替换失败" in report
     assert "崩溃 staging" in traceability
+
+
+def test_sqlcipher_compat_report_reflects_latest_recovery_evidence() -> None:
+    report = SQLCIPHER_COMPAT.read_text(encoding="utf-8")
+
+    assert "WAL 数据库备份/恢复" in report
+    assert "SIGKILL" in report
+    assert "SQLCipher 专项测试：15 项通过" in report
+    assert "真实 ENOSPC" in report
