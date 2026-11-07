@@ -102,6 +102,29 @@ import Testing
     try supervisor.stop()
 }
 
+@available(macOS 12.0, *)
+@Test func supervisorDeinitializationStopsOwnedBackend() async throws {
+    let (python, backendDirectory) = try localBackendFixture()
+    let weakBox = WeakSupervisorBox()
+    let handshake = try startAndReleaseSupervisor(
+        pythonExecutableURL: python,
+        backendDirectoryURL: backendDirectory,
+        weakBox: weakBox
+    )
+
+    #expect(weakBox.value == nil)
+    var endpointRejectedAfterOwnerRelease = false
+    do {
+        endpointRejectedAfterOwnerRelease = try await LocalAPIClient(
+            baseURL: handshake.baseURL,
+            token: handshake.token
+        ).health() == false
+    } catch {
+        endpointRejectedAfterOwnerRelease = true
+    }
+    #expect(endpointRejectedAfterOwnerRelease)
+}
+
 private func localBackendFixture() throws -> (URL, URL) {
     var repositoryRoot = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 {
@@ -135,4 +158,23 @@ private func localBackendFixture(moduleSource: String) throws -> (URL, URL) {
     try Data().write(to: package.appendingPathComponent("__init__.py"))
     try Data(moduleSource.utf8).write(to: package.appendingPathComponent("local_service.py"))
     return (python, fixture)
+}
+
+@available(macOS 12.0, *)
+private final class WeakSupervisorBox {
+    weak var value: LocalBackendSupervisor?
+}
+
+@available(macOS 12.0, *)
+private func startAndReleaseSupervisor(
+    pythonExecutableURL: URL,
+    backendDirectoryURL: URL,
+    weakBox: WeakSupervisorBox
+) throws -> LocalBackendHandshake {
+    let supervisor = LocalBackendSupervisor(
+        pythonExecutableURL: pythonExecutableURL,
+        backendDirectoryURL: backendDirectoryURL
+    )
+    weakBox.value = supervisor
+    return try supervisor.start()
 }
