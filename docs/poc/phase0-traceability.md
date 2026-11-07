@@ -68,7 +68,7 @@ flowchart TD
 2. 0B 本地语音链路：中文 Streaming ASR、partial/final、用户主动录音、TTS 打断；英语覆盖取决于用户后续补充多语言模型，不属于当前代码缺陷或实现阻塞；真实端到端验收仍未完成。
 3. 0C 本地 Gateway/能力注册/Agent 模拟：完成可测试骨架；真实多 Provider blocked。
 4. 0D 记忆 POC：SQLite/FTS/来源/纠错/删除/恢复；真实向量 OPEN。
-5. 0E Swift/Loopback/Keychain/Consent：部分完成；策略支持 Touch ID 或设备密码，fake evaluator 路径已测；真实认证 UI 与正式 App lifecycle OPEN。
+5. 0E Swift/Loopback/Keychain/Consent：部分完成；策略支持 Touch ID 或设备密码，fake evaluator 路径已测；POC SwiftUI demo 启停/退出清理已实机验证；真实认证提示、异常自动恢复/退避、锁屏行为及正式分发配置仍 OPEN。
 6. 0F SQLCipher：兼容性与临时 migration POC 部分完成；产品 ADR 及故障面 OPEN。
 7. 0G Embedding：真实模型已下载并离线加载，固定 revision 权重完整性、FastEmbed 本机真实向量和 offline 二次加载已验证；4 条合成 query top-1 为 4/4；真实检索质量、重复性能和模型选择未验收。
 8. 0H 故障注入/性能：事务崩溃和页数限制 POC 完成；真实介质故障和语音并发性能未验证。
@@ -99,7 +99,7 @@ V1.1 及 V2–V5 仅按规格书规划；当前不实施后台任务、专业 Ag
 | Consent 仅内存、策略字段不全 | 重启/持久审计后授权可能无法证明 | POC 无云出站、默认拒绝 | 产品阶段实现完整 schema/migration/audit |
 | SQLCipher POC 不是发布形态验证 | DB/备份/打包或恢复失败 | ARM64 本机临时 migration 与错误 key 测试 | ADR、WAL、打包、灾难恢复和性能 |
 | Embedding 合成集过小且 observed RSS 较高 | 语义质量或资源占用不达产品目标 | 固定 revision 权重校验；离线加载；报告仅记两次观察值 | 真实标注检索集、重复性能分布、模型许可与产品阈值 |
-| 真实 Touch ID/SwiftUI 生命周期未跑 | 敏感入口和进程恢复风险 | `.deviceOwnerAuthentication` fake evaluator 测试、Keychain 授权门测试与 loopback CLI 集成 | 原生 UI/系统认证提示、拒绝/取消、App 启停/崩溃恢复实测 |
+| 真实认证与正式运行策略未验收 | 敏感入口和进程恢复风险 | `.deviceOwnerAuthentication` fake evaluator 测试；SwiftUI POC demo 启停/退出清理实测；supervisor 超时/退出集成回归 | 系统认证提示、正式签名分发、自动恢复/退避、锁屏/休眠策略 |
 | POC 与产品容易混淆 | 误将模拟视为完成承诺 | 报告标 POC、能力需要证据 | 每项产品功能进入正式实现仍需独立契约与验收 |
 
 ## 6. 阶段状态

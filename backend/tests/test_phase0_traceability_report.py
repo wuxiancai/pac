@@ -26,6 +26,7 @@ def test_phase0_traceability_matches_latest_local_poc_evidence_and_gate() -> Non
 
     assert "模型权重下载未完成" not in report
     assert "Touch ID UI/完整 App lifecycle OPEN" not in report
+    assert "POC SwiftUI demo 启停/退出清理已实机验证" in report
 
 
 def test_handoff_does_not_leave_superseded_embedding_or_backend_status() -> None:
@@ -35,3 +36,5 @@ def test_handoff_does_not_leave_superseded_embedding_or_backend_status() -> None
     assert "这不是正式 App 后端子进程管理，真实 App 生命周期仍未验收" not in handoff
     assert "候选权重已下载并离线评测" in handoff
     assert "SwiftUI demo 已接入本机后端 supervisor" in handoff
+    assert "SwiftUI demo 已实测启动/握手/停止/退出清理" in handoff
+    assert "POC-05 真实 Touch ID、完整 App 生命周期/握手未验证" not in handoff
