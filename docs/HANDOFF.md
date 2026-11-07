@@ -29,6 +29,7 @@
 - 为本地 ASR 新增测试先行的离线计时与峰值 RSS 测量脚本；使用现存合成 WAV 单次记录 ASR 分帧耗时、RTF、模型加载、进程 RSS 与事件计数。数据写入 `docs/poc/phase0-local-asr.md`，只作观察值，不等于麦克风链路性能验收。
 - 建立 `docs/poc/phase0-traceability.md`，按 v1.2 §13/§14 和 V1.1 §16 逐项列出阶段 0 证据、状态、缺口、模块依赖、未决项、后续阶段门禁与风险。矩阵判定阶段 0 未验收，阶段 1 未开始。
 - 补强本地 Model Gateway 流式关闭语义：非本地 adapter stream 在调用前拒绝；下游关闭时关闭 adapter async generator。测试先行捕获原有未关闭问题，现已修复并回归。
+- 本轮最终回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）55 项通过；本机 Swift Testing 12 项通过；`compileall`、`uv lock --check`、本次改动文件的 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
 
 ## 当前限制
 
