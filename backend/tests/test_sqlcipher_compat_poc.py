@@ -100,6 +100,50 @@ def test_wal_truncate_checkpoint_preserves_encrypted_memory_and_fts(database_pat
         reopened.close()
 
 
+def test_wal_truncate_checkpoint_reports_reader_contention_and_recovers(database_paths) -> None:
+    path, _ = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="wal-reader-checkpoint-poc-key")
+    assert database.enable_wal_for_poc() == "wal"
+    database.add("baseline WAL checkpoint record")
+
+    reader = sqlcipher.connect(str(path))
+    reader.execute("PRAGMA key = 'wal-reader-checkpoint-poc-key'")
+    reader.execute("SELECT count(*) FROM sqlite_master").fetchone()
+    reader.execute("BEGIN")
+    assert reader.execute("SELECT content FROM poc_memories").fetchall()
+    try:
+        database.add("committed during active WAL reader")
+
+        blocked = database.checkpoint_wal_for_poc("TRUNCATE")
+
+        assert blocked[0] == 1
+        assert blocked[1] >= blocked[2]
+        assert database.search("active WAL reader") == [
+            "committed during active WAL reader"
+        ]
+    finally:
+        reader.rollback()
+        reader.close()
+
+    retried = database.checkpoint_wal_for_poc("TRUNCATE")
+    assert retried[0] == 0
+    assert retried[1] == retried[2]
+    database.close()
+
+    reopened = SQLCipherFTSDatabase.open_existing(
+        path=path,
+        key="wal-reader-checkpoint-poc-key",
+    )
+    try:
+        assert reopened.search("baseline WAL") == ["baseline WAL checkpoint record"]
+        assert reopened.search("committed during") == [
+            "committed during active WAL reader"
+        ]
+        assert reopened.integrity_check() == "ok"
+    finally:
+        reopened.close()
+
+
 def test_backup_target_failure_preserves_source_database(database_paths) -> None:
     path, _ = database_paths
     database = SQLCipherFTSDatabase(path=path, key="backup-failure-poc-key")

@@ -9,6 +9,7 @@ REPORT = (
 )
 HANDOFF = Path(__file__).parents[2] / "docs" / "HANDOFF.md"
 MEMORY_EMBEDDING = Path(__file__).parents[2] / "docs" / "poc" / "phase0-memory-embedding.md"
+FAILURE_RECOVERY = Path(__file__).parents[2] / "docs" / "poc" / "phase0-failure-recovery.md"
 
 
 def test_phase0_traceability_matches_latest_local_poc_evidence_and_gate() -> None:
@@ -52,3 +53,14 @@ def test_memory_embedding_report_preserves_opt_in_and_non_product_scope() -> Non
     assert "top1_matches=3" in report
     assert "产品模型、持久化 schema 与真实检索质量仍 OPEN" in traceability
     assert "固定候选权重离线合成检索 3/3 top-1" in handoff
+
+
+def test_failure_recovery_report_distinguishes_reader_contention_from_crash_mid_checkpoint() -> None:
+    report = FAILURE_RECOVERY.read_text(encoding="utf-8")
+    traceability = REPORT.read_text(encoding="utf-8")
+
+    assert "活动 WAL reader" in report
+    assert "busy=1" in report
+    assert "释放并关闭 reader 后" in report
+    assert "checkpoint 执行中 SIGKILL" in report
+    assert "活动 WAL reader 下 `busy=1` 可见" in traceability

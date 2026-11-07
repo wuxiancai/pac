@@ -35,7 +35,7 @@ swift test
 ./scripts/run_backend_lifecycle_poc.sh
 ```
 
-最近全量回归：Python（包含 `phase0-security` 与 `phase0-embedding` extras）101 项通过；`compileall`、`uv lock --check` 通过。Swift 测试 27 项通过。Python 测试包括实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 测试包含真实本机 Keychain dummy secret 写入/轮换/删除及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
+最近全量回归：Python（包含 `phase0-security` 与 `phase0-embedding` extras）103 项通过；`compileall`、`uv lock --check` 通过。Swift 测试 27 项通过。Python 测试包括实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 测试包含真实本机 Keychain dummy secret 写入/轮换/删除及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
 
 ## 未解决/未验收
 
