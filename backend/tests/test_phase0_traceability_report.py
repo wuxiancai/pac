@@ -64,3 +64,12 @@ def test_failure_recovery_report_distinguishes_reader_contention_from_crash_mid_
     assert "释放并关闭 reader 后" in report
     assert "checkpoint 执行中 SIGKILL" in report
     assert "活动 WAL reader 下 `busy=1` 可见" in traceability
+
+
+def test_failure_recovery_report_records_atomic_backup_failure_protection() -> None:
+    report = FAILURE_RECOVERY.read_text(encoding="utf-8")
+    traceability = REPORT.read_text(encoding="utf-8")
+
+    assert "原子替换" in report
+    assert "旧备份仍可用原密钥解密" in report
+    assert "保留旧备份" in traceability

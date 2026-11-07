@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import tempfile
 from pathlib import Path
 
 import sqlcipher3.dbapi2 as sqlcipher
@@ -123,13 +125,42 @@ class SQLCipherFTSDatabase:
             target.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise SQLCipherPOCError("encrypted backup destination is unavailable") from exc
-        destination = self._open_connection(target, self._validate_key(backup_key))
+        validated_key = self._validate_key(backup_key)
+        descriptor = -1
+        staging_path: Path | None = None
+        destination = None
         try:
-            self._connection.backup(destination)
-        except sqlcipher.DatabaseError as exc:
+            descriptor, staging_name = tempfile.mkstemp(
+                prefix=f".{target.name}.", suffix=".partial", dir=target.parent
+            )
+            os.close(descriptor)
+            descriptor = -1
+            staging_path = Path(staging_name)
+            destination = self._open_connection(staging_path, validated_key)
+            self._copy_backup_to(destination)
+            destination.close()
+            destination = None
+
+            verified = self.open_existing(path=staging_path, key=validated_key)
+            try:
+                if verified.integrity_check() != "ok":
+                    raise SQLCipherPOCError("encrypted backup validation failed")
+            finally:
+                verified.close()
+            os.replace(staging_path, target)
+        except (OSError, sqlcipher.DatabaseError, SQLCipherPOCError) as exc:
             raise SQLCipherPOCError("encrypted backup operation failed") from exc
         finally:
-            destination.close()
+            if descriptor >= 0:
+                os.close(descriptor)
+            if destination is not None:
+                destination.close()
+            if staging_path is not None:
+                for suffix in ("", "-wal", "-shm", "-journal"):
+                    Path(f"{staging_path}{suffix}").unlink(missing_ok=True)
+
+    def _copy_backup_to(self, destination) -> None:
+        self._connection.backup(destination)
 
     def close(self) -> None:
         self._connection.close()

@@ -166,6 +166,43 @@ def test_backup_target_failure_preserves_source_database(database_paths) -> None
         blocked_parent.unlink(missing_ok=True)
 
 
+def test_failed_backup_preserves_previous_valid_backup(database_paths, monkeypatch) -> None:
+    path, backup = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="backup-atomic-source-key")
+    database.add("new source record")
+    previous = SQLCipherFTSDatabase(path=backup, key="temporary-init-key")
+    previous.add("previous valid backup record")
+    previous.close()
+    previous = SQLCipherFTSDatabase.open_existing(
+        path=backup, key="temporary-init-key"
+    )
+    previous.close()
+
+    def interrupted_copy(_destination) -> None:
+        raise sqlcipher.DatabaseError("simulated mid-copy I/O failure")
+
+    monkeypatch.setattr(database, "_copy_backup_to", interrupted_copy, raising=False)
+    try:
+        with pytest.raises(SQLCipherPOCError, match="backup operation failed"):
+            database.backup_to(backup, backup_key="separate-backup-key")
+
+        preserved = SQLCipherFTSDatabase.open_existing(
+            path=backup, key="temporary-init-key"
+        )
+        try:
+            assert preserved.search("previous valid") == [
+                "previous valid backup record"
+            ]
+            assert preserved.integrity_check() == "ok"
+        finally:
+            preserved.close()
+        assert database.search("new source") == ["new source record"]
+        assert database.integrity_check() == "ok"
+        assert list(backup.parent.glob(f".{backup.name}.*.partial")) == []
+    finally:
+        database.close()
+
+
 def test_sqlalchemy_and_alembic_migration_work_on_encrypted_fts_database(database_paths) -> None:
     path, _ = database_paths
     engine = create_sqlalchemy_compat_engine(path=path, key="poc-alembic-key")
