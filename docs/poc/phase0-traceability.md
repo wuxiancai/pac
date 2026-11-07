@@ -9,7 +9,7 @@
 | 基线条目 | 阶段 0 要求 / 验收 | 状态 | 现有证据 | 缺口 / 下一步 |
 |---|---|---|---|---|
 | D-001、阶段 0 设备记录 | 记录型号、内存、macOS、磁盘、音频设备 | PARTIAL | M1/16 GiB、macOS 26.5.1、采集时空间约 18–19 GiB、系统音频设备，见 ASR 报告 | 设备空间与设备列表是时点记录；主力设备仍待产品负责人确认 |
-| POC-01 / FR-VOICE-002/004 | 本地流式 partial/final、语句端点 | PARTIAL | 合成 WAV 多个 partial、final；用户实机反馈麦克风可录音 | 固定真实语音集、重复轮次、麦克风 partial/final 停止/异常清理记录不完整；当前加载中文模型，多语言模型由用户安排后续补充 |
+| POC-01 / FR-VOICE-002/004 | 本地流式 partial/final、语句端点 | PARTIAL | 8 条本机中文合成句在 3,000 ms 静音尾段下均产生 final，59 个 partial，weighted CER 0.0；用户实机反馈麦克风可录音 | 该结果仅为小型合成集；真人麦克风 partial/final、重复轮次、停止/异常清理仍不完整；英语取决于用户后续多语言模型，不是当前代码阻塞 |
 | POC-01 / FR-VOICE-005/008 | 本机 TTS 可打断；ASR/TTS 独立 | PARTIAL | AVSpeechSynthesizer CLI 实测打断；ASR、TTS POC 分开 | SwiftUI 集成与 ASR/TTS 并发未验证 |
 | POC-01 / FR-VOICE-006/007/010 | 本地默认；本地失败显式失败；不落盘、不静默云切换 | PARTIAL | ASR adapter 无云 fallback；麦克风仅内存队列；测试覆盖拒绝/溢出 | 麦克风真实异常与系统级出站监测未完整执行 |
 | POC-01 性能 | ASR 与 Agent 同时运行的延迟、内存、CPU/GPU | PARTIAL | 单独 ASR 与同步 barrier 的 ASR + 本机 Ollama LLM 生成各有一次单样本记录；后者实测重叠 0.785 秒、帧 P95 52.17 ms、Python + Ollama 进程 RSS 采样峰值 702,267,392 bytes、CPU 时间差约 10.95 秒；不是完整 Agent | 不是麦克风端到端或重复负载；采样间隔 1 秒；GPU 未测；目标阈值未决 |

@@ -29,7 +29,7 @@
 - 为本地 ASR 新增测试先行的离线计时与峰值 RSS 测量脚本；使用现存合成 WAV 单次记录 ASR 分帧耗时、RTF、模型加载、进程 RSS 与事件计数。数据写入 `docs/poc/phase0-local-asr.md`，只作观察值，不等于麦克风链路性能验收。
 - 建立 `docs/poc/phase0-traceability.md`，按 v1.2 §13/§14 和 V1.1 §16 逐项列出阶段 0 证据、状态、缺口、模块依赖、未决项、后续阶段门禁与风险。矩阵判定阶段 0 未验收，阶段 1 未开始。
 - 补强本地 Model Gateway 流式关闭语义：非本地 adapter stream 在调用前拒绝；下游关闭时关闭 adapter async generator。测试先行捕获原有未关闭问题，现已修复并回归。
-- 当前最终回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）83 项通过；本机 Swift Testing 16 项通过；`compileall`、`uv lock --check`、本次提交文件的 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
+- 当前最终回归记录：Python（包含 `phase0-security` 与 `phase0-embedding` extras）90 项通过；本机 Swift Testing 16 项通过；`compileall`、`uv lock --check`、本次提交文件的 whitespace 检查通过。ASR 单样本数据及适用范围见 ASR POC 报告。
 - 用户澄清本机是软件开发、测试和运行设备，允许下载模型并行进行。Embedding 下载单独进程仍停滞于权重文件；显式设置项目级 HF/XDG cache 和代理后，Python 下载器仍打开 macOS Library HTTP 缓存，现已停止。权重不完整部分保留在 `.poc-data`；将改用受控传输方式后继续下载，不让下载阻塞开发。
 - 扩展 Swift↔FastAPI loopback 集成 POC：服务由测试 harness 停止后重新创建，Swift CLI 使用新随机端口/新短期 token 再次健康握手；这不是正式 App 后端子进程管理，真实 App 生命周期仍未验收。
 - SQLCipher 恢复 POC 新增真实子进程 `SIGKILL` 注入：在事务写入后、提交前强制杀进程，再开启 DB 验证已提交行、未提交 memory/FTS 行和 `integrity_check`；恢复测试只覆盖默认 rollback journal，不代表断电/WAL。
@@ -42,6 +42,7 @@
 - 依 FR-SEC-006 修正敏感操作认证策略：由仅 biometric-only 改为 LocalAuthentication `.deviceOwnerAuthentication`（Touch ID 或设备密码）；先添加策略回归测试，验证通过。未触发真实系统提示；旧 `touchIDUnavailable` 错误 case 保留兼容，当前不可用路径抛出通用 `authenticationUnavailable`。
 - 为 POC-01 新增同步 barrier 并发测量 helper 与本机脚本；同一合成 WAV 的 ASR 与 Ollama `qwen3.5:0.8b` 请求确证重叠 0.785 秒。该次 ASR frame P95 52.17 ms / max 75.45 ms，ASR+Ollama 进程 RSS 采样峰值 702,267,392 bytes，CPU 增量约 10.95 秒；GPU 未测，只有一次样本且不是完整 Agent 或性能验收。详见 `phase0-local-asr.md`。
 - 为 0H SQLCipher POC 增加受限模式 WAL TRUNCATE checkpoint；已验证 checkpoint 前后 encrypted memory/FTS 可查询、checkpoint status 正常、重开 integrity check 通过，并拒绝未列入白名单的 mode 文本。不是进程中断/断电 checkpoint 可靠性证明。
+- 为 POC-01 新增字符级 CER 统计和显式 manifest 评估脚本，manifest 路径限制为同目录文件。固定 8 条本机合成中文语音重测为 8/8 final、59 partial、weighted CER 0.0；不是真人麦克风质量或英语能力证据。见 `phase0-local-asr.md`。
 
 ## 当前限制
 
