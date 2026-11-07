@@ -26,11 +26,13 @@
 - 建立 FastEmbed 多语言 Embedding 候选接口和测试。真实权重下载停滞并中断；未计算真实向量或检索准确性，详情见 `docs/poc/phase0-local-embedding.md`。
 - 开始恢复 POC：在 SQLCipher 临时 DB 上验证未提交事务遇进程立即退出后的恢复，以及页数上限触发数据库错误时 memory/FTS 事务回滚；报告见 `docs/poc/phase0-failure-recovery.md`。
 - 建立精确 Provider/Model capability registry POC；未知默认拒绝，支持状态要求证据，报告见 `docs/poc/phase0-model-capability-registry.md`。
+- 为本地 ASR 新增测试先行的离线计时与峰值 RSS 测量脚本；使用现存合成 WAV 单次记录 ASR 分帧耗时、RTF、模型加载、进程 RSS 与事件计数。数据写入 `docs/poc/phase0-local-asr.md`，只作观察值，不等于麦克风链路性能验收。
 
 ## 当前限制
 
 - ASR 仅在当前中文模型上验证；本机麦克风已实测可录音，但英文识别未解决。不得静默改用云 ASR。
 - 尚未验证 SwiftUI 麦克风链路、中英混合识别质量、P50/P95、资源占用、AEC、TTS 与 ASR 同时工作和锁屏/休眠处理。
+- 目前仅有合成短音频单次 ASR 性能观测；真实麦克风端到端延迟、重复样本分布与可确认性能阈值仍未验证/未决。
 - Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始；POC-05 真实 Touch ID、完整 App 生命周期/握手未验证；POC-06 尚未评估密钥生命周期、WAL、真实 ENOSPC/断电、备份介质故障和性能，也未作 ADR。记忆 POC 尚未评测真实本地 Embedding；模型下载被中断，不能标记通过。
 - 所有产品待决策项继续保持未定；本地 ASR 模型是临时 POC 候选。
 

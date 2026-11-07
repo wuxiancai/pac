@@ -37,6 +37,8 @@
 - 本地中文合成音频期间观察到多个增量 partial，序列号持续前进；静音尾段触发 final。
 - 测试文本“你好，今天天气很好。我想测试本地实时语音识别。”的最终识别为“你好今天天气很好我想测试本地实时语音识别”。这是单条合成样本观察，不构成准确率结论。
 - 未采集 P50/P95、内存/CPU、端到端麦克风延迟；不据此作性能承诺。
+- 新增可重复的离线资源测量命令 `scripts/measure_local_asr_poc.py`；它只读取用户明确传入的 WAV、只输出统计指标，不输出识别文本或另存音频。
+- 对已有本机合成样本单次实测：处理音频 6.94 秒（含 1.6 秒端点静音）、35 帧；ASR 阶段 wall time 0.397 秒、RTF 0.057；模型加载 1.901 秒；进程峰值 RSS 461,209,600 bytes；帧处理延迟 P50 16.34 ms、P95 20.78 ms、最大 25.79 ms；观察到 15 个 partial、1 个 final。以上为单机单样本单次观测，且峰值 RSS 是脚本进程峰值，不是 ASR 子组件增量；不构成麦克风实时链路、稳定性或性能承诺。
 - 麦克风 CLI 要求交互式终端，运行后还需用户按回车才会开始最多20秒采集；本次未按下启动键，未录制麦克风音频。
 
 ## 复现
@@ -49,6 +51,9 @@ mkdir -p .poc-data/audio
 say -v Tingting -o .poc-data/audio/mandarin.aiff '你好，今天天气很好。我想测试本地实时语音识别。'
 afconvert -f WAVE -d LEI16@16000 -c 1 .poc-data/audio/mandarin.aiff .poc-data/audio/mandarin-16k.wav
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_local_asr_poc.py \
+  .poc-data/audio/mandarin-16k.wav \
+  .poc-data/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30
+UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/measure_local_asr_poc.py \
   .poc-data/audio/mandarin-16k.wav \
   .poc-data/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_live_microphone_poc.py \
@@ -65,7 +70,7 @@ swift run tts-interrupt-poc
 ## 尚未解决
 
 - 需要由用户明确启动真实麦克风测试，验证 partial/final、VAD、背压、停止和异常后的缓冲清理。
-- 需要中英混合固定样本集与多轮重复，测识别质量及 P50/P95；阈值由产品负责人确认。
+- 需要中英混合固定样本集与多轮重复，测识别质量及端到端麦克风 P50/P95；阈值由产品负责人确认。当前测量仅是单条合成 WAV 的 ASR 分帧耗时。
 - 需要与 FastAPI、SwiftUI 音频采集及独立 TTS 配置集成验证；当前为本机 CLI POC。
 - 此模型的许可、分发方式和用户设备内存压力仍需单独记录。
 - 静态加密、Keychain、Consent/Policy、云端 ASR、Gateway、记忆和备份 POC 均未开始。
