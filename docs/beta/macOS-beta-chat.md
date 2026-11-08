@@ -27,13 +27,14 @@
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q tests/test_beta_api.py tests/test_local_service_process_poc.py tests/test_security_poc.py`：11 项通过。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q`：158 项通过（该轮记录，其后新增测试使全量升至 162 项）；`uv run --locked python -m compileall -q pac_poc scripts tests`：通过。
 - 千问应用选项改动后：千问相关后端窄回归 26 项通过；Python 全量回归 162 项通过；`swift test --package-path poc/macos-audio` 31 项通过；Beta `.app` 构建成功。运行中 GUI Accessibility 树显示模型 `qwen3.8-flash` 与“模型设置”按钮；设置 sheet 手动操作、Keychain 保存和真实千问 API 请求尚未验证。
+- 2026-11-09 用户确认千问应用 API Key 已轮换，曾暴露的 Key 已删除。本轮通过 `scripts/run_beta_app.sh` 启动后 GUI 显示本机服务已连接、当前云模型为 `qwen3.8-flash`；模型设置页对 `qwen-app` 的 Keychain 状态查询显示“未配置”。没有输入、读取 Key 内容或保存 Key，也没有发送云请求。用户需在本机设置页保存新 `sk-ws-` Key 后，才能进行真实 API 验证。
 - 移除聊天逐条云确认弹窗后：`swift test --package-path poc/macos-audio` 31 项通过，Beta target 构建通过；尚未在运行 GUI 中发起消息做无弹窗手动复核。用户选择云端即持续授权，设置页告知发送目标和切回本地的方法。
 - `scripts/run_beta_app.sh` 构建并启动更新后的应用；GUI Accessibility 树确认右上角“模型设置”按钮和当前模型状态显示。设置 sheet 本身以及真实云端请求尚未进行手动 GUI 验收。
 - 使用真实本机 Ollama 模型对 `/chat/stream` 发送合成短句，HTTP 200，收到 7 个非空增量片段；未记录回复正文。服务经 supervisor stop 正常退出。
 
 ## 下一步与限制
 
-- GUI 已确认可以提交消息并显示回答，也观察到模型设置按钮；设置 sheet 选择/保存路径、停止按钮行为和关闭窗口后的后端清理仍待手动复核。
+- GUI 已确认可以提交消息并显示回答，也观察到模型设置按钮；本轮确认设置页仍未配置 `qwen-app`。启动脚本启动并显示服务连接；Cmd-Q 后进程检查未见 app/backend 残留。窗口关闭路径和停止按钮行为仍待手动复核。
 - 生成请求用 request ID 隔离流片段和收尾状态，避免停止后立即发起的新请求被旧请求回调清除。`swift test --package-path poc/macos-audio` 构建通过，31 项既有 Swift 测试通过；当前尚无专门覆盖 SwiftUI 请求竞态的单元测试。
 - 对话不持久化是当前范围选择，不是故障；持久化等用户确认数据保留和加密方案后再做。
 - 语音接入作为 B2；开始录音必须由用户在应用内明确操作，音频不落盘，识别失败不切云。

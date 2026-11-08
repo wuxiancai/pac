@@ -1,3 +1,10 @@
+### 2026-11-09：复核千问 Key 状态并推进 B0/B1 手动冒烟
+
+- 用户确认千问应用 API Key 已轮换，暴露的旧 Key 已删除。运行 `poc/macos-audio/scripts/run_beta_app.sh` 后 SwiftUI 页面显示本机服务已连接，当前模型仍为千问 `qwen3.8-flash`；设置页通过 Keychain 状态接口显示 `qwen-app` “未配置”。没有输入、读取 Key 内容或保存 Key，也没有发起真实云请求。
+- B0 复核：启动脚本构建成功；一次 GUI 检查遇到本机服务启动失败提示，干净重启后连接成功；Cmd-Q 后 `ps` 检查未见测试版 app 或 `pac_poc.local_service` 残留。因本轮没有单独验证关闭窗口的生命周期，不关闭 B0。
+- 直接启动固定后端模块的握手诊断成功，输出中省略 token，并通过关闭 stdin 收到退出码 0。真实千问调用仍取决于用户先在设置页保存新 `sk-ws-` Key；保存凭据必须由用户亲自在应用内完成。
+- 更新 `docs/TASKS.md`、`docs/beta/macOS-beta-chat.md`。下一步：用户在测试版“模型设置”中输入并保存新千问应用 API Key（本机 Keychain）；随后再逐次授权并执行合成云请求。B0 窗口关闭清理、B1 停止行为仍需 GUI 冒烟。用户已确认旧暴露 Key 删除，解除此前遗留的撤销状态疑问。
+
 ### 2026-11-09：收紧 Consent 操作与来源范围
 
 - Consent grant 增加必填的 `action_scopes` 与 `source_scopes`，并记录 ACTIVE/REVOKED 生命周期；撤销后保留 REVOKED 状态。Gateway 按实际调用入口派生 generate、stream 或 tool-proposal 操作，远端请求缺来源或操作不匹配时在 Adapter 调用前拒绝。Beta GUI 的云请求授权限定到 `beta-gui-chat` 来源及 stream 操作；Provider POC 探测调用已提供明确来源和对应动作授权。
