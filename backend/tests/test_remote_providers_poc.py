@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 import subprocess
+import sys
 
 import httpx
 import pytest
@@ -89,6 +91,26 @@ def test_remote_default_deny_prevents_keychain_read_and_network_request() -> Non
 
     assert credentials.reads == []
     assert requests == []
+
+
+def test_provider_capability_deny_check_uses_tripwires_and_never_reads_keychain() -> None:
+    backend = Path(__file__).parents[1]
+    for provider in ("deepseek", "openrouter"):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/probe_provider_capability_poc.py",
+                provider,
+                "deny-check",
+            ],
+            cwd=backend,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "Keychain 读取次数=0，HTTP transport 调用次数=0: True" in result.stdout
 
 
 def test_deepseek_text_request_requires_exact_consent_and_uses_keychain_secret() -> None:
@@ -266,10 +288,12 @@ def test_one_gateway_routes_sequentially_to_both_providers_with_exact_consents()
 def test_remote_tools_are_returned_as_data_and_never_executed() -> None:
     credentials = FakeCredentials()
     calls = 0
+    seen: list[httpx.Request] = []
 
-    def handle(_request: httpx.Request) -> httpx.Response:
+    def handle(request: httpx.Request) -> httpx.Response:
         nonlocal calls
         calls += 1
+        seen.append(request)
         return httpx.Response(
             200,
             json={
@@ -299,7 +323,10 @@ def test_remote_tools_are_returned_as_data_and_never_executed() -> None:
     consent = ConsentManager()
     grant_for(consent)
     gateway = make_gateway(consent, adapter, "deepseek")
-    request = request_for(tools=({"type": "function", "function": {"name": "synthetic_lookup"}},))
+    request = request_for(
+        tools=({"type": "function", "function": {"name": "synthetic_lookup"}},),
+        tool_choice={"type": "function", "function": {"name": "synthetic_lookup"}},
+    )
 
     result = asyncio.run(gateway.call_with_tools(request))
 
@@ -308,6 +335,7 @@ def test_remote_tools_are_returned_as_data_and_never_executed() -> None:
         ("synthetic_lookup", {"key": "phase0"})
     ]
     assert calls == 1
+    assert b'"tool_choice":{"type":"function","function":{"name":"synthetic_lookup"}}' in seen[0].read()
 
 
 def test_structured_response_format_is_forwarded_without_secret_logging() -> None:

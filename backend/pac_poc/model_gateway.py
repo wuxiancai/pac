@@ -22,6 +22,7 @@ class LocalModelRequest:
     data_level: DataLevel = DataLevel.L0
     tools: Sequence[Mapping[str, object]] = ()
     response_format: Mapping[str, object] | None = None
+    tool_choice: Mapping[str, object] | str | None = None
 
 
 @dataclass(frozen=True)

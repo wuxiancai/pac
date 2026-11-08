@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：0C Provider 能力探测工具
+
+- 新增 `backend/scripts/probe_provider_capability_poc.py`，按 Provider/能力单次运行，覆盖 streaming、强制工具提案（不执行）、JSON、故意触发 4xx、重复 metadata，以及无授权 deny-check。每个真实 HTTP 请求都需要单独输入精确确认；故意错误请求可能计费。
+- Adapter 新增显式 `tool_choice` 透传。窄回归 30 项通过；deny-check tripwire 结果为 Keychain reads=0、HTTP transport calls=0。该结果不是系统级抓包，所有真实能力请求仍未执行。
+- 复现命令、payload、确认短语及未决限制见 `poc/phase0-remote-provider.md`。
+
 ### 2026-11-08：0C 同一 Gateway 双 Provider 路由
 
 - 新增 `backend/scripts/probe_provider_switch_poc.py`：同一 ModelGateway 注册 DeepSeek 与 OpenRouter 两个固定 adapter，逐家展示合成请求并要求独立精确确认；拒绝或失败不触发自动 failover。

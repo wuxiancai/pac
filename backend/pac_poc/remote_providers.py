@@ -251,6 +251,12 @@ class OpenAICompatibleRemoteAdapter:
         }
         if request.tools:
             payload["tools"] = list(request.tools)
+        if request.tool_choice is not None:
+            payload["tool_choice"] = (
+                dict(request.tool_choice)
+                if isinstance(request.tool_choice, Mapping)
+                else request.tool_choice
+            )
         if request.response_format is not None:
             payload["response_format"] = dict(request.response_format)
         if self._config.provider == "openrouter":
