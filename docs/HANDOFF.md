@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：OpenRouter 工具提案实测通过
+
+- 用户在诊断增强后的脚本中再次独立确认 OpenRouter tools 请求。第三次探测返回 `phase0_echo_synthetic(marker=phase0-probe-ack)`，finish_reason=`tool_calls`，模型 `deepseek/deepseek-v4.1-flash-1017`，下游 Provider `Relace` / `HKG`；提案未执行。
+- 前两次已授权请求返回空 proposal（第二次文本为空），原因仍未知；第三次成功证明固定配置有可用端到端路径，不代表稳定性。0C 还需两家 JSON/错误、费用和区域重复核验、拒绝后的系统级零出站证据。详见 `poc/phase0-remote-provider.md`。
+- 本轮仅更新实测证据与排程文档；待执行 `git diff --check` 并提交。
+
 ### 2026-11-08：OpenRouter 工具探测诊断增强
 
 - 用户在保持 `provider.require_parameters=true`、`allow_fallbacks=false` 的配置下再次确认 OpenRouter 工具探测；结果仍为 `工具调用提案（未执行）: []` 与空模型文本。此请求发生在 finish_reason/路由诊断输出加入前，故上游返回形态和原因仍未知。

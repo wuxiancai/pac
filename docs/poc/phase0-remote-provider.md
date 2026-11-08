@@ -86,10 +86,10 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 - **DeepSeek SSE**：用户按 `probe_provider_capability_poc.py deepseek stream` 执行并输入本次精确确认。流式分块拼接后得到 `phase0-probe-ack`，精确匹配为 True。未提供 token/cost 或服务侧 Provider/region metadata；只证明 DeepSeek `deepseek-flash` 的一次真实流式合成文本成功，不代表 OpenRouter 或稳定性。
 - **OpenRouter SSE**：用户按 `probe_provider_capability_poc.py openrouter stream` 输入 `ALLOW OPENROUTER STREAM 1` 后，流式分块拼接得到 `phase0-probe-ack`，精确匹配为 True。未提供 token/cost 或流式 metadata；只证明 OpenRouter `deepseek/deepseek-v4.1-flash-1017` Global 的一次真实流式合成文本成功，不代表稳定性或其他能力。
 - **DeepSeek 工具提案**：首次请求返回 HTTP 400。依据 DeepSeek 官方说明，thinking 默认启用且 named `tool_choice` 在 thinking mode 不受支持；脚本随后显式关闭 thinking，并由用户对更新后的完整 schema/payload 再次独立确认。第二次请求返回 `phase0_echo_synthetic`，参数为 `{"marker":"phase0-probe-ack"}`。提案只作为数据展示，未执行任何工具。该实测证明 DeepSeek `deepseek-flash` 在此配置下的一次工具提案成功；不证明 OpenRouter、执行安全或稳定性。
-- **OpenRouter 工具提案两次尝试**：第一次逐次确认后返回空 proposal list；随后请求增加 `provider.require_parameters=true` 且保持 `allow_fallbacks=false`，用户再次输入 `ALLOW OPENROUTER TOOLS 1`，仍返回空 proposal list、空模型文本。第二次请求发生在诊断字段加入之前，因此 finish_reason、实际模型、下游 Provider 与区域仍无实测值；原因未确认。脚本现已输出这些字段，便于下一次单独授权请求定位。即使模型目录声明支持工具，尚不能据此判定此路由实际成功。
+- **OpenRouter 工具提案**：前两次逐次确认后均返回空 proposal list（第二次普通文本也为空）。加入 finish_reason/路由诊断后，用户再次输入 `ALLOW OPENROUTER TOOLS 1`，第三次请求成功返回 `phase0_echo_synthetic`，参数为 `{"marker":"phase0-probe-ack"}`；finish_reason=`tool_calls`，实际模型 `deepseek/deepseek-v4.1-flash-1017`，下游 Provider `Relace`、区域 `HKG`。工具仅作为提案展示，未执行。此证据证明该固定配置的一次真实工具提案成功，不证明稳定性或执行安全；前两次空结果的原因仍未知。
 
 ## 尚未验收
 
-- 两家真实 SSE 各有一次成功；DeepSeek 工具提案一次成功，OpenRouter 工具提案两次均无 proposal（第二次普通文本也为空）；结构化输出、服务端 4xx 错误、费用/区域重复结果及拒绝/撤销后的系统级零出站边界尚未充分验证。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
+- 两家真实 SSE 各有一次成功；DeepSeek 与 OpenRouter 工具提案各有一次成功且均未执行（OpenRouter 前两次曾为空）；结构化输出、服务端 4xx 错误、费用/区域重复结果及拒绝/撤销后的系统级零出站边界尚未充分验证。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。
