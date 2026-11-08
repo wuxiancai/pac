@@ -6,6 +6,11 @@
 
 ## 最近交接
 
+### 2026-11-08：阶段追踪记录与最新 Provider 证据对齐
+
+- 修正 D-010 的旧表述：DeepSeek 一次合成探测由用户报告成功；OpenRouter 尚无成功端到端证据，余额不足原因按用户说明记录。
+- 更新追踪矩阵的 Consent/Policy 真实路径证据与 Python 139 项最新回归数；阶段 0 仍有明确缺口，不能签收。
+
 ### 2026-11-08：首次双语麦克风实测与 Provider 组合输入
 
 - 用户主动运行官方中英 Streaming Zipformer 麦克风 CLI，回报多个 partial、两个 final。混合中文/英语话语出现可见错词，第二段英语也未稳定识别；无逐字 ground truth，未算 CER。该轮只作为一次真实设备观察，原始音频未保存。复测要求见 `poc/phase0-local-asr.md` 和 `TASKS.md`。

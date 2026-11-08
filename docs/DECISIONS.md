@@ -29,7 +29,7 @@
 | D-007 | 静态加密方案 | **DEFERRED（2026-11-08）**；ADR-019 同步延期。 |
 | D-008 | 外接盘能否作为活动数据目录 | **DEFERRED（2026-11-08）**；若恢复该范围，需补介质 POC。 |
 | D-009 | 固定专业 Agent 属于 V2 还是 V3 | **DEFERRED（2026-11-08）**。 |
-| D-010 | V1 首批 Provider | **DEFERRED（2026-11-08）**；用户提供 DeepSeek 与 OpenRouter 两家测试候选，并确认 DeepSeek 按中国处理、OpenRouter 使用 Global 路由。是否将它们定为 V1 首批组合仍待决。未配置凭据、未发送请求。 |
+| D-010 | V1 首批 Provider | **DEFERRED（2026-11-08）**；用户提供 DeepSeek 与 OpenRouter 两家测试候选，并确认 DeepSeek 按中国处理、OpenRouter 使用 Global 路由。是否将它们定为 V1 首批组合仍待决。DeepSeek 一次合成探测由用户报告成功；OpenRouter 尚无成功端到端证据。 |
 | D-011 | 云 ASR/TTS 供应商与区域 | **DEFERRED（2026-11-08）**。 |
 | D-012 | 文件导入白名单和容量限制 | **DEFERRED（2026-11-08）**。 |
 | D-013 | 性能目标数值 | **DEFERRED（2026-11-08）**；当前测量仅作为观察值。 |
