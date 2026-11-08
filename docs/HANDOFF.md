@@ -1,6 +1,13 @@
+### 2026-11-08：0H APFS 满卷备份复制恢复
+
+- 扩展 `run_sqlcipher_enospc_poc.py`，在仓库 `.poc-data` 下的 128 MiB APFS 临时映像中先留存旧加密备份，再扩展源库并填满目标卷，真实执行新备份直到 SQLCipher 返回 `database or disk is full`。释放填充文件后，源库的基线与 12 条新记录可检索，旧备份可用旧密钥检索；两边 `integrity_check=ok`，失败 staging 已清理。
+- SQLCipher binding 未提供 `sqlite_errorcode`，仅有标准错误文本；`is_disk_full_error` 现识别 SQLCipher exception 的精确 SQLite 满盘文本，并有回归覆盖。
+- 窄恢复回归 `pytest -q tests/test_sqlcipher_enospc_poc.py tests/test_sqlcipher_compat_poc.py`：29 项通过；全量 Python 回归 154 项通过、compileall 和 `uv lock --check` 通过；Swift 31 项通过；追踪文档测试 9 项通过，`git diff --check` 通过。
+- 更新 `phase0-failure-recovery.md`、`phase0-enospc-recovery.md`、`TASKS.md` 和追踪矩阵。系统卷/外接介质、断电/文件系统故障、WAL 产品策略仍未覆盖。
+
 ### 2026-11-08：阶段 0 本机全量回归复核
 
-- 在 `backend/` 运行 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q`、`uv run --locked python -m compileall -q pac_poc scripts tests` 与 `uv lock --check`：Python 153 项通过，compileall 与锁文件检查通过。
+- 在 `backend/` 运行 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q`、`uv run --locked python -m compileall -q pac_poc scripts tests` 与 `uv lock --check`：Python 154 项通过，compileall 与锁文件检查通过。
 - 在 `poc/macos-audio/` 运行 `swift test`：31 项通过。`git diff --check` 通过。
 - 将上下文、任务清单和追踪矩阵的旧 Python 151/Swift 29 结果更新为当前结果。GitHub Actions 实际运行仍受仓库未配置 remote 阻塞。
 

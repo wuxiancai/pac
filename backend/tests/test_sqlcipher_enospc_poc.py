@@ -9,6 +9,7 @@ import sys
 import tempfile
 
 import pytest
+import sqlcipher3.dbapi2 as sqlcipher
 
 from pac_poc.disk_full_poc import is_disk_full_error, validate_workspace
 
@@ -22,6 +23,7 @@ def test_disk_full_classifier_accepts_os_and_sqlite_full_errors() -> None:
     assert is_disk_full_error(sqlite_error)
     assert not is_disk_full_error(OSError(errno.EIO, "I/O error"))
     assert not is_disk_full_error(sqlite3.OperationalError("database is locked"))
+    assert is_disk_full_error(sqlcipher.OperationalError("database or disk is full"))
 
 
 def test_disk_full_classifier_recognizes_wrapped_sqlite_full_error() -> None:
@@ -96,3 +98,42 @@ def test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup(
     assert report["record_content_or_key_logged"] is False
     assert "baseline sentinel" not in completed.stdout
     assert "capacity overflow" not in completed.stdout
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS hdiutil")
+def test_backup_copy_enospc_preserves_source_and_previous_backup() -> None:
+    backend = Path(__file__).resolve().parents[1]
+    allowed_root = backend / ".poc-data"
+    allowed_root.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="backup-enospc-test-", dir=allowed_root) as workspace:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/run_sqlcipher_enospc_poc.py",
+                "--work-dir",
+                workspace,
+                "--scenario",
+                "backup-copy",
+                "--image-size-mb",
+                "128",
+            ],
+            cwd=backend,
+            capture_output=True,
+            text=True,
+            timeout=90,
+            check=False,
+        )
+
+    assert completed.returncode == 0, completed.stderr + completed.stdout
+    report = json.loads(completed.stdout)
+    assert report["backup_disk_full_observed"] is True
+    assert report["filesystem"] == "APFS"
+    assert report["source_integrity"] == "ok"
+    assert report["old_backup_integrity"] == "ok"
+    assert report["source_baseline_rows"] == 1
+    assert report["source_bulk_rows"] == 12
+    assert report["old_backup_baseline_rows"] == 1
+    assert report["partial_files_cleaned"] is True
+    assert report["record_content_or_keys_logged"] is False
+    assert "source baseline sentinel" not in completed.stdout
+    assert "bulkcopytoken" not in completed.stdout

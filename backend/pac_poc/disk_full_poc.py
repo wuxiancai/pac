@@ -15,6 +15,14 @@ def is_disk_full_error(error: BaseException) -> bool:
             return True
         if getattr(current, "sqlite_errorcode", None) == sqlite3.SQLITE_FULL:
             return True
+        is_sqlite_error = isinstance(current, sqlite3.Error) or type(
+            current
+        ).__module__.startswith("sqlcipher3.")
+        if (
+            is_sqlite_error
+            and str(current).strip().casefold() == "database or disk is full"
+        ):
+            return True
         current = current.__cause__ or current.__context__
     return False
 
