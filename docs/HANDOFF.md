@@ -6,6 +6,11 @@
 
 ## 最近交接
 
+### 2026-11-08：0C 拒绝边界复核
+
+- 本轮分别运行 DeepSeek 与 OpenRouter `deny-check`。两者均在无 Consent 情况下得到 Keychain reads=0、HTTP transport calls=0；检查未出网。证据是进程内 tripwire，不等同于操作系统级抓包。
+- 下一步能力矩阵优先跑 DeepSeek JSON，再 OpenRouter JSON；每条命令会单独展示内容并要求精确确认。随后再考虑可能计费的错误路径、metadata 重复核验。阶段 0 仍未验收。
+
 ### 2026-11-08：OpenRouter 工具提案实测通过
 
 - 用户在诊断增强后的脚本中再次独立确认 OpenRouter tools 请求。第三次探测返回 `phase0_echo_synthetic(marker=phase0-probe-ack)`，finish_reason=`tool_calls`，模型 `deepseek/deepseek-v4.1-flash-1017`，下游 Provider `Relace` / `HKG`；提案未执行。

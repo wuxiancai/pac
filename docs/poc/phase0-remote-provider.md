@@ -61,7 +61,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 
 每个外发请求都会打印实际 payload 并要求独立精确确认，短语格式为 `ALLOW <PROVIDER> <CAPABILITY> <序号>`；没有某项确认就不会读取 Keychain 或发送该项请求。`tools` 使用强制 tool_choice，仅返回合成函数提案，不执行工具。DeepSeek 工具探测显式设置 `thinking.type=disabled`：官方文档说明 thinking 默认启用，而 thinking mode 不支持指定工具的 named `tool_choice`，会返回 HTTP 400。见 [DeepSeek Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/) 与 [Tool Calls 指南](https://api-docs.deepseek.com/guides/tool_calls/)。OpenRouter 工具探测设置 `provider.require_parameters=true` 与 `allow_fallbacks=false`，以筛掉不支持请求参数的端点且不启用 fallback；官方说明部分不支持工具调用的端点可能忽略 tools 并返回普通文本。见 [OpenRouter 工具调用指南](https://openrouter.ai/blog/tutorials/tool-calling/) 和 [Provider routing 文档](https://openrouter.ai/blog/insights/model-routing/)。若没有 tool call，CLI 会显示普通文本、finish_reason、实际模型及 OpenRouter 下游 Provider/区域（服务有返回时），用于诊断。`json` 请求 JSON object 并检查响应。`error` 故意发送无效 `response_format` 并只把 HTTP 400 视为预期结果；请求可能计费，不重试。`metadata --repeat 2` 会逐次确认并发送两条请求，打印模型、Provider/region、token 和费用，供重复观察；DeepSeek 若不返回 region/cost 会如实显示缺失。
 
-拒绝边界可在不联网的情况下，分别对 `deepseek` 与 `openrouter` 运行 `UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_capability_poc.py <provider> deny-check`。它将 Consent policy 前接 HTTP MockTransport tripwire，断言无授权时 Keychain 读取数和 transport 调用数都为零。这是进程内网络边界证据，不是操作系统抓包证据。
+拒绝边界可在不联网的情况下，分别对 `deepseek` 与 `openrouter` 运行 `UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_capability_poc.py <provider> deny-check`。它将 Consent policy 前接 HTTP MockTransport tripwire，断言无授权时 Keychain 读取数和 transport 调用数都为零。这是进程内网络边界证据，不是操作系统抓包证据。 2026-11-08 本轮在两家 Provider 配置上重跑均通过：Keychain reads=0、HTTP transport calls=0。
 
 ## 已验证（仅本地 MockTransport）
 
