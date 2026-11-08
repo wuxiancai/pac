@@ -1,3 +1,9 @@
+### 2026-11-08：0B/0G 双语 ASR 许可线索复核
+
+- 第一方资料核对发现，归档模型包 README 声明 Apache-2.0 并指向 `pfluo/k2fsa-zipformer-chinese-english-mixed`；sherpa-onnx 官方索引将转换来源列为 `csukuangfj/k2fsa-zipformer-chinese-english-mixed`。两个 Hugging Face 模型页都声明 Apache-2.0，但官方索引只称其使用内部训练数据，权利链未给出可核验细节。
+- 修正 ASR 报告中上游归属，新增运行时、sounddevice 与 PortAudio 分层许可线索。结论限于仓库/包维护者声明；不视作训练数据权利审计或正式分发批准。详见 `poc/phase0-model-license-review.md`。
+- 用户无需配合；模型仍仅作本机 POC，不据此决定产品打包。
+
 ### 2026-11-08：0B 本机 ASR 与 LLM 并发重复测量
 
 - 同一条 6.94 秒合成 WAV + `qwen3.5:0.8b` 新跑三轮，均重叠、35 帧、15 partial/1 final。重叠 0.420–0.553 秒，P50 16.65–20.82 ms、P95 19.55–30.17 ms、峰值帧耗时 35.41–36.90 ms；本机 ASR 与 Ollama 进程 RSS 采样峰值 585,367,552–1,126,219,776 bytes。加上已有一轮，共四轮同样本观察。

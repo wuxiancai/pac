@@ -16,6 +16,14 @@
 - 上游 Hugging Face 仓库当前要求登录并接受访问条件；公开页面没有显示许可正文或具体再分发条款：[上游模型页](https://huggingface.co/yuekai/icefall-asr-multi-zh-hans-zipformer-large)。sherpa-onnx 索引给出模型来源和下载说明，但该页面本身未提供这组权重的明确许可证。
 - 因此当前证据不足以确认这组 ASR 权重是否可随产品打包、镜像或再分发。当前本机 POC 已能使用，不代表产品分发许可已核实。关闭该项需从授权页面取得并归档具体条款，确认模型权重与训练数据要求；否则另选许可清晰的候选并重做识别验证。
 
+## 实际使用的中英 Streaming Zipformer 候选
+
+- 本机归档包 `sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/README.md` 的 front matter 声明 `apache-2.0`，正文指向 `pfluo/k2fsa-zipformer-chinese-english-mixed`。sherpa-onnx 官方模型索引将发布包列为社区贡献模型，但其转换来源列为 `csukuangfj/k2fsa-zipformer-chinese-english-mixed`，并称其使用“some internal dataset”。两个上游标识不一致；本机包 README 与官方索引均保留在项目的审计记录中。
+- `pfluo/k2fsa-zipformer-chinese-english-mixed` 与 `csukuangfj/k2fsa-zipformer-bilingual-zh-en-t` 的 Hugging Face 页面均声明 `apache-2.0`；后者说明它 fork 自前者。上述是上游仓库元数据/模型卡的许可声明，不是独立权属审计，也没有提供内部训练数据的可核验来源或授权明细。因此记录为“模型仓库声明 Apache-2.0；训练数据权利链未独立核验”，不推断为已完成法律许可审批。
+- 使用的 sherpa-onnx runtime 与模型权重是不同许可对象。本机锁定 `sherpa-onnx==2.0.1` wheel 含 `sherpa-onnx-2.0.1.dist-info/licenses/LICENSE`，其项目许可证为 Apache-2.0；runtime 许可证不自动覆盖独立预训练权重。
+- 采音 Python 包 `sounddevice==0.5.6` 的 PyPI 发布信息声明 MIT；它是 PortAudio bindings。PortAudio 官方 V19 许可同样是 MIT 风格并要求保留版权与许可通知。最终发行审查仍应核对实际链接/随包的 PortAudio 二进制版本及其通知。
+- 第一方来源： [sherpa-onnx 官方模型索引](https://github.com/k2-fsa/sherpa/blob/master/docs/source/onnx/pretrained_models/online-transducer/zipformer-transducer-models.rst)、[pfluo 模型页](https://huggingface.co/pfluo/k2fsa-zipformer-chinese-english-mixed/tree/main)、[csukuangfj 转换模型页](https://huggingface.co/csukuangfj/k2fsa-zipformer-bilingual-zh-en-t)、[sherpa-onnx runtime LICENSE](https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE)、[sherpa-onnx 2.0.1 PyPI](https://pypi.org/project/sherpa-onnx/2.0.1/)、[sounddevice 0.5.6 PyPI](https://pypi.org/project/sounddevice/0.5.6/)、[PortAudio V19 license](https://portaudio.com/license.html)。
+
 ## 新增 Qwen3-ASR ONNX 候选
 
 - 用户于 2026-11-08 提供 `sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25`。目录 README 指向 [ModelScope 转换模型目录](https://modelscope.cn/models/zengshuishui/Qwen3-ASR-onnx/files) 与 [Wasser1462/Qwen3-ASR-onnx 转换项目](https://github.com/Wasser1462/Qwen3-ASR-onnx)；本地权重目录没有 `LICENSE`/`NOTICE` 文件。转换项目页面列出的文件仅有 README、脚本和 WAV 样本，没有展示单独许可证。
@@ -26,6 +34,6 @@
 ## 阶段影响
 
 - Embedding 候选：模型卡和直接运行库许可初核完成，Python 锁定依赖清单已生成；许可证闭包、真实标注集、资源阈值和产品模型决定仍开放。
-- 原中文 ASR 候选：产品分发条款仍未核实，是 0B 发布/分发证据缺口。新 Qwen3-ASR 候选可做本机离线英语识别，但转换权重/测试音频的分发许可仍待核，且还未通过实时麦克风验收。
+- 原中文 ASR 候选：产品分发条款仍未核实，是 0B 发布/分发证据缺口。实际使用的中英 Streaming Zipformer 模型仓库声明 Apache-2.0，但来源标识不一致且内部训练数据权利链未核验。新 Qwen3-ASR 候选可做本机离线英语识别，但转换权重/测试音频的分发许可仍待核，且还未通过实时麦克风验收。
 - Qwen3-ASR ONNX 候选：上游 Qwen 项目是 Apache-2.0，但第三方转换权重包/随附测试 WAV 的具体许可未确认；只在本地 POC 使用，不纳入产品打包判断。
 - 阶段 0 保持未验收；不得将公开页面标签、访问成功或本机推理通过解释为完整许可审批。
