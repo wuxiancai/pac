@@ -174,6 +174,12 @@ def _print_response_diagnostics(result) -> None:
     print(f"服务报告费用（USD）: {result.cost_usd if result.cost_usd is not None else '未提供'}")
 
 
+def _print_probe_error(error: RemoteProviderError) -> None:
+    print(f"探测失败: {error}")
+    if error.is_authentication_error:
+        print("API Key 认证失败：请检查对应 Provider 的 Keychain 项；密钥内容未读取或显示在此提示中。")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="One capability probe per exact Provider consent"
@@ -282,12 +288,10 @@ def main() -> int:
                 try:
                     asyncio.run(gateway.generate_with_metadata(request))
                 except RemoteProviderError as exc:
-                    print(f"Provider 返回已脱敏错误: {exc}")
+                    _print_probe_error(exc)
                     passed = exc.is_request_validation_error
                     if passed:
                         print("错误路径验证通过：Provider 拒绝了无效请求参数。")
-                    elif exc.is_authentication_error:
-                        print("API Key 认证失败：请检查对应 Provider 的 Keychain 项；密钥内容未读取或显示在此提示中。")
                 else:
                     print("Provider 接受了预期无效格式；未观察到 4xx 错误。")
                     passed = False
@@ -307,7 +311,10 @@ def main() -> int:
                     passed = result.text.strip() == PROBE_ACK
             all_passed = all_passed and passed
         except (CredentialUnavailable, RemoteProviderError, ValueError) as exc:
-            print(f"探测失败: {exc}")
+            if isinstance(exc, RemoteProviderError):
+                _print_probe_error(exc)
+            else:
+                print(f"探测失败: {exc}")
             all_passed = False
         except Exception as exc:  # noqa: BLE001 - avoid printing transport/body details
             print(f"探测未完成: {type(exc).__name__}；未输出密钥或响应正文。")

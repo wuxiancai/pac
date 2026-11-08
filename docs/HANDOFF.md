@@ -1,3 +1,15 @@
+### 2026-11-08：0B 识别器异常时的本地清理回归
+
+- 新增模拟麦克风 callback 与故障 decoder 回归：decoder 抛出异常后，输入流上下文退出，音频缓冲关闭并清空；测试没有启用真实麦克风。
+- 真实设备的 Ctrl-C / 驱动异常仍需本机交互冒烟，SwiftUI 音频集成也未覆盖。0C 的陈旧取消/JSON 状态同步已修正；两家 Provider 服务端是否停止生成仍未知。
+- 验证通过：麦克风窄回归 8 passed；全量 Python 148 passed；compileall、`uv lock --check`、`git diff --check` 通过。
+
+### 2026-11-08：完成 0C 取消证据对齐与 API Key 提示回归
+
+- 对齐了阶段追踪和 Provider 报告：DeepSeek、OpenRouter 均已各自完成一次 SSE 首片段后客户端取消；Provider 是否停止生成或计费仍无服务端证据。DeepSeek JSON 现记为三次一空两成功。
+- 补充 CLI 错误提示回归：401 在所有 capability 出错路径均显示中文 API Key 认证失败和 Keychain 检查指引；403 等其他状态不误标为 Key 错误。
+- 验证通过：窄回归 36 passed；全量 Python 148 passed；compileall、`uv lock --check`、`git diff --check` 通过。阶段 0 未验收，0C 剩余缺口仍见追踪矩阵。
+
 ### 2026-11-08：Provider API Key 错误分类与 DeepSeek JSON 复核
 
 - 用户再次授权的 DeepSeek JSON 请求成功返回 `{"phase0":"ack"}`，结构匹配，finish_reason=`stop`，tokens=68/28/96。结合前一次成功（68/46/114），此前空正文不是 API Key 错误的证据；空正文根因仍未知。
@@ -15,12 +27,12 @@
 ### 2026-11-08：OpenRouter SSE 客户端取消实测
 
 - 用户逐次确认 `ALLOW OPENROUTER CANCEL 1` 后，真实 SSE 返回首个片段 `phase0-probe-`，脚本立即关闭 gateway stream。与 DeepSeek 一样，证明客户端取消路径；没有服务端信号说明 Provider 停止生成或计费。
-- 两家客户端取消实测均完成，下一步是汇总审查 0C 的剩余风险：DeepSeek JSON 两次一空一成功；DeepSeek 服务端未提供费用/区域 metadata；取消是否停止 Provider 生成未知。阶段 0 整体仍未验收。
+- 两家客户端取消实测均完成；DeepSeek JSON 后续已有第三次观察，三次一空两成功；DeepSeek 服务端仍未提供费用/区域 metadata，取消是否停止 Provider 生成未知。阶段 0 整体仍未验收。
 
 ### 2026-11-08：DeepSeek SSE 客户端取消实测
 
 - 用户逐次确认 `ALLOW DEEPSEEK CANCEL 1` 后，真实 SSE 返回首个文本片段 `phase`，脚本立即关闭 gateway stream。此结果验证客户端取消路径；没有服务端信号可确认 Provider 停止生成或停止计费。
-- 取消能力的本地资源关闭回归已通过（窄 34、全量 145）；本次真实探测无自动重试。下一项为用户逐次确认 OpenRouter `cancel`，其后记录两家客户端取消证据和 Provider 侧可见性限制。
+- 取消能力的本地资源关闭回归已通过（窄 34、全量 145）；本次真实探测无自动重试。随后用户已完成 OpenRouter `cancel`；见上方最新交接记录。
 
 ### 2026-11-08：Provider SSE 首片段后取消探测就绪
 

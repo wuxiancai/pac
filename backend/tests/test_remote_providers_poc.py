@@ -31,7 +31,7 @@ from pac_poc.security_poc import ConsentGrant, ConsentManager, DataLevel, Outbou
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
 try:
-    from probe_provider_capability_poc import _print_metadata
+    from probe_provider_capability_poc import _print_metadata, _print_probe_error
 finally:
     sys.path.pop(0)
 
@@ -536,6 +536,27 @@ def test_remote_provider_422_is_classified_as_expected_client_error() -> None:
     assert not RemoteProviderError("Provider account requires payment", status_code=402).is_request_validation_error
     assert not RemoteProviderError("Provider rate limit reached", status_code=429).is_request_validation_error
     assert not RemoteProviderError("Provider returned invalid JSON").is_client_error
+
+
+def test_probe_error_explains_401_as_api_key_authentication_failure(capsys) -> None:
+    _print_probe_error(
+        RemoteProviderError("Provider rejected API credentials (HTTP 401)", status_code=401)
+    )
+
+    output = capsys.readouterr().out
+    assert "API Key 认证失败" in output
+    assert "Keychain" in output
+    assert "密钥内容未读取或显示" in output
+
+
+def test_probe_error_does_not_label_non_401_status_as_bad_api_key(capsys) -> None:
+    _print_probe_error(
+        RemoteProviderError("Provider denied access or permission (HTTP 403)", status_code=403)
+    )
+
+    output = capsys.readouterr().out
+    assert "HTTP 403" in output
+    assert "API Key 认证失败" not in output
 
 
 def test_metadata_probe_prints_json_encoded_text_when_response_mismatches(capsys) -> None:

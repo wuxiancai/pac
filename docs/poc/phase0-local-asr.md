@@ -104,8 +104,9 @@ swift run tts-interrupt-poc
 
 ## 尚未解决
 
-- 2026-11-08 首次实机运行的历史观察：产生多个增量 partial 和两个 final；混合中英内容有错词。用户后来将当前真人语音标准限定为功能冒烟、把模型识别质量留待后续，因此此观察不计 CER，也不作为本轮功能验证的阻断项。当前未完成项为停止/异常清理、重复功能稳定性及 SwiftUI 集成。
-- 双语 streaming 候选已产生中英及混说的文件分帧 partial/final；用户已补两次 CLI 实机功能冒烟，并指定识别质量留待后续模型选择。停止/异常清理、重复功能稳定性及 SwiftUI 链路仍未覆盖；合成语音分数不能替代这些证据。
+- 自动回归现以模拟 `sounddevice` callback 和故意失败的 decoder 验证：异常向上传递、输入流上下文关闭且有界缓冲清空。该结果不覆盖真实设备驱动故障或 Ctrl-C 的硬件行为；仍需用户交互式实机停止/异常冒烟。
+- 2026-11-08 首次实机运行的历史观察：产生多个增量 partial 和两个 final；混合中英内容有错词。用户后来将当前真人语音标准限定为功能冒烟、把模型识别质量留待后续，因此此观察不计 CER，也不作为本轮功能验证的阻断项。当前未完成项为真实设备上的停止/异常行为、重复功能稳定性及 SwiftUI 集成。
+- 双语 streaming 候选已产生中英及混说的文件分帧 partial/final；用户已补两次 CLI 实机功能冒烟，并指定识别质量留待后续模型选择。真实麦克风停止/异常清理、重复功能稳定性及 SwiftUI 链路仍未覆盖；合成语音分数不能替代这些证据。
 - Qwen3-ASR 候选已在五条随包音频上完成离线中/英/混说检查；尚无独立留出中英语料。其 ONNX 离线整段路径不能证明实时流式延迟、partial/final、打断、SwiftUI 麦克风处理或长时运行能力。Qwen 官方当前说明流式推理需 vLLM backend；本机现有 sherpa-onnx API 测试使用 `OfflineRecognizer`，因此不能把 RTF<1 写成实时流式验收。
 - sherpa-onnx 官方 Python API 样例将此类模型通过 `OfflineRecognizer.from_qwen3_asr` 整段解码；参见 [官方 Qwen3-ASR 文件解码样例](https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-qwen3-asr-decode-files.py)。Qwen 官方说明 Qwen3-ASR 的 streaming inference 当前只在 vLLM backend 提供，详见 [Qwen3-ASR 官方文档](https://github.com/QwenLM/Qwen3-ASR#streaming-inference)。
 - 当前 8 条合成中文集只有一轮，CER 不能代表真人麦克风或真实用户话语分布；需要更广语料与多轮实机验证，阈值待产品负责人确认。

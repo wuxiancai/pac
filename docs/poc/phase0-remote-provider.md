@@ -61,7 +61,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_capability_poc.py openrouter metadata --repeat 2
 ```
 
-`cancel` 启动一条真实 SSE 请求，首个文本 delta 到达后即关闭客户端流；这会产生一次 Provider 请求/可能计费，只能验证客户端取消和本地响应流清理，不能单独证明 Provider 停止生成。每个外发请求都会打印实际 payload 并要求独立精确确认，短语格式为 `ALLOW <PROVIDER> <CAPABILITY> <序号>`；没有某项确认就不会读取 Keychain 或发送该项请求。`tools` 使用强制 tool_choice，仅返回合成函数提案，不执行工具。DeepSeek 工具探测显式设置 `thinking.type=disabled`：官方文档说明 thinking 默认启用，而 thinking mode 不支持指定工具的 named `tool_choice`，会返回 HTTP 400。见 [DeepSeek Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/) 与 [Tool Calls 指南](https://api-docs.deepseek.com/guides/tool_calls/)。OpenRouter 工具探测设置 `provider.require_parameters=true` 与 `allow_fallbacks=false`，以筛掉不支持请求参数的端点且不启用 fallback；官方说明部分不支持工具调用的端点可能忽略 tools 并返回普通文本。见 [OpenRouter 工具调用指南](https://openrouter.ai/blog/tutorials/tool-calling/) 和 [Provider routing 文档](https://openrouter.ai/blog/insights/model-routing/)。若没有 tool call，CLI 会显示普通文本、finish_reason、实际模型及 OpenRouter 下游 Provider/区域（服务有返回时），用于诊断。`json` 请求 JSON object 并检查响应，同时输出 finish_reason、模型/路由、token 和费用 metadata，便于识别空正文。`error` 故意发送无效 `response_format` 并把 HTTP 4xx 视为预期拒绝；请求可能计费，不重试。`metadata --repeat 2` 会逐次确认并发送两条请求，打印模型、Provider/region、token 和费用，供重复观察；DeepSeek 若不返回 region/cost 会如实显示缺失。
+`cancel` 启动一条真实 SSE 请求，首个文本 delta 到达后即关闭客户端流；这会产生一次 Provider 请求/可能计费，只能验证客户端取消和本地响应流清理，不能单独证明 Provider 停止生成。每个外发请求都会打印实际 payload 并要求独立精确确认，短语格式为 `ALLOW <PROVIDER> <CAPABILITY> <序号>`；没有某项确认就不会读取 Keychain 或发送该项请求。`tools` 使用强制 tool_choice，仅返回合成函数提案，不执行工具。DeepSeek 工具探测显式设置 `thinking.type=disabled`：官方文档说明 thinking 默认启用，而 thinking mode 不支持指定工具的 named `tool_choice`，会返回 HTTP 400。见 [DeepSeek Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/) 与 [Tool Calls 指南](https://api-docs.deepseek.com/guides/tool_calls/)。OpenRouter 工具探测设置 `provider.require_parameters=true` 与 `allow_fallbacks=false`，以筛掉不支持请求参数的端点且不启用 fallback；官方说明部分不支持工具调用的端点可能忽略 tools 并返回普通文本。见 [OpenRouter 工具调用指南](https://openrouter.ai/blog/tutorials/tool-calling/) 和 [Provider routing 文档](https://openrouter.ai/blog/insights/model-routing/)。若没有 tool call，CLI 会显示普通文本、finish_reason、实际模型及 OpenRouter 下游 Provider/区域（服务有返回时），用于诊断。`json` 请求 JSON object 并检查响应，同时输出 finish_reason、模型/路由、token 和费用 metadata，便于识别空正文。`error` 故意发送无效 `response_format`；仅 HTTP 400/422 视为预期参数拒绝，认证/余额等错误会分类提示；请求可能计费，不重试。`metadata --repeat 2` 会逐次确认并发送两条请求，打印模型、Provider/region、token 和费用，供重复观察；DeepSeek 若不返回 region/cost 会如实显示缺失。
 
 拒绝边界可在不联网的情况下，分别对 `deepseek` 与 `openrouter` 运行 `UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_capability_poc.py <provider> deny-check`。它将 Consent policy 前接 HTTP MockTransport tripwire，断言无授权时 Keychain 读取数和 transport 调用数都为零。这是进程内网络边界证据，不是操作系统抓包证据。 2026-11-08 本轮在两家 Provider 配置上重跑均通过：Keychain reads=0、HTTP transport calls=0。
 
@@ -75,10 +75,10 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 - DeepSeek 首次真实工具探测已获当次确认但返回 HTTP 400；错误正文按安全设计未保留。根据 DeepSeek 官方文档，thinking 默认启用且 thinking mode 不接受 named `tool_choice`，这是与观察一致的原因推断，非对错误正文的直接确认。POC 已调整为 DeepSeek 工具请求显式关闭 thinking，并在新 Consent 通过后复测。
 - 精确授权后 adapter 才从凭据接口取密钥；HTTP header/body 与固定 model/endpoint 匹配。
 - OpenRouter Global SSE streaming 分块解析；非流式响应 metadata 可报告实际选择的上游 Provider/region、token 数和 cost；请求禁用跨 Provider failover；tool call 仅作为 `ToolCallResult` 数据返回，不执行工具。
-- JSON `response_format` 透传；Provider 非 2xx 错误只暴露 HTTP 状态，不保留 response body；端点/model/region 配置均固定 allowlist。
+- JSON `response_format` 透传；Provider 非 2xx 错误只保留状态码并分类提示，不保留 response body；端点/model/region 配置均固定 allowlist。
 - Keychain reader 只允许 `deepseek` / `openrouter` 两个 account，CLI 参数不包含秘密，缺失/拒绝读取错误不暴露原始 stderr。
-- 窄回归命令：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q tests/test_remote_providers_poc.py tests/test_local_model_gateway.py tests/test_consent_aware_gateway.py`；当前 **31 passed**，含同一 Gateway 双 adapter 切换、OpenRouter tool 参数过滤和拒绝 tripwire 回归。这些都是本地测试，不是 Provider 端到端证据。
-- 当前全量 Python：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`：**142 passed**（2026-11-08，含 OpenRouter tool 参数过滤回归）。`compileall`、`uv lock --check` 均通过；macOS Swift Testing `swift test`：**27 passed**（既有基线）。
+- 窄回归命令：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q tests/test_remote_providers_poc.py tests/test_local_model_gateway.py tests/test_consent_aware_gateway.py`；当前 0C 窄回归为 **36 passed**，含同一 Gateway 双 adapter 切换、OpenRouter tool 参数过滤、拒绝 tripwire 和错误分类提示回归。这些都是本地测试，不是 Provider 端到端证据。
+- 当前全量 Python：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`：**148 passed**（2026-11-08，含 Provider 错误分类和 API Key 认证提示回归）。`compileall`、`uv lock --check` 均通过；macOS Swift Testing `swift test`：**27 passed**（既有基线）。
 - DeepSeek SSE 的一次真实结果已补记；其他能力矩阵脚本的真实 Provider 请求仍待用户执行逐项确认。本地拒绝 tripwire 与远端 adapter 窄回归见本轮 HANDOFF。不得把本地 transport 测试记作真实 Provider 能力。
 
 ## 用户实机真实请求结果（2026-11-08）
@@ -109,6 +109,6 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 
 ## 尚未验收
 
-- 两家真实 SSE 各有一次成功；DeepSeek 与 OpenRouter 工具提案各有一次成功且均未执行（OpenRouter 前两次曾为空）；两家 JSON 各有一次结构匹配成功，DeepSeek另有一次空正文；DeepSeek 服务侧费用/区域字段未返回；无 Consent 时 PID 级 OS socket 检查无活动 socket；客户端 SSE 取消探测已实现，本地测试证明关闭响应流；DeepSeek 已有一次首片段后客户端取消结果，OpenRouter 取消待测；两家 Provider 是否停止生成/计费未由服务侧证实。DeepSeek JSON 重复一致性仍待观察。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。PID 级 lsof 是活动 socket 快照，不是完整包级证明；用户提供的全局 tcpdump 流量未按 PID 过滤，无法归因。Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
+- 两家真实 SSE 各有一次成功；DeepSeek 与 OpenRouter 工具提案各有一次成功且均未执行（OpenRouter 前两次曾为空）；OpenRouter JSON 一次成功；DeepSeek JSON 三次一空两成功；DeepSeek 服务侧费用/区域字段未返回；无 Consent 时 PID 级 OS socket 检查无活动 socket；客户端 SSE 取消探测已实现，本地测试证明关闭响应流；DeepSeek 与 OpenRouter 均已有一次首片段后客户端取消结果；两家 Provider 是否停止生成/计费未由服务侧证实。DeepSeek JSON 三次观察为一空两成功，空正文原因及更广泛稳定性仍未知。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。PID 级 lsof 是活动 socket 快照，不是完整包级证明；用户提供的全局 tcpdump 流量未按 PID 过滤，无法归因。Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。

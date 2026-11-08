@@ -3,11 +3,13 @@ from __future__ import annotations
 import struct
 import subprocess
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
 
 from pac_poc.microphone import AudioBackpressure, MicrophoneFrameBuffer
+from scripts import run_live_microphone_poc
 from scripts.run_live_microphone_poc import is_complete_pcm16_frame, pcm16le_to_float_samples
 
 
@@ -86,3 +88,58 @@ def test_microphone_script_entrypoint_imports_project_package() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "Explicitly started, local-only microphone" in result.stdout
+
+
+def test_microphone_cli_closes_stream_and_discards_buffer_when_asr_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frame_buffer = MicrophoneFrameBuffer(max_frames=25)
+    stream_closed = False
+
+    class FakeInputStream:
+        def __init__(self, **kwargs) -> None:
+            self.callback = kwargs["callback"]
+
+        def __enter__(self):
+            self.callback(b"\x00\x00" * 3200, 3200, None, None)
+            return self
+
+        def __exit__(self, *_args) -> None:
+            nonlocal stream_closed
+            stream_closed = True
+
+    class FailingASR:
+        def accept(self, _frame):
+            raise RuntimeError("synthetic decoder failure")
+
+    monkeypatch.setattr(run_live_microphone_poc.sys, "stdin", SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr("builtins.input", lambda _prompt="": "")
+    monkeypatch.setattr(
+        run_live_microphone_poc,
+        "MicrophoneFrameBuffer",
+        lambda **_kwargs: frame_buffer,
+    )
+    monkeypatch.setattr(
+        run_live_microphone_poc,
+        "resolve_model_files",
+        lambda _path: SimpleNamespace(),
+    )
+    monkeypatch.setattr(run_live_microphone_poc, "SherpaOnnxRecognizer", lambda **_kwargs: object())
+    monkeypatch.setattr(
+        run_live_microphone_poc,
+        "LocalStreamingASR",
+        lambda *_args, **_kwargs: FailingASR(),
+    )
+    monkeypatch.setitem(sys.modules, "sounddevice", SimpleNamespace(RawInputStream=FakeInputStream))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_live_microphone_poc.py", "unused-model-dir", "--seconds", "1"],
+    )
+
+    with pytest.raises(RuntimeError, match="synthetic decoder failure"):
+        run_live_microphone_poc.main()
+
+    assert stream_closed
+    assert frame_buffer.closed
+    assert frame_buffer.queued_frames == 0
