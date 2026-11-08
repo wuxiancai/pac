@@ -24,7 +24,7 @@
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；MemoryStore + 固定 Embedding 权重新增四组严格离线合成检索，4/4 top-1 且来源证据完整；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；系统认证测试真实成功两次、用户取消一次；状态分类按 LocalAuthentication 错误码区分取消和系统中断，测试代码不访问钥匙串；两轮 GUI 停止/启动/健康检查完成，进程数符合预期；锁屏/休眠、正式分发与异常恢复策略证据仍待补。 |
 | 0F | 静态加密兼容性 | IN PROGRESS | SQLCipher 已有 ARM64、FTS、迁移和恢复证据；完成密钥生命周期、产品性能及发布形态评估，形成 ADR-019 决定。 |
-| 0G | Embedding 候选 | IN PROGRESS | 固定候选已离线推理三次，均为 4/4 合成 query top-1；observed max RSS 883,130,368–883,490,816 bytes；Python 锁定依赖 CycloneDX SBOM 已覆盖 54/54 个包，见 `poc/phase0-python-sbom.md`。补许可证闭包、真实标注检索集和产品选择（D-014）。 |
+| 0G | Embedding 候选 | IN PROGRESS | 固定候选已离线推理三次，均为 4/4 合成 query top-1；observed max RSS 883,130,368–883,490,816 bytes；Python 锁定依赖 CycloneDX SBOM 覆盖 54/54 个包，见 `poc/phase0-python-sbom.md`。本轮确认 Qwen 官方源模型声明 Apache-2.0，但第三方 ONNX 转换仓库无可见 LICENSE、ModelScope 工件许可及随包样例音频许可未核；补全 Swift/macOS 运行时和实际发行物清单、许可通知闭包，真实标注检索集及 D-014 仍待处理。 |
 | 0H | 故障注入与性能 | IN PROGRESS | 已测 WAL 备份的活动 reader + 三次 writer 提交、checkpoint 等待读锁期间 SIGKILL 后恢复、备份复制在 DELETE/WAL 下 SIGKILL、HFS+ 与 APFS 有界映像 ENOSPC；新增 `os.replace` 调用前/成功返回后的 SIGKILL 边界测试。边界测试不代表系统调用内部中断或断电持久性；备份复制路径的确定性 ENOSPC 注入已通过且旧备份/源库保全；真实备份目标满载仍未实测。实际外接介质/产品 WAL 生命周期与崩溃后 staging 清理规则仍待处理。 |
 | 0I | 阶段追踪与验收 | OPEN | D-001–D-015 与 ADR-019/020/021/022 已按用户要求标记延期（D-010 候选及区域已明确，V1 选型仍延期）。ASR-final→本机 TTS 已有合成链路报告（5 条中英/混说 WAV、7/7 完成），仍缺独立真人语料/长时多负载资源评估；其他缺口包括 GitHub Actions 真实运行、Provider 服务端取消/稳定性、模型/依赖许可闭包及恢复边界；SwiftUI 麦克风/AEC 属阶段 3，完成证据审查后才能签收。 |
 
@@ -33,7 +33,7 @@
 1. **本机已完成：0H 原子替换边界恢复审查。** 调用 `os.replace` 前 SIGKILL 保留旧备份，成功返回后 SIGKILL 保留新备份，两条路径源库均完整；不覆盖 syscall 内部中断或断电持久性。报告和测试已记录。
 2. **本机已完成：0E supervisor 异常退出路径审查。** 子进程握手后异常退出时能清理并由调用方显式重启；GUI 启停与退出清理已实测。真实系统认证成功两次、用户取消一次和两轮 GUI 启停已记录；自动重启/退避、锁屏/休眠及正式分发仍缺证据或决策，见安全客户端报告。
 3. **0B 语音功能冒烟已取得用户实机证据。** 用户主动采集已产生 partial/final；用户决定将当前识别质量留待后续模型选择，不作为本轮功能冒烟阻断项。按规格书 §13，SwiftUI 麦克风/AEC 在阶段 3，不作为 0B 关闭条件。ASR→TTS 合成链路报告已记录；真实设备驱动故障、独立语料和多负载资源证据仍待补，D-013 数值目标继续延期。
-4. **0B 语音链路补证。** 合成样本上的“ASR final → AVSpeechSynthesizer 播放”已覆盖 5 条中英/混说样本、共 7/7 完成并归档；下一步补独立真人语料/长时运行与资源覆盖。原中文 ASR 权重许可仍未核；双语 Streaming Zipformer 的仓库声明 Apache-2.0，但来源标识与训练数据权利链未独立核实；Qwen ONNX 转换包许可也未核。不得据此自动选定产品模型或分发方案。
+4. **0B/0G 许可闭环。** 本轮确认 Qwen 官方源模型 Apache-2.0 许可线索；其第三方 ONNX 转换仓库没有可见 LICENSE，ModelScope 下载工件许可与随包 WAV 再分发许可仍不明。双语 Streaming Zipformer 的来源标识和训练数据权利链、原中文权重授权条件也未闭环。继续核对实际发行物/原生依赖并整理通知清单；不据此自动选定模型或分发方案。
 5. **0C DeepSeek 工具提案已实测通过。** 用户重新确认显式关闭 thinking 后的完整请求，DeepSeek 返回合成函数提案，未执行。DeepSeek 空 JSON 的原因仍未知，不能由单次空正文认定为 Key 错误；新增 HTTP 状态分类与本地回归。继续处理 Provider 侧取消证据及其他 0C 缺口，每条外发请求仍需独立确认。
 6. **产品决策继续延期：0F/0G 及规格 D 项。** ADR-019 与 D-014 等照用户要求保持延期；这不关闭对应证据缺口，也不允许开始阶段 1。
 

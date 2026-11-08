@@ -1,3 +1,10 @@
+### 2026-11-08：0B/0G Qwen3-ASR 许可来源交叉核对
+
+- 官方 `Qwen/Qwen3-ASR-0.6B-hf` 模型页和 `QwenLM/Qwen3-ASR` LICENSE 均给出 Apache-2.0 许可线索；该许可不能直接推定覆盖第三方 ONNX 导出仓库、ModelScope 工件或随包音频。
+- `Wasser1462/Qwen3-ASR-onnx` 当前公开目录没有可见 LICENSE；ModelScope 文件页本轮不可访问，无法核实实际下载 revision/工件条款。随包 WAV README 指向 Qwen 博客，但未给出音频再分发许可。报告已分别记为官方上游许可已知、第三方产物/音频许可未闭环。
+- 更新 `phase0-model-license-review.md`、`TASKS.md` 和阶段追踪矩阵。阶段 0 仍未验收；下一步继续核对实际 Swift/macOS 发行物及原生依赖，并保留真实标注语料、D-014 与模型权利链缺口。
+- 公开来源：[Qwen 模型页](https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf)、[Qwen 官方 LICENSE](https://github.com/QwenLM/Qwen3-ASR/blob/main/LICENSE)、[转换仓库](https://github.com/Wasser1462/Qwen3-ASR-onnx)、[ModelScope 文件页](https://modelscope.cn/models/zengshuishui/Qwen3-ASR-onnx/files)、[Qwen 样例页](https://qwen.ai/blog?id=qwen3asr)。
+
 ### 2026-11-08：0G Python 依赖许可证线索复核
 
 - 核实 `tokenizers==0.23.3` 的本机 Trove classifier 与固定版本 PyPI 页均声明 Apache，发布对应的上游 tag 有 LICENSE 文件。更新 SBOM 报告以明确 metadata 分类来源。
