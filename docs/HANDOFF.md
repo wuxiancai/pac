@@ -1,3 +1,8 @@
+### 2026-11-08：0G Python 依赖许可证线索复核
+
+- 核实 `tokenizers==0.23.3` 的本机 Trove classifier 与固定版本 PyPI 页均声明 Apache，发布对应的上游 tag 有 LICENSE 文件。更新 SBOM 报告以明确 metadata 分类来源。
+- 54/54 锁定包目前各有初步来源线索；许可证适用范围、通知义务、原生依赖与最终打包闭包仍未审查，不是法律批准。依据：[固定版本 PyPI 页面](https://pypi.org/project/tokenizers/0.23.3/)、[上游 tag LICENSE](https://github.com/huggingface/tokenizers/blob/v0.23.3/LICENSE)。
+
 ### 2026-11-08：0B 模拟设备故障注入
 
 - 新增 PortAudio stream open failure 与 callback status error 注入；打开失败被清楚报告并丢弃 PCM 缓冲，callback 状态错误会停止采集、退出 stream context 并清空缓冲。decoder 异常/用户 Ctrl-C 路径继续通过原有测试。
