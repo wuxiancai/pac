@@ -1,3 +1,9 @@
+### 2026-11-08：测试版本机服务会话时长修正
+
+- 发现复用 POC 默认会令本机 API token 五分钟后过期，长时间打开测试版会导致聊天 401。Beta 服务改为 token 仅在 supervisor 管理的进程存活期间有效；随机 token 不落盘，owner pipe 关闭即停止服务并销毁 token。POC 其他调用继续保留短时过期默认值。
+- `tests/test_beta_api.py`、`test_local_service_process_poc.py`、`test_security_poc.py`：11 项通过；`git diff --check` 通过。
+- 后续仍需 GUI 停止按钮和关窗服务清理验证。
+
 ### 2026-11-08：B0/B1 测试版本机文字对话首个垂直切片
 
 - 新增 macOS SwiftUI app target 与 `scripts/build_beta_app.sh` / `scripts/run_beta_app.sh`。应用通过固定 supervisor 启动本机服务，窗口显示连接状态；当前模型为本机 Ollama `qwen3.5:0.8b`。

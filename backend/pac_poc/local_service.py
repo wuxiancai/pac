@@ -24,8 +24,13 @@ def main() -> int:
         listener.listen()
         port = listener.getsockname()[1]
         token = secrets.token_urlsafe(32)
+        # This random token is private to the owning app and is discarded when
+        # the supervisor closes the process pipe, so the beta session follows
+        # the process lifetime instead of the short POC demo timeout.
         server = create_local_server(
-            session=LocalAPISession(token=token), port=port, app_factory=create_beta_api
+            session=LocalAPISession(token=token, expires_at=float("inf")),
+            port=port,
+            app_factory=create_beta_api,
         )
         server_thread = threading.Thread(
             target=server.run,

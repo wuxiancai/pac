@@ -5,7 +5,7 @@
 ## 当前范围
 
 - SwiftUI 应用由 `poc/macos-audio/scripts/run_beta_app.sh` 构建并启动；后端继续由固定 supervisor 进程管理，退出时经私有管道停止。
-- 本机服务只绑定 `127.0.0.1`，沿用短期随机 Bearer token、Host/Origin 检查和健康检查。
+- 本机服务只绑定 `127.0.0.1`，使用随机 Bearer token、Host/Origin 检查和健康检查；token 与 supervisor 管理的后端进程同寿命，关窗停止服务后销毁。
 - `POST /chat/stream` 固定路由到 Ollama 的 `qwen3.5:0.8b`，只接受 `user`/`assistant` 消息；单条消息上限 16,000 字符、上下文总量 40,000 字符、最多 20 条。未知字段拒绝。
 - SwiftUI 页面支持发消息、增量显示本机模型回复和停止当前流。对话只保留在当前 app 进程内存中，关闭后不恢复；UI 明示“不保存对话”。
 - 模型未就绪或请求失败时显示本机错误提示，不回退到远端 Provider。未接入云端、记忆、文件导入或麦克风。
