@@ -6,6 +6,11 @@
 
 ## 最近交接
 
+### 2026-11-08：OpenRouter SSE 客户端取消实测
+
+- 用户逐次确认 `ALLOW OPENROUTER CANCEL 1` 后，真实 SSE 返回首个片段 `phase0-probe-`，脚本立即关闭 gateway stream。与 DeepSeek 一样，证明客户端取消路径；没有服务端信号说明 Provider 停止生成或计费。
+- 两家客户端取消实测均完成，下一步是汇总审查 0C 的剩余风险：DeepSeek JSON 两次一空一成功；DeepSeek 服务端未提供费用/区域 metadata；取消是否停止 Provider 生成未知。阶段 0 整体仍未验收。
+
 ### 2026-11-08：DeepSeek SSE 客户端取消实测
 
 - 用户逐次确认 `ALLOW DEEPSEEK CANCEL 1` 后，真实 SSE 返回首个文本片段 `phase`，脚本立即关闭 gateway stream。此结果验证客户端取消路径；没有服务端信号可确认 Provider 停止生成或停止计费。
