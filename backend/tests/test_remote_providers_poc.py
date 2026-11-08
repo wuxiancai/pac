@@ -23,6 +23,7 @@ from pac_poc.model_gateway import (
 from pac_poc.remote_providers import (
     DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG,
+    QWEN_APP_API_CONFIG,
     QWEN_TOKEN_PLAN_PROBE_CONFIG,
     OpenAICompatibleRemoteAdapter,
     RemoteProviderConfig,
@@ -222,6 +223,76 @@ def test_qwen_token_plan_refuses_non_plan_credential_before_http_request() -> No
 
     assert credentials.reads == ["qwen"]
     assert requests == []
+
+
+def test_qwen_application_api_uses_separate_endpoint_and_pay_as_you_go_key() -> None:
+    config = QWEN_APP_API_CONFIG
+    assert config.provider == "qwen-app"
+    assert config.account == "qwen-app"
+    assert config.model == "qwen3.8-flash"
+    assert config.endpoint == (
+        "https://maas.qianwenaiapi.com/compatible-mode/v1/chat/completions"
+    )
+
+    class ApplicationCredentials(FakeCredentials):
+        def get(self, account: str) -> str:
+            self.reads.append(account)
+            return "sk-ws-fresh-application-key"
+
+    credentials = ApplicationCredentials()
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "qwen-app-ack"}}]},
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        config,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent, config)
+    gateway = make_gateway(consent, adapter, config.provider)
+
+    result = asyncio.run(gateway.generate(request_for(config)))
+
+    assert result == "qwen-app-ack"
+    assert credentials.reads == ["qwen-app"]
+    assert str(seen[0].url) == config.endpoint
+    assert seen[0].headers["authorization"] == "Bearer sk-ws-fresh-application-key"
+    assert b'"model":"qwen3.8-flash"' in seen[0].read()
+
+
+def test_qwen_application_api_rejects_token_plan_key_before_network() -> None:
+    config = QWEN_APP_API_CONFIG
+
+    class TokenPlanCredentials(FakeCredentials):
+        def get(self, account: str) -> str:
+            self.reads.append(account)
+            return "sk-sp-token-plan-key"
+
+    credentials = TokenPlanCredentials()
+    requests: list[httpx.Request] = []
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            lambda request: requests.append(request) or httpx.Response(200, json={"choices": []})
+        )
+    )
+    adapter = OpenAICompatibleRemoteAdapter(config, credentials=credentials, client=client)
+    consent = ConsentManager()
+    grant_for(consent, config)
+    gateway = make_gateway(consent, adapter, config.provider)
+
+    with pytest.raises(RemoteProviderError, match="pay-as-you-go key"):
+        asyncio.run(gateway.generate(request_for(config)))
+
+    assert credentials.reads == ["qwen-app"]
+    assert requests == []
+    asyncio.run(client.aclose())
 
 
 def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:

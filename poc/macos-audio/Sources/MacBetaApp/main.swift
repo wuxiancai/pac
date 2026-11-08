@@ -11,15 +11,23 @@ enum ModelSource: String, CaseIterable, Identifiable {
 }
 
 enum CloudProvider: String, CaseIterable, Identifiable {
+    case qwenApp = "qwen-app"
     case deepseek
     case openrouter
 
     var id: String { rawValue }
-    var title: String { self == .deepseek ? "DeepSeek" : "OpenRouter" }
+    var title: String {
+        switch self {
+        case .qwenApp: "千问（应用 API）"
+        case .deepseek: "DeepSeek"
+        case .openrouter: "OpenRouter"
+        }
+    }
     var account: String { rawValue }
-    var region: String { self == .deepseek ? "中国" : "Global（由 OpenRouter 路由）" }
+    var region: String { self == .openrouter ? "Global（由 OpenRouter 路由）" : "中国" }
     var model: String {
         switch self {
+        case .qwenApp: "qwen3.8-flash"
         case .deepseek: "deepseek-flash"
         case .openrouter: "deepseek/deepseek-v4.1-flash-1017"
         }
@@ -103,8 +111,8 @@ final class BetaChatModel {
         source = ModelSource(rawValue: defaults.string(forKey: "beta.model.source") ?? "local") ?? .local
         localModel = defaults.string(forKey: "beta.model.local") ?? "qwen3.5:0.8b"
         cloudProvider = CloudProvider(
-            rawValue: defaults.string(forKey: "beta.model.cloud-provider") ?? "deepseek"
-        ) ?? .deepseek
+            rawValue: defaults.string(forKey: "beta.model.cloud-provider") ?? "qwen-app"
+        ) ?? .qwenApp
         supervisor = LocalBackendSupervisor(
             pythonExecutableURL: configuration.pythonExecutableURL,
             backendDirectoryURL: configuration.backendDirectoryURL
@@ -356,9 +364,13 @@ private struct BetaModelSettingsView: View {
                         Text(saveMessage).font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                if model.cloudProvider == .qwenApp {
+                    Text("千问应用 API 使用按量计费 Key（sk-ws-），与 Token Plan 个人版 Key 分开。请新建应用 API Key；不要复用曾公开过的 Key。")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
                 Text("每次发送云端请求前，应用都会展示完整对话、服务商、模型和区域，并要求单次确认。Key 不进入聊天、设置文件或日志。")
                     .font(.callout).foregroundStyle(.secondary)
-                Label("千问 Token Plan 个人版 Key 不能用于本自建应用；如需千问，请先取得适用于自定义应用的 API 凭据。", systemImage: "info.circle")
+                Label("千问 Token Plan 个人版 Key（sk-sp-）不能用于本自建应用；千问应用 API 使用独立 Keychain 项 qwen-app。", systemImage: "info.circle")
                     .font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
@@ -379,6 +391,10 @@ private struct BetaModelSettingsView: View {
     }
 
     private func saveCredential() {
+        if model.cloudProvider == .qwenApp && !apiKey.hasPrefix("sk-ws-") {
+            saveMessage = "千问应用 API Key 应以 sk-ws- 开头；sk-sp- Token Plan Key 不用于本应用。"
+            return
+        }
         do {
             try keychain.save(apiKey, account: model.cloudProvider.account)
             apiKey = ""

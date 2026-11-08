@@ -53,6 +53,14 @@ QWEN_TOKEN_PLAN_PROBE_CONFIG = RemoteProviderConfig(
     ),
 )
 
+QWEN_APP_API_CONFIG = RemoteProviderConfig(
+    provider="qwen-app",
+    account="qwen-app",
+    model="qwen3.8-flash",
+    region="china",
+    endpoint="https://maas.qianwenaiapi.com/compatible-mode/v1/chat/completions",
+)
+
 
 @dataclass(frozen=True)
 class RemoteCompletion:
@@ -105,11 +113,13 @@ class OpenAICompatibleRemoteAdapter:
             "deepseek": "api.deepseek.com",
             "openrouter": "openrouter.ai",
             "qwen": "token-plan.maas.qianwenaiapi.com",
+            "qwen-app": "maas.qianwenaiapi.com",
         }
         expected_configs = {
             DEEPSEEK_PROBE_CONFIG.provider: DEEPSEEK_PROBE_CONFIG,
             OPENROUTER_PROBE_CONFIG.provider: OPENROUTER_PROBE_CONFIG,
             QWEN_TOKEN_PLAN_PROBE_CONFIG.provider: QWEN_TOKEN_PLAN_PROBE_CONFIG,
+            QWEN_APP_API_CONFIG.provider: QWEN_APP_API_CONFIG,
         }
         if (
             config.provider not in expected_hosts
@@ -269,6 +279,10 @@ class OpenAICompatibleRemoteAdapter:
         if self._config.provider == "qwen" and not secret.startswith("sk-sp-"):
             raise RemoteProviderError(
                 "Token Plan requires its dedicated API key; refusing to send request"
+            )
+        if self._config.provider == "qwen-app" and not secret.startswith("sk-ws-"):
+            raise RemoteProviderError(
+                "Qwen application API requires its separate pay-as-you-go key; refusing to send request"
             )
         return secret
 

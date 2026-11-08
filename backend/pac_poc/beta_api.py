@@ -22,6 +22,7 @@ from .model_gateway import (
 from .remote_providers import (
     DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG,
+    QWEN_APP_API_CONFIG,
     OpenAICompatibleRemoteAdapter,
     RemoteProviderConfig,
     RemoteProviderError,
@@ -53,7 +54,7 @@ class StreamChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     messages: list[ChatMessage] = Field(min_length=1, max_length=MAX_MESSAGES)
-    provider: Literal["ollama", "deepseek", "openrouter"] = "ollama"
+    provider: Literal["ollama", "deepseek", "openrouter", "qwen-app"] = "ollama"
     model: str = Field(default=BETA_MODEL, min_length=1, max_length=128)
     confirmed_for_this_request: bool = False
 
@@ -61,6 +62,7 @@ class StreamChatRequest(BaseModel):
 CLOUD_PROVIDERS: dict[str, RemoteProviderConfig] = {
     "deepseek": DEEPSEEK_PROBE_CONFIG,
     "openrouter": OPENROUTER_PROBE_CONFIG,
+    "qwen-app": QWEN_APP_API_CONFIG,
 }
 
 

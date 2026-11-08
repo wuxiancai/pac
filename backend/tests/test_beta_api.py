@@ -159,3 +159,33 @@ def test_cloud_chat_requires_one_time_consent_before_adapter_access() -> None:
         assert credentials.reads == 0
 
     asyncio.run(run())
+
+
+def test_qwen_application_route_is_available_with_exact_region_and_model() -> None:
+    async def run() -> None:
+        adapter = StubCloudAdapter()
+        app = create_beta_api(
+            session=LocalAPISession(token="test-token"),
+            remote_adapters_override={"qwen-app": adapter},
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            response = await client.post(
+                "/chat/stream",
+                headers={"authorization": "Bearer test-token"},
+                json={
+                    "provider": "qwen-app",
+                    "model": "qwen3.8-flash",
+                    "confirmed_for_this_request": True,
+                    "messages": [{"role": "user", "content": "synthetic"}],
+                },
+            )
+        assert response.status_code == 200
+        assert adapter.request is not None
+        assert adapter.request.provider == "qwen-app"
+        assert adapter.request.model == "qwen3.8-flash"
+        assert adapter.request.region == "china"
+        assert adapter.request.data_level.value == "L2"
+
+    asyncio.run(run())

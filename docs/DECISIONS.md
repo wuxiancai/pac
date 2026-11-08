@@ -16,7 +16,7 @@
 | C-006 | 阶段 0 的交互式云模型 POC 测试默认优先使用千问；任何真实请求仍要求逐次 Consent/Policy 放行，不启用自动 fallback。 | 用户 2026-11-08 指定。Token Plan 文本兼容端点暂用 `qwen3.8-flash`、北京区域，限合规的交互式测试。Token Plan 服务支持文本 OpenAI-compatible HTTP 和 `qwen-audio-3.0-realtime-plus` Realtime WebSocket；个人版条款将使用范围限定在编程/智能体工具交互，并排除自定义应用后端，因此个人版 Key 不接入本项目自建 SwiftUI/FastAPI Beta。应用内云语音须另用适用于自定义应用的 API 凭据，或通过官方允许的 Agent 工具扩展路线。接入参数和状态见 `beta/qwen-token-plan-integration.md`。此项不等同于 D-010 的 V1 Provider 决策。 |
 | C-007 | 开始建设单用户 macOS 测试版；阶段 0 未完成的验证不再整体阻塞可用测试版。 | 用户 2026-11-08 明确希望先交付可使用的软件，后期功能先留扩展接口，待功能开发时再完成相应验证。当前优先本机闭环；非测试版必需的 CI 远端运行、广泛负载/独立语料、未来云语音、服务端取消/区域费用核验、许可与正式分发闭环等转为按功能启用/发布前的任务。延期项不得表述为已验证；本机优先、逐次远端 Consent、Keychain、L3 默认拒绝等安全底线不延期。 |
 
-| C-008 | macOS 测试版 GUI 提供本地/云端模型来源选择和单次云请求确认。 | 用户 2026-11-08 要求优先增加模型设置按钮。默认本地；初始云端配置为已验证的 DeepSeek/OpenRouter 固定 POC 路由。云端每次请求展示完整对话并单次授权，Key 只存 Keychain。该 Beta 入口不等同于 D-010 的 V1 Provider 决策；千问 Token Plan 个人版 Key 不用于自建应用。 |
+| C-008 | macOS 测试版 GUI 提供本地/云端模型来源选择和单次云请求确认。 | 用户 2026-11-08 要求优先增加模型设置按钮，并指定云模型默认优先千问。云端默认配置为千问 `qwen3.8-flash` 按量计费应用 API（`sk-ws-`，独立 Keychain account `qwen-app`）；另保留 DeepSeek/OpenRouter 固定 POC 路由。云端每次请求展示完整对话并单次授权。千问 Token Plan 个人版 `sk-sp-` 不接入自建应用。此 Beta 入口不等同于 D-010 的 V1 Provider 决策。 |
 
 ## 待决产品事项
 

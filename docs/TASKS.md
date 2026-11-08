@@ -19,7 +19,7 @@
 | 顺序 | 工作包 | 状态 | 完成条件 / 说明 |
 |---:|---|---|---|
 | B0 | 应用可运行骨架 | IN PROGRESS | 新增 SwiftUI 测试版 `.app` 构建/启动入口；真实启动后显示本机模型已连接，supervisor 管理后端。仍需关闭窗口后确认服务清理，并完善启动失败体验。 |
-| B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或固定 DeepSeek/OpenRouter 云路由；本地模型 ID 可配置；云端有 Keychain 保存、完整对话预览、逐请求 Consent、L3 凭据拦截和无自动 fallback。Python 159 项、Swift 31 项通过，GUI Accessibility 树确认设置按钮显示；sheet 实际交互及真实云请求尚未手动验收。D-010 仍待决。详见 `beta/macOS-beta-chat.md`。 |
+| B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或千问应用 API（默认云服务商）、DeepSeek、OpenRouter 固定路由；本地模型 ID 可配置；云端有 Keychain 保存、完整对话预览、逐请求 Consent、L3 凭据拦截和无自动 fallback。千问用 `sk-ws-` 按量计费 Key；Token Plan `sk-sp-` 不用于自建应用。千问应用路由有 mock 覆盖，真实 API/Key 尚未验证。D-010 仍待决。详见 `beta/macOS-beta-chat.md`。 |
 | B2 | 本地语音闭环 | OPEN | 在应用内显式开始/停止麦克风，连接已验证本地 ASR 和本机 TTS；原始音频不落盘，失败不静默上云。 |
 | B3 | 会话保存与恢复 | DEFERRED | 等待最小数据保留和静态加密决策；在决定前不持久化敏感对话。 |
 | B4 | 千问文本/实时语音 | DEFERRED | Token Plan 服务端支持文本和 Realtime WebSocket，但个人版条款仅允许在编程/智能体工具内交互使用，排除自建应用后端；因此不把个人版 Key 接入本项目 SwiftUI/FastAPI 测试版。取得适用于自定义应用的 API 凭据后再评估启用。协议、地址和事件见 `beta/qwen-token-plan-integration.md`。 |

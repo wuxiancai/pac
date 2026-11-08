@@ -1,27 +1,31 @@
-# 千问 Token Plan 接入备忘
+# 千问 API 与 Token Plan 接入说明
 
 最后核对：2026-11-08（Asia/Shanghai）
 
-本文给后续文本模型和实时语音接入提供协议、地址、Key 和实现状态记录。官方支持/计费能力与本项目是否已实现分开标注。
+本文记录千问按量计费 API 与 Token Plan 的协议、地址、Key 和项目实现状态。不同 Key 和计费方式分开记录。
 
 ## 接入结论
 
 - Token Plan 支持 `sk-sp-` 专属 API Key，也支持文本模型和 `qwen-audio-3.0-realtime-plus` 实时语音对话。
+- 自建应用可使用千问按量计费 API 的 `sk-ws-` Key 和标准 OpenAI 兼容端点。Beta 设置中的“千问（应用 API）”使用该路线，不使用 Token Plan 个人版 Key/额度。
 - 文本与实时语音走不同协议：文本使用 OpenAI-compatible HTTP Chat Completions；实时语音使用 Realtime WebSocket。文本 adapter 不能直接拿来传音频。
 - 实时语音 Token Plan 端点：`wss://token-plan.maas.qianwenaiapi.com/api-ws/v1/realtime?model=qwen-audio-3.0-realtime-plus`。
 - 官方实时语音示例可由 Agent 工具的扩展机制交互式调用；Token Plan 支持矩阵也列出 Realtime API。**这表示服务端能力可用，不代表本项目的自建应用可使用个人版 Token Plan Key。**当前官方个人版条款把使用范围限定在编程/智能体工具内交互使用，并明确排除自定义应用后端和非交互批量调用；因此不得把该 Key 接入本项目 SwiftUI/FastAPI 测试版。若要在本应用交付云实时语音，需改用适用于自定义应用的千问 API 计费/凭据，或采用官方允许的 Agent 工具扩展路线。任何获准路线都须由用户主动开始会话；不得将 Key 放入常驻后台、批处理或日志。
-- 本项目当前 Beta **尚未接入** Qwen 文本或实时语音。文本 Token Plan 有一次历史真实请求成功，但使用的是旧北京域名；当前文本 adapter 已改为官方品牌域名，新域名尚未重新真实探测。实时语音只有官方协议资料核对，没有本地代码或真实设备验证。
+- Beta 已添加千问按量计费文本路由：`qwen3.8-flash`、北京区，Keychain account `qwen-app`，端点为普通千问 OpenAI 兼容 API。该应用路由已有 mock/默认拒绝保护，尚未做真实出站。Token Plan 文本另有一次历史真实请求成功（旧北京域名）；当前 Token Plan 域名尚未重新实测，且个人版 Key 不用于自建 Beta。实时语音服务端支持已核验，但 Beta 尚未实现或实测。
 
 ## 固定配置
 
 | 能力 | 模型 | 协议 | 地址 | 状态 |
 |---|---|---|---|---|
-| 文本对话 | `qwen3.8-flash`（按套餐可用型号） | OpenAI-compatible HTTP | `https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1`；Chat Completions 路径为 `/chat/completions` | CLI adapter 已配置；旧域名有一次真实请求证据，新地址尚未实测；未接入 Beta 对话 UI |
+| 文本对话（自建应用） | `qwen3.8-flash` | OpenAI-compatible HTTP，按量计费 | `https://maas.qianwenaiapi.com/compatible-mode/v1/chat/completions` | Beta GUI 有固定路由，Keychain account `qwen-app`，要求独立 `sk-ws-` Key；有 mock/Consent 覆盖，未真实出站 |
+| 文本对话（Token Plan POC） | `qwen3.8-flash`（按套餐可用型号） | OpenAI-compatible HTTP，Token Plan | `https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1/chat/completions` | CLI adapter 已配置；旧域名有一次真实请求证据，新地址尚未实测；个人版 Key 不接入本自建 Beta |
 | 实时语音对话 | `qwen-audio-3.0-realtime-plus` | Realtime WebSocket | `wss://token-plan.maas.qianwenaiapi.com/api-ws/v1/realtime?model=qwen-audio-3.0-realtime-plus` | 服务端支持已核验；本项目自建测试版不得使用个人版 Token Plan Key；尚未实现或实测 |
 | 非实时语音识别 | `qwen-audio-3.0-asr-flash` | 独立 DashScope HTTP 接口 | `/api/v1/services/aigc/multimodal-generation/generation` | 尚未实现；不是实时语音会话端点 |
 | 语音合成 | `qwen-audio-3.0-tts-plus` | 独立 DashScope HTTP 接口 | `/api/v1/services/audio/tts/SpeechSynthesizer` | 尚未实现；不是实时语音会话端点 |
 
-Token Plan 专属 API Key 存在 macOS login Keychain：service `com.personal-ai-assistant.phase0.provider`、account `qwen`。只在授权请求的内存中读取；不要复制进仓库、聊天、命令行参数、配置文件或日志。前缀不为 `sk-sp-` 时拒绝发送。新建 Key 后，须确认服务区域/套餐匹配；不得静默切换按量计费 Key。
+Token Plan 专属 API Key 存在 macOS login Keychain：service `com.personal-ai-assistant.phase0.provider`、account `qwen`。只用于官方允许的交互式工具 POC；个人版条款不允许将该 Key 用于本项目自建应用。
+
+Beta 千问按量计费应用 Key 使用同一 Keychain service、account `qwen-app`，要求 `sk-ws-` 前缀；API endpoint 固定为 `maas.qianwenaiapi.com`。请在千问平台新建应用 API Key，绝不复用曾公开贴入聊天的 Key。应用发送仍需每次 GUI Consent；应用路由不回退到 Token Plan Key 或其他 Provider。
 
 ## 实时语音会话流程
 
@@ -38,12 +42,16 @@ Token Plan 专属 API Key 存在 macOS login Keychain：service `com.personal-ai
 
 ## 当前进度和后续验收
 
-- 已完成：Token Plan 文本 HTTP 地址更正到品牌域名；套餐专属 Key 前缀检查；真实文本一次成功（历史旧域名）；官方实时 WebSocket Endpoint、模型、事件结构和音频规格记录；核对个人版 Token Plan 使用范围并确认不接入本项目自建应用。
-- 未完成：新文本域名逐次确认探测；取得适用于自定义应用的语音 API 凭据前，不实现本项目云实时语音；获准接入后再验收 session 连接、音频收发、partial/final/播放、停止清理和错误分类、UI Consent/麦克风授权、资源/延迟和 Credits 观察。
+- 已完成：Beta GUI 可选择千问按量计费应用文本路由；固定 endpoint/model/Keychain account 和 `sk-ws-` 检查；逐请求 Consent、错误脱敏及无自动 fallback 保护。仅有 mock/策略验证，没有真实 API 请求。
+- Token Plan 未完成：当前官方品牌域名的单次 Consent 真实文本验证；Token Plan 个人版 Key 不能接入自建 Beta。实时语音尚未实现，待采用适用于自定义应用的凭据并按交互音频流程另行开发和验证。
+- 千问新应用 Key 的认证和流式响应尚未真实测试；待用户在 GUI Keychain 输入新建的 `sk-ws-` 应用 Key，并逐次确认具体合成测试内容后验证。
 - 真实请求仍须逐次显示目标、用途、数据级别和发送内容/音频范围并取得用户明确 Consent。任何一次文字授权不覆盖麦克风/音频请求。
 
 ## 官方资料
 
+- [千问 OpenAI 兼容接口](https://platform.qianwenai.com/docs/api-reference/toolkitframework/openai-compatible/overview)
+- [获取 API Key（区分 `sk-sp-` 与通用 API Key）](https://platform.qianwenai.com/docs/api-reference/preparation/api-key)
+- [Token Plan 个人版使用范围](https://platform.qianwenai.com/docs/token-plan/personal/token-plan-personal-overview)
 - [Token Plan 接入实时语音对话模型](https://platform.qianwenai.com/docs/token-plan/best-practices/realtime-voice)
 - [Token Plan 接入概览与各能力端点](https://platform.qianwenai.com/docs/token-plan/best-practices/integration-overview)
 - [Realtime API 协议与模型支持矩阵](https://platform.qianwenai.com/docs/api-reference/realtime-api/overview)

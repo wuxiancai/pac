@@ -1,3 +1,12 @@
+### 2026-11-08：将千问应用 API 加入模型设置选项
+
+- 云端服务商列表新增并默认选择千问 `qwen3.8-flash` 应用 API，固定普通 OpenAI 兼容端点 `https://maas.qianwenaiapi.com/compatible-mode/v1`、中国区域、Keychain account `qwen-app`。
+- 该路由使用千问按量计费应用 API 的新 `sk-ws-` Key；Keychain adapter 会拒绝 `sk-sp-` Token Plan 个人版 Key，保存 UI 也校验 key 前缀。提醒用户不要复用先前在聊天中公开过的旧 Key。Token Plan 个人版不用于本自建应用。
+- 保留 DeepSeek/OpenRouter 配置。所有云请求继续逐次展示完整对话并确认；无 Consent、L3 凭据命中均在 Keychain 读取/网络出站前拒绝，无自动 failover。
+- 官方确认依据：[OpenAI 兼容接口](https://platform.qianwenai.com/docs/api-reference/toolkitframework/openai-compatible/overview)、[API Key 类型](https://platform.qianwenai.com/docs/api-reference/preparation/api-key)、[Token Plan 个人版范围](https://platform.qianwenai.com/docs/token-plan/personal/token-plan-personal-overview)。项目配置和运行条件见 `docs/beta/qwen-token-plan-integration.md` 与 `docs/beta/macOS-beta-chat.md`。
+- 验证：千问相关后端窄回归 26 项通过；Python 全量回归 162 项通过；`swift test --package-path poc/macos-audio` 31 项通过；Beta `.app` 构建成功；Accessibility 树确认运行中的 GUI 状态为 `qwen3.8-flash` 且“模型设置”按钮可见；启动脚本语法和 `git diff --check` 通过。未读取 Keychain 中的 Qwen key、未打开设置 sheet 手动操作、未发送云请求。
+- 下一步：用户在设置中保存新建的千问按量计费 `sk-ws-` 应用 Key 后，可逐次确认合成请求以实测认证和流式；设置入口已加入。不得复用曾贴入聊天的旧 Key。
+
 ### 2026-11-08：增加本地/云端模型设置 GUI
 
 - SwiftUI 聊天页新增“模型设置”齿轮按钮；默认本地 Ollama，可编辑本地模型 ID。云端暂提供固定 DeepSeek `deepseek-flash` / 中国与 OpenRouter `deepseek/deepseek-v4.1-flash-1017` / Global。
