@@ -187,6 +187,51 @@ def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:
     assert b'"provider":{"allow_fallbacks":false}' in seen[0].read()
 
 
+def test_closing_remote_sse_after_first_chunk_closes_response_stream() -> None:
+    class PendingSSE(httpx.AsyncByteStream):
+        def __init__(self) -> None:
+            self.closed = False
+
+        async def __aiter__(self):
+            yield b'data: {"choices":[{"delta":{"content":"first"}}]}\n\n'
+            await asyncio.Event().wait()
+
+        async def aclose(self) -> None:
+            self.closed = True
+
+    credentials = FakeCredentials()
+    response_stream = PendingSSE()
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                stream=response_stream,
+            )
+        )
+    )
+    adapter = OpenAICompatibleRemoteAdapter(
+        OPENROUTER_PROBE_CONFIG,
+        credentials=credentials,
+        client=client,
+    )
+    consent = ConsentManager()
+    grant_for(consent, OPENROUTER_PROBE_CONFIG)
+    gateway = make_gateway(consent, adapter, "openrouter")
+
+    async def cancel() -> str:
+        stream = gateway.stream(request_for(OPENROUTER_PROBE_CONFIG))
+        try:
+            return await anext(stream)
+        finally:
+            await stream.aclose()
+            await client.aclose()
+
+    assert asyncio.run(cancel()) == "first"
+    assert response_stream.closed
+    assert credentials.reads == ["openrouter"]
+
+
 def test_openrouter_metadata_reports_selected_provider_region_usage_and_cost() -> None:
     credentials = FakeCredentials()
     seen: list[httpx.Request] = []

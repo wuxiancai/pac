@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：Provider SSE 首片段后取消探测就绪
+
+- `probe_provider_capability_poc.py` 新增 `cancel` 能力：每次经精确 Consent 发起一条 SSE 请求，收到首个文本 delta 后主动关闭 gateway stream。脚本提示可能计费，并明确只观测客户端关闭，不把它当作 Provider 已停止生成的证明。
+- 新增 MockTransport 测试，首片段后关闭 gateway stream 会关闭底层 HTTP 响应体。窄回归 34 项、全量 Python 145 项、compileall、uv lock --check 均通过。
+- 下一步可分别逐次确认 `deepseek cancel` 与 `openrouter cancel`。复现命令与证据限制见 `poc/phase0-remote-provider.md`。DeepSeek JSON 目前两次一空一成功，原因/重复一致性未明。
+
 ### 2026-11-08：拒绝路径 PID 级 socket 检查完成
 
 - 用户提供的全局 `tcpdump -i en0` 捕获 546 个 TCP/443 窗口包；输出包含已建立的会话，未按 PID 过滤，不能据此归因给测试进程。

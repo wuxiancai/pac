@@ -33,7 +33,7 @@ CONFIGS = {
     DEEPSEEK_PROBE_CONFIG.provider: DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG.provider: OPENROUTER_PROBE_CONFIG,
 }
-CAPABILITIES = ("stream", "tools", "json", "error", "metadata", "deny-check")
+CAPABILITIES = ("stream", "cancel", "tools", "json", "error", "metadata", "deny-check")
 TOOL_SCHEMA = {
     "type": "function",
     "function": {
@@ -62,7 +62,7 @@ def _request(config: RemoteProviderConfig, capability: str) -> LocalModelRequest
     prompt = PROBE_PROMPT
     tools = ()
     response_format = None
-    if capability == "stream":
+    if capability in {"stream", "cancel"}:
         prompt = PROBE_PROMPT
     elif capability == "tools":
         prompt = (
@@ -230,6 +230,9 @@ def main() -> int:
             print(f"tool_choice: {json.dumps(request.tool_choice, ensure_ascii=False)}")
         elif args.capability == "error":
             print("此项故意发送无效 response_format，以观察 Provider HTTP 错误；服务仍可能计费，不会重试。")
+        elif args.capability == "cancel":
+            print("本次会启动一条真实 SSE 请求，收到首个文本片段后立即关闭客户端流；可能产生费用，不会重试。")
+            print("客户端可证明关闭本地流；Provider 是否及时停止生成/计费，需看服务端是否提供记录。")
         elif args.capability == "metadata":
             print("用于费用/区域重复观察；每次都是独立请求，可能产生费用。")
         print(f"若同意本次请求，请输入 `{confirmation}`：")
@@ -249,6 +252,18 @@ def main() -> int:
                 passed = text.strip() == PROBE_ACK
                 print(f"流式响应: {text}")
                 print(f"精确匹配: {passed}")
+            elif args.capability == "cancel":
+                async def cancel_after_first_chunk() -> str:
+                    stream = gateway.stream(request)
+                    try:
+                        return await anext(stream)
+                    finally:
+                        await stream.aclose()
+
+                first_chunk = asyncio.run(cancel_after_first_chunk())
+                print(f"首个文本片段: {json.dumps(first_chunk, ensure_ascii=False)}")
+                print("客户端流已主动关闭。")
+                passed = bool(first_chunk)
             elif args.capability == "tools":
                 result: ToolCallResult = asyncio.run(gateway.call_with_tools(request))
                 calls = [
