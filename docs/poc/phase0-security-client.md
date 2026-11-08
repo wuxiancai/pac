@@ -14,7 +14,7 @@
 - Swift 本机集成测试实测 supervisor 启动→握手→正确 token 健康检查/错误 token 拒绝→关闭，并验证重复 start 被拒、停止后可重启。测试运行时从仓库 backend `.venv` 使用本机 Python。
 - SwiftUI 连接 POC 新增可选 backend-controller 接口与主动启动/停止按钮：点击启动后在 detached task 启动服务、创建本机客户端并执行健康检查，健康确认后才显示 connected；点击停止后关闭服务。旧的 `init(client:)` 与“检查本机服务”路径保留。ViewModel fake-controller 测试覆盖成功启停与启动失败清理；GUI 启停实机证据见下。
 - 新增独立 `backend-lifecycle-poc` SwiftUI demo target，以及本机 build/run shell scripts；应用运行配置通过 `PAC_POC_PYTHON` 和 `PAC_POC_BACKEND` 显式提供，缺少配置或入口文件时 fail closed。构建输出 bundle 放在忽略目录 `.poc-data/backend-lifecycle-poc.app`，不会纳入 Git。
-- 已通过 `poc/macos-audio/scripts/run_backend_lifecycle_poc.sh` 实机启动本地 `.app`，无服务初始显示“尚未检查”；点击启动后状态变为“本机服务已连接”；点击停止后回到“尚未检查”，停止/检查按钮恢复禁用。此为当前设备一次 GUI 冒烟，不覆盖多轮、休眠或 App 退出期间故障。
+- 已通过 `poc/macos-audio/scripts/run_backend_lifecycle_poc.sh` 实机启动本地 `.app`，无服务初始显示“尚未检查”；点击启动后状态变为“本机服务已连接”；点击停止后回到“尚未检查”，停止/检查按钮恢复禁用。随后另完成两轮停止→启动→健康检查：每轮 UI 状态正确变化，最终进程表仅有一个受管理的 `pac_poc.local_service`；不覆盖锁屏/休眠或 App 退出期间故障。
 - 失败路径测试在 `.poc-data` 临时夹具下运行固定模块入口：无握手服务在 250 ms 配置期限触发 `startupTimedOut` 并被清理；非法 JSON 握手返回 `invalidHandshake` 且不保留运行子进程。该时限是测试注入值，不是产品启动时限决策。
 - 子进程握手后立即异常退出的回归曾使 supervisor 在向已关闭 pipe 写 `stop` 时收到 SIGPIPE。停止协议已改为关闭 stdin 以发送 EOF；supervisor 会清理已退出的 `Process` 后允许调用方显式重启。回归验证异常退出、清理和调用方显式重启；不实现或暗示自动重启/退避。
 - 新增 owner 生命周期释放测试：释放最后一个 supervisor 引用后，健康端点不再可访问，证明其 deinit 会停止自己拥有的 FastAPI 子进程。本机 GUI 试验也在服务已连接时退出应用，随后未发现残留 `pac_poc.local_service` 进程；macOS 恢复窗口会按系统设置重新打开 demo，但新实例因缺少环境配置而 fail closed。
@@ -39,7 +39,7 @@ swift test
 
 ## 未解决/未验收
 
-- SwiftUI demo 已实测一次启动/停止并验证退出清理；没有多轮交互、锁屏/休眠场景测试，也不是完整产品 UI。
+- SwiftUI demo 已实测一次启动/停止并验证退出清理；已完成两轮连续启停和连接检查；锁屏/休眠场景仍未测试，也不是完整产品 UI。
 - LocalAuthentication API 接入已实现，测试按钮和视图模型已构建并在 demo 界面显示；真实系统认证成功已实测一次；用户取消/拒绝结果仍未实测。测试按钮不会访问钥匙串。
 - POC Swift supervisor 已验证本机后端进程所有权、随机端口 handshake、优雅关闭、手动停止后重启、启动超时与非法握手清理、owner deinit 清理及异常退出后的调用方显式重启；未实现异常退出自动重启/退避、锁屏策略、持久化/正式分发 app 运行时配置或面向用户的启动诊断 UI。
 - supervisor 的 stderr 当前定向 `/dev/null`，避免将意外服务日志并入普通输出；正式诊断/脱敏日志策略需在产品阶段设计。
