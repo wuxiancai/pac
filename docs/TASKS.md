@@ -19,7 +19,7 @@
 | 顺序 | 工作包 | 状态 | 完成条件 / 说明 |
 |---:|---|---|---|
 | B0 | 应用可运行骨架 | IN PROGRESS | 新增 SwiftUI 测试版 `.app` 构建/启动入口；真实启动后显示本机模型已连接，supervisor 管理后端。仍需关闭窗口后确认服务清理，并完善启动失败体验。 |
-| B1 | 本机文字对话闭环 | IN PROGRESS | 新增 Loopback `/chat/stream`、输入校验及 SwiftUI 输入/流式显示/停止控件；本机 Ollama API 真实合成短句返回 7 个增量；GUI 实际输入并显示模型回复通过。已修复取消后新旧请求状态竞态；停止按钮 GUI 行为与关窗后端清理仍需实机复核。详见 `beta/macOS-beta-chat.md`。 |
+| B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或固定 DeepSeek/OpenRouter 云路由；本地模型 ID 可配置；云端有 Keychain 保存、完整对话预览、逐请求 Consent、L3 凭据拦截和无自动 fallback。Python 159 项、Swift 31 项通过，GUI Accessibility 树确认设置按钮显示；sheet 实际交互及真实云请求尚未手动验收。D-010 仍待决。详见 `beta/macOS-beta-chat.md`。 |
 | B2 | 本地语音闭环 | OPEN | 在应用内显式开始/停止麦克风，连接已验证本地 ASR 和本机 TTS；原始音频不落盘，失败不静默上云。 |
 | B3 | 会话保存与恢复 | DEFERRED | 等待最小数据保留和静态加密决策；在决定前不持久化敏感对话。 |
 | B4 | 千问文本/实时语音 | DEFERRED | Token Plan 服务端支持文本和 Realtime WebSocket，但个人版条款仅允许在编程/智能体工具内交互使用，排除自建应用后端；因此不把个人版 Key 接入本项目 SwiftUI/FastAPI 测试版。取得适用于自定义应用的 API 凭据后再评估启用。协议、地址和事件见 `beta/qwen-token-plan-integration.md`。 |
@@ -32,7 +32,7 @@
 ## 当前执行顺序
 
 1. **B0 应用可运行骨架**：基于现有 SwiftUI lifecycle demo，形成开发者可重复启动的单用户 app 入口；本机后端启动、健康状态、错误提示和退出清理纳入该闭环。
-2. **B1 本机文字对话**：扩展 Loopback API 与客户端，打通文字提交、流式回答、停止；先用 Ollama，暂不引入云端依赖或会话持久化。
+2. **B1 本机文字对话和模型设置**：本机 Ollama/已验证固定云端配置选择；云端逐请求内容预览与 Consent、Keychain 凭据和无自动 fallback；完成设置 UI 手动复核及 API Key/错误路径验证。
 3. **B2 本地语音**：把已有 ASR、麦克风捕获和 TTS 接入 app；录音只在用户明确开始后采集并留在内存，识别失败不得转云。
 4. 后续再按用户实际使用反馈决定会话持久化、记忆、文件导入和备份。B4 千问 Token Plan 文本/实时语音已按用户确认列入候选，但排在本机对话和本地语音基础之后；进入可用路径前按单次 Consent 和对应协议验证。
 

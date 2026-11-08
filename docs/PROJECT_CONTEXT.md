@@ -8,6 +8,7 @@
 
 ## 当前状态
 
+- 2026-11-08 模型设置更新：SwiftUI 聊天页增加本地/云端选择，默认本机 Ollama；云端首批为固定 DeepSeek/OpenRouter 路由。GUI 按钮已在真实窗口 Accessibility 树确认显示；设置 sheet 实际交互仍待人工复核。云请求需逐次展示完整对话并同意，Key 存 login Keychain，L3 凭据模式在后端出站前拒绝；千问 Token Plan 个人版 Key 不接入自建应用。Python 全量 159 项、Swift 31 项通过。详见 `docs/beta/macOS-beta-chat.md`。
 - 当前目标：单用户 macOS 本机优先测试版；POC 证据仍标为 POC，阶段 0 完整 V1/正式发布验收未完成。当前已新增可启动 SwiftUI 测试版、受认证的本机 `/chat/stream` 和 Ollama 增量对话页面；HTTP 本机模型合成请求已收到 7 个片段。GUI 发消息/显示回复已实机通过；停止按钮和退出清理尚待手动冒烟，对话暂不持久化。生成请求使用 request ID 隔离回调，已消除停止后立即重发时旧请求回调覆盖新状态的竞态；Swift 31 项既有测试和构建通过。之后接入本地语音；延期能力仅保留清晰扩展边界，不宣称已通过验证。
 - 实现形态：macOS SwiftUI 客户端 + 本机 Python/FastAPI 服务；仓库内各工作包的当前状态和证据见 [阶段 0 追踪矩阵](poc/phase0-traceability.md)。
 - 本机语音：中文 Streaming ASR、麦克风捕获 CLI、TTS 打断已有 POC 和部分实测；用户提供的 Qwen3-ASR 0.6B INT8 ONNX 已完成随包中/英离线评估。另下载 sherpa-onnx 官方中英双语 Streaming Zipformer，10 条合成音频均产生 final；用户三次实机运行 CLI 均观察到 partial/final；5 条中英/混说 manifest 合成 WAV 的本机 ASR-final→AVSpeechSynthesizer 链路共 7/7 完成；另一次麦克风未打开时验证 Ctrl-C 可停止；自动回归模拟覆盖 ASR 解码异常、PortAudio 启动失败和 callback status 错误时的流/缓冲清理，真实设备驱动故障仍未测。用户指定当前真人语音目标为功能冒烟，模型识别质量后续再优化；中英 Streaming Zipformer 仓库声明 Apache-2.0，但上游来源标识和训练数据权利链尚未核清；ASR+LLM 已在两条合成 WAV 上有七轮并发观察，独立语料/多负载资源结果未覆盖；SwiftUI 麦克风/AEC 属规格书阶段 3，当前不列为阶段 0 阻塞；详情见 `docs/poc/phase0-local-asr.md`。

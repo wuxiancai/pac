@@ -1,21 +1,29 @@
 import Foundation
 import Security
 
-enum KeychainCredentialError: Error, Equatable {
+public enum KeychainCredentialError: Error, Equatable, LocalizedError {
     case emptyIdentity
     case emptySecret
     case keychain(operation: String, status: OSStatus)
+
+    public var errorDescription: String? {
+        switch self {
+        case .emptyIdentity: "密钥账户信息无效。"
+        case .emptySecret: "API Key 不能为空。"
+        case .keychain(let operation, let status): "Keychain 操作失败（\(operation), \(status)）。"
+        }
+    }
 }
 
 /// Stores credentials in this Mac's Keychain without exposing a plaintext read API.
-final class KeychainCredentialStore {
+public final class KeychainCredentialStore {
     private let service: String
 
-    init(service: String) {
+    public init(service: String) {
         self.service = service
     }
 
-    func save(_ secret: String, account: String) throws {
+    public func save(_ secret: String, account: String) throws {
         try validate(account: account)
         guard !secret.isEmpty else { throw KeychainCredentialError.emptySecret }
         let key = baseQuery(account: account)
@@ -38,7 +46,7 @@ final class KeychainCredentialStore {
         }
     }
 
-    func delete(account: String) throws {
+    public func delete(account: String) throws {
         try validate(account: account)
         let status = SecItemDelete(baseQuery(account: account) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
@@ -46,7 +54,7 @@ final class KeychainCredentialStore {
         }
     }
 
-    func contains(account: String) throws -> Bool {
+    public func contains(account: String) throws -> Bool {
         try validate(account: account)
         var query = baseQuery(account: account)
         query[kSecMatchLimit as String] = kSecMatchLimitOne

@@ -61,7 +61,12 @@ public final class LocalAPIClient: @unchecked Sendable {
         return value.status == "ok"
     }
 
-    public func streamChat(messages: [LocalChatMessage]) -> AsyncThrowingStream<String, Error> {
+    public func streamChat(
+        messages: [LocalChatMessage],
+        provider: String = "ollama",
+        model: String = "qwen3.5:0.8b",
+        confirmedForThisRequest: Bool = false
+    ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -73,7 +78,12 @@ public final class LocalAPIClient: @unchecked Sendable {
                     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                    request.httpBody = try JSONEncoder().encode(ChatRequest(messages: messages))
+                    request.httpBody = try JSONEncoder().encode(ChatRequest(
+                        messages: messages,
+                        provider: provider,
+                        model: model,
+                        confirmedForThisRequest: confirmedForThisRequest
+                    ))
                     let (bytes, response) = try await session.bytes(for: request)
                     guard let httpResponse = response as? HTTPURLResponse else {
                         throw LocalAPIClientError.invalidResponse
@@ -120,6 +130,16 @@ public final class LocalAPIClient: @unchecked Sendable {
 
 private struct ChatRequest: Encodable {
     let messages: [LocalChatMessage]
+    let provider: String
+    let model: String
+    let confirmedForThisRequest: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case messages
+        case provider
+        case model
+        case confirmedForThisRequest = "confirmed_for_this_request"
+    }
 }
 
 private struct ChatStreamEvent: Decodable {

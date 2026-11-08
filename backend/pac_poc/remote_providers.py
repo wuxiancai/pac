@@ -98,6 +98,7 @@ class OpenAICompatibleRemoteAdapter:
         *,
         credentials: CredentialProvider,
         client: httpx.AsyncClient | None = None,
+        max_output_tokens: int = 64,
     ) -> None:
         parsed = urlsplit(config.endpoint)
         expected_hosts = {
@@ -121,9 +122,12 @@ class OpenAICompatibleRemoteAdapter:
             raise ValueError("remote Provider configuration is not allowlisted")
         if not config.account or not config.model or not config.region:
             raise ValueError("remote Provider identity must be complete")
+        if not 1 <= max_output_tokens <= 4096:
+            raise ValueError("max_output_tokens is outside the supported range")
         self._config = config
         self._credentials = credentials
         self._client = client
+        self._max_output_tokens = max_output_tokens
 
     async def generate(self, request: LocalModelRequest) -> str:
         return (await self.generate_with_metadata(request)).text
@@ -279,7 +283,7 @@ class OpenAICompatibleRemoteAdapter:
             "model": self._config.model,
             "messages": list(request.messages),
             "stream": stream,
-            "max_tokens": 64,
+            "max_tokens": self._max_output_tokens,
         }
         if request.tools:
             payload["tools"] = list(request.tools)

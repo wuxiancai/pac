@@ -1,3 +1,12 @@
+### 2026-11-08：增加本地/云端模型设置 GUI
+
+- SwiftUI 聊天页新增“模型设置”齿轮按钮；默认本地 Ollama，可编辑本地模型 ID。云端暂提供固定 DeepSeek `deepseek-flash` / 中国与 OpenRouter `deepseek/deepseek-v4.1-flash-1017` / Global。
+- 设置面板可将云 API Key 保存到 login Keychain 的既有 service/account；界面只显示是否已保存。每次云发送前弹窗展示完整对话、Provider、模型和区域；用户逐次确认后才创建一次精确 Consent。Keychain 缺失、401、402 有脱敏提示，不自动 failover。检测到常见 `sk-`、Bearer 或私钥标记时在读取 Keychain 和网络出站前拒绝。
+- 千问 Token Plan 个人版 Key 不列为应用 Provider：服务端虽支持文本和实时语音，个人版范围限定于编程/智能体工具交互，不适用于本自建应用。需取得适用于自定义应用的凭据后再加入千问。
+- 本地来源和模型 ID 保存在 UserDefaults；启动脚本不再硬编码要求 `qwen3.5:0.8b`，所选模型需已在 Ollama 安装。具体设置说明见 `docs/beta/macOS-beta-chat.md`。
+- 验证：Python 全量 `pytest -q` 159 passed；Swift `swift test --package-path poc/macos-audio` 31 passed；应用 target build 通过；Accessibility 树确认设置按钮显示；`git diff --check` 通过。设置 sheet 手动操作和真实云端请求尚未验证，未发送云请求。
+- 下一步：手动打开设置 sheet 复核控件与 Keychain 状态；随后完成 B0/B1 停止与关窗清理实机复核，再推进 B2 本机语音。
+
 ### 2026-11-08：修复本机对话停止后的请求状态竞态并核对千问实时语音范围
 
 - SwiftUI 本机聊天给每轮生成分配 request ID；取消后清除当前 ID，流片段和结束/错误回调仅在 ID 仍匹配时更新 UI，避免旧请求收尾清掉新请求状态。

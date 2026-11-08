@@ -12,15 +12,6 @@ if [ ! -x "$PYTHON" ]; then
   printf 'Create the backend environment with: cd %s && uv sync --locked\n' "$BACKEND_DIR" >&2
   exit 1
 fi
-if ! command -v ollama >/dev/null 2>&1; then
-  printf 'Ollama is required for the local beta model. Install/start Ollama, then retry.\n' >&2
-  exit 1
-fi
-if ! ollama list | awk 'NR > 1 { print $1 }' | grep -Fxq 'qwen3.5:0.8b'; then
-  printf 'Required local model qwen3.5:0.8b is not installed in Ollama.\n' >&2
-  exit 1
-fi
-
 "$SCRIPT_DIR/build_beta_app.sh"
 open -n "$APP_DIR" \
   --env "PAC_POC_PYTHON=$PYTHON" \
