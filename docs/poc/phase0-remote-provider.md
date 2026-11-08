@@ -63,6 +63,8 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 
 拒绝边界可在不联网的情况下，分别对 `deepseek` 与 `openrouter` 运行 `UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_capability_poc.py <provider> deny-check`。它将 Consent policy 前接 HTTP MockTransport tripwire，断言无授权时 Keychain 读取数和 transport 调用数都为零。这是进程内网络边界证据，不是操作系统抓包证据。 2026-11-08 本轮在两家 Provider 配置上重跑均通过：Keychain reads=0、HTTP transport calls=0。
 
+新增 `backend/scripts/probe_denied_egress_poc.py <provider>` 用真实 HTTPX client（不注入 MockTransport）和凭据读取 tripwire，在无 Consent 下尝试 Gateway 请求，并留出观察窗口。2026-11-08 实跑 OpenRouter：Policy 在 adapter 前拒绝，credential reads=0。尝试用 macOS `nettop` 按 PID 采样时，连 loopback 正向对照都未显示该 PID 行，故该观察无效；`tcpdump` 的 BPF 设备需要管理员权限，当前执行账户无 sudo 凭据。操作系统级网络抓包仍待用户在本机终端运行短时 SYN 观察；脚本本身没有读取 Keychain 或连接 Provider。
+
 ## 已验证（仅本地 MockTransport）
 
 - 默认拒绝发生在 Keychain 读取和 adapter 网络调用之前。
@@ -96,6 +98,6 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 
 ## 尚未验收
 
-- 两家真实 SSE 各有一次成功；DeepSeek 与 OpenRouter 工具提案各有一次成功且均未执行（OpenRouter 前两次曾为空）；DeepSeek JSON 空正文原因、DeepSeek 可报告费用/区域字段的能力及拒绝/撤销后的系统级零出站边界尚未充分验证。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
+- 两家真实 SSE 各有一次成功；DeepSeek 与 OpenRouter 工具提案各有一次成功且均未执行（OpenRouter 前两次曾为空）；DeepSeek JSON 空正文原因、DeepSeek 服务侧费用/区域字段未返回；拒绝后的系统级零出站抓包仍待完成。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。

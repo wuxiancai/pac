@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：拒绝路径真实 HTTPX 与系统监测准备
+
+- 新增 `backend/scripts/probe_denied_egress_poc.py <provider>`：走真实 HTTPX client、默认无 Consent，并以 credential tripwire 避免读取真实凭据；观察窗口内 OpenRouter 被 Policy 在 Adapter 前拒绝，credential reads=0。无 Provider 请求发出。
+- `nettop` PID 过滤在本机未能显示测试进程，loopback 正向对照也未出现，不能作为系统证据；`tcpdump` 存在但打开 BPF 需要 sudo，当前 agent shell 无管理员凭据。系统级抓包仍未完成，需用户在本机终端短时运行 `sudo tcpdump -i en0 -nn -l 'tcp port 443 and (tcp[tcpflags] & tcp-syn != 0)'`，同时运行上述本地 harness，然后停止抓包并提供是否观察到新连接/ SYN 的结果。tcpdump 默认只显示包头，不写 pcap 文件。
+- DeepSeek metadata 两次结果已由增强 CLI 后记录；下一项可重新逐次确认 DeepSeek JSON 获取 finish_reason/usage，之后完成系统抓包。
+
 ### 2026-11-08：DeepSeek metadata 重复观察完成
 
 - 用户分别确认 DeepSeek metadata 两条请求。两次均报告模型 `deepseek-flash`，服务未返回下游 Provider/区域/费用；token 分别 42/29/71 与 42/16/58。第 1 次 ACK 不匹配，第 2 次匹配；旧 CLI 未输出第 1 次正文，原因未知。
