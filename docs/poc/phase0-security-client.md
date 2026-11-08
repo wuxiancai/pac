@@ -20,7 +20,7 @@
 - 新增 owner 生命周期释放测试：释放最后一个 supervisor 引用后，健康端点不再可访问，证明其 deinit 会停止自己拥有的 FastAPI 子进程。本机 GUI 试验也在服务已连接时退出应用，随后未发现残留 `pac_poc.local_service` 进程；macOS 恢复窗口会按系统设置重新打开 demo，但新实例因缺少环境配置而 fail closed。
 - Swift `LocalAPIClient` 仅允许 HTTP `127.0.0.1` / `::1`，使用内存 token，拒绝 HTTP redirect；SwiftUI POC 连接视图只展示状态并提供主动检查按钮。
 - API Key POC 使用 macOS Keychain generic-password，`AfterFirstUnlockThisDeviceOnly`；外部可见的凭据管理 API 只提供写入、删除、存在状态查询，不提供明文读取。
-- 凭据写入/删除先经过 `LocalAuthentication` 敏感操作授权门；认证策略为 `.deviceOwnerAuthentication`。新增独立 SwiftUI 系统认证测试区，按钮明确说明只验证本机身份认证、不读写钥匙串；点按钮后才调用授权器，成功/未完成或系统拒绝状态会显示在界面。该 UI 使用同一系统授权器，不调用 `CredentialManagementService` 或 `KeychainCredentialStore`。fake evaluator 测试覆盖策略/原因传递、系统不可用时 fail closed、系统拒绝向上传递；fake authorizer 测试覆盖测试视图模型成功/失败。真实 demo 窗口现有两次认证成功观察，界面均显示“系统认证成功；未访问钥匙串”；本次再次实测未认证结果，界面显示“认证未完成或被系统拒绝”。此界面合并取消和拒绝状态，不能单凭状态断言系统返回的具体原因；测试视图代码不访问钥匙串。
+- 凭据写入/删除先经过 `LocalAuthentication` 敏感操作授权门；认证策略为 `.deviceOwnerAuthentication`。独立 SwiftUI 系统认证测试区使用同一系统授权器，不调用 `CredentialManagementService` 或 `KeychainCredentialStore`。视图模型现按 `LAError.userCancel`、`LAError.systemCancel` 分别显示用户取消和系统中断；其他认证失败保持 fail closed 状态。fake evaluator 测试覆盖策略/原因传递、系统不可用时 fail closed、系统拒绝向上传递；fake authorizer 回归覆盖成功、普通认证失败、用户取消及系统中断。真实 demo 窗口此前两次认证成功，本次新版 UI 实测用户取消，显示“用户取消了系统认证；未访问钥匙串”。测试路径不访问钥匙串。
 - Consent/Policy 只允许精确匹配 Provider、Model、Region、Purpose、数据等级和期限的 grant；无 grant 默认拒绝、L3 永远拒绝，支持撤销。没有实现或调用任何云 Provider。
 - 当前 POC 没有数据库 schema 变更；FastAPI/Uvicorn 版本已锁定到 `0.159.1` / `0.54.0`。
 
@@ -35,12 +35,12 @@ swift test
 ./scripts/run_backend_lifecycle_poc.sh
 ```
 
-截至 2026-11-08 当前本机验证：Python 全量 151 项通过（当前阶段总基线）；本次 `swift test` 29 项通过，新增两项系统认证测试视图模型回归。Python 覆盖实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 覆盖 supervisor 子进程失败/显式重启、GUI ViewModel fake 路径、Keychain dummy secret 及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
+截至 2026-11-08 当前本机验证：Python 全量 151 项通过（当前阶段总基线）；认证状态分类后 `swift test` 31 项通过。Python 覆盖实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 覆盖 supervisor 子进程失败/显式重启、GUI ViewModel fake 路径、Keychain dummy secret 及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
 
 ## 未解决/未验收
 
 - SwiftUI demo 已实测一次启动/停止并验证退出清理；已完成两轮连续启停和连接检查；锁屏/休眠场景仍未测试，也不是完整产品 UI。
-- LocalAuthentication API 接入已实现，测试按钮和视图模型已构建并在 demo 界面显示；真实系统认证成功两次、未认证一次；界面未区分用户取消和系统拒绝，当前只证明未授权状态会 fail closed。测试按钮不会访问钥匙串。
+- LocalAuthentication API 接入已实现，测试按钮和视图模型已构建并在 demo 界面显示；真实系统认证成功两次、用户取消一次均有实机结果，取消状态正确区分并显示；普通认证失败和系统中断由 fake 回归覆盖。测试按钮不会访问钥匙串。
 - POC Swift supervisor 已验证本机后端进程所有权、随机端口 handshake、优雅关闭、手动停止后重启、启动超时与非法握手清理、owner deinit 清理及异常退出后的调用方显式重启；未实现异常退出自动重启/退避、锁屏策略、持久化/正式分发 app 运行时配置或面向用户的启动诊断 UI。
 - supervisor 的 stderr 当前定向 `/dev/null`，避免将意外服务日志并入普通输出；正式诊断/脱敏日志策略需在产品阶段设计。
 - Host/Origin、token 和无云出站策略经过 POC 测试；真实用户 Consent UI、完整数据分类/脱敏/审计与撤销竞态未实现。

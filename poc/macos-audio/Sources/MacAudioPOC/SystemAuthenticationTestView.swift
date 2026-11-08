@@ -1,4 +1,5 @@
 import Observation
+import LocalAuthentication
 import SwiftUI
 
 @available(macOS 14.0, *)
@@ -6,6 +7,8 @@ public enum SystemAuthenticationTestState: Equatable {
     case ready
     case evaluating
     case authenticated
+    case cancelled
+    case interrupted
     case notAuthenticated
 
     fileprivate var label: String {
@@ -13,6 +16,8 @@ public enum SystemAuthenticationTestState: Equatable {
         case .ready: "尚未测试系统认证"
         case .evaluating: "正在等待系统认证…"
         case .authenticated: "系统认证成功；未访问钥匙串"
+        case .cancelled: "用户取消了系统认证；未访问钥匙串"
+        case .interrupted: "系统中断了认证；未访问钥匙串"
         case .notAuthenticated: "认证未完成或被系统拒绝"
         }
     }
@@ -37,6 +42,10 @@ public final class SystemAuthenticationTestModel {
                 reason: "验证本机系统认证能力；本测试不会修改钥匙串。"
             )
             state = .authenticated
+        } catch let error as LAError where error.code == .userCancel {
+            state = .cancelled
+        } catch let error as LAError where error.code == .systemCancel {
+            state = .interrupted
         } catch {
             state = .notAuthenticated
         }

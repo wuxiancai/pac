@@ -1,20 +1,17 @@
 import Testing
+import LocalAuthentication
 @testable import MacAudioPOC
 
 @available(macOS 14.0, *)
 @MainActor
 private final class FakeSensitiveActionAuthorizer: SensitiveActionAuthorizing {
-    var shouldFail = false
+    var errorToThrow: (any Error)?
     private(set) var reasons: [String] = []
 
     func authorize(reason: String) async throws {
         reasons.append(reason)
-        if shouldFail { throw TestAuthorizationError.denied }
+        if let errorToThrow { throw errorToThrow }
     }
-}
-
-private enum TestAuthorizationError: Error {
-    case denied
 }
 
 @available(macOS 14.0, *)
@@ -33,10 +30,34 @@ private enum TestAuthorizationError: Error {
 @MainActor
 @Test func systemAuthenticationTestFailsClosedWhenAuthenticationIsDenied() async {
     let authorizer = FakeSensitiveActionAuthorizer()
-    authorizer.shouldFail = true
+    authorizer.errorToThrow = LAError(.authenticationFailed)
     let model = SystemAuthenticationTestModel(authorizer: authorizer)
 
     await model.testAuthentication()
 
     #expect(model.state == .notAuthenticated)
+}
+
+@available(macOS 14.0, *)
+@MainActor
+@Test func systemAuthenticationTestDistinguishesUserCancellation() async {
+    let authorizer = FakeSensitiveActionAuthorizer()
+    authorizer.errorToThrow = LAError(.userCancel)
+    let model = SystemAuthenticationTestModel(authorizer: authorizer)
+
+    await model.testAuthentication()
+
+    #expect(model.state == .cancelled)
+}
+
+@available(macOS 14.0, *)
+@MainActor
+@Test func systemAuthenticationTestDistinguishesSystemInterruption() async {
+    let authorizer = FakeSensitiveActionAuthorizer()
+    authorizer.errorToThrow = LAError(.systemCancel)
+    let model = SystemAuthenticationTestModel(authorizer: authorizer)
+
+    await model.testAuthentication()
+
+    #expect(model.state == .interrupted)
 }
