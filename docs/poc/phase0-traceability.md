@@ -66,7 +66,7 @@ flowchart TD
 ### 阶段 0（当前阶段，未验收）
 
 1. 0A 仓库审计与基线记录：完成，不改动原功能/章节/schema/API。
-2. 0B 本地语音链路：旧模型有中文 Streaming ASR；官方双语 Streaming Zipformer 对合成中英音频产生 partial/final；Qwen3-ASR ONNX 另有随包离线评估。用户已两次在真实设备上运行麦克风 CLI 并观察到 partial/final，按用户指示当前以功能冒烟为准，模型质量留待后续选择；SwiftUI 集成、异常/停止清理和性能仍未验收。
+2. 0B 本地语音链路：旧模型有中文 Streaming ASR；官方双语 Streaming Zipformer 对合成中英音频产生 partial/final；Qwen3-ASR ONNX 另有随包离线评估。用户已有三次真实设备麦克风 CLI partial/final 观察和一次麦克风未打开时 Ctrl-C 正常停止记录；当前以功能冒烟为准，模型质量留待后续选择；SwiftUI 集成、真实驱动异常和性能仍未验收。
 3. 0C 本地 Gateway/能力注册/Agent 模拟：可测试骨架完成；DeepSeek 与 OpenRouter 有用户逐次确认的合成文本实测，同一 ModelGateway 顺序跨 Provider 路由一次通过，两家 SSE 各一次通过；完整工具/JSON/错误能力矩阵仍待补证。
 4. 0D 记忆 POC：SQLite/FTS/来源/纠错/删除/恢复已测；本地 Embedding 候选以 opt-in provider 接入内存仓库并完成 3 条合成查询；产品模型、持久化 schema 与真实检索质量仍 OPEN。
 5. 0E Swift/Loopback/Keychain/Consent：部分完成；策略支持 Touch ID 或设备密码，fake evaluator 路径已测；POC SwiftUI demo 启停/退出清理已实机验证；真实认证提示、异常自动恢复/退避、锁屏行为及正式分发配置仍 OPEN。
