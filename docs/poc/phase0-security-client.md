@@ -20,7 +20,7 @@
 - 新增 owner 生命周期释放测试：释放最后一个 supervisor 引用后，健康端点不再可访问，证明其 deinit 会停止自己拥有的 FastAPI 子进程。本机 GUI 试验也在服务已连接时退出应用，随后未发现残留 `pac_poc.local_service` 进程；macOS 恢复窗口会按系统设置重新打开 demo，但新实例因缺少环境配置而 fail closed。
 - Swift `LocalAPIClient` 仅允许 HTTP `127.0.0.1` / `::1`，使用内存 token，拒绝 HTTP redirect；SwiftUI POC 连接视图只展示状态并提供主动检查按钮。
 - API Key POC 使用 macOS Keychain generic-password，`AfterFirstUnlockThisDeviceOnly`；外部可见的凭据管理 API 只提供写入、删除、存在状态查询，不提供明文读取。
-- 凭据写入/删除先经过 `LocalAuthentication` 敏感操作授权门；认证策略为 `.deviceOwnerAuthentication`，允许系统按可用性使用 Touch ID 或设备密码。fake evaluator 测试覆盖策略/原因传递、系统不可用时 fail closed、系统拒绝向上传递；fake authorizer 测试验证拒绝路径不会变更 Keychain。真实系统认证提示未触发。
+- 凭据写入/删除先经过 `LocalAuthentication` 敏感操作授权门；认证策略为 `.deviceOwnerAuthentication`。新增独立 SwiftUI 系统认证测试区，按钮明确说明只验证本机身份认证、不读写钥匙串；点按钮后才调用授权器，成功/取消/拒绝状态会显示在界面。该 UI 使用同一系统授权器，不调用 `CredentialManagementService` 或 `KeychainCredentialStore`。fake evaluator 测试覆盖策略/原因传递、系统不可用时 fail closed、系统拒绝向上传递；fake authorizer 测试覆盖测试视图模型成功/失败。已在真实 demo 窗口触发系统认证；界面显示“系统认证成功；未访问钥匙串”。只记录认证成功结果，不推断系统实际采用了哪种认证方式。
 - Consent/Policy 只允许精确匹配 Provider、Model、Region、Purpose、数据等级和期限的 grant；无 grant 默认拒绝、L3 永远拒绝，支持撤销。没有实现或调用任何云 Provider。
 - 当前 POC 没有数据库 schema 变更；FastAPI/Uvicorn 版本已锁定到 `0.159.1` / `0.54.0`。
 
@@ -35,12 +35,12 @@ swift test
 ./scripts/run_backend_lifecycle_poc.sh
 ```
 
-本工作包的全量回归持续随阶段推进；截至 2026-11-08 本轮记录的 Python 全量 129 项、Swift Testing 27 项通过。Python 覆盖实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 覆盖 supervisor 子进程失败/显式重启、GUI ViewModel fake 路径、Keychain dummy secret 及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
+截至 2026-11-08 当前本机验证：Python 全量 149 项通过（阶段总基线）；本次 `swift test` 29 项通过，新增两项系统认证测试视图模型回归。Python 覆盖实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 覆盖 supervisor 子进程失败/显式重启、GUI ViewModel fake 路径、Keychain dummy secret 及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
 
 ## 未解决/未验收
 
 - SwiftUI demo 已实测一次启动/停止并验证退出清理；没有多轮交互、锁屏/休眠场景测试，也不是完整产品 UI。
-- LocalAuthentication API 接入已实现，默认策略覆盖生物识别或设备密码；单测不等于真实系统交互。真实 Touch ID/设备密码提示、拒绝/取消仍未实测。
+- LocalAuthentication API 接入已实现，测试按钮和视图模型已构建并在 demo 界面显示；真实系统认证成功已实测一次；用户取消/拒绝结果仍未实测。测试按钮不会访问钥匙串。
 - POC Swift supervisor 已验证本机后端进程所有权、随机端口 handshake、优雅关闭、手动停止后重启、启动超时与非法握手清理、owner deinit 清理及异常退出后的调用方显式重启；未实现异常退出自动重启/退避、锁屏策略、持久化/正式分发 app 运行时配置或面向用户的启动诊断 UI。
 - supervisor 的 stderr 当前定向 `/dev/null`，避免将意外服务日志并入普通输出；正式诊断/脱敏日志策略需在产品阶段设计。
 - Host/Origin、token 和无云出站策略经过 POC 测试；真实用户 Consent UI、完整数据分类/脱敏/审计与撤销竞态未实现。

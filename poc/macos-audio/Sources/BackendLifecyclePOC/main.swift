@@ -27,7 +27,11 @@ struct BackendLifecyclePOCApp: App {
         WindowGroup("本机后端生命周期 POC") {
             Group {
                 if let supervisor {
-                    LocalAPIConnectionView(backendController: supervisor)
+                    VStack(spacing: 0) {
+                        LocalAPIConnectionView(backendController: supervisor)
+                        Divider()
+                        SystemAuthenticationTestView()
+                    }
                 } else {
                     VStack(spacing: 12) {
                         Text("尚未配置本机后端")
