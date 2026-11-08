@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：0C 同一 Gateway 双 Provider 路由
+
+- 新增 `backend/scripts/probe_provider_switch_poc.py`：同一 ModelGateway 注册 DeepSeek 与 OpenRouter 两个固定 adapter，逐家展示合成请求并要求独立精确确认；拒绝或失败不触发自动 failover。
+- 新增 MockTransport 回归证明双路由端点和对应 Keychain account 均按 Provider 选择；窄回归 29 项通过，脚本 compileall 通过。真实跨 Provider 请求仍待用户执行新脚本并逐家确认；复现命令和边界见 `poc/phase0-remote-provider.md`。
+- 更新后全量 Python 回归 **140 passed**。阶段 0 仍未验收；真实 SSE/工具/JSON/错误能力、其他阶段缺口和延期决策仍需按矩阵处理。
+
 ### 2026-11-08：0G Python 依赖 SBOM
 
 - 从锁文件导出 CycloneDX 1.5 SBOM，覆盖所有 54 个 Python 锁定依赖（包括所有 extras 与 dev 组），并核对 BOM 的 `(name, version)` 集合与 `uv.lock` 完全一致。复现步骤、SHA-256 和范围限制见 `poc/phase0-python-sbom.md`。
@@ -144,7 +150,7 @@
 
 ## 下一步
 
-继续阶段 0：双语流式 ASR 已完成合成文件分帧评估，用户两次主动运行麦克风 CLI 均观察到 partial/final；当前真人语音验收按用户指示先验证功能，识别质量留待模型选择。Provider 方面，DeepSeek 与 OpenRouter 各有一次用户逐次授权后的真实合成文本请求成功；同一 orchestrator 跨 Provider 切换及流式/工具/JSON/错误能力对照仍缺。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：Provider 方面，DeepSeek 与 OpenRouter 各有一次用户逐次授权后的真实合成文本请求成功；同一 ModelGateway 双 adapter 本地路由回归通过，真实跨 Provider 切换及流式/工具/JSON/错误能力对照仍缺。用户可逐次确认运行 `backend/scripts/probe_provider_switch_poc.py`。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 

@@ -18,9 +18,9 @@
 
 | 顺序 | 工作包 | 状态 | 下一步 / 完成条件 |
 |---:|---|---|---|
-| 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；本机 Python 139 项、Swift 27 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
+| 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；最新本机 Python 140 项、Swift 27 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
 | 0B | 本地语音链路 | IN PROGRESS | 官方中英 Streaming Zipformer 文件分帧 10/10 final、82 partial、weighted CER 0.0254；用户已完成两次真实 CLI 麦克风采集并看到 partial/final。用户将当前目标限定为功能冒烟，识别质量转为后续模型选择/优化项；剩余停止/异常清理、SwiftUI 集成、许可与性能证据仍待补。 |
-| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | DeepSeek（中国）和 OpenRouter（Global）各完成一次经用户逐次确认的 L1 合成非流式真实请求并精确匹配。OpenRouter 返回 Relace/HKG、token 与 cost；完整流式/工具/JSON/错误对照及同一 orchestrator 跨 Provider 切换仍待补。详见 `poc/phase0-remote-provider.md`。 |
+| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | DeepSeek（中国）和 OpenRouter（Global）各完成一次经用户逐次确认的 L1 合成非流式真实请求并精确匹配。同一 ModelGateway 双 adapter 本地路由回归通过；真实跨 Provider 请求及流式/工具/JSON/错误对照仍待补。详见 `poc/phase0-remote-provider.md`。 |
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；补真实系统认证提示、锁屏/休眠、多轮 GUI、正式分发与恢复策略证据。 |
 | 0F | 静态加密兼容性 | IN PROGRESS | SQLCipher 已有 ARM64、FTS、迁移和恢复证据；完成密钥生命周期、产品性能及发布形态评估，形成 ADR-019 决定。 |
@@ -34,7 +34,7 @@
 2. **本机已完成：0E supervisor 异常退出路径审查。** 子进程握手后异常退出时能清理并由调用方显式重启；GUI 启停与退出清理已实测。自动重启/退避、锁屏/休眠、真实系统认证提示仍缺证据或决策，见安全客户端报告。
 3. **0B 语音功能冒烟已取得用户实机证据。** 两次主动采集均产生 partial/final；用户决定将当前识别质量留待后续模型选择，不作为本轮功能冒烟阻断项。若要关闭该工作包，仍需补停止/异常清理、SwiftUI 集成、许可和性能证据；D-013 阈值继续延期。
 4. **需许可条款：0B 中文 ASR 权重分发。** 原中文候选上游要求接受访问条件，公开页面未展示许可；可提供获准账号所见许可文本供记录，或明确只采用官方双语 Apache-2.0 候选，后者仍需真人语音验证。
-5. **0C 两家文本真实请求已完成。** 用户逐次确认后，DeepSeek 与 OpenRouter 均返回精确探测文本。后续需补流式/工具/JSON/错误能力对照，并在同一 orchestrator 路径验证切换；每次出站仍需单独 Consent。
+5. **0C 两家文本真实请求已完成。** 用户逐次确认后，DeepSeek 与 OpenRouter 均返回精确探测文本；同一 ModelGateway 的双 adapter 路由已由 MockTransport 回归。可在 `backend` 目录运行 `UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_switch_poc.py` 获取真实切换证据；脚本对两家分别要求精确 Consent，不会自动 failover。真实流式/工具/JSON/错误能力对照仍待补。
 6. **产品决策继续延期：0F/0G 及规格 D 项。** ADR-019 与 D-014 等照用户要求保持延期；这不关闭对应证据缺口，也不允许开始阶段 1。
 
 麦克风复现命令（从仓库根目录，在本机交互式终端运行）：

@@ -1,6 +1,6 @@
 # 阶段 0 POC：真实 Provider 探测准备（工作包 0C）
 
-状态：`IN PROGRESS`。固定目标 adapter、Keychain reader、一次性终端授权入口已实现。用户已分别对 DeepSeek 与 OpenRouter 完成一次经逐次确认的合成文本真实请求；更广的能力矩阵与跨 Provider 切换仍未验收。
+状态：`IN PROGRESS`。固定目标 adapter、Keychain reader、一次性终端授权入口已实现。用户已分别对 DeepSeek 与 OpenRouter 完成一次经逐次确认的合成文本真实请求；同一 ModelGateway 双 adapter 路由已通过本地 MockTransport 回归。真实跨 Provider 切换与更广的能力矩阵仍未验收。
 
 ## 用户确认与固定范围
 
@@ -38,15 +38,20 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_remote_prov
 
 必须在运行时再次确认该 provider 的这一次精确请求；地区选择不等同于单次 Consent。运行一次 `deepseek` 不会授予 `openrouter`，反之亦然。
 
+### 同一 Gateway 跨 Provider 路由 POC
+
+在 `backend` 目录运行 `UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_switch_poc.py`。脚本在一个 `ModelGateway` 实例注册两家固定 adapter，并依次路由同一合成请求。每家请求前都会展示完整目标和内容，并分别要求 `ALLOW DEEPSEEK`、`ALLOW OPENROUTER`。拒绝、凭据缺失或请求失败均不会触发另一家代发，也不会重试或自动 failover。脚本成功与否不能由本地 mock 代替，须用户实际运行并提供输出后记录真实证据。
+
 ## 已验证（仅本地 MockTransport）
 
 - 默认拒绝发生在 Keychain 读取和 adapter 网络调用之前。
+- 同一 `ModelGateway` 实例可按 request.provider 分别选中两家固定 adapter；本地 MockTransport 回归验证两条 endpoint 顺序命中、Keychain account 按 provider 读取、两次响应正文精确匹配。这不是远端服务证据。
 - 精确授权后 adapter 才从凭据接口取密钥；HTTP header/body 与固定 model/endpoint 匹配。
 - OpenRouter Global SSE streaming 分块解析；非流式响应 metadata 可报告实际选择的上游 Provider/region、token 数和 cost；请求禁用跨 Provider failover；tool call 仅作为 `ToolCallResult` 数据返回，不执行工具。
 - JSON `response_format` 透传；Provider 非 2xx 错误只暴露 HTTP 状态，不保留 response body；端点/model/region 配置均固定 allowlist。
 - Keychain reader 只允许 `deepseek` / `openrouter` 两个 account，CLI 参数不包含秘密，缺失/拒绝读取错误不暴露原始 stderr。
-- 窄回归命令：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q tests/test_remote_providers_poc.py tests/test_local_model_gateway.py tests/test_consent_aware_gateway.py`；当前 **28 passed**。拒绝确认路径另外在本机子进程运行，断言退出码 2 且提示未读 Keychain/未发送请求。这些都是本地测试，不是 Provider 端到端证据。
-- 当前全量 Python：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`：**139 passed**。`compileall`、`uv lock --check` 均通过；macOS Swift Testing `swift test`：**27 passed**。
+- 窄回归命令：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q tests/test_remote_providers_poc.py tests/test_local_model_gateway.py tests/test_consent_aware_gateway.py`；当前 **29 passed**，含同一 Gateway 双 adapter 切换回归。拒绝确认路径另外在本机子进程运行，断言退出码 2 且提示未读 Keychain/未发送请求。这些都是本地测试，不是 Provider 端到端证据。
+- 当前全量 Python：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`：**140 passed**（2026-11-08，含新增跨路由回归）。`compileall`、`uv lock --check` 均通过；macOS Swift Testing `swift test`：**27 passed**（既有基线）。
 
 ## 用户实机真实请求结果（2026-11-08）
 
@@ -56,6 +61,6 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_remote_prov
 
 ## 尚未验收
 
-- 真实费用、模型/区域可用性、错误码、实际 SSE、工具 schema、结构化输出、拒绝/撤销出站边界、同内容跨 Provider 切换尚未充分验证。Provider 响应元数据只采集到上述各一次；MockTransport 能力不能作为供应商能力证据。
+- 真实费用、模型/区域可用性、错误码、实际 SSE、工具 schema、结构化输出、拒绝/撤销出站边界、同内容跨 Provider 切换尚未充分验证。真实切换脚本已就绪，等待用户分别逐次确认并执行。Provider 响应元数据只采集到上述各一次；MockTransport 能力不能作为供应商能力证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。

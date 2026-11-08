@@ -210,6 +210,59 @@ def test_openrouter_metadata_reports_selected_provider_region_usage_and_cost() -
     assert b'"provider":{"allow_fallbacks":false}' in seen[0].read()
 
 
+def test_one_gateway_routes_sequentially_to_both_providers_with_exact_consents() -> None:
+    credentials = FakeCredentials()
+    routed: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        routed.append(str(request.url))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "phase0-probe-ack"}}]},
+        )
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    adapters = {
+        config.provider: OpenAICompatibleRemoteAdapter(
+            config, credentials=credentials, client=client
+        )
+        for config in (DEEPSEEK_PROBE_CONFIG, OPENROUTER_PROBE_CONFIG)
+    }
+    consent = ConsentManager()
+    gateway = ModelGateway(
+        adapters=adapters,
+        policy=ConsentAwarePolicy(OutboundPolicy(consent)),
+    )
+
+    async def switch() -> list[str]:
+        answers = []
+        for config in (DEEPSEEK_PROBE_CONFIG, OPENROUTER_PROBE_CONFIG):
+            grant_for(consent, config)
+            request = request_for(
+                config,
+                messages=(
+                    {
+                        "role": "user",
+                        "content": "Reply with exactly this text: phase0-probe-ack",
+                    },
+                ),
+            )
+            answers.append(
+                (await gateway.generate_with_metadata(request)).text
+            )
+            consent.revoke(
+                config.provider, config.model, config.region, "phase0-provider-probe"
+            )
+        await client.aclose()
+        return answers
+
+    answers = asyncio.run(switch())
+
+    assert answers == ["phase0-probe-ack", "phase0-probe-ack"]
+    assert routed == [DEEPSEEK_PROBE_CONFIG.endpoint, OPENROUTER_PROBE_CONFIG.endpoint]
+    assert credentials.reads == ["deepseek", "openrouter"]
+
+
 def test_remote_tools_are_returned_as_data_and_never_executed() -> None:
     credentials = FakeCredentials()
     calls = 0
