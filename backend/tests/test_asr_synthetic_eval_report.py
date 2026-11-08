@@ -15,7 +15,7 @@ def test_asr_report_records_reproducible_synthetic_set_and_scope() -> None:
         "3,000 ms",
         "不是真人麦克风准确率",
         "不输出转写正文",
-        "由用户后续补下载多语言模型",
+        "该次历史测量之后新增 Qwen3-ASR 离线英语样本评估",
     ):
         assert required in report
 

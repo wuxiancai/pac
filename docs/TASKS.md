@@ -19,7 +19,7 @@
 | 顺序 | 工作包 | 状态 | 下一步 / 完成条件 |
 |---:|---|---|---|
 | 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；本机等价 Python/Swift 回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
-| 0B | 本地语音链路 | IN PROGRESS | 在 SwiftUI 链路完成真实麦克风的 partial/final、停止/异常清理与 TTS 打断验证；记录重复轮次和性能。目标阈值待 D-013；多语言 ASR 按 C-003 延后；当前中文权重的许可条款仍需从授权页面核验。 |
+| 0B | 本地语音链路 | IN PROGRESS | Qwen3-ASR 0.6B INT8 ONNX 已完成 5 条随包中文/英语/混说 WAV 的离线评估；待确认转换 ONNX 包/音频许可，评估其是否满足 streaming 集成，完成 SwiftUI 真实麦克风 partial/final、停止/异常清理与 TTS 打断验收。目标阈值按用户指示暂缓。 |
 | 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | 本机 Ollama 与模拟接口已有证据。D-010 按用户要求延期，用户将另提供 Provider 组合；在供应商和区域明确、凭据经 Keychain 配置且 Consent/Policy 明确放行前，不发送远端请求。 |
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；补真实系统认证提示、锁屏/休眠、多轮 GUI、正式分发与恢复策略证据。 |

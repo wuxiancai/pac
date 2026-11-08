@@ -6,6 +6,13 @@
 
 ## 最近交接
 
+### 2026-11-08：用户提供 Qwen3-ASR 多语言候选
+
+- 将 `~/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25` 移至 `backend/.poc-data/models/` 下同名目录；972 MB 权重与样本目录被 Git 忽略。三份 ONNX 权重 SHA-256 和复现入口记录于 `poc/phase0-local-asr.md`。
+- 新增 `backend/scripts/evaluate_qwen3_asr_poc.py`，以 sherpa-onnx 2.0.1 `OfflineRecognizer.from_qwen3_asr` 在 CPU 上对随包 5 条中/英/混说 WAV 执行自动语言离线解码。模型 load 2.025 秒，observed peak RSS 4,472,487,936 bytes；五条加权 CER 0.1564，单项和 RTF 已入报告。完整 transcript 不写日志。
+- 88 秒英语样本在 max-total-len 1024 下出现截断警告；该结果已排除。将 max-total-len 调到 4096 后复跑，英语样本 CER 0.1743，RTF 0.8094。
+- 本次不是 streaming 或麦克风测试。Qwen 官方资料说明 streaming inference 当前仅在 vLLM backend；本地 ONNX 候选目前经 OfflineRecognizer 整段解码。Qwen 源项目标注 Apache-2.0，但第三方 ONNX 转换包和随附 WAV 的再分发许可待核。用户仍需主动完成真人麦克风流程，未启动录音。
+
 ### 2026-11-08 补充
 
 - 用户要求先延期未决事项。`DECISIONS.md` 已将 D-001–D-015 和 ADR-019/020/021/022 记为延期；D-010 Provider 组合待用户另行提供。尚无 Provider 名称/区域或请求授权，因此未读取凭据、未发出云请求。延期不等同于相关阶段验收证据通过。
@@ -86,7 +93,7 @@
 
 ## 当前限制
 
-- ASR 仅在当前中文模型上验证；本机麦克风已实测可录音。多语言模型由用户安排后续补充，不属于当前代码 bug；不得静默改用云 ASR。
+- 旧 Streaming ASR 模型的实机反馈仅覆盖中文；新增 Qwen3-ASR ONNX 候选已有随包中/英离线测试，尚无 streaming 接入或 SwiftUI 麦克风实测。不得静默改用云 ASR。
 - 尚未验证 SwiftUI 麦克风链路、中英混合识别质量、P50/P95、资源占用、AEC、TTS 与 ASR 同时工作和锁屏/休眠处理。
 - ASR 资源测量已对同一条合成 WAV 做 3 次独立进程重复，但没有独立语料或实时麦克风端到端统计；重复样本分布和可确认性能阈值仍未验证/未决。
 - Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始，需在本地客户端连接外部服务时经 Consent/Policy、Keychain 和合成数据逐项测试；POC-05 真实系统认证提示、异常自动恢复/退避、锁屏/休眠策略和正式分发仍未验证，SwiftUI demo 的进程握手/启停/退出清理已通过；POC-06 尚未评估密钥生命周期、APFS/外接介质 ENOSPC、断电/checkpoint 执行中断、备份介质故障和产品性能，也未作 ADR。记忆 Embedding 只接入 disposable 内存 repository，产品 schema 与真实检索质量仍未验收。

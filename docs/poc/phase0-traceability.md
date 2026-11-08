@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | 阶段 0 工程基线 / CI | 仓库入口、依赖安装、Python/Swift 回归可重复运行 | PARTIAL | 新增根 `README.md`、`AGENTS.md`、GitHub Actions macOS arm64 workflow；本机等价命令 Python 127 项、Swift 27 项通过，`uv lock --check`、`compileall` 和 YAML 语法通过 | 仓库未配置 Git remote，GitHub Actions 首次执行未验证；PR/push 真实 CI 状态仍待有 remote 后取得 |
 | D-001、阶段 0 设备记录 | 记录型号、内存、macOS、磁盘、音频设备 | PARTIAL | 2026-11-07 快照：MacBook Air `MacBookAir10,1`、M1/16 GiB、macOS 26.5.1 (25F80)、Xcode 26.6、Swift 6.3.3、uv Python 3.12.13、数据卷剩余约 18 GiB、内建音频输入/输出 48 kHz，见 ASR 报告；2026-11-08 用户将未决事项延期 | 记录了设备快照，但用户未确认其为产品主力设备；最低 macOS 与设备门槛按用户要求延期 |
-| POC-01 / FR-VOICE-002/004 | 本地流式 partial/final、语句端点 | PARTIAL | 8 条本机中文合成句在 3,000 ms 静音尾段下均产生 final，59 个 partial，weighted CER 0.0；用户实机反馈麦克风可录音 | 该结果仅为小型合成集；真人麦克风/SwiftUI partial/final、重复轮次、停止/异常清理仍不完整；中文 ASR 权重的公开许可/再分发条款待核；英语取决于用户后续多语言模型，不是当前代码阻塞 |
+| POC-01 / FR-VOICE-002/004 | 本地流式 partial/final、语句端点 | PARTIAL | 旧中文 Streaming 模型：8 条本机合成句在 3,000 ms 静音尾段下均产生 final、59 partial、weighted CER 0.0；新 Qwen3-ASR 候选：随包 2 条中文、2 条英语和 1 条混说 WAV 离线整段评估，加权 CER 0.1564，详情见 `phase0-local-asr.md` | 两种结果均非独立留出集。新候选是 OfflineRecognizer 路径，未证明 streaming/partial/final；真人麦克风/SwiftUI partial/final、重复轮次、停止/异常清理仍不完整；新 ONNX 包/测试音频许可待核 |
 | POC-01 / FR-VOICE-005/008 | 本机 TTS 可打断；ASR/TTS 独立 | PARTIAL | AVSpeechSynthesizer CLI 实测打断；ASR、TTS POC 分开 | SwiftUI 集成与 ASR/TTS 并发未验证 |
 | POC-01 / FR-VOICE-006/007/010 | 本地默认；本地失败显式失败；不落盘、不静默云切换 | PARTIAL | ASR adapter 无云 fallback；麦克风仅内存队列；测试覆盖拒绝/溢出 | 麦克风真实异常与系统级出站监测未完整执行 |
 | POC-01 性能 | ASR 与 Agent 同时运行的延迟、内存、CPU/GPU | PARTIAL | 同一条本机合成 WAV 的独立 ASR 进程重复 3 次，帧 P50 16.01–16.51 ms、P95 17.22–31.78 ms、RTF 0.0527–0.0665；另有一次同步 barrier 的 ASR + 本机 Ollama LLM 生成，重叠 0.785 秒、帧 P95 52.17 ms、Python + Ollama 进程 RSS 采样峰值 702,267,392 bytes、CPU 时间差约 10.95 秒；不是完整 Agent | 同一短合成 WAV 重复不代表独立样本；并发只有单次；不是麦克风端到端；采样间隔 1 秒；GPU 未测；目标阈值未决 |
@@ -53,7 +53,7 @@ flowchart TD
 以下事项已按用户 2026-11-08 指示延期；延期不视为阶段 0 中明确要求的 POC/验收通过：
 
 - 规格书 D-001–D-015：主力设备；最低 macOS；对话/日志/缓存/备份保留期限；音频缓存期限；月预算/币种/软硬阈值；备份 RPO/RTO/份数/目的地；应用静态加密方案；活动数据目录是否支持外接盘；固定专业 Agent 属 V2 还是 V3；V1 首批 2–3 Provider；云 ASR/TTS 供应商及区域；导入白名单/容量限制；性能目标；Embedding 型号/格式；导出格式/默认加密。
-- 多语言 ASR：当前加载的是中文专用模型，不属于实现 bug；用户安排后续补下载多语言模型。当前不声称英语覆盖通过，也不把模型替换列为当前代码工作包。
+- 多语言 ASR：新增 Qwen3-ASR 候选已完成随包英语与混说 WAV 的离线测试；它没有在本项目的 streaming 接口上运行，不能据此标记实时英语识别通过。模型集成、真实麦克风、独立评测语料与转换包许可仍待验证。
 - 多 Provider 实测与开源 Gateway 对照：D-010 延期，用户将另提供组合；名单/区域和凭据到位后，任何真实出站请求仍须由 Consent Manager + Policy Engine 明确放行，凭据只从 Keychain 取得，未经授权不得发送。
 - 真实 Provider/Gateway 实测尚缺；LiteLLM、Bifrost、Portkey 第一方桌面资料对照已记录，但不代表运行集成或供应商端到端证据。
 - 真实 Touch ID 提示、应用正式进程生命周期、SwiftUI 麦克风链路及 AEC/插话。
@@ -66,7 +66,7 @@ flowchart TD
 ### 阶段 0（当前阶段，未验收）
 
 1. 0A 仓库审计与基线记录：完成，不改动原功能/章节/schema/API。
-2. 0B 本地语音链路：中文 Streaming ASR、partial/final、用户主动录音、TTS 打断；英语覆盖取决于用户后续补充多语言模型，不属于当前代码缺陷或实现阻塞；真实端到端验收仍未完成。
+2. 0B 本地语音链路：旧模型有中文 Streaming ASR、partial/final、用户主动录音、TTS 打断；Qwen3-ASR ONNX 新候选有随包中文/英语离线音频评估，但本项目尚未验证它的流式模式，真实麦克风端到端验收仍未完成。
 3. 0C 本地 Gateway/能力注册/Agent 模拟：完成可测试骨架；真实多 Provider blocked。
 4. 0D 记忆 POC：SQLite/FTS/来源/纠错/删除/恢复已测；本地 Embedding 候选以 opt-in provider 接入内存仓库并完成 3 条合成查询；产品模型、持久化 schema 与真实检索质量仍 OPEN。
 5. 0E Swift/Loopback/Keychain/Consent：部分完成；策略支持 Touch ID 或设备密码，fake evaluator 路径已测；POC SwiftUI demo 启停/退出清理已实机验证；真实认证提示、异常自动恢复/退避、锁屏行为及正式分发配置仍 OPEN。
@@ -94,7 +94,7 @@ V1.1 及 V2–V5 仅按规格书规划；当前不实施后台任务、专业 Ag
 
 | 风险 | 影响 | 当前缓解 | 剩余事项 |
 |---|---|---|---|
-| 当前 ASR 模型语言范围 | 暂不覆盖英语/中英混合 | 保持模型和 ASR 配置边界明确；不静默云 fallback | 用户计划后续补多语言模型；当前不是代码 bug，不伪报英语测试通过 |
+| ASR 候选与流式能力 | 旧 Streaming 模型只覆盖中文；Qwen3-ASR 0.6B INT8 ONNX 离线候选已测中英 | 保持本地推理；不静默云 fallback；OfflineRecognizer 路径不声称 streaming | 新候选五条随包 WAV CER/RTF 见报告；独立语料、流式接入、真人麦克风和 ONNX 转换包许可待测 |
 | 短合成样本无法代表真实语音 | 延迟/准确率/噪声鲁棒性被高估 | 明确记录同一 WAV 三次的观察范围，不设承诺 | 独立语料、真人麦克风重复与产品阈值待定 |
 | 真实云 Provider 证据缺失 | 无法证明多 Provider/费用/取消/区域 | 能力默认 UNKNOWN；远端请求接入 ConsentAwarePolicy 默认拒绝 | 需合成请求的明确 Consent、Keychain 凭据及逐 Provider 端到端验证 |
 | Consent 仅内存、策略字段不全 | 重启/持久审计后授权可能无法证明 | POC 无云出站、默认拒绝 | 产品阶段实现完整 schema/migration/audit |
