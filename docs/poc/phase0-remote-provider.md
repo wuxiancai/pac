@@ -87,7 +87,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 - 本次真实跨 Provider 证据证明在相同 Gateway 配置下可按请求 provider 顺序调用两家适配器；不是失败后的自动 fallback，也不证明真实 SSE、工具、结构化输出、错误路径或可重复性能。所有真实请求均由用户对当次显示的 Provider、model、区域和固定合成正文分别确认。OpenRouter 用户早先报告的一次余额不足失败已由后续成功请求补充；早期 Keychain 缺失错误也已解决。
 - **DeepSeek SSE**：用户按 `probe_provider_capability_poc.py deepseek stream` 执行并输入本次精确确认。流式分块拼接后得到 `phase0-probe-ack`，精确匹配为 True。未提供 token/cost 或服务侧 Provider/region metadata；只证明 DeepSeek `deepseek-flash` 的一次真实流式合成文本成功，不代表 OpenRouter 或稳定性。
 - **OpenRouter SSE**：用户按 `probe_provider_capability_poc.py openrouter stream` 输入 `ALLOW OPENROUTER STREAM 1` 后，流式分块拼接得到 `phase0-probe-ack`，精确匹配为 True。未提供 token/cost 或流式 metadata；只证明 OpenRouter `deepseek/deepseek-v4.1-flash-1017` Global 的一次真实流式合成文本成功，不代表稳定性或其他能力。
-- **DeepSeek JSON**：用户输入 `ALLOW DEEPSEEK JSON 1` 后，命令返回空 JSON 正文，结构检查失败；输出未包含 finish_reason、token 用量或路由 metadata，故暂不能区分输出预算耗尽与上游正常结束但正文为空。没有重试。CLI 已补充这些字段，之后由 OpenRouter JSON 单次探测做能力对照；如需重测 DeepSeek，须另行逐次确认。
+- **DeepSeek JSON**：首次用户确认后返回空正文、结构检查失败；该次旧 CLI 未打印 finish_reason/usage/路由 metadata，没有重试。增强诊断后用户再次确认，返回 `{"phase0":"ack"}`，结构检查 True，finish_reason=`stop`，模型 `deepseek-flash`，prompt/completion/total tokens=68/46/114；下游 Provider、region、cost 未提供。当前两次实测一空一成功，说明本配置至少一次通过，但重复一致性与首次空正文原因未知。
 - **OpenRouter JSON**：用户输入 `ALLOW OPENROUTER JSON 1` 后返回 `{"phase0":"ack"}`，结构检查为 True，finish_reason=`stop`。实际模型 `deepseek/deepseek-v4.1-flash-1017`，下游 Provider `Relace`、区域 `HKG`；prompt/completion/total tokens=46/36/82，服务报告费用 USD `0.000018276`。只证明本配置的一次结构化输出成功。
 - **DeepSeek 错误路径**：用户输入 `ALLOW DEEPSEEK ERROR 1` 后，对故意无效的 `response_format` 收到 HTTP 422；CLI 只输出状态码，未暴露响应正文/凭据。原 CLI 只认 HTTP 400，导致这次合理的 4xx 拒绝未被识别为预期路径；现已改为任何 4xx 均通过、5xx 不通过，并以 MockTransport 回归覆盖 401/422/503 分类。该真实请求未输出费用 metadata。
 - **OpenRouter 错误路径**：用户输入 `ALLOW OPENROUTER ERROR 1` 后，对同一故意无效 `response_format` 收到 HTTP 400；CLI 输出脱敏状态码并报告错误路径验证通过。两家各一次真实 4xx 拒绝，不等于所有服务错误类别已覆盖。此请求未输出费用或路由 metadata。
@@ -98,6 +98,6 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 
 ## 尚未验收
 
-- 两家真实 SSE 各有一次成功；DeepSeek 与 OpenRouter 工具提案各有一次成功且均未执行（OpenRouter 前两次曾为空）；DeepSeek JSON 空正文原因、DeepSeek 服务侧费用/区域字段未返回；无 Consent 时的 PID 级 OS socket 检查无活动 socket；全系统包级归因未完成。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
+- 两家真实 SSE 各有一次成功；DeepSeek 与 OpenRouter 工具提案各有一次成功且均未执行（OpenRouter 前两次曾为空）；两家 JSON 各有一次结构匹配成功，DeepSeek另有一次空正文；DeepSeek 服务侧费用/区域字段未返回；无 Consent 时 PID 级 OS socket 检查无活动 socket；远端取消、JSON 重复一致性仍待观察。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。PID 级 lsof 是活动 socket 快照，不是完整包级证明；用户提供的全局 tcpdump 流量未按 PID 过滤，无法归因。Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。

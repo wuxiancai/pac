@@ -11,7 +11,7 @@
 - 用户提供的全局 `tcpdump -i en0` 捕获 546 个 TCP/443 窗口包；输出包含已建立的会话，未按 PID 过滤，不能据此归因给测试进程。
 - 用真实 HTTPX、无 Consent、凭据读取 tripwire 的 harness 分别运行 OpenRouter 与 DeepSeek；两者都在 Adapter 前拒绝，Keychain credential reads=0。Policy 拒绝后在 harness hold 窗口内通过 PID 运行 `lsof -nP -a -p <PID> -i`，均无活动 socket；loopback 正向对照证明 lsof 能列出进程 TCP socket。
 - 当前证据支持这两个拒绝路径未建立网络 socket；限制是 lsof 只观察活动 socket，非完整包级/全系统零流量证明。deny-check、真实 HTTPX harness 和证据边界已记录。
-- 下一步逐次确认重跑 DeepSeek JSON，使用增强诊断取得 finish_reason、usage 与实际正文；再审查 0C 剩余验收。
+- DeepSeek JSON 增强诊断复测已由用户逐次确认：返回 `{"phase0":"ack"}`，结构检查 True，finish_reason=`stop`，tokens=68/46/114；与此前空正文形成一次成功、一次失败。下一步检查 0C 剩余验收，优先远端流式取消语义与 JSON 重复一致性。
 
 ### 2026-11-08：拒绝路径真实 HTTPX 与系统监测准备
 
