@@ -6,10 +6,15 @@
 
 ## 最近交接
 
+### 2026-11-08：两家 Provider 实测与本地语音功能复测
+
+- 用户在每条命令中分别输入精确确认短语后，DeepSeek 与 OpenRouter 各完成一次 L1 合成文本请求，均返回 `phase0-probe-ack`。DeepSeek：`deepseek-flash`，prompt/completion/total=42/41/83，服务未返回 downstream Provider、region 或 cost。OpenRouter：`deepseek/deepseek-v4.1-flash-1017`，下游 `Relace` / `HKG`，token=42/17/59，cost USD 0.000008752。报告见 `poc/phase0-remote-provider.md`。
+- 用户另运行 30 秒双语麦克风 CLI，观察到多个 partial 和一个 final。用户指定本轮 ASR 验证以链路功能为准，识别质量留待后续模型选择/优化；该轮不计 CER。测试仍未覆盖 SwiftUI 采集、停止/异常清理、性能和多轮稳定性。
+- `cd backend` 因用户终端已经位于 backend 目录而报错，之后运行的脚本命令仍成功。
+
 ### 2026-11-08：阶段追踪记录与最新 Provider 证据对齐
 
-- 修正 D-010 的旧表述：DeepSeek 一次合成探测由用户报告成功；OpenRouter 尚无成功端到端证据，余额不足原因按用户说明记录。
-- 更新追踪矩阵的 Consent/Policy 真实路径证据与 Python 139 项最新回归数；阶段 0 仍有明确缺口，不能签收。
+- 将 D-010 保持为 V1 Provider 选型待决，同时把两家实际合成文本调用记录到阶段追踪；更新 Consent/Policy 真实路径证据与 Python 139 项最新回归数。阶段 0 仍有明确缺口，不能签收。
 
 ### 2026-11-08：首次双语麦克风实测与 Provider 组合输入
 
@@ -134,7 +139,7 @@
 
 ## 下一步
 
-继续阶段 0：双语流式 ASR 已完成合成文件分帧评估，真实麦克风验收需要用户主动启动采集并说话。Gateway 对照报告已完成桌面资料比较；DeepSeek/OpenRouter 单次合成探测入口和 Keychain 路径已就绪，真实 Provider/Gateway 请求尚缺；每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：双语流式 ASR 已完成合成文件分帧评估，用户两次主动运行麦克风 CLI 均观察到 partial/final；当前真人语音验收按用户指示先验证功能，识别质量留待模型选择。Provider 方面，DeepSeek 与 OpenRouter 各有一次用户逐次授权后的真实合成文本请求成功；同一 orchestrator 跨 Provider 切换及流式/工具/JSON/错误能力对照仍缺。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 

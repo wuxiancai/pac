@@ -19,22 +19,22 @@
 | 顺序 | 工作包 | 状态 | 下一步 / 完成条件 |
 |---:|---|---|---|
 | 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；本机 Python 139 项、Swift 27 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
-| 0B | 本地语音链路 | IN PROGRESS | 官方中英 Streaming Zipformer 文件分帧 10/10 final、82 partial、weighted CER 0.0254；用户已完成一次真实麦克风采集，出现多个 partial、两个 final，但混合中英输出存在错词，未有逐字 ground truth，不能计 CER。下一步需受控短句多轮复测、异常/停止清理与 TTS 打断；Qwen ONNX 转换包许可仍待核，性能目标暂缓。 |
-| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | 用户确认 DeepSeek（中国）和 OpenRouter（Global）；固定 adapter、Keychain 与逐请求确认入口已就绪。用户报告 DeepSeek 一次合成探测成功；OpenRouter 按用户说明因账户余额不足未完成，需后续有余额时补一次成功探测。报告见 `poc/phase0-remote-provider.md`。 |
+| 0B | 本地语音链路 | IN PROGRESS | 官方中英 Streaming Zipformer 文件分帧 10/10 final、82 partial、weighted CER 0.0254；用户已完成两次真实 CLI 麦克风采集并看到 partial/final。用户将当前目标限定为功能冒烟，识别质量转为后续模型选择/优化项；剩余停止/异常清理、SwiftUI 集成、许可与性能证据仍待补。 |
+| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | DeepSeek（中国）和 OpenRouter（Global）各完成一次经用户逐次确认的 L1 合成非流式真实请求并精确匹配。OpenRouter 返回 Relace/HKG、token 与 cost；完整流式/工具/JSON/错误对照及同一 orchestrator 跨 Provider 切换仍待补。详见 `poc/phase0-remote-provider.md`。 |
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；补真实系统认证提示、锁屏/休眠、多轮 GUI、正式分发与恢复策略证据。 |
 | 0F | 静态加密兼容性 | IN PROGRESS | SQLCipher 已有 ARM64、FTS、迁移和恢复证据；完成密钥生命周期、产品性能及发布形态评估，形成 ADR-019 决定。 |
 | 0G | Embedding 候选 | IN PROGRESS | 固定候选已离线推理三次，均为 4/4 合成 query top-1；observed max RSS 883,130,368–883,490,816 bytes；模型卡/运行包许可初核见 `poc/phase0-model-license-review.md`。补真实标注检索集、完整依赖 SBOM 和产品选择（D-014）。 |
 | 0H | 故障注入与性能 | IN PROGRESS | 已测 WAL 备份的活动 reader + 三次 writer 提交、checkpoint 等待读锁期间 SIGKILL 后恢复、备份复制在 DELETE/WAL 下 SIGKILL、HFS+ 与 APFS 有界映像 ENOSPC；新增 `os.replace` 调用前/成功返回后的 SIGKILL 边界测试。边界测试不代表系统调用内部中断或断电持久性；备份目标 ENOSPC、实际外接介质/产品 WAL 生命周期与 staging 清理规则仍待处理。 |
-| 0I | 阶段追踪与验收 | OPEN | D-001–D-015 与 ADR-019/020/021/022 已按用户要求标记延期（D-010 候选及区域已明确，V1 选型仍延期）。延期不豁免规格要求的 POC 证据；GitHub Actions 真实运行、语音/认证验收、Provider 端到端、许可与恢复边界等仍有缺口，完成证据审查后才能签收。 |
+| 0I | 阶段追踪与验收 | OPEN | D-001–D-015 与 ADR-019/020/021/022 已按用户要求标记延期（D-010 候选及区域已明确，V1 选型仍延期）。延期不豁免规格要求的 POC 证据；GitHub Actions 真实运行、语音系统集成/故障验收、Provider 能力矩阵与切换、许可及恢复边界等仍有缺口，完成证据审查后才能签收。 |
 
 ## 近期执行队列
 
 1. **本机已完成：0H 原子替换边界恢复审查。** 调用 `os.replace` 前 SIGKILL 保留旧备份，成功返回后 SIGKILL 保留新备份，两条路径源库均完整；不覆盖 syscall 内部中断或断电持久性。报告和测试已记录。
 2. **本机已完成：0E supervisor 异常退出路径审查。** 子进程握手后异常退出时能清理并由调用方显式重启；GUI 启停与退出清理已实测。自动重启/退避、锁屏/休眠、真实系统认证提示仍缺证据或决策，见安全客户端报告。
-3. **需用户参与：0B 双语实时麦克风验收。** 用户已完成一次主动采集，暴露了混合语句错词；需按固定短句多轮复测并测试停止/异常清理和 TTS 打断。上次命令已从 backend 目录成功运行，开头 `cd backend` 的报错可忽略。D-013 性能阈值继续延期。
+3. **0B 语音功能冒烟已取得用户实机证据。** 两次主动采集均产生 partial/final；用户决定将当前识别质量留待后续模型选择，不作为本轮功能冒烟阻断项。若要关闭该工作包，仍需补停止/异常清理、SwiftUI 集成、许可和性能证据；D-013 阈值继续延期。
 4. **需许可条款：0B 中文 ASR 权重分发。** 原中文候选上游要求接受访问条件，公开页面未展示许可；可提供获准账号所见许可文本供记录，或明确只采用官方双语 Apache-2.0 候选，后者仍需真人语音验证。
-5. **需用户本机操作：0C 真实远端 Provider/Gateway。** 用户报告 DeepSeek 合成请求成功；OpenRouter 因余额不足的判断按用户说明记录，未取得成功请求证据。后续有余额后重试 OpenRouter，每次仍须核对范围并输入单次确认短语。不要把密钥贴到聊天。
+5. **0C 两家文本真实请求已完成。** 用户逐次确认后，DeepSeek 与 OpenRouter 均返回精确探测文本。后续需补流式/工具/JSON/错误能力对照，并在同一 orchestrator 路径验证切换；每次出站仍需单独 Consent。
 6. **产品决策继续延期：0F/0G 及规格 D 项。** ADR-019 与 D-014 等照用户要求保持延期；这不关闭对应证据缺口，也不允许开始阶段 1。
 
 麦克风复现命令（从仓库根目录，在本机交互式终端运行）：

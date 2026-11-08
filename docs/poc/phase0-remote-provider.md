@@ -1,6 +1,6 @@
 # 阶段 0 POC：真实 Provider 探测准备（工作包 0C）
 
-状态：`IN PROGRESS`。固定目标 adapter、Keychain reader、一次性终端授权入口已实现。用户报告 DeepSeek 合成探测成功；OpenRouter 探测未完成，用户判断是账户余额不足，并要求按预期失败记录。尚缺 OpenRouter 成功端到端证据。
+状态：`IN PROGRESS`。固定目标 adapter、Keychain reader、一次性终端授权入口已实现。用户已分别对 DeepSeek 与 OpenRouter 完成一次经逐次确认的合成文本真实请求；更广的能力矩阵与跨 Provider 切换仍未验收。
 
 ## 用户确认与固定范围
 
@@ -48,9 +48,14 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_remote_prov
 - 窄回归命令：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q tests/test_remote_providers_poc.py tests/test_local_model_gateway.py tests/test_consent_aware_gateway.py`；当前 **28 passed**。拒绝确认路径另外在本机子进程运行，断言退出码 2 且提示未读 Keychain/未发送请求。这些都是本地测试，不是 Provider 端到端证据。
 - 当前全量 Python：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`：**139 passed**。`compileall`、`uv lock --check` 均通过；macOS Swift Testing `swift test`：**27 passed**。
 
+## 用户实机真实请求结果（2026-11-08）
+
+- **DeepSeek**：用户在 CLI 输入 `ALLOW DEEPSEEK` 后发送一条 L1 合成文本请求，返回 `phase0-probe-ack`，与期望文本完全匹配。实际模型 `deepseek-flash`；token 用量 prompt 42 / completion 41 / total 83。服务未返回下游 Provider、区域或费用信息。
+- **OpenRouter Global**：用户在 CLI 输入 `ALLOW OPENROUTER` 后发送一条 L1 合成文本请求，返回 `phase0-probe-ack`，与期望文本完全匹配。实际模型 `deepseek/deepseek-v4.1-flash-1017`；下游 Provider `Relace`、服务区域 `HKG`；token 用量 prompt 42 / completion 17 / total 59；报告费用 USD 0.000008752。
+- 两次请求均由用户在运行时对显示的 Provider、model、区域和固定合成正文逐次确认。仅证明各自一次非流式文本请求成功；不证明真实 SSE、工具、结构化输出、错误路径、跨 Provider 自动切换或可重复性能。OpenRouter 用户早先报告的一次余额不足失败已由后续成功请求补充；早期 Keychain 缺失错误也已解决。
+
 ## 尚未验收
 
-- DeepSeek：用户报告一条合成文本真实探测成功，未提供返回 metadata，尚未复核响应/model/usage/cost。OpenRouter：未成功；按用户说明记录为账户余额不足导致的预期失败，原因未通过 Provider 响应验证；需补余额后重新做一次性探测，才能形成成功的端到端证据。
-- 真实费用、模型/区域可用性、错误码、实际 SSE、工具 schema、结构化输出、Usage 统计、同内容跨 Provider 切换尚未验证。当前 `ModelGateway` 文本适配路径只验证计划中的单次合成文本探测；MockTransport 能力不能作为供应商能力证据。
+- 真实费用、模型/区域可用性、错误码、实际 SSE、工具 schema、结构化输出、拒绝/撤销出站边界、同内容跨 Provider 切换尚未充分验证。Provider 响应元数据只采集到上述各一次；MockTransport 能力不能作为供应商能力证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。

@@ -10,7 +10,7 @@
 - 使用系统本地合成的中文语音生成测试 WAV；没有录制私人麦克风音频。
 - 新增明确按回车后才启动的本机默认麦克风 CLI；采集时音频只进入有界内存队列，溢出/输入错误时停止并清缓冲。
 - 使用 AVSpeechSynthesizer 本机播放，并验证立即打断控制。
-- 本包尚未验证 SwiftUI 音频采集、本机服务认证、AEC、实际麦克风实时识别质量、ASR准确率或目标性能阈值。
+- 本包尚未验证 SwiftUI 音频采集、本机服务认证、AEC、重复实机质量/准确率或目标性能阈值。用户将当前阶段的真人语音目标限定为功能冒烟，转写质量留待后续模型选择和优化。
 
 ## 本机环境
 
@@ -26,6 +26,8 @@
 - 新增多语言候选：用户提供的 `sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25`，约 972 MB，已移至忽略的 `backend/.poc-data/models/`。目录包含 Qwen3-ASR ONNX decoder/encoder/conv frontend 与 tokenizer。它通过 `OfflineRecognizer.from_qwen3_asr` 做整段离线解码；本次并未验证流式/麦克风接入，也未替换原 streaming 模型。
 
 ## 结果
+
+- **2026-11-08 用户主动麦克风功能复测**：运行双语 Streaming Zipformer CLI 30 秒，观察到持续 partial 和一个 final，采集流程完成。用户说明当前阶段只要求链路功能正常；识别文本相对其朗读的参考内容出现明显错词/缩写误识，按用户指示作为后续模型选择/质量优化项，不阻断本轮功能冒烟。该次没有保存音频；未做 CER、延迟或重复性统计。`cd backend` 因终端已在 `backend` 目录而报错，后续脚本仍正常运行。
 
 - 初始 ASR 事件契约测试：4 项通过（2026-11-07）。
 - Python 全量测试：11 项通过；包括麦克风缓冲、PCM 转换、回调 PCM 帧长度、非交互环境拒绝采集和直接脚本入口导入回归。
@@ -102,8 +104,8 @@ swift run tts-interrupt-poc
 
 ## 尚未解决
 
-- 2026-11-08 用户在 MacBook Air 主动运行双语流式麦克风 CLI 并贴回终端结果：产生多个增量 partial 和两个 final；中文大意可辨，但其中夹杂英文词/缩写的句子发生若干错词，第二段英语短语亦未稳定识别。用户运行时 `cd backend` 因已位于 backend 目录而失败，随后相对路径命令仍正常启动。未提供逐字 ground truth，故不计算 CER；这是一次、用户现场话语的主观质量观察，不代表可重复质量或性能验收。脚本未保存音频，终端文本由用户贴入对话。仍需按屏幕提示的受控中英句子重复多轮，并核验停止、异常/背压清理与 TTS 打断。
-- 双语 streaming 候选已产生中英及混说的文件分帧 partial/final；仍需用户参与实时麦克风多轮说话，检查真实说话节奏、停止/异常清理及 SwiftUI 链路。合成语音分数不能替代此门槛。
+- 2026-11-08 首次实机运行的历史观察：产生多个增量 partial 和两个 final；混合中英内容有错词。用户后来将当前真人语音标准限定为功能冒烟、把模型识别质量留待后续，因此此观察不计 CER，也不作为本轮功能验证的阻断项。当前未完成项为停止/异常清理、重复功能稳定性及 SwiftUI 集成。
+- 双语 streaming 候选已产生中英及混说的文件分帧 partial/final；用户已补两次 CLI 实机功能冒烟，并指定识别质量留待后续模型选择。停止/异常清理、重复功能稳定性及 SwiftUI 链路仍未覆盖；合成语音分数不能替代这些证据。
 - Qwen3-ASR 候选已在五条随包音频上完成离线中/英/混说检查；尚无独立留出中英语料。其 ONNX 离线整段路径不能证明实时流式延迟、partial/final、打断、SwiftUI 麦克风处理或长时运行能力。Qwen 官方当前说明流式推理需 vLLM backend；本机现有 sherpa-onnx API 测试使用 `OfflineRecognizer`，因此不能把 RTF<1 写成实时流式验收。
 - sherpa-onnx 官方 Python API 样例将此类模型通过 `OfflineRecognizer.from_qwen3_asr` 整段解码；参见 [官方 Qwen3-ASR 文件解码样例](https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-qwen3-asr-decode-files.py)。Qwen 官方说明 Qwen3-ASR 的 streaming inference 当前只在 vLLM backend 提供，详见 [Qwen3-ASR 官方文档](https://github.com/QwenLM/Qwen3-ASR#streaming-inference)。
 - 当前 8 条合成中文集只有一轮，CER 不能代表真人麦克风或真实用户话语分布；需要更广语料与多轮实机验证，阈值待产品负责人确认。

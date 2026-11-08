@@ -10,7 +10,7 @@
 
 - 当前阶段：阶段 0 POC，未验收；阶段 1 未开始。
 - 实现形态：macOS SwiftUI 客户端 + 本机 Python/FastAPI 服务；仓库内各工作包的当前状态和证据见 [阶段 0 追踪矩阵](poc/phase0-traceability.md)。
-- 本机语音：中文 Streaming ASR、麦克风捕获 CLI、TTS 打断已有 POC 和部分实测；用户提供的 Qwen3-ASR 0.6B INT8 ONNX 已完成随包中/英离线评估。另下载 sherpa-onnx 官方中英双语 Streaming Zipformer，在本机分帧适配器上测试了 10 条合成音频并观察到 partial/final。真人端到端质量、SwiftUI 麦克风与性能验收仍未完成；详情见 `docs/poc/phase0-local-asr.md`。
+- 本机语音：中文 Streaming ASR、麦克风捕获 CLI、TTS 打断已有 POC 和部分实测；用户提供的 Qwen3-ASR 0.6B INT8 ONNX 已完成随包中/英离线评估。另下载 sherpa-onnx 官方中英双语 Streaming Zipformer，10 条合成音频均产生 final；用户两次实机运行 CLI 均观察到 partial/final。用户指定当前真人语音目标为功能冒烟，模型识别质量后续再优化；SwiftUI 麦克风、停止/异常清理和性能验收仍未完成；详情见 `docs/poc/phase0-local-asr.md`。
 - Gateway、安全、记忆、Embedding、SQLCipher 和后端生命周期均有 POC；它们不等同于产品功能验收。详情按需查阅 [`docs/poc/`](poc/)。
 - 根目录现有 `README.md`、`AGENTS.md` 和 `.github/workflows/ci.yml`；本机 CI 等价命令已通过，GitHub Actions 尚未执行（当前仓库无 remote）。D-001–D-015 与 ADR-019/020/021/022 按用户 2026-11-08 指示延期；延期不豁免阶段验收证据。
 - 每次工作的 Git 基线以 `git log -1` 为准；工作开始前先检查 `git status`，保护已有改动。
@@ -19,7 +19,7 @@
 
 - UI 通过本机 Loopback API 与后端通信；服务由 Swift supervisor 固定启动，不经任意 shell 命令。
 - Model Gateway 使用 Adapter 和精确 Provider/Model capability registry；未知能力默认不支持。
-- 本地优先。远端模型调用必须在发送前通过 Consent Manager 与 Policy Engine；默认拒绝；凭据来自 Keychain。不得以 fallback 扩大授权。阶段 0 已加入 DeepSeek 与 OpenRouter 固定端点 adapter 和逐请求终端确认探测，但真实调用仍须用户每次主动确认。
+- 本地优先。远端模型调用必须在发送前通过 Consent Manager 与 Policy Engine；默认拒绝；凭据来自 Keychain。不得以 fallback 扩大授权。阶段 0 已加入 DeepSeek 与 OpenRouter 固定端点 adapter 和逐请求终端确认；两家各有一次用户确认后的合成文本真实请求成功记录，后续请求仍须每次主动确认。
 - Agent Registry 当前为模拟 POC；权限不得超出父权限，不实现 Agent 团队或任意执行器。
 - 记忆 POC 使用 disposable 内存 SQLite/FTS5；Embedding 显式 opt-in。不得把 POC schema 当作产品 schema。
 - ASR、TTS、LLM 分开配置；原始音频默认不持久化；本地 ASR 失败不得静默切到云端。
