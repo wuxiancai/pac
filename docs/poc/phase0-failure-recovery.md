@@ -15,6 +15,7 @@
 - **磁盘页数耗尽模拟**：将 SQLCipher POC DB 的 `max_page_count` 限制到当前页数 + 1，插入大记录触发 DBAPI 数据库错误。事务回滚后旧记忆和 FTS 仍可检索，失败记录不存在，完整性检查为 `ok`。
 - **Alembic 回滚**：工作包 0F 已验证 POC migration `upgrade`/`downgrade`；这不是进程崩溃注入。
 - **备份目标不可创建**：将 backup 的父路径预置为普通文件，模拟目标目录不可用；接口返回不含凭据的 `SQLCipherPOCError`，源 DB 查询与完整性检查仍通过。该故障注入验证错误目标路径，不等同真实备份介质 I/O 故障。
+- **备份目标 ENOSPC**：在 `_copy_backup_to` 处确定性注入 `OSError(ENOSPC)`。`backup_to` 将其封装为安全的 `SQLCipherPOCError`，异常链仍可识别为磁盘耗尽；同名旧备份继续可用旧密钥检索并通过完整性检查，源库可检索且完整，临时 `.partial` 已清理。此为系统调用边界的模拟注入，不代表真实满载卷/介质测试；实测满卷仅覆盖数据库写入。
 - **已有备份时复制/校验/替换失败**：分别在 backup 调用边界注入 SQLite 数据库错误、注入 staging 校验不通过、模拟 `os.replace` 抛出 `OSError`；三种情况下接口均显式失败，旧备份仍可用原密钥解密、查询和通过 `integrity_check`，源数据库也保持可查询/完整，临时 `.partial` 文件清理。正常成功路径先将数据写入同目录加密 staging 文件、重新打开并完整性校验，再通过 `os.replace` 原子替换目标。注入故障不是损坏介质测试，也不证明所有文件系统/介质上的断电原子性。
 - **原子替换调用边界 SIGKILL**：隔离子进程先完成新 staging 备份及完整性校验，再由受控 wrapper 在 `os.replace` 调用前或成功返回后暂停；父进程确认边界标记后发送 SIGKILL。调用前中断时旧目标仍以旧密钥通过检索和 `integrity_check`；调用成功返回后中断时新目标以新密钥通过检索和 `integrity_check`；两条路径源库均完整。调用前中断会留下加密 staging，测试 teardown 清理。该注入不发生在系统调用内部，不覆盖文件系统崩溃、断电、数据/目录 fsync 持久性或硬件缓存语义。
 - **备份复制期间子进程 SIGKILL**：测试在 SQLCipher DELETE 和 WAL journal mode 分别构造 80 条带较大索引内容的加密源记录及可解密旧目标备份。故障注入子进程经 stdin 接收源/备份 key，在 SQLCipher backup progress callback 确认 staging 已复制部分页面后发出 `BACKUP_COPY_PROGRESS`；测试向该子进程发送 SIGKILL。两种 mode 下旧目标仍能用旧密钥检索并通过 `integrity_check`；源库全部记录仍在且完整。SIGKILL 绕过正常 finally 清理，测试观察到加密 `.partial` 遗留并在 teardown 清除。此项仅证明本机临时数据库在该注入点的进程终止恢复，不代表断电、设备缓存或其他文件系统语义。
@@ -30,11 +31,11 @@ UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra pha
 
 本报告最初提交时全量本机 Python 测试 44 项通过；当前完整回归数量以 `docs/HANDOFF.md` 的最新记录为准。
 
-2026-11-08 SQLCipher 专项回归命令 `uv run --locked --extra phase0-security --group dev pytest -q tests/test_sqlcipher_compat_poc.py`：21 项通过，包含 checkpoint 等待读锁 SIGKILL 恢复、WAL reader/writer 并发备份、DELETE/WAL 备份复制 SIGKILL，以及 `os.replace` 调用前/成功返回后的 SIGKILL 边界恢复。完整项目回归以交接记录为准。
+SQLCipher 故障恢复窄回归命令 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra phase0-security --group dev pytest -q tests/test_sqlcipher_enospc_poc.py tests/test_sqlcipher_compat_poc.py`：28 项通过，包含确定性备份目标 ENOSPC 注入、旧目标保全、HFS+/APFS 有界映像写满、checkpoint/SIGKILL 和原子替换边界恢复。全量 Python 回归 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`：151 项通过。
 
 ## 限制与未验收
 
 - `max_page_count` 是受控 SQLite 页数上限模拟，不是 macOS 文件系统真实 ENOSPC、配额耗尽或磁盘设备故障。
 - `os._exit` 与真实子进程 `SIGKILL` 均验证未提交事务恢复；WAL 下验证 checkpoint 等待读锁期间 SIGKILL 后恢复、正常 TRUNCATE checkpoint 及活动 reader 导致 busy 后的释放/重试。未覆盖断电、损坏 rollback journal、checkpoint 正在写页期间 SIGKILL、后端自动拉起和 GUI 会话恢复。
-- 未覆盖真实备份介质读写错误、恢复中断回滚、SIGKILL 恰好发生于原子替换系统调用内部、空间配额耗尽及文件系统权限错误。边界测试只证明系统调用前/成功返回后的进程中断结果；未验证 staging 与父目录的 fsync、断电持久性或文件系统崩溃语义。备份复制中 SIGKILL 会遗留 staging 文件；应用启动时的临时文件清理/保留策略尚未决定，当前 POC 不扫描目录。校验失败有完整性门禁，但尚未以损坏数据注入覆盖。
+- 未覆盖真实备份介质读写错误、真实备份目标卷 ENOSPC、恢复中断回滚、SIGKILL 恰好发生于原子替换系统调用内部、空间配额耗尽及文件系统权限错误。边界测试只证明系统调用前/成功返回后的进程中断结果；未验证 staging 与父目录的 fsync、断电持久性或文件系统崩溃语义。备份复制中 SIGKILL 会遗留 staging 文件；应用启动时的临时文件清理/保留策略尚未决定，当前 POC 不扫描目录。校验失败有完整性门禁，但尚未以损坏数据注入覆盖。
 - 此 POC 不能证明产品可安全恢复用户数据库；没有产品 schema、正式 Keychain 密钥生命周期或发布 ADR。

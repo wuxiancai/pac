@@ -18,14 +18,14 @@
 
 | 顺序 | 工作包 | 状态 | 下一步 / 完成条件 |
 |---:|---|---|---|
-| 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；最新本机 Python 149 项、Swift 29 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
+| 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；最新本机 Python 151 项、Swift 29 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
 | 0B | 本地语音链路 | IN PROGRESS | 官方中英 Streaming Zipformer 文件分帧 10/10 final、82 partial、weighted CER 0.0254；用户已完成三次真实 CLI 麦克风采集并看到 partial/final；另一次麦克风未打开时按 Ctrl-C 正常停止。用户将当前目标限定为功能冒烟，识别质量转为后续模型选择/优化项；识别器异常与模拟用户中断时 stream context 均关闭、缓冲清空已有 mock 回归；真实设备 Ctrl-C 停止路径已有一次记录。按规格书 §13，SwiftUI 麦克风/AEC 属阶段 3，不作 0B 门禁；0B 下一步核齐资源观察与 ASR/TTS 稳定链路报告。真实驱动异常作稳健性补证；Qwen 云 ASR/云 TTS 未测试且受 D-011 延期约束，模型许可也待核。 |
 | 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | DeepSeek 与 OpenRouter 文本、同一 Gateway 顺序路由、两家各一次真实 SSE 均通过；DeepSeek 与 OpenRouter 工具提案实测成功且均未执行；OpenRouter 在前两次空结果后，第三次返回正确 proposal（tool_calls、Relace/HKG）。OpenRouter JSON 一次结构匹配成功（Relace/HKG）；DeepSeek JSON 三次结果为一次空正文、两次结构匹配成功（后两次 finish_reason=stop，tokens=68/46/114 与 68/28/96）；成功请求证明该次 API Key 被接受。适配器会对 401 明确提示 Key 认证失败，并分类 402 余额、403 权限、429 限流；error probe 仅将 400/422 作为无效请求路径通过。两家客户端 SSE 取消均已实测收到首片段后关闭流，Provider 是否停止生成/计费未知；OpenRouter metadata 两次均精确匹配并返回 Relace/HKG（cost USD 0.000008752、0.000008252）；DeepSeek metadata 两次已观察：一次 ACK 不匹配、一次匹配；两次均未返回 downstream Provider/区域/费用，首次正文未被旧 CLI 捕获。本轮 deny-check 两家均为 Keychain reads=0、HTTP calls=0（进程内 tripwire）；真实 HTTPX 无 Consent harness 对两家均在 Adapter 前拒绝、credential reads=0；PID 级 lsof 观察无活动网络 socket（loopback 正向对照可见）。本次全局 tcpdump 虽见 546 个包但未按进程过滤，不能归因给测试进程；lsof 是活动 socket 快照，不是完整包级证明。详见 `poc/phase0-remote-provider.md`。 |
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；已新增显式系统认证测试按钮，真实 demo 窗口已显示认证成功且未访问钥匙串；两轮 GUI 停止/启动/健康检查完成，进程数符合预期；用户取消/拒绝路径、锁屏/休眠、正式分发与异常恢复策略证据仍待补。 |
 | 0F | 静态加密兼容性 | IN PROGRESS | SQLCipher 已有 ARM64、FTS、迁移和恢复证据；完成密钥生命周期、产品性能及发布形态评估，形成 ADR-019 决定。 |
 | 0G | Embedding 候选 | IN PROGRESS | 固定候选已离线推理三次，均为 4/4 合成 query top-1；observed max RSS 883,130,368–883,490,816 bytes；Python 锁定依赖 CycloneDX SBOM 已覆盖 54/54 个包，见 `poc/phase0-python-sbom.md`。补许可证闭包、真实标注检索集和产品选择（D-014）。 |
-| 0H | 故障注入与性能 | IN PROGRESS | 已测 WAL 备份的活动 reader + 三次 writer 提交、checkpoint 等待读锁期间 SIGKILL 后恢复、备份复制在 DELETE/WAL 下 SIGKILL、HFS+ 与 APFS 有界映像 ENOSPC；新增 `os.replace` 调用前/成功返回后的 SIGKILL 边界测试。边界测试不代表系统调用内部中断或断电持久性；备份目标 ENOSPC、实际外接介质/产品 WAL 生命周期与 staging 清理规则仍待处理。 |
+| 0H | 故障注入与性能 | IN PROGRESS | 已测 WAL 备份的活动 reader + 三次 writer 提交、checkpoint 等待读锁期间 SIGKILL 后恢复、备份复制在 DELETE/WAL 下 SIGKILL、HFS+ 与 APFS 有界映像 ENOSPC；新增 `os.replace` 调用前/成功返回后的 SIGKILL 边界测试。边界测试不代表系统调用内部中断或断电持久性；备份复制路径的确定性 ENOSPC 注入已通过且旧备份/源库保全；真实备份目标满载仍未实测。实际外接介质/产品 WAL 生命周期与崩溃后 staging 清理规则仍待处理。 |
 | 0I | 阶段追踪与验收 | OPEN | D-001–D-015 与 ADR-019/020/021/022 已按用户要求标记延期（D-010 候选及区域已明确，V1 选型仍延期）。延期不豁免规格要求的 POC 证据；GitHub Actions 真实运行、ASR/TTS 稳定链路及资源证据、Provider 服务端取消/稳定性、许可及恢复边界等仍有缺口；SwiftUI 麦克风/AEC 属阶段 3，完成证据审查后才能签收。 |
 
 ## 近期执行队列

@@ -35,7 +35,7 @@ swift test
 ./scripts/run_backend_lifecycle_poc.sh
 ```
 
-截至 2026-11-08 当前本机验证：Python 全量 149 项通过（阶段总基线）；本次 `swift test` 29 项通过，新增两项系统认证测试视图模型回归。Python 覆盖实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 覆盖 supervisor 子进程失败/显式重启、GUI ViewModel fake 路径、Keychain dummy secret 及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
+截至 2026-11-08 当前本机验证：Python 全量 151 项通过（当前阶段总基线）；本次 `swift test` 29 项通过，新增两项系统认证测试视图模型回归。Python 覆盖实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 覆盖 supervisor 子进程失败/显式重启、GUI ViewModel fake 路径、Keychain dummy secret 及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
 
 ## 未解决/未验收
 

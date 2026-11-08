@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import select
 import signal
 import subprocess
@@ -12,6 +13,7 @@ from alembic.config import Config
 import pytest
 import sqlcipher3.dbapi2 as sqlcipher
 import pac_poc.sqlcipher_poc as sqlcipher_poc
+from pac_poc.disk_full_poc import is_disk_full_error
 
 pytest.importorskip("sqlcipher3")
 pytest.importorskip("sqlalchemy")
@@ -425,6 +427,44 @@ def test_failed_backup_preserves_previous_valid_backup(database_paths, monkeypat
         finally:
             preserved.close()
         assert database.search("new source") == ["new source record"]
+        assert database.integrity_check() == "ok"
+        assert list(backup.parent.glob(f".{backup.name}.*.partial")) == []
+    finally:
+        database.close()
+
+
+def test_backup_target_enospc_preserves_source_and_previous_backup(
+    database_paths, monkeypatch
+) -> None:
+    path, backup = database_paths
+    database = SQLCipherFTSDatabase(path=path, key="backup-enospc-source-key")
+    database.add("new source record before backup ENOSPC")
+    previous = SQLCipherFTSDatabase(path=backup, key="backup-enospc-old-key")
+    previous.add("previous backup survives ENOSPC")
+    previous.close()
+
+    def no_space(_destination) -> None:
+        raise OSError(errno.ENOSPC, "no space left on device")
+
+    monkeypatch.setattr(database, "_copy_backup_to", no_space, raising=False)
+    try:
+        with pytest.raises(SQLCipherPOCError, match="backup operation failed") as error:
+            database.backup_to(backup, backup_key="backup-enospc-new-key")
+
+        assert is_disk_full_error(error.value)
+        preserved = SQLCipherFTSDatabase.open_existing(
+            path=backup, key="backup-enospc-old-key"
+        )
+        try:
+            assert preserved.search("survives ENOSPC") == [
+                "previous backup survives ENOSPC"
+            ]
+            assert preserved.integrity_check() == "ok"
+        finally:
+            preserved.close()
+        assert database.search("before backup ENOSPC") == [
+            "new source record before backup ENOSPC"
+        ]
         assert database.integrity_check() == "ok"
         assert list(backup.parent.glob(f".{backup.name}.*.partial")) == []
     finally:

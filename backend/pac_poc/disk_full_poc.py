@@ -7,9 +7,16 @@ from pathlib import Path
 
 
 def is_disk_full_error(error: BaseException) -> bool:
-    if isinstance(error, OSError) and error.errno == errno.ENOSPC:
-        return True
-    return getattr(error, "sqlite_errorcode", None) == sqlite3.SQLITE_FULL
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, OSError) and current.errno == errno.ENOSPC:
+            return True
+        if getattr(current, "sqlite_errorcode", None) == sqlite3.SQLITE_FULL:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 
 def validate_workspace(path: Path, allowed_root: Path) -> Path:

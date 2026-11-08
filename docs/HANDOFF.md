@@ -1,3 +1,9 @@
+### 2026-11-08：0H 备份 ENOSPC 失败路径
+
+- 在 `backup_to` 复制边界确定性注入 `OSError(ENOSPC)`；安全错误保留可识别 cause，旧备份可用旧密钥检索且完整，源库保持完整，`.partial` 清理。
+- 与实际 HFS+/APFS 有界映像写满测试区分：物理目标卷满载下的备份失败尚未实测。该项尝试发现满卷后备份有时仍完成，且 APFS 满载时重开数据库需要可用空间；未将不稳定结果记作通过。
+- 窄回归：`UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra phase0-security --group dev pytest -q tests/test_sqlcipher_enospc_poc.py tests/test_sqlcipher_compat_poc.py`，28 passed。
+
 ### 2026-11-08：0I 规格阶段归属复核
 
 - 对照规格书 §13–§14 修正 0B 门禁描述：SwiftUI 麦克风、AEC 与锁屏/休眠语音闭环属于阶段 3，不再误列为阶段 0 的 0B 阻塞项。阶段 0 当前继续核对 ASR/TTS 稳定链路报告、资源证据及总体追踪矩阵。

@@ -32,7 +32,7 @@ def test_phase0_traceability_matches_latest_local_poc_evidence_and_gate() -> Non
 
     assert "模型权重下载未完成" not in report
     assert "Touch ID UI/完整 App lifecycle OPEN" not in report
-    assert "POC SwiftUI demo 启停/退出清理已实机验证" in report
+    assert "本机 demo `.app` 实际点击启停、退出后无残留服务；本次再完成两轮停止/启动/健康检查" in report
 
 
 def test_handoff_does_not_leave_superseded_embedding_or_backend_status() -> None:
@@ -83,6 +83,7 @@ def test_failure_recovery_report_records_atomic_backup_failure_protection() -> N
     assert "复制/校验/替换失败" in report
     assert "复制/校验/替换失败" in report
     assert "崩溃 staging" in traceability
+    assert "确定性注入 ENOSPC" in traceability
 
 
 def test_sqlcipher_compat_report_reflects_latest_recovery_evidence() -> None:

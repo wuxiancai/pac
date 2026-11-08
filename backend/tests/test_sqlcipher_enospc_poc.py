@@ -24,6 +24,15 @@ def test_disk_full_classifier_accepts_os_and_sqlite_full_errors() -> None:
     assert not is_disk_full_error(sqlite3.OperationalError("database is locked"))
 
 
+def test_disk_full_classifier_recognizes_wrapped_sqlite_full_error() -> None:
+    wrapped = RuntimeError("safe domain error")
+    original = sqlite3.OperationalError("database or disk is full")
+    original.sqlite_errorcode = sqlite3.SQLITE_FULL
+    wrapped.__cause__ = original
+
+    assert is_disk_full_error(wrapped)
+
+
 def test_workspace_must_be_a_child_of_explicit_poc_root(tmp_path: Path) -> None:
     allowed_root = tmp_path / "backend" / ".poc-data"
     workspace = allowed_root / "enospc"

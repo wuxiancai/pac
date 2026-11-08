@@ -31,6 +31,6 @@ UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra pha
 ## 限制与未决项
 
 - HFS+ 与 APFS 临时 disk image 的 ENOSPC 是有界文件系统分配耗尽，但不能代表实际 APFS 系统卷、外接盘、网络文件系统、WAL 并发写入或正式 App 数据目录的所有行为。
-- 只验证 SQLCipher 单写事务和此前已完成的独立备份；备份目标卷同时 ENOSPC、断电、设备移除、文件系统损坏或映像挂载/卸载中断仍未验证。
+- 本报告的满卷映像验证 SQLCipher 单写事务和此前已完成的独立备份；备份复制过程的确定性 ENOSPC 注入及旧备份保全见 `phase0-failure-recovery.md`。真实备份目标卷满载、断电、设备移除、文件系统损坏或映像挂载/卸载中断仍未验证。
 - 测试密钥是临时随机值，未评估 Keychain 生命周期、密钥轮换、备份密钥分离用户流程或丢失密钥恢复。
 - 本 POC 不改 schema，不执行 Alembic migration，也不形成静态加密方案 ADR。
