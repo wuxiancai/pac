@@ -16,9 +16,9 @@
 - 云端配置提供千问 `qwen3.8-flash`（中国，按量计费应用 API）、DeepSeek `deepseek-flash`（中国）与 OpenRouter `deepseek/deepseek-v4.1-flash-1017`（Global）。型号和区域固定，不能填写任意端点。默认云服务商为千问；D-010 仍为待决，不代表正式 V1 Provider 选型。
 - 云端 API Key 可在设置窗口的 SecureField 保存到 macOS login Keychain：service `com.personal-ai-assistant.phase0.provider`，account 为 `qwen-app`、`deepseek` 或 `openrouter`。界面只显示是否已保存；后端逐次从 Keychain 读取，密钥不进入聊天、本机 API 请求体、环境变量、设置文件或日志。
 - 千问应用选项使用普通按量计费 API（`sk-ws-` Key），地址为 `https://maas.qianwenaiapi.com/compatible-mode/v1`，与 Token Plan 个人版的 `sk-sp-` Key 及套餐端点分开。请新建应用 API Key 并保存到 `qwen-app`；不要复用曾在聊天中公开的旧 Key。Token Plan 个人版 Key 仍不用于本自建应用。
-- 每次发送云端请求前，GUI 展示将发送的完整对话、服务商、型号和区域。用户点击“同意并发送这一次”后，后端只为该请求创建精确匹配的短时 Consent；取消时不读 Keychain、不发请求。请求按 L2 处理；检测到常见 API Key、Bearer 凭据或私钥标记时，在 Keychain 读取和网络出站前拒绝。
+- 选择云端来源/Provider 即表示持续授权后续聊天发往该服务商，不再逐条弹出确认框。设置窗口明确显示当前目标、区域和发送行为；切回本地来源即可停止云端出站。后端仍为每个单独请求建立精确 Provider/model/region/purpose/Data Level 的短时 Consent，并在 Keychain 读取前检查 L3 凭据；取消云模式后不会通过其他 Provider fallback。请求按 L2 处理。
 - HTTP 401 显示 API Key 认证失败，HTTP 402 显示余额/套餐额度不足。错误不会触发 Provider fallback；云端输出上限为 1,024 tokens。
-- 千问 Token Plan 服务端支持 Realtime API，但个人版 Key 条款限定于编程/智能体工具内的交互使用，不适用于本项目自建应用。GUI 提供的是另一个适用于应用的按量计费 API 选项，不使用 Token Plan 个人版额度。详情见 [`qwen-token-plan-integration.md`](qwen-token-plan-integration.md)。
+- 千问 Token Plan 服务端支持文本和 Realtime API，但个人版条款仅允许通过受支持的编程/智能体工具扩展交互调用，明确排除自定义应用后端；因此不在本应用 Provider 列表中直连 `sk-sp-`。GUI 提供适用于自建应用的按量计费 API 选项。详情见 [`qwen-token-plan-integration.md`](qwen-token-plan-integration.md)。
 
 ## 验证记录
 
@@ -27,6 +27,7 @@
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q tests/test_beta_api.py tests/test_local_service_process_poc.py tests/test_security_poc.py`：11 项通过。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q`：158 项通过；`uv run --locked python -m compileall -q pac_poc scripts tests`：通过。
 - 千问应用选项改动后：千问相关后端窄回归 26 项通过；Python 全量回归 162 项通过；`swift test --package-path poc/macos-audio` 31 项通过；Beta `.app` 构建成功。运行中 GUI Accessibility 树显示模型 `qwen3.8-flash` 与“模型设置”按钮；设置 sheet 手动操作、Keychain 保存和真实千问 API 请求尚未验证。
+- 移除聊天逐条云确认弹窗后：`swift test --package-path poc/macos-audio` 31 项通过，Beta target 构建通过；尚未在运行 GUI 中发起消息做无弹窗手动复核。用户选择云端即持续授权，设置页告知发送目标和切回本地的方法。
 - `scripts/run_beta_app.sh` 构建并启动更新后的应用；GUI Accessibility 树确认右上角“模型设置”按钮和当前模型状态显示。设置 sheet 本身以及真实云端请求尚未进行手动 GUI 验收。
 - 使用真实本机 Ollama 模型对 `/chat/stream` 发送合成短句，HTTP 200，收到 7 个非空增量片段；未记录回复正文。服务经 supervisor stop 正常退出。
 

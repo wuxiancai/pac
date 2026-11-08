@@ -25,7 +25,7 @@
 
 Token Plan 专属 API Key 存在 macOS login Keychain：service `com.personal-ai-assistant.phase0.provider`、account `qwen`。只用于官方允许的交互式工具 POC；个人版条款不允许将该 Key 用于本项目自建应用。
 
-Beta 千问按量计费应用 Key 使用同一 Keychain service、account `qwen-app`，要求 `sk-ws-` 前缀；API endpoint 固定为 `maas.qianwenaiapi.com`。请在千问平台新建应用 API Key，绝不复用曾公开贴入聊天的 Key。应用发送仍需每次 GUI Consent；应用路由不回退到 Token Plan Key 或其他 Provider。
+Beta 千问按量计费应用 Key 使用同一 Keychain service、account `qwen-app`，要求 `sk-ws-` 前缀；API endpoint 固定为 `maas.qianwenaiapi.com`。请在千问平台新建应用 API Key，绝不复用曾公开贴入聊天的 Key。启用云端模型后，后续聊天内容会直接发送至当前 Provider；应用路由不回退到 Token Plan Key 或其他 Provider。
 
 ## 实时语音会话流程
 
@@ -42,10 +42,10 @@ Beta 千问按量计费应用 Key 使用同一 Keychain service、account `qwen-
 
 ## 当前进度和后续验收
 
-- 已完成：Beta GUI 可选择千问按量计费应用文本路由；固定 endpoint/model/Keychain account 和 `sk-ws-` 检查；逐请求 Consent、错误脱敏及无自动 fallback 保护。仅有 mock/策略验证，没有真实 API 请求。
+- 已完成：Beta GUI 可选择千问按量计费应用文本路由；固定 endpoint/model/Keychain account 和 `sk-ws-` 检查；云端 Provider 启用作为持续用户授权，每个后端请求仍受固定目标 Policy、L3 检查和无自动 fallback 约束。仅有 mock/策略验证，没有真实 API 请求。
 - Token Plan 未完成：当前官方品牌域名的单次 Consent 真实文本验证；Token Plan 个人版 Key 不能接入自建 Beta。实时语音尚未实现，待采用适用于自定义应用的凭据并按交互音频流程另行开发和验证。
 - 千问新应用 Key 的认证和流式响应尚未真实测试；待用户在 GUI Keychain 输入新建的 `sk-ws-` 应用 Key，并逐次确认具体合成测试内容后验证。
-- 真实请求仍须逐次显示目标、用途、数据级别和发送内容/音频范围并取得用户明确 Consent。任何一次文字授权不覆盖麦克风/音频请求。
+- Token Plan 个人版目前明确禁止通过自定义应用后端调用。要在本产品内使用，须千问官方提供允许此类自建应用接入的套餐/许可，或实现通过其明确支持的编程/智能体工具扩展的独立交互集成。任何音频采集仍须由用户显式开始；文字云端授权不自动授权麦克风。
 
 ## 官方资料
 

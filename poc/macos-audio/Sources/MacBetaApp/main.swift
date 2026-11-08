@@ -33,7 +33,6 @@ enum CloudProvider: String, CaseIterable, Identifiable {
         }
     }
 }
-
 @main
 @available(macOS 14.0, *)
 struct PersonalAssistantBetaApp: App {
@@ -71,7 +70,6 @@ struct PersonalAssistantBetaApp: App {
         }
     }
 }
-
 @available(macOS 14.0, *)
 @MainActor
 @Observable
@@ -100,13 +98,6 @@ final class BetaChatModel {
     var selectedModel: String { usesCloud ? cloudProvider.model : localModel }
     var selectedRegion: String { usesCloud ? cloudProvider.region : "仅本机" }
     var selectedModelTitle: String { usesCloud ? cloudProvider.title : "Ollama 本地模型" }
-    var remoteConsentMessages: [LocalChatMessage] {
-        nonemptyMessages(messages) + [LocalChatMessage(
-            role: "user",
-            content: draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        )]
-    }
-
     init(configuration: BackendLifecycleConfiguration) {
         source = ModelSource(rawValue: defaults.string(forKey: "beta.model.source") ?? "local") ?? .local
         localModel = defaults.string(forKey: "beta.model.local") ?? "qwen3.5:0.8b"
@@ -133,9 +124,8 @@ final class BetaChatModel {
         }
     }
 
-    func send(confirmedForThisRequest: Bool = false) {
+    func send() {
         guard activeRequest == nil, let client else { return }
-        guard !usesCloud || confirmedForThisRequest else { return }
         guard !selectedModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             status = "请先在模型设置中选择模型。"
             return
@@ -148,6 +138,7 @@ final class BetaChatModel {
         let context = nonemptyMessages(Array(messages.dropLast()))
         let provider = selectedProvider
         let modelID = selectedModel
+        let confirmedForThisRequest = usesCloud
         let requestID = UUID()
         activeRequestID = requestID
         status = "正在使用\(usesCloud ? "云端" : "本地")模型生成…"
@@ -211,7 +202,6 @@ final class BetaChatModel {
 private struct BetaChatView: View {
     @Bindable var model: BetaChatModel
     @State private var showingSettings = false
-    @State private var showingCloudConsent = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -219,6 +209,10 @@ private struct BetaChatView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("个人 AI 助理").font(.title2.bold())
                     Text(model.status).font(.caption).foregroundStyle(.secondary)
+                    Text(model.usesCloud
+                        ? "云端：聊天内容发送至\(model.selectedModelTitle)（\(model.selectedRegion)）"
+                        : "本地：聊天内容仅发送到本机模型")
+                        .font(.caption).foregroundStyle(model.usesCloud ? .orange : .secondary)
                 }
                 Spacer()
                 Button { showingSettings = true } label: {
@@ -239,7 +233,7 @@ private struct BetaChatView: View {
                                 "开始一段对话",
                                 systemImage: "bubble.left.and.bubble.right",
                                 description: Text(model.usesCloud
-                                    ? "发送云端请求前会逐次显示完整对话并等待确认。关闭窗口后对话不会保存。"
+                                    ? "当前选择了云端模型；发送的聊天内容会直接发往所选服务商。关闭窗口后对话不会保存。"
                                     : "文字只发送到本机 Ollama；关闭窗口后对话不会保存。")
                             )
                             .padding(.top, 80)
@@ -279,25 +273,10 @@ private struct BetaChatView: View {
         .sheet(isPresented: $showingSettings) {
             BetaModelSettingsView(model: model)
         }
-        .sheet(isPresented: $showingCloudConsent) {
-            CloudSendConsentView(
-                provider: model.selectedModelTitle,
-                model: model.selectedModel,
-                region: model.selectedRegion,
-                messages: model.remoteConsentMessages,
-                onCancel: { showingCloudConsent = false },
-                onConfirm: {
-                    showingCloudConsent = false
-                    model.send(confirmedForThisRequest: true)
-                }
-            )
-        }
     }
 
     private func requestSend() {
-        guard !model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        if model.usesCloud { showingCloudConsent = true }
-        else { model.send() }
+        model.send()
     }
 
     private func userBubble(_ text: String) -> some View {
@@ -368,9 +347,9 @@ private struct BetaModelSettingsView: View {
                     Text("千问应用 API 使用按量计费 Key（sk-ws-），与 Token Plan 个人版 Key 分开。请新建应用 API Key；不要复用曾公开过的 Key。")
                         .font(.callout).foregroundStyle(.secondary)
                 }
-                Text("每次发送云端请求前，应用都会展示完整对话、服务商、模型和区域，并要求单次确认。Key 不进入聊天、设置文件或日志。")
+                Text("选择云端模型即表示后续聊天内容会直接发送给所选服务商（\(model.cloudProvider.title)，\(model.cloudProvider.model)，\(model.cloudProvider.region)），发送时不再逐条弹窗。切回本地模型即可停止云端发送。Key 保存在 Keychain，不进入聊天或设置文件。")
                     .font(.callout).foregroundStyle(.secondary)
-                Label("千问 Token Plan 个人版 Key（sk-sp-）不能用于本自建应用；千问应用 API 使用独立 Keychain 项 qwen-app。", systemImage: "info.circle")
+                Label("千问 Token Plan 个人版 Key（sk-sp-）仅能通过官方支持的编程/智能体工具扩展使用，不接入本自建应用；千问应用 API 使用独立 Keychain 项 qwen-app。", systemImage: "info.circle")
                     .font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
@@ -403,49 +382,5 @@ private struct BetaModelSettingsView: View {
         } catch {
             saveMessage = error.localizedDescription
         }
-    }
-}
-
-@available(macOS 14.0, *)
-private struct CloudSendConsentView: View {
-    let provider: String
-    let model: String
-    let region: String
-    let messages: [LocalChatMessage]
-    let onCancel: () -> Void
-    let onConfirm: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("确认发送到云端").font(.title2.bold())
-            Text("以下完整对话将发送给 \(provider) 的 \(model)，服务区域：\(region)。按普通个人对话（L2）处理；本次授权仅覆盖这一次请求。L3 凭据会被后端拦截。")
-                .fixedSize(horizontal: false, vertical: true)
-            Label("不要发送密码、API Key、私钥或其他不应上传的信息。", systemImage: "exclamationmark.triangle")
-                .font(.callout).foregroundStyle(.orange)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(messages.enumerated()), id: \.offset) { _, message in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(message.role == "user" ? "用户" : "助手")
-                                .font(.caption.bold()).foregroundStyle(.secondary)
-                            Text(message.content).textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(10)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-            }
-            .frame(minHeight: 150)
-            HStack {
-                Button("取消", action: onCancel)
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button("同意并发送这一次", action: onConfirm)
-                    .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(24)
-        .frame(minWidth: 580, minHeight: 460)
     }
 }

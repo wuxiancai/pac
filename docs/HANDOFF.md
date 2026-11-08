@@ -1,3 +1,10 @@
+### 2026-11-08：移除逐消息云端确认弹窗并澄清 Token Plan 边界
+
+- 用户明确反馈选择了云模型后每条消息再弹窗影响体验。聊天发送不再显示确认 sheet；模型设置解释选中云端 Provider 即持续授权后续消息直接发送，切回本地即可停止云出站。后端仍按具体 Provider/model/region/data level 建立单请求 Policy grant，保留 L3 凭据拦截、Keychain、固定目标和禁用 fallback。
+- 用户再次要求把千问 Token Plan 加入大模型选项。复核千问官方个人版当前条款：`sk-sp-` 仅可在官方支持的编程/智能体工具扩展机制中交互使用，明确禁止自定义应用后端。因此不把 Token Plan Key 直连本应用 Provider；应用内千问仍提供 `sk-ws-` 按量 API。若以后取得适用于自建应用的官方许可，或改为官方支持的工具扩展集成，再评估加入。
+- 官方资料：[Token Plan 个人版使用范围](https://platform.qianwenai.com/docs/token-plan/personal/token-plan-personal-overview)、[千问 API Key 类型](https://platform.qianwenai.com/docs/api-reference/preparation/api-key)。
+- 验证：`swift test --package-path poc/macos-audio` 31 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功；`git diff --check` 通过。新版 app 已重启，GUI Accessibility 树显示云模式将直接把聊天内容发送给所选服务商；没有发送聊天消息，因此没有产生云请求，也没有读取 Keychain。
+
 ### 2026-11-08：将千问应用 API 加入模型设置选项
 
 - 云端服务商列表新增并默认选择千问 `qwen3.8-flash` 应用 API，固定普通 OpenAI 兼容端点 `https://maas.qianwenaiapi.com/compatible-mode/v1`、中国区域、Keychain account `qwen-app`。
