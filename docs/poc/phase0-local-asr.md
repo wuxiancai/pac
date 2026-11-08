@@ -10,7 +10,7 @@
 - 使用系统本地合成的中文语音生成测试 WAV；没有录制私人麦克风音频。
 - 新增明确按回车后才启动的本机默认麦克风 CLI；采集时音频只进入有界内存队列，溢出/输入错误时停止并清缓冲。
 - 使用 AVSpeechSynthesizer 本机播放，并验证立即打断控制。
-- 本包尚未验证 SwiftUI 音频采集、本机服务认证、AEC、重复实机质量/准确率或目标性能阈值。用户将当前阶段的真人语音目标限定为功能冒烟，转写质量留待后续模型选择和优化。
+- 本包尚未验证 SwiftUI 音频采集、本机服务认证、AEC、重复实机质量/准确率或目标性能阈值。按规格书 §13，SwiftUI 采集/AEC 属阶段 3，不作为阶段 0 本工作包的关闭条件。用户将当前阶段的真人语音目标限定为功能冒烟，转写质量留待后续模型选择和优化。
 
 ## 本机环境
 
@@ -106,13 +106,13 @@ swift run tts-interrupt-poc
 
 - 2026-11-08 实机停止冒烟：用户启动双语 Streaming Zipformer 麦克风 CLI 后，观察到“正在本机识别”；停止前没有 partial/final 输出，按 Ctrl-C 后 CLI 打印“用户停止了本机采集；未补造 final。”并正常回到 shell。用户随后澄清当时麦克风未打开；该次只作为静音期间手动停止路径证据，不计为语音识别通过。
 - 自动回归现以模拟 `sounddevice` callback 和故意失败/中断的 decoder 验证：普通异常向上传递，KeyboardInterrupt 显示用户停止提示；两种情况下输入流上下文均关闭且有界缓冲清空。该结果不覆盖真实设备驱动故障或 Ctrl-C 的硬件行为；已有一次真实设备 Ctrl-C 停止证据；真实设备驱动异常仍待测。
-- 2026-11-08 首次实机运行的历史观察：产生多个增量 partial 和两个 final；混合中英内容有错词。用户后来将当前真人语音标准限定为功能冒烟、把模型识别质量留待后续，因此此观察不计 CER，也不作为本轮功能验证的阻断项。开麦后的后续实机复测也已观察到中英 partial/final；当前未完成项为真实设备驱动异常、重复功能稳定性及 SwiftUI 集成。
-- 双语 streaming 候选已产生中英及混说的文件分帧 partial/final；用户已补三次 CLI 实机功能冒烟，并指定识别质量留待后续模型选择。真实麦克风 Ctrl-C 停止已有一次证据；之后开麦实测又观察到中文和英文 partial/final。识别词句存在偏差，按用户决定留待后续模型优化；驱动异常、重复功能稳定性及 SwiftUI 链路仍未覆盖；合成语音分数不能替代这些证据。
+- 2026-11-08 首次实机运行的历史观察：产生多个增量 partial 和两个 final；混合中英内容有错词。用户后来将当前真人语音标准限定为功能冒烟、把模型识别质量留待后续，因此此观察不计 CER，也不作为本轮功能验证的阻断项。开麦后的后续实机复测也已观察到中英 partial/final；当前补证项为真实设备驱动异常和重复功能稳定性；SwiftUI 集成按规格书属于阶段 3。
+- 双语 streaming 候选已产生中英及混说的文件分帧 partial/final；用户已补三次 CLI 实机功能冒烟，并指定识别质量留待后续模型选择。真实麦克风 Ctrl-C 停止已有一次证据；之后开麦实测又观察到中文和英文 partial/final。识别词句存在偏差，按用户决定留待后续模型优化；驱动异常和额外重复功能稳定性仍未覆盖；SwiftUI 链路按规格书属于阶段 3。合成语音分数不能替代真实麦克风功能冒烟。
 - Qwen3-ASR 候选已在五条随包音频上完成离线中/英/混说检查；尚无独立留出中英语料。其 ONNX 离线整段路径不能证明实时流式延迟、partial/final、打断、SwiftUI 麦克风处理或长时运行能力。Qwen 官方当前说明流式推理需 vLLM backend；本机现有 sherpa-onnx API 测试使用 `OfflineRecognizer`，因此不能把 RTF<1 写成实时流式验收。
 - sherpa-onnx 官方 Python API 样例将此类模型通过 `OfflineRecognizer.from_qwen3_asr` 整段解码；参见 [官方 Qwen3-ASR 文件解码样例](https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-qwen3-asr-decode-files.py)。Qwen 官方说明 Qwen3-ASR 的 streaming inference 当前只在 vLLM backend 提供，详见 [Qwen3-ASR 官方文档](https://github.com/QwenLM/Qwen3-ASR#streaming-inference)。
 - 当前 8 条合成中文集只有一轮，CER 不能代表真人麦克风或真实用户话语分布；需要更广语料与多轮实机验证，阈值待产品负责人确认。
 - ASR + LLM 并发目前只有一条合成音频/本机模型观察；需要重复轮次、负载时段、GPU 和冷/热启动分开测量，才能评估资源与性能。
-- 需要与 FastAPI、SwiftUI 音频采集及独立 TTS 配置集成验证；当前为本机 CLI POC。
+- 当前为本机 CLI POC；规格书将 SwiftUI 采集/播放与 WebSocket 闭环列入阶段 3。阶段 0 仍需将 ASR/TTS 稳定链路证据及现有资源测量归档。
 - 新 Qwen3-ASR ONNX 候选的模型来源为 ModelScope 第三方转换包，模型目录没有 LICENSE 文件；Qwen 官方项目标注 Apache-2.0，但转换包及随附测试音频的分发许可/来源仍需单独核实。设备内存观察峰值约 4.47 GB；需要更多样本和并发负载后评估资源预算。
 - 本中文 ASR 权重的公开上游仓库要求接受访问条件，公开页面未展示许可条款；具体证据与待核验范围见 [`phase0-model-license-review.md`](phase0-model-license-review.md)。
 - 其他阶段 0 工作包状态见 [`phase0-traceability.md`](phase0-traceability.md)。
