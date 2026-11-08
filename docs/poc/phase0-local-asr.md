@@ -35,7 +35,7 @@
 - Swift TTS 控制器单元测试：3 项通过；Swift 包构建通过。
 - AVSpeechSynthesizer 本机播放后按回车中断，返回 `interrupted=true speaking=false`。
 - 2026-11-08 新增 ASR→TTS 链路脚本 `scripts/run_asr_tts_chain_poc.py`：只处理显式 JSON manifest 中的一条音频，使用现有 Streaming ASR 得到 final；只有交互终端输入 `PLAY FINAL LOCALLY` 后才把 final 交给 `poc/macos-audio` 中的 AVSpeechSynthesizer。脚本不打印或保存 transcript，非交互终端拒绝执行，不启用麦克风或云端。
-- 对 `bilingual-manifest.json` 第 1 条本机合成 WAV 连续运行三轮，每轮 ASR 都产生 6 个 partial、1 个 final；每轮本机 AVSpeechSynthesizer 都报告 `playback_completed=true speaking=false`，进程退出码为 0。该链路只在同一合成样本上重复，说明接口顺序和播放完成路径可运行；不等于独立样本、长时运行或性能稳定性验收。
+- `bilingual-manifest.json` 第 1 条本机合成 WAV 连续运行三轮，另对第 2、3 条各运行一轮；五轮均有 1 个 final，分别为 6/6/6/6/7 个 partial，final 字符数 8/8/8/9/9；本机 AVSpeechSynthesizer 五轮均报告 `playback_completed=true speaking=false`，进程退出码为 0。涵盖 3 条 manifest 合成样本和 5 次链路运行；说明多样本接口顺序与播放完成路径可运行，不等于独立语料、长时运行或性能稳定性验收。
 - 新增 `tts-interrupt-poc --wait-for-completion` 模式，超时为 45 秒；已有的交互式立即打断路径保持独立。Swift 测试 29 项通过；Python 脚本编译检查通过；非交互拒绝检查返回 2 并确认未启动麦克风或 TTS。
 - `uv lock --check` 通过；sounddevice 默认输入设备检查支持 16 kHz、单声道、PCM16。
 - 本地模型加载：通过。
