@@ -22,7 +22,7 @@
 - UI 通过本机 Loopback API 与后端通信；服务由 Swift supervisor 固定启动，不经任意 shell 命令。
 - Model Gateway 使用 Adapter 和精确 Provider/Model capability registry；未知能力默认不支持。
 - 本地优先。远端模型调用必须在发送前通过 Consent Manager 与 Policy Engine；默认拒绝；凭据来自 Keychain。不得以 fallback 扩大授权。阶段 0 已加入 DeepSeek 与 OpenRouter 固定端点 adapter 和逐请求终端确认；两家各有用户确认后的合成文本真实请求成功记录，同一 Gateway 顺序跨 Provider 路由已真实通过一次；逐项能力探测脚本已就绪，所有后续出站仍需逐次主动确认；远端 HTTP 401 会提示凭据认证失败，Keychain 缺失与认证拒绝分开提示，错误响应正文不保留。无 Consent 的真实 HTTPX 检查在两家均于 Adapter 前拒绝、credential reads=0，PID 级 `lsof` 观察无活动网络 socket；全系统包捕获的 TCP/443 流量因未按进程过滤不作归因。
-- 用户已指定交互式云模型 POC 默认优先千问 Token Plan。新增固定北京 `qwen3.8-flash` 文本 adapter 与 mock/deny-check 覆盖；用户已逐次确认并完成一次真实合成文本请求，响应精确匹配，usage 为 73/50/123 tokens。服务未返回下游 Provider、实际区域或费用。用户在聊天中暴露的临时 key 未被读取或保存。官方文档确认 Token Plan 有 OpenAI 兼容 Base URL，并支持 OpenClaw 等交互式 Agent 工具；但使用范围明确排除自定义应用后端，因此本项目 FastAPI 产品后端需另备允许后端调用的 API Key/计费方案。Token Plan ASR、TTS、实时语音为独立 DashScope 协议，尚未接入/实测。
+- 用户已指定交互式云模型 POC 默认优先千问 Token Plan。新增固定北京 `qwen3.8-flash` 文本 adapter 与 mock/deny-check 覆盖；用户已逐次确认并完成一次真实合成文本请求，响应精确匹配，usage 为 73/50/123 tokens。服务未返回下游 Provider、实际区域或费用。用户在聊天中暴露的临时 key 未被读取或保存。官方资料确认 Token Plan 同时支持文本 OpenAI-compatible HTTP 和 `qwen-audio-3.0-realtime-plus` Realtime WebSocket；非实时 ASR/TTS 使用独立 HTTP 接口。当前 Beta 尚未接入 Qwen 实时语音，也未对新文本域名重新实测。实时语音需用户主动开始交互会话，Key 继续留在 Keychain；模型、地址、事件、音频规格和待验证项见 `docs/beta/qwen-token-plan-integration.md`。
 - Agent Registry 当前为模拟 POC；权限不得超出父权限，不实现 Agent 团队或任意执行器。
 - 记忆 POC 使用 disposable 内存 SQLite/FTS5；Embedding 显式 opt-in。不得把 POC schema 当作产品 schema。
 - ASR、TTS、LLM 分开配置；原始音频默认不持久化；本地 ASR 失败不得静默切到云端。

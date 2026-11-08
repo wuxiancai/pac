@@ -9,6 +9,7 @@
 - [决策记录](docs/DECISIONS.md)：已确认边界与待决产品事项。
 - [交接记录](docs/HANDOFF.md)：最近完成内容和接续点。
 - [阶段 0 追踪矩阵](docs/poc/phase0-traceability.md)：验收要求、证据、缺口和风险。
+- [千问 Token Plan 接入备忘](docs/beta/qwen-token-plan-integration.md)：文本与实时语音地址、协议、Key 边界、状态和后续步骤。
 - [POC 报告](docs/poc/)：按工作包记录实现与验证。
 
 开始改动前先读取 `AGENTS.md` 和上述项目文档，并检查 `git status`。

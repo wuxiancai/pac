@@ -1,3 +1,9 @@
+### 2026-11-08：补齐千问 Token Plan 实时语音接入说明
+
+- 用户指出 Token Plan 也支持实时语音。已核对官方 Token Plan 实时语音页和 Realtime API 支持矩阵：`qwen-audio-3.0-realtime-plus` 支持 Token Plan，通过独立 WebSocket 地址；不是 OpenAI Chat Completions，也不是现有本地 ASR/TTS 链路。
+- 新增 `docs/beta/qwen-token-plan-integration.md`，记录文本/实时语音/非实时 ASR/TTS 的独立地址和协议、Keychain 约束、PCM/事件流程、Consent、实现状态与逐项验收。同步更新 DECISIONS、TASKS、PROJECT_CONTEXT、Provider 报告、追踪矩阵和 README 索引。
+- 目前只是文档和产品排程更新；Beta 应用尚未接入 Qwen 实时语音，未启用麦克风或发起新云请求。
+
 ### 2026-11-08：千问 Token Plan Base URL 纠正
 
 - 用户提供官方截图，指出 Token Plan 的 OpenAI 兼容 Base URL 为 `https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1`。此前 adapter 仍用旧北京 `maas.aliyuncs.com` 域名，现已切换到截图/千问AI平台文档中的品牌域名，固定模型和 `sk-sp-` Keychain 检查不变。
