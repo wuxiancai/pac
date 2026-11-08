@@ -4,6 +4,7 @@ import hmac
 import ipaddress
 import time
 from dataclasses import dataclass, field
+from collections.abc import Callable
 from enum import StrEnum
 from urllib.parse import urlsplit
 
@@ -50,12 +51,17 @@ def create_local_api(*, session: LocalAPISession) -> FastAPI:
     return app
 
 
-def create_local_server(*, session: LocalAPISession, port: int) -> uvicorn.Server:
+def create_local_server(
+    *,
+    session: LocalAPISession,
+    port: int,
+    app_factory: Callable[..., FastAPI] = create_local_api,
+) -> uvicorn.Server:
     """Build a single-worker server pinned to IPv4 loopback, including port 0 for tests."""
     if not 0 <= port <= 65535:
         raise ValueError("port must be between 0 and 65535")
     config = uvicorn.Config(
-        create_local_api(session=session),
+        app_factory(session=session),
         host=LOCAL_API_BIND_HOST,
         port=port,
         workers=1,

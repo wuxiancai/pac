@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 
+from .beta_api import create_beta_api
 from .security_poc import LOCAL_API_BIND_HOST, LocalAPISession, create_local_server
 
 
@@ -23,7 +24,9 @@ def main() -> int:
         listener.listen()
         port = listener.getsockname()[1]
         token = secrets.token_urlsafe(32)
-        server = create_local_server(session=LocalAPISession(token=token), port=port)
+        server = create_local_server(
+            session=LocalAPISession(token=token), port=port, app_factory=create_beta_api
+        )
         server_thread = threading.Thread(
             target=server.run,
             kwargs={"sockets": [listener]},

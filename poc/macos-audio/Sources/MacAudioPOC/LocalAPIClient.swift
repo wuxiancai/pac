@@ -6,6 +6,16 @@ public enum LocalAPIClientError: Error, Equatable {
     case requestFailed(statusCode: Int)
 }
 
+public struct LocalChatMessage: Codable, Equatable, Sendable {
+    public let role: String
+    public let content: String
+
+    public init(role: String, content: String) {
+        self.role = role
+        self.content = content
+    }
+}
+
 /// Minimal native client for the authenticated, loopback-only POC health endpoint.
 @available(macOS 12.0, *)
 public final class LocalAPIClient: @unchecked Sendable {
@@ -51,6 +61,45 @@ public final class LocalAPIClient: @unchecked Sendable {
         return value.status == "ok"
     }
 
+    public func streamChat(messages: [LocalChatMessage]) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    guard let url = URL(string: "/chat/stream", relativeTo: baseURL)?.absoluteURL else {
+                        throw LocalAPIClientError.invalidEndpoint
+                    }
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.httpBody = try JSONEncoder().encode(ChatRequest(messages: messages))
+                    let (bytes, response) = try await session.bytes(for: request)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        throw LocalAPIClientError.invalidResponse
+                    }
+                    guard httpResponse.statusCode == 200 else {
+                        throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+                    }
+                    for try await line in bytes.lines {
+                        guard line.hasPrefix("data: ") else { continue }
+                        let event = try JSONDecoder().decode(
+                            ChatStreamEvent.self,
+                            from: Data(line.dropFirst(6).utf8)
+                        )
+                        if let delta = event.delta { continuation.yield(delta) }
+                        if let message = event.error { throw LocalAPIStreamError(message: message) }
+                        if event.done == true { break }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     private static func isAllowedEndpoint(_ url: URL) -> Bool {
         let portAllowed = url.port.map { (1...65535).contains($0) } ?? true
         guard url.scheme == "http",
@@ -67,6 +116,21 @@ public final class LocalAPIClient: @unchecked Sendable {
         }
         return true
     }
+}
+
+private struct ChatRequest: Encodable {
+    let messages: [LocalChatMessage]
+}
+
+private struct ChatStreamEvent: Decodable {
+    let delta: String?
+    let done: Bool?
+    let error: String?
+}
+
+public struct LocalAPIStreamError: Error, LocalizedError {
+    public let message: String
+    public var errorDescription: String? { message }
 }
 
 private struct HealthResponse: Decodable {

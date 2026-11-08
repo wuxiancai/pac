@@ -1,3 +1,10 @@
+### 2026-11-08：B0/B1 测试版本机文字对话首个垂直切片
+
+- 新增 macOS SwiftUI app target 与 `scripts/build_beta_app.sh` / `scripts/run_beta_app.sh`。应用通过固定 supervisor 启动本机服务，窗口显示连接状态；当前模型为本机 Ollama `qwen3.5:0.8b`。
+- 后端新增受 Bearer token/loopback 保护的 `/chat/stream`，消息尺寸、条数和字段均有边界；SwiftUI 输入/流式展示/停止功能接线完成。会话仅保存在进程内存，关窗不保存。
+- 验证：Swift build 通过；Swift 31 项通过；后端窄回归 11 项、全量 Python 158 项通过；compileall 通过。启动真实 app 后显示模型已连接；另以本机真实 Ollama 对合成短句发起 API 冒烟，HTTP 200、7 个非空增量，未记录正文，服务正常停止。
+- 报告见 `docs/beta/macOS-beta-chat.md`。GUI 实际发消息并显示模型回复已观察通过；未完成：停止按钮、关窗后服务清理确认；后续接 B2 本地语音。云模型、持久化与未来功能不挡当前文字闭环。
+
 ### 2026-11-08：测试版优先范围调整（C-007）
 
 - 用户明确：前期只在 macOS 单用户使用，先交付能用的测试版；未来功能先留扩展点，待实际开发该功能时再验证。

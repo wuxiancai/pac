@@ -38,6 +38,16 @@ swift test
 
 上述命令不下载 ASR/Embedding 权重、不调用远端 Provider，也不采集麦克风。需要模型的本机 POC 请按对应 `docs/poc/` 报告执行；音频采集只在用户明确操作后开始。
 
+## 启动 macOS 测试版
+
+当前测试版先提供本机文字对话，使用已安装的 Ollama `qwen3.5:0.8b`；对话不会保存到磁盘。首次启动前需在 `backend/` 执行 `uv sync --locked`，并确认 Ollama 服务和模型已就绪。
+
+```bash
+./poc/macos-audio/scripts/run_beta_app.sh
+```
+
+测试版窗口关闭时会停止由应用管理的本机后端。该脚本依赖当前仓库环境，不是独立安装包。
+
 ## CI
 
 `.github/workflows/ci.yml` 在 GitHub Actions 的 macOS arm64 runner 上运行锁定依赖的 Python 全量测试、编译检查和 Swift 测试。它只使用仓库依赖，不注入 Provider 密钥，不下载模型，不启动麦克风。

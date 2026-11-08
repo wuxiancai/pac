@@ -8,12 +8,14 @@ let package = Package(
         .executable(name: "tts-interrupt-poc", targets: ["TTSInterruptPOC"]),
         .executable(name: "local-api-client-poc", targets: ["LocalAPIClientPOC"]),
         .executable(name: "backend-lifecycle-poc", targets: ["BackendLifecyclePOC"]),
+        .executable(name: "personal-assistant-beta", targets: ["MacBetaApp"]),
     ],
     targets: [
         .target(name: "MacAudioPOC"),
         .executableTarget(name: "TTSInterruptPOC", dependencies: ["MacAudioPOC"]),
         .executableTarget(name: "LocalAPIClientPOC", dependencies: ["MacAudioPOC"]),
         .executableTarget(name: "BackendLifecyclePOC", dependencies: ["MacAudioPOC"]),
+        .executableTarget(name: "MacBetaApp", dependencies: ["MacAudioPOC"]),
         .testTarget(name: "MacAudioPOCTests", dependencies: ["MacAudioPOC"]),
     ]
 )
