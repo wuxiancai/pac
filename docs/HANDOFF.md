@@ -6,6 +6,11 @@
 
 ## 最近交接
 
+### 2026-11-08：DeepSeek SSE 客户端取消实测
+
+- 用户逐次确认 `ALLOW DEEPSEEK CANCEL 1` 后，真实 SSE 返回首个文本片段 `phase`，脚本立即关闭 gateway stream。此结果验证客户端取消路径；没有服务端信号可确认 Provider 停止生成或停止计费。
+- 取消能力的本地资源关闭回归已通过（窄 34、全量 145）；本次真实探测无自动重试。下一项为用户逐次确认 OpenRouter `cancel`，其后记录两家客户端取消证据和 Provider 侧可见性限制。
+
 ### 2026-11-08：Provider SSE 首片段后取消探测就绪
 
 - `probe_provider_capability_poc.py` 新增 `cancel` 能力：每次经精确 Consent 发起一条 SSE 请求，收到首个文本 delta 后主动关闭 gateway stream。脚本提示可能计费，并明确只观测客户端关闭，不把它当作 Provider 已停止生成的证明。
