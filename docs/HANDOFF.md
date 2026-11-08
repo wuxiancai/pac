@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：OpenRouter JSON 实测通过
+
+- 用户逐次确认 `ALLOW OPENROUTER JSON 1` 后，返回 `{"phase0":"ack"}`，结构检查 True，finish_reason=`stop`。模型 `deepseek/deepseek-v4.1-flash-1017`，下游 Relace/HKG，tokens=46/36/82，服务报告费用 USD 0.000018276。
+- DeepSeek JSON 仍记录为空正文、原因未知；OpenRouter 单次成功不代表稳定性。下一项为 DeepSeek `error` 探测，故意使用无效 response_format，可能计费；须用户对脚本显示的请求逐次确认。
+- 已更新 Provider 报告、阶段追踪矩阵与任务清单；变更待 `git diff --check` 并提交。
+
 ### 2026-11-08：DeepSeek JSON 空正文与诊断增强
 
 - 用户逐次确认 `ALLOW DEEPSEEK JSON 1` 后，真实请求返回空 JSON 正文，结构检查失败。旧 CLI 未打印 finish_reason、usage 或路由 metadata，因此原因无法判定；无重试。

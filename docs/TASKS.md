@@ -20,7 +20,7 @@
 |---:|---|---|---|
 | 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；最新本机 Python 142 项、Swift 27 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
 | 0B | 本地语音链路 | IN PROGRESS | 官方中英 Streaming Zipformer 文件分帧 10/10 final、82 partial、weighted CER 0.0254；用户已完成两次真实 CLI 麦克风采集并看到 partial/final。用户将当前目标限定为功能冒烟，识别质量转为后续模型选择/优化项；剩余停止/异常清理、SwiftUI 集成、许可与性能证据仍待补。 |
-| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | DeepSeek 与 OpenRouter 文本、同一 Gateway 顺序路由、两家各一次真实 SSE 均通过；DeepSeek 与 OpenRouter 工具提案实测成功且均未执行；OpenRouter 在前两次空结果后，第三次返回正确 proposal（tool_calls、Relace/HKG）。DeepSeek JSON 已实测但返回空正文，原因待由 metadata 定位；OpenRouter JSON、两家错误及重复 metadata 仍待探测。本轮 deny-check 两家均为 Keychain reads=0、HTTP calls=0（进程内 tripwire）。详见 `poc/phase0-remote-provider.md`。 |
+| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | DeepSeek 与 OpenRouter 文本、同一 Gateway 顺序路由、两家各一次真实 SSE 均通过；DeepSeek 与 OpenRouter 工具提案实测成功且均未执行；OpenRouter 在前两次空结果后，第三次返回正确 proposal（tool_calls、Relace/HKG）。OpenRouter JSON 一次真实请求结构匹配成功（Relace/HKG）；DeepSeek JSON 一次返回空正文，原因未知。两家错误及重复 metadata 仍待探测。本轮 deny-check 两家均为 Keychain reads=0、HTTP calls=0（进程内 tripwire）。详见 `poc/phase0-remote-provider.md`。 |
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；补真实系统认证提示、锁屏/休眠、多轮 GUI、正式分发与恢复策略证据。 |
 | 0F | 静态加密兼容性 | IN PROGRESS | SQLCipher 已有 ARM64、FTS、迁移和恢复证据；完成密钥生命周期、产品性能及发布形态评估，形成 ADR-019 决定。 |
