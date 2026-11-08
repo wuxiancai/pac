@@ -11,6 +11,7 @@ from pac_poc.model_gateway import ConsentAwarePolicy, LocalModelRequest, ModelGa
 from pac_poc.remote_providers import (
     DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG,
+    QWEN_TOKEN_PLAN_PROBE_CONFIG,
     OpenAICompatibleRemoteAdapter,
 )
 from pac_poc.security_poc import ConsentManager, DataLevel, OutboundPolicy
@@ -18,6 +19,7 @@ from pac_poc.security_poc import ConsentManager, DataLevel, OutboundPolicy
 CONFIGS = {
     DEEPSEEK_PROBE_CONFIG.provider: DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG.provider: OPENROUTER_PROBE_CONFIG,
+    QWEN_TOKEN_PLAN_PROBE_CONFIG.provider: QWEN_TOKEN_PLAN_PROBE_CONFIG,
 }
 
 

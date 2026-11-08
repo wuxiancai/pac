@@ -12,6 +12,7 @@ from pac_poc.model_gateway import ConsentAwarePolicy, LocalModelRequest, ModelGa
 from pac_poc.remote_providers import (
     DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG,
+    QWEN_TOKEN_PLAN_PROBE_CONFIG,
     OpenAICompatibleRemoteAdapter,
     RemoteProviderError,
 )
@@ -27,13 +28,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="One explicitly approved synthetic remote Provider probe"
     )
-    parser.add_argument("provider", choices=("deepseek", "openrouter"))
+    configs = {
+        config.provider: config
+        for config in (
+            DEEPSEEK_PROBE_CONFIG,
+            OPENROUTER_PROBE_CONFIG,
+            QWEN_TOKEN_PLAN_PROBE_CONFIG,
+        )
+    }
+    parser.add_argument("provider", choices=tuple(configs))
     args = parser.parse_args()
-    config = (
-        DEEPSEEK_PROBE_CONFIG
-        if args.provider == "deepseek"
-        else OPENROUTER_PROBE_CONFIG
-    )
+    config = configs[args.provider]
     confirmation = f"ALLOW {config.provider.upper()}"
 
     print("单次远端合成探测；不重试、不启用跨 Provider failover、不调用工具。")
@@ -46,6 +51,8 @@ def main() -> int:
     print("最大输出: 64 tokens；本次只发一个非流式 chat-completions 请求。")
     if config.provider == "openrouter":
         print("OpenRouter Global 会选择一个上游端点；已关闭上游故障切换，响应会报告选中的 Provider 和区域。")
+    elif config.provider == "qwen":
+        print("Token Plan 固定北京兼容端点；凭据应为 Token Plan 专属 API Key（sk-sp-），不自动切换按量付费 API Key。")
     print(f"凭据只从 macOS Keychain 的 account `{config.account}` 读取；不会显示或记录密钥。")
     answer = input(f"若同意现在向该 Provider 发送以上合成内容，请输入 `{confirmation}`：")
     if answer.strip() != confirmation:

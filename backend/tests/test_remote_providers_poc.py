@@ -23,6 +23,7 @@ from pac_poc.model_gateway import (
 from pac_poc.remote_providers import (
     DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG,
+    QWEN_TOKEN_PLAN_PROBE_CONFIG,
     OpenAICompatibleRemoteAdapter,
     RemoteProviderConfig,
     RemoteProviderError,
@@ -102,7 +103,7 @@ def test_remote_default_deny_prevents_keychain_read_and_network_request() -> Non
 
 def test_provider_capability_deny_check_uses_tripwires_and_never_reads_keychain() -> None:
     backend = Path(__file__).parents[1]
-    for provider in ("deepseek", "openrouter"):
+    for provider in ("deepseek", "openrouter", "qwen"):
         result = subprocess.run(
             [
                 sys.executable,
@@ -150,6 +151,73 @@ def test_deepseek_text_request_requires_exact_consent_and_uses_keychain_secret()
         b'{"model":"deepseek-flash","messages":[{"role":"user",'
         b'"content":"phase0 synthetic probe"}],"stream":false,"max_tokens":64}'
     )
+
+
+def test_qwen_token_plan_uses_fixed_beijing_endpoint_and_keychain_credential() -> None:
+    config = QWEN_TOKEN_PLAN_PROBE_CONFIG
+
+    class PlanCredentials(FakeCredentials):
+        def get(self, account: str) -> str:
+            self.reads.append(account)
+            return "sk-sp-test-key"
+
+    credentials = PlanCredentials()
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "phase0-probe-ack"}}]},
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        config,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent, config)
+    gateway = make_gateway(consent, adapter, config.provider)
+
+    result = asyncio.run(gateway.generate(request_for(config)))
+
+    assert result == "phase0-probe-ack"
+    assert credentials.reads == ["qwen"]
+    assert str(seen[0].url) == config.endpoint
+    assert seen[0].headers["authorization"] == "Bearer sk-sp-test-key"
+    assert b'"model":"qwen3.8-flash"' in seen[0].read()
+
+
+def test_qwen_token_plan_refuses_non_plan_credential_before_http_request() -> None:
+    config = QWEN_TOKEN_PLAN_PROBE_CONFIG
+
+    class PayAsYouGoCredentials(FakeCredentials):
+        def get(self, account: str) -> str:
+            self.reads.append(account)
+            return "sk-ws-test-key"
+
+    credentials = PayAsYouGoCredentials()
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"choices": []})
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        config,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent, config)
+    gateway = make_gateway(consent, adapter, config.provider)
+
+    with pytest.raises(RemoteProviderError, match="dedicated API key"):
+        asyncio.run(gateway.generate(request_for(config)))
+
+    assert credentials.reads == ["qwen"]
+    assert requests == []
 
 
 def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:

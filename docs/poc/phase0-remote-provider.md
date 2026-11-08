@@ -7,17 +7,21 @@
 - 用户指定两个测试候选：DeepSeek、OpenRouter。
 - 用户确认 DeepSeek 按中国处理，OpenRouter 使用 Global 路由。DeepSeek 官方隐私政策称其服务数据在中国处理；OpenRouter 默认 `openrouter.ai` 为全球路由，US/EU in-region routing 另需 Business/Enterprise 账户条件。见 [DeepSeek 隐私政策](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html?os=v0)、[OpenRouter US/EU in-region routing](https://openrouter.ai/business/eu/)。
 - 本 POC 固定使用 DeepSeek `deepseek-flash`、`https://api.deepseek.com/chat/completions`（[官方模型/API 文档](https://api-docs.deepseek.com/api/create-chat-completion)）；OpenRouter `deepseek/deepseek-v4.1-flash-1017`、`https://openrouter.ai/api/v1/chat/completions`（[官方模型目录](https://openrouter.ai/deepseek)）。模型和费用可能变化，真实请求前应按官方当前账号目录再次确认。
+- 用户 2026-11-08 指定后续云模型 POC 默认优先千问 Token Plan。新增交互式测试 CLI 使用的文本模型配置为 `qwen3.8-flash`、区域 `china-beijing`、端点 `https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions`。其凭据账号为 `qwen`；发送前拒绝非 `sk-sp-` 前缀凭据，避免将按量付费 API Key 误当 Token Plan Key。该 adapter 目前仅完成 MockTransport/默认拒绝回归，尚无真实请求。阿里云官方说明 Token Plan 仅适用于 Claude Code、Codex 等交互式使用，不能用于后端服务；此 POC CLI 探测结果不授权将 Token Plan Key 接入产品后端。产品后端若调用千问，需要另选允许后端 API 调用的计费方案与 Key。[Base URL 使用范围](https://help.aliyun.com/zh/model-studio/base-url)
+- Token Plan 的语音识别、语音合成、实时语音对话走各自 DashScope HTTP/WebSocket 接口，不走文本 chat-completions adapter。官方当前列出的语音识别 `qwen-audio-3.0-asr-flash` 为非实时，合成型号为 `qwen-audio-3.0-tts-plus`，实时语音对话为 `qwen-audio-3.0-realtime-plus`；对应北京端点和输入/输出契约见[Token Plan 接入概览](https://help.aliyun.com/zh/model-studio/token-plan-integration-overview)、[语音识别接口](https://help.aliyun.com/zh/model-studio/token-plan-speech-recognition)、[语音合成接口](https://help.aliyun.com/zh/model-studio/token-plan-speech-synthesis)、[实时语音对话接口](https://help.aliyun.com/zh/model-studio/token-plan-realtime-voice)。真实语音请求尚未实现/执行；本地录音仍不得未经逐次确认上传。
 - 基础探测正文为 `Reply with exactly this text: phase0-probe-ack`，L1 合成文本，最多 64 output tokens；基础 CLI 每次只执行一条非流式 chat-completions 请求，不带工具、不重试。能力矩阵探测使用同等级合成内容，按独立命令测试 SSE、工具提案、JSON、错误处理和 metadata。OpenRouter Global 初始选择一个符合条件的上游端点，adapter 设置 `provider.allow_fallbacks=false` 禁止跨 Provider 故障切换；请求启用路由 metadata，并输出实际选择的 Provider、服务区域、token 用量和服务报告的 USD cost（如 API 返回）。
 
 ## 本机 Keychain 配置
 
-**不要把 API Key 发到聊天、终端命令参数、环境变量或普通配置文件。** 用 macOS 自带“钥匙串访问”保存：在 Spotlight 搜索 `Keychain Access` / `钥匙串访问`，选择 `login` 钥匙串，按 Command-N 新建密码项（[Apple 操作说明](https://support.apple.com/en-ge/guide/keychain-access/kyca699a9058/mac)）。分别新建两项：
+**不要把 API Key 发到聊天、终端命令参数、环境变量或普通配置文件。** 用 macOS 自带“钥匙串访问”保存：在 Spotlight 搜索 `Keychain Access` / `钥匙串访问`，选择 `login` 钥匙串，按 Command-N 新建密码项（[Apple 操作说明](https://support.apple.com/en-ge/guide/keychain-access/kyca699a9058/mac)）。按需为对应 Provider 新建以下条目：
 
-| 字段 | DeepSeek | OpenRouter |
-|---|---|---|
-| Keychain Item Name / Service | `com.personal-ai-assistant.phase0.provider` | `com.personal-ai-assistant.phase0.provider` |
-| Account Name | `deepseek` | `openrouter` |
-| Password | 该 Provider 的 API Key | 该 Provider 的 API Key |
+| 字段 | DeepSeek | OpenRouter | Qwen Token Plan |
+|---|---|---|---|
+| Keychain Item Name / Service | `com.personal-ai-assistant.phase0.provider` | `com.personal-ai-assistant.phase0.provider` | `com.personal-ai-assistant.phase0.provider` |
+| Account Name | `deepseek` | `openrouter` | `qwen` |
+| Password | 该 Provider 的 API Key | 该 Provider 的 API Key | Token Plan 专属 `sk-sp-` API Key |
+
+用户在 2026-11-08 将一把临时 key 粘贴在聊天中。该值没有被读取、复用或写入仓库；用户应立即在控制台撤销，并新建 Token Plan 专属 key。当前 key 前缀为 `sk-ws-`，与官方 Token Plan 文档要求的 `sk-sp-` 不符；Token Plan 接入文档明确说明专属套餐 key 使用 `sk-sp-`。Qwen adapter 已实现前缀检查，其他前缀在发起 HTTP 前拒绝。不得在回复、命令参数或项目文件中复述密钥。
 
 2026-11-08 用户已按流程输入两次确认短语，但两次均返回 `provider credential is missing or unavailable in Keychain`。脚本已进入 Keychain 查询，但未取得凭据，因此未发送 HTTP 请求。请检查钥匙串访问中是否在 **login** 钥匙串创建了“通用密码”项，且名称/Service、账户名完全匹配上表；不要删除或覆盖其他钥匙串项。可先只创建一项，再重试对应 Provider。
 
@@ -32,9 +36,10 @@
 ```bash
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_remote_provider_poc.py deepseek
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_remote_provider_poc.py openrouter
+UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_remote_provider_poc.py qwen
 ```
 
-脚本会先展示 provider/model/region/purpose/data level/完整合成正文/max tokens，并要求输入精确短语 `ALLOW DEEPSEEK` 或 `ALLOW OPENROUTER`。空输入、错误输入、缺失凭据、无有效授权时均不会发送请求；每次只发一条请求。OpenRouter 由服务选择一个 Global 上游端点，但禁止请求失败后转发给其他上游。若 macOS 要求访问 Keychain，建议只允许本次访问。脚本只输出合成探测响应、路由/usage metadata 和是否精确匹配，不输出 API Key。
+脚本会先展示 provider/model/region/purpose/data level/完整合成正文/max tokens，并要求输入对应的精确短语（Qwen 为 `ALLOW QWEN`）。空输入、错误输入、缺失凭据、无有效授权时均不会发送请求；每次只发一条请求。OpenRouter 由服务选择一个 Global 上游端点，但禁止请求失败后转发给其他上游。Qwen 只允许 Token Plan 专属 Key 格式。若 macOS 要求访问 Keychain，建议只允许本次访问。脚本只输出合成探测响应、路由/usage metadata 和是否精确匹配，不输出 API Key。
 
 必须在运行时再次确认该 provider 的这一次精确请求；地区选择不等同于单次 Consent。运行一次 `deepseek` 不会授予 `openrouter`，反之亦然。
 

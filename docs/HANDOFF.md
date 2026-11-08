@@ -1,3 +1,12 @@
+### 2026-11-08：千问 Token Plan 默认测试路径
+
+- 用户指定后续云模型默认优先千问 Token Plan；D-011 阶段 0 候选方向定为千问/北京，但 D-010 的 V1 Provider 最终组合仍延期。文本默认测试型号暂取截图所列 `qwen3.8-flash`。
+- 新增固定北京 chat-completions adapter、Keychain `qwen` 账户 allowlist、单次 Consent 探测与 capability/deny-check 入口。前缀不是 `sk-sp-` 时在发 HTTP 前拒绝；MockTransport 已覆盖正确端点/模型/keychain 路径和按量付费 key 的拒绝。
+- 用户贴出的临时 key 没有被使用或保存；它以 `sk-ws-` 开头，而 Token Plan 官方说明套餐专属 key 为 `sk-sp-`，`sk-ws-` 属于按量付费 API Key 类型。需在控制台撤销这把暴露的 key，另建 `sk-sp-` 并只存 Keychain（service `com.personal-ai-assistant.phase0.provider`、account `qwen`）。
+- Token Plan 语音接口并非 chat-compatible：非实时 ASR `qwen-audio-3.0-asr-flash`、TTS `qwen-audio-3.0-tts-plus`、实时语音对话 `qwen-audio-3.0-realtime-plus` 需各自协议适配。文本 adapter 已有 mock，但没有真实出站；任何真实请求还需单项精确确认。
+- 窄验证：`pytest -q tests/test_remote_providers_poc.py tests/test_phase0_traceability_report.py`，29 passed。阶段 0 仍未验收；更新 DECISIONS、TASKS、PROJECT_CONTEXT、Provider POC 报告和追踪矩阵。
+- 后续官方资料核对补充：Token Plan Base URL 明确“仅限 Claude Code、Codex 等 AI 工具交互式使用，不能用于后端服务”。当前 qwen adapter 只供阶段 0 交互式 CLI POC，不可移入本机 FastAPI 产品服务；产品后端要调用千问需换成允许后端的普通百炼计费方案/API Key。
+
 ### 2026-11-08：0B 第二组合成负载并发资源复测
 
 - 用本机 `bilingual-mandarin-16k.wav`、官方双语 Streaming Zipformer 与 Ollama `qwen3.5:0.8b` 运行三轮同步屏障观察；每轮 28 帧、10 partial/1 final，模型返回非空，ASR 与 LLM 确认重叠 0.243–0.254 秒。

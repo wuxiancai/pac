@@ -42,6 +42,17 @@ OPENROUTER_PROBE_CONFIG = RemoteProviderConfig(
     endpoint="https://openrouter.ai/api/v1/chat/completions",
 )
 
+QWEN_TOKEN_PLAN_PROBE_CONFIG = RemoteProviderConfig(
+    provider="qwen",
+    account="qwen",
+    model="qwen3.8-flash",
+    region="china-beijing",
+    endpoint=(
+        "https://token-plan.cn-beijing.maas.aliyuncs.com/"
+        "compatible-mode/v1/chat/completions"
+    ),
+)
+
 
 @dataclass(frozen=True)
 class RemoteCompletion:
@@ -92,10 +103,12 @@ class OpenAICompatibleRemoteAdapter:
         expected_hosts = {
             "deepseek": "api.deepseek.com",
             "openrouter": "openrouter.ai",
+            "qwen": "token-plan.cn-beijing.maas.aliyuncs.com",
         }
         expected_configs = {
             DEEPSEEK_PROBE_CONFIG.provider: DEEPSEEK_PROBE_CONFIG,
             OPENROUTER_PROBE_CONFIG.provider: OPENROUTER_PROBE_CONFIG,
+            QWEN_TOKEN_PLAN_PROBE_CONFIG.provider: QWEN_TOKEN_PLAN_PROBE_CONFIG,
         }
         if (
             config.provider not in expected_hosts
@@ -156,7 +169,7 @@ class OpenAICompatibleRemoteAdapter:
 
     async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
         self._validate_request(request)
-        secret = self._credentials.get(self._config.account)
+        secret = self._credential_for_request()
         client, owns_client = self._client_or_new()
         try:
             async with client.stream(
@@ -218,7 +231,7 @@ class OpenAICompatibleRemoteAdapter:
 
     async def _post(self, request: LocalModelRequest, *, stream: bool) -> httpx.Response:
         self._validate_request(request)
-        secret = self._credentials.get(self._config.account)
+        secret = self._credential_for_request()
         client, owns_client = self._client_or_new()
         try:
             response = await client.post(
@@ -246,6 +259,14 @@ class OpenAICompatibleRemoteAdapter:
             "Authorization": f"Bearer {secret}",
             "Content-Type": "application/json",
         }
+
+    def _credential_for_request(self) -> str:
+        secret = self._credentials.get(self._config.account)
+        if self._config.provider == "qwen" and not secret.startswith("sk-sp-"):
+            raise RemoteProviderError(
+                "Token Plan requires its dedicated API key; refusing to send request"
+            )
+        return secret
 
     def _headers_for_request(self, secret: str) -> dict[str, str]:
         headers = self._headers(secret)

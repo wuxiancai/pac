@@ -7,7 +7,7 @@ from typing import Protocol
 
 
 PROVIDER_KEYCHAIN_SERVICE = "com.personal-ai-assistant.phase0.provider"
-PROVIDER_ACCOUNTS = frozenset({"deepseek", "openrouter"})
+PROVIDER_ACCOUNTS = frozenset({"deepseek", "openrouter", "qwen"})
 
 
 class CredentialUnavailable(RuntimeError):

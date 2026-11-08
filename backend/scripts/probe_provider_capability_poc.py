@@ -21,6 +21,7 @@ from pac_poc.model_gateway import (
 from pac_poc.remote_providers import (
     DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG,
+    QWEN_TOKEN_PLAN_PROBE_CONFIG,
     OpenAICompatibleRemoteAdapter,
     RemoteProviderConfig,
     RemoteProviderError,
@@ -32,6 +33,7 @@ from probe_remote_provider_poc import PROBE_ACK, PROBE_PROMPT, PROBE_PURPOSE
 CONFIGS = {
     DEEPSEEK_PROBE_CONFIG.provider: DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG.provider: OPENROUTER_PROBE_CONFIG,
+    QWEN_TOKEN_PLAN_PROBE_CONFIG.provider: QWEN_TOKEN_PLAN_PROBE_CONFIG,
 }
 CAPABILITIES = ("stream", "cancel", "tools", "json", "error", "metadata", "deny-check")
 TOOL_SCHEMA = {
