@@ -1,0 +1,374 @@
+from __future__ import annotations
+
+import asyncio
+import subprocess
+
+import httpx
+import pytest
+
+from pac_poc.keychain_credentials import (
+    CredentialUnavailable,
+    MacOSKeychainCredentialProvider,
+    PROVIDER_KEYCHAIN_SERVICE,
+)
+from pac_poc.model_gateway import (
+    ConsentAwarePolicy,
+    LocalModelRequest,
+    ModelGateway,
+    PolicyDenied,
+)
+from pac_poc.remote_providers import (
+    DEEPSEEK_PROBE_CONFIG,
+    OPENROUTER_PROBE_CONFIG,
+    OpenAICompatibleRemoteAdapter,
+    RemoteProviderConfig,
+    RemoteProviderError,
+)
+from pac_poc.security_poc import ConsentGrant, ConsentManager, DataLevel, OutboundPolicy
+
+
+class FakeCredentials:
+    def __init__(self) -> None:
+        self.reads: list[str] = []
+
+    def get(self, account: str) -> str:
+        self.reads.append(account)
+        return f"test-secret-for-{account}"
+
+
+def request_for(config=DEEPSEEK_PROBE_CONFIG, **overrides) -> LocalModelRequest:
+    fields = {
+        "provider": config.provider,
+        "model": config.model,
+        "messages": ({"role": "user", "content": "phase0 synthetic probe"},),
+        "region": config.region,
+        "purpose": "phase0-provider-probe",
+        "data_level": DataLevel.L1,
+    }
+    fields.update(overrides)
+    return LocalModelRequest(**fields)
+
+
+def make_gateway(consent: ConsentManager, adapter, provider: str) -> ModelGateway:
+    return ModelGateway(
+        adapters={provider: adapter},
+        policy=ConsentAwarePolicy(OutboundPolicy(consent)),
+    )
+
+
+def grant_for(consent: ConsentManager, config=DEEPSEEK_PROBE_CONFIG) -> None:
+    consent.grant(
+        ConsentGrant(
+            provider=config.provider,
+            model=config.model,
+            region=config.region,
+            purpose="phase0-provider-probe",
+            data_levels=frozenset({DataLevel.L1}),
+            expires_at=1e20,
+        )
+    )
+
+
+def test_remote_default_deny_prevents_keychain_read_and_network_request() -> None:
+    credentials = FakeCredentials()
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"choices": []})
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    gateway = make_gateway(ConsentManager(), adapter, "deepseek")
+
+    with pytest.raises(PolicyDenied):
+        asyncio.run(gateway.generate(request_for()))
+
+    assert credentials.reads == []
+    assert requests == []
+
+
+def test_deepseek_text_request_requires_exact_consent_and_uses_keychain_secret() -> None:
+    credentials = FakeCredentials()
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "phase0-probe-accepted"}}]},
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent)
+    gateway = make_gateway(consent, adapter, "deepseek")
+
+    answer = asyncio.run(gateway.generate(request_for()))
+
+    assert answer == "phase0-probe-accepted"
+    assert credentials.reads == ["deepseek"]
+    assert str(seen[0].url) == DEEPSEEK_PROBE_CONFIG.endpoint
+    assert seen[0].headers["authorization"] == "Bearer test-secret-for-deepseek"
+    assert seen[0].read() == (
+        b'{"model":"deepseek-flash","messages":[{"role":"user",'
+        b'"content":"phase0 synthetic probe"}],"stream":false,"max_tokens":64}'
+    )
+
+
+def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:
+    credentials = FakeCredentials()
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=(
+                b'data: {"choices":[{"delta":{"content":"phase0"}}]}\n\n'
+                b'data: {"choices":[{"delta":{"content":"-stream"}}]}\n\n'
+                b"data: [DONE]\n\n"
+            ),
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        OPENROUTER_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent, OPENROUTER_PROBE_CONFIG)
+    gateway = make_gateway(consent, adapter, "openrouter")
+
+    async def collect() -> list[str]:
+        return [chunk async for chunk in gateway.stream(request_for(OPENROUTER_PROBE_CONFIG))]
+
+    assert asyncio.run(collect()) == ["phase0", "-stream"]
+    assert str(seen[0].url) == OPENROUTER_PROBE_CONFIG.endpoint
+    assert credentials.reads == ["openrouter"]
+    assert seen[0].headers["x-openrouter-metadata"] == "enabled"
+    assert b'"provider":{"allow_fallbacks":false}' in seen[0].read()
+
+
+def test_openrouter_metadata_reports_selected_provider_region_usage_and_cost() -> None:
+    credentials = FakeCredentials()
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "model": OPENROUTER_PROBE_CONFIG.model,
+                "choices": [{"message": {"content": "phase0-probe-ack"}}],
+                "openrouter_metadata": {
+                    "region": "iad",
+                    "endpoints": {
+                        "available": [
+                            {"provider": "DeepSeek", "selected": True},
+                            {"provider": "Other", "selected": False},
+                        ]
+                    },
+                },
+                "usage": {
+                    "prompt_tokens": 12,
+                    "completion_tokens": 5,
+                    "total_tokens": 17,
+                    "cost": 0.000123,
+                },
+            },
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        OPENROUTER_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent, OPENROUTER_PROBE_CONFIG)
+    gateway = make_gateway(consent, adapter, "openrouter")
+
+    result = asyncio.run(
+        gateway.generate_with_metadata(request_for(OPENROUTER_PROBE_CONFIG))
+    )
+
+    assert result.text == "phase0-probe-ack"
+    assert result.model == OPENROUTER_PROBE_CONFIG.model
+    assert result.provider == "DeepSeek"
+    assert result.region == "iad"
+    assert (result.prompt_tokens, result.completion_tokens, result.total_tokens) == (12, 5, 17)
+    assert result.cost_usd == 0.000123
+    assert seen[0].headers["x-openrouter-metadata"] == "enabled"
+    assert b'"provider":{"allow_fallbacks":false}' in seen[0].read()
+
+
+def test_remote_tools_are_returned_as_data_and_never_executed() -> None:
+    credentials = FakeCredentials()
+    calls = 0
+
+    def handle(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "synthetic_lookup",
+                                        "arguments": '{"key":"phase0"}',
+                                    }
+                                }
+                            ],
+                        }
+                    }
+                ]
+            },
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent)
+    gateway = make_gateway(consent, adapter, "deepseek")
+    request = request_for(tools=({"type": "function", "function": {"name": "synthetic_lookup"}},))
+
+    result = asyncio.run(gateway.call_with_tools(request))
+
+    assert result.text == ""
+    assert [(call.name, call.arguments) for call in result.tool_calls] == [
+        ("synthetic_lookup", {"key": "phase0"})
+    ]
+    assert calls == 1
+
+
+def test_structured_response_format_is_forwarded_without_secret_logging() -> None:
+    credentials = FakeCredentials()
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"ok":true}'}}]},
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent)
+    gateway = make_gateway(consent, adapter, "deepseek")
+    request = request_for(response_format={"type": "json_object"})
+
+    assert asyncio.run(gateway.generate(request)) == '{"ok":true}'
+    assert b'"response_format":{"type":"json_object"}' in seen[0].read()
+    assert credentials.reads == ["deepseek"]
+
+
+def test_remote_error_is_sanitized_and_does_not_expose_body_or_key() -> None:
+    credentials = FakeCredentials()
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda _request: httpx.Response(401, text="invalid test-secret-for-deepseek")
+            )
+        ),
+    )
+    consent = ConsentManager()
+    grant_for(consent)
+    gateway = make_gateway(consent, adapter, "deepseek")
+
+    with pytest.raises(RemoteProviderError, match="HTTP 401") as error:
+        asyncio.run(gateway.generate(request_for()))
+
+    assert "test-secret" not in str(error.value)
+    assert credentials.reads == ["deepseek"]
+
+
+def test_remote_adapter_rejects_changed_model_region_and_endpoint() -> None:
+    with pytest.raises(ValueError, match="not allowlisted"):
+        OpenAICompatibleRemoteAdapter(
+            RemoteProviderConfig(
+                **{**DEEPSEEK_PROBE_CONFIG.__dict__, "endpoint": "https://example.com/chat"}
+            ),
+            credentials=FakeCredentials(),
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=FakeCredentials(),
+    )
+    with pytest.raises(ValueError, match="fixed Provider/model/region"):
+        asyncio.run(adapter.generate(request_for(model="other-model")))
+
+
+def test_keychain_reader_uses_fixed_identity_and_captures_secret_only_in_memory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("pac_poc.keychain_credentials.sys.platform", "darwin")
+    seen: list[list[str]] = []
+
+    def runner(args, **kwargs):
+        seen.append(args)
+        assert kwargs["capture_output"] is True
+        assert kwargs["stdin"] == subprocess.DEVNULL
+        assert kwargs["timeout"] == 10
+        return subprocess.CompletedProcess(args, 0, stdout="test-key\n", stderr="")
+
+    credentials = MacOSKeychainCredentialProvider(runner=runner)
+
+    assert credentials.get("deepseek") == "test-key"
+    assert seen == [
+        [
+            "/usr/bin/security",
+            "find-generic-password",
+            "-s",
+            PROVIDER_KEYCHAIN_SERVICE,
+            "-a",
+            "deepseek",
+            "-w",
+        ]
+    ]
+
+
+def test_keychain_reader_never_requests_unknown_account_or_surfaces_cli_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("pac_poc.keychain_credentials.sys.platform", "darwin")
+    calls = 0
+
+    def runner(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        raise subprocess.CalledProcessError(44, "security", stderr="secret must stay private")
+
+    credentials = MacOSKeychainCredentialProvider(runner=runner)
+
+    with pytest.raises(CredentialUnavailable, match="identity is not allowed"):
+        credentials.get("unknown")
+    assert calls == 0
+
+    with pytest.raises(CredentialUnavailable, match="missing or unavailable") as error:
+        credentials.get("deepseek")
+    assert "secret" not in str(error.value)
+    assert calls == 1

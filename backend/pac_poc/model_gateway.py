@@ -4,7 +4,7 @@ import ipaddress
 import json
 from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import urlparse
 
 import httpx
@@ -21,6 +21,7 @@ class LocalModelRequest:
     purpose: str = ""
     data_level: DataLevel = DataLevel.L0
     tools: Sequence[Mapping[str, object]] = ()
+    response_format: Mapping[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -107,6 +108,15 @@ class ModelGateway:
     async def generate(self, request: LocalModelRequest) -> str:
         adapter = self._get_authorized_adapter(request)
         return await adapter.generate(request)
+
+    async def generate_with_metadata(self, request: LocalModelRequest) -> Any:
+        adapter = self._get_authorized_adapter(request)
+        generate_with_metadata = getattr(adapter, "generate_with_metadata", None)
+        if not callable(generate_with_metadata):
+            raise ProviderCapabilityUnsupported(
+                f"provider {request.provider} does not expose response metadata"
+            )
+        return await generate_with_metadata(request)
 
     async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
         adapter = self._get_authorized_adapter(request)

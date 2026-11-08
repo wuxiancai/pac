@@ -18,15 +18,15 @@
 
 | 顺序 | 工作包 | 状态 | 下一步 / 完成条件 |
 |---:|---|---|---|
-| 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；本机 Python 129 项、Swift 27 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
+| 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；本机 Python 139 项、Swift 27 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
 | 0B | 本地语音链路 | IN PROGRESS | 官方中英 Streaming Zipformer 文件分帧 10/10 final、82 partial、weighted CER 0.0254；用户已完成一次真实麦克风采集，出现多个 partial、两个 final，但混合中英输出存在错词，未有逐字 ground truth，不能计 CER。下一步需受控短句多轮复测、异常/停止清理与 TTS 打断；Qwen ONNX 转换包许可仍待核，性能目标暂缓。 |
-| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | 本机 Ollama 与模拟接口已有证据。用户给出 DeepSeek、OpenRouter 两家测试候选；区域/路由范围待确认，项目当前 Keychain 仅有写入/删除/存在状态 POC，尚未接入 Provider Adapter 的凭据读取，因此暂不录入密钥或发请求。 |
+| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | 用户确认 DeepSeek（中国）和 OpenRouter（Global）；已新增固定目标 OpenAI-compatible adapter、Keychain 读取和逐请求终端确认探测入口。下一步用户在本机 Keychain Access 添加两项 API Key，并在每次探测时逐家输入确认短语；此刻未读取凭据、未发送请求。Gateway/Consent 测试报告见 `poc/phase0-remote-provider.md`。 |
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；补真实系统认证提示、锁屏/休眠、多轮 GUI、正式分发与恢复策略证据。 |
 | 0F | 静态加密兼容性 | IN PROGRESS | SQLCipher 已有 ARM64、FTS、迁移和恢复证据；完成密钥生命周期、产品性能及发布形态评估，形成 ADR-019 决定。 |
 | 0G | Embedding 候选 | IN PROGRESS | 固定候选已离线推理三次，均为 4/4 合成 query top-1；observed max RSS 883,130,368–883,490,816 bytes；模型卡/运行包许可初核见 `poc/phase0-model-license-review.md`。补真实标注检索集、完整依赖 SBOM 和产品选择（D-014）。 |
 | 0H | 故障注入与性能 | IN PROGRESS | 已测 WAL 备份的活动 reader + 三次 writer 提交、checkpoint 等待读锁期间 SIGKILL 后恢复、备份复制在 DELETE/WAL 下 SIGKILL、HFS+ 与 APFS 有界映像 ENOSPC；新增 `os.replace` 调用前/成功返回后的 SIGKILL 边界测试。边界测试不代表系统调用内部中断或断电持久性；备份目标 ENOSPC、实际外接介质/产品 WAL 生命周期与 staging 清理规则仍待处理。 |
-| 0I | 阶段追踪与验收 | OPEN | D-001–D-015 与 ADR-019/020/021/022 已按用户要求标记延期（D-010 候选为 DeepSeek、OpenRouter，区域待确认）。延期不豁免规格要求的 POC 证据；GitHub Actions 真实运行、语音/认证验收、许可与恢复边界等仍有缺口，完成证据审查后才能签收。 |
+| 0I | 阶段追踪与验收 | OPEN | D-001–D-015 与 ADR-019/020/021/022 已按用户要求标记延期（D-010 候选及区域已明确，V1 选型仍延期）。延期不豁免规格要求的 POC 证据；GitHub Actions 真实运行、语音/认证验收、Provider 端到端、许可与恢复边界等仍有缺口，完成证据审查后才能签收。 |
 
 ## 近期执行队列
 
@@ -34,7 +34,7 @@
 2. **本机已完成：0E supervisor 异常退出路径审查。** 子进程握手后异常退出时能清理并由调用方显式重启；GUI 启停与退出清理已实测。自动重启/退避、锁屏/休眠、真实系统认证提示仍缺证据或决策，见安全客户端报告。
 3. **需用户参与：0B 双语实时麦克风验收。** 用户已完成一次主动采集，暴露了混合语句错词；需按固定短句多轮复测并测试停止/异常清理和 TTS 打断。上次命令已从 backend 目录成功运行，开头 `cd backend` 的报错可忽略。D-013 性能阈值继续延期。
 4. **需许可条款：0B 中文 ASR 权重分发。** 原中文候选上游要求接受访问条件，公开页面未展示许可；可提供获准账号所见许可文本供记录，或明确只采用官方双语 Apache-2.0 候选，后者仍需真人语音验证。
-5. **需用户确认区域：0C 真实远端 Provider/Gateway。** DeepSeek 与 OpenRouter 候选已给出。DeepSeek 官方 API 使用 `api.deepseek.com`，[隐私政策](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html?os=v0)称数据可能存于境外，并称服务数据在中国处理；OpenRouter 默认域名全球路由，[US/EU in-region](https://openrouter.ai/business/eu/) 需符合 Business/Enterprise 条件。请确认接受 DeepSeek 中国处理，并为 OpenRouter 指定 Global、US 或 EU。凭据暂勿发送；目前项目还没有接通这两家所需的 Keychain 凭据读取路径。
+5. **需用户本机操作：0C 真实远端 Provider/Gateway。** 用户已确认 DeepSeek 按中国处理、OpenRouter 选 Global。区域背景见 [DeepSeek 隐私政策](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html?os=v0) 与 [OpenRouter 区域路由](https://openrouter.ai/business/eu/)。本机固定 adapter、Keychain reader、每次请求的确认提示和回归已经准备好；请按 `poc/phase0-remote-provider.md` 在 Keychain Access 保存两项凭据，并逐 Provider 在终端输入一次性确认短语。密钥不要贴到聊天；当前尚未读取 Keychain 或发送请求。
 6. **产品决策继续延期：0F/0G 及规格 D 项。** ADR-019 与 D-014 等照用户要求保持延期；这不关闭对应证据缺口，也不允许开始阶段 1。
 
 麦克风复现命令（从仓库根目录，在本机交互式终端运行）：

@@ -1,0 +1,286 @@
+from __future__ import annotations
+
+import json
+import math
+from collections.abc import AsyncIterator, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any
+from urllib.parse import urlsplit
+
+import httpx
+
+from pac_poc.keychain_credentials import CredentialProvider
+from pac_poc.model_gateway import (
+    LocalModelRequest,
+    ToolCall,
+    ToolCallResult,
+)
+
+
+@dataclass(frozen=True)
+class RemoteProviderConfig:
+    provider: str
+    account: str
+    model: str
+    region: str
+    endpoint: str
+
+
+DEEPSEEK_PROBE_CONFIG = RemoteProviderConfig(
+    provider="deepseek",
+    account="deepseek",
+    model="deepseek-flash",
+    region="china",
+    endpoint="https://api.deepseek.com/chat/completions",
+)
+
+OPENROUTER_PROBE_CONFIG = RemoteProviderConfig(
+    provider="openrouter",
+    account="openrouter",
+    model="deepseek/deepseek-v4.1-flash-1017",
+    region="global",
+    endpoint="https://openrouter.ai/api/v1/chat/completions",
+)
+
+
+@dataclass(frozen=True)
+class RemoteCompletion:
+    text: str
+    model: str
+    provider: str | None
+    region: str | None
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    total_tokens: int | None
+    cost_usd: float | None
+
+
+class RemoteProviderError(RuntimeError):
+    """Sanitized Provider error; response bodies and credentials are not retained."""
+
+
+class OpenAICompatibleRemoteAdapter:
+    """Fixed-endpoint OpenAI chat-completions adapter for Phase 0 remote probes."""
+
+    is_local = False
+
+    def __init__(
+        self,
+        config: RemoteProviderConfig,
+        *,
+        credentials: CredentialProvider,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
+        parsed = urlsplit(config.endpoint)
+        expected_hosts = {
+            "deepseek": "api.deepseek.com",
+            "openrouter": "openrouter.ai",
+        }
+        expected_configs = {
+            DEEPSEEK_PROBE_CONFIG.provider: DEEPSEEK_PROBE_CONFIG,
+            OPENROUTER_PROBE_CONFIG.provider: OPENROUTER_PROBE_CONFIG,
+        }
+        if (
+            config.provider not in expected_hosts
+            or parsed.scheme != "https"
+            or parsed.hostname != expected_hosts[config.provider]
+            or parsed.query
+            or parsed.fragment
+            or config != expected_configs.get(config.provider)
+        ):
+            raise ValueError("remote Provider configuration is not allowlisted")
+        if not config.account or not config.model or not config.region:
+            raise ValueError("remote Provider identity must be complete")
+        self._config = config
+        self._credentials = credentials
+        self._client = client
+
+    async def generate(self, request: LocalModelRequest) -> str:
+        return (await self.generate_with_metadata(request)).text
+
+    async def generate_with_metadata(self, request: LocalModelRequest) -> RemoteCompletion:
+        response = await self._post(request, stream=False)
+        payload = self._json_object(response)
+        try:
+            content = payload["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise RemoteProviderError("Provider returned an invalid chat response") from exc
+        if not isinstance(content, str):
+            raise RemoteProviderError("Provider returned non-text content")
+        usage = payload.get("usage")
+        usage = usage if isinstance(usage, dict) else {}
+        provider: str | None = None
+        region: str | None = None
+        if self._config.provider == "openrouter":
+            metadata = payload.get("openrouter_metadata")
+            if isinstance(metadata, dict):
+                region = metadata.get("region") if isinstance(metadata.get("region"), str) else None
+                endpoints = metadata.get("endpoints")
+                available = endpoints.get("available") if isinstance(endpoints, dict) else None
+                if isinstance(available, list):
+                    selected = next(
+                        (
+                            endpoint
+                            for endpoint in available
+                            if isinstance(endpoint, dict) and endpoint.get("selected") is True
+                        ),
+                        None,
+                    )
+                    if selected is not None and isinstance(selected.get("provider"), str):
+                        provider = selected["provider"]
+        cost = usage.get("cost")
+        cost_usd = (
+            float(cost)
+            if isinstance(cost, (int, float))
+            and not isinstance(cost, bool)
+            and math.isfinite(float(cost))
+            and cost >= 0
+            else None
+        )
+        return RemoteCompletion(
+            text=content,
+            model=(
+                payload.get("model")
+                if isinstance(payload.get("model"), str)
+                else self._config.model
+            ),
+            provider=provider,
+            region=region,
+            prompt_tokens=self._optional_nonnegative_int(usage.get("prompt_tokens")),
+            completion_tokens=self._optional_nonnegative_int(usage.get("completion_tokens")),
+            total_tokens=self._optional_nonnegative_int(usage.get("total_tokens")),
+            cost_usd=cost_usd,
+        )
+
+    async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
+        self._validate_request(request)
+        secret = self._credentials.get(self._config.account)
+        client, owns_client = self._client_or_new()
+        try:
+            async with client.stream(
+                "POST",
+                self._config.endpoint,
+                headers=self._headers_for_request(secret),
+                json=self._payload(request, stream=True),
+            ) as response:
+                self._raise_for_status(response)
+                async for line in response.aiter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        event = json.loads(data)
+                        content = event["choices"][0]["delta"].get("content")
+                    except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
+                        raise RemoteProviderError("Provider returned an invalid stream event") from exc
+                    if content:
+                        if not isinstance(content, str):
+                            raise RemoteProviderError("Provider returned non-text stream content")
+                        yield content
+        finally:
+            if owns_client:
+                await client.aclose()
+
+    async def call_with_tools(self, request: LocalModelRequest) -> ToolCallResult:
+        if not request.tools:
+            raise ValueError("tool call request must include at least one tool schema")
+        payload = self._json_object(await self._post(request, stream=False))
+        try:
+            message = payload["choices"][0]["message"]
+            text = message.get("content") or ""
+            raw_calls = message.get("tool_calls") or []
+            if not isinstance(text, str) or not isinstance(raw_calls, list):
+                raise TypeError
+            calls: list[ToolCall] = []
+            for raw_call in raw_calls:
+                function = raw_call["function"]
+                name = function["name"]
+                arguments = json.loads(function["arguments"])
+                if not isinstance(name, str) or not name or not isinstance(arguments, dict):
+                    raise TypeError
+                calls.append(ToolCall(name=name, arguments=arguments))
+            return ToolCallResult(text=text, tool_calls=tuple(calls))
+        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+            raise RemoteProviderError("Provider returned invalid tool-call data") from exc
+
+    async def _post(self, request: LocalModelRequest, *, stream: bool) -> httpx.Response:
+        self._validate_request(request)
+        secret = self._credentials.get(self._config.account)
+        client, owns_client = self._client_or_new()
+        try:
+            response = await client.post(
+                self._config.endpoint,
+                headers=self._headers_for_request(secret),
+                json=self._payload(request, stream=stream),
+            )
+            self._raise_for_status(response)
+            return response
+        finally:
+            if owns_client:
+                await client.aclose()
+
+    def _validate_request(self, request: LocalModelRequest) -> None:
+        if (
+            request.provider != self._config.provider
+            or request.model != self._config.model
+            or request.region != self._config.region
+        ):
+            raise ValueError("request does not match the fixed Provider/model/region")
+
+    @staticmethod
+    def _headers(secret: str) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {secret}",
+            "Content-Type": "application/json",
+        }
+
+    def _headers_for_request(self, secret: str) -> dict[str, str]:
+        headers = self._headers(secret)
+        if self._config.provider == "openrouter":
+            headers["X-OpenRouter-Metadata"] = "enabled"
+        return headers
+
+    def _payload(self, request: LocalModelRequest, *, stream: bool) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": self._config.model,
+            "messages": list(request.messages),
+            "stream": stream,
+            "max_tokens": 64,
+        }
+        if request.tools:
+            payload["tools"] = list(request.tools)
+        if request.response_format is not None:
+            payload["response_format"] = dict(request.response_format)
+        if self._config.provider == "openrouter":
+            # OpenRouter otherwise enables cross-provider failover by default.
+            payload["provider"] = {"allow_fallbacks": False}
+        return payload
+
+    @staticmethod
+    def _json_object(response: httpx.Response) -> Mapping[str, Any]:
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise RemoteProviderError("Provider returned invalid JSON") from exc
+        if not isinstance(payload, dict):
+            raise RemoteProviderError("Provider returned invalid JSON")
+        return payload
+
+    @staticmethod
+    def _raise_for_status(response: httpx.Response) -> None:
+        if response.is_error:
+            # Deliberately discard provider response bodies; they may echo request data.
+            raise RemoteProviderError(f"Provider request failed with HTTP {response.status_code}")
+
+    def _client_or_new(self) -> tuple[httpx.AsyncClient, bool]:
+        if self._client is not None:
+            return self._client, False
+        return httpx.AsyncClient(timeout=45.0), True
+
+    @staticmethod
+    def _optional_nonnegative_int(value: object) -> int | None:
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+        return None

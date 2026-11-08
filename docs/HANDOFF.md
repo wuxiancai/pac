@@ -9,9 +9,15 @@
 ### 2026-11-08：首次双语麦克风实测与 Provider 组合输入
 
 - 用户主动运行官方中英 Streaming Zipformer 麦克风 CLI，回报多个 partial、两个 final。混合中文/英语话语出现可见错词，第二段英语也未稳定识别；无逐字 ground truth，未算 CER。该轮只作为一次真实设备观察，原始音频未保存。复测要求见 `poc/phase0-local-asr.md` 和 `TASKS.md`。
-- 用户给出两家 Provider 候选：DeepSeek、OpenRouter。官方资料显示 DeepSeek API 端点为 `api.deepseek.com`，隐私政策称该服务数据在中国处理；OpenRouter 默认域名全球路由，US/EU 区域路由需要符合 Business/Enterprise 条件。链接记录于任务文档。
-- 已向用户澄清：不要把 API Key 发到聊天。当前 Keychain 凭据 POC 仅实现写入、删除和存在状态；尚未集成真实 Provider Adapter 的安全读取/使用路径，也没有为用户准备好固定 service/account 名称，因此现在不要手动创建凭据项。待确认区域后会先把本机安全路径补齐。
+- 用户给出两家 Provider 候选：DeepSeek、OpenRouter，并确认 DeepSeek 按中国处理、OpenRouter 选 Global。官方隐私/区域资料与模型 id 见 `poc/phase0-remote-provider.md`。
+- 已向用户说明不要把 API Key 发到聊天。新实现固定 Keychain service `com.personal-ai-assistant.phase0.provider`，account 分别为 `deepseek`、`openrouter`；每次请求须先由用户在本机 CLI 输入精确确认语句，ConsentAwarePolicy 放行后才从 Keychain 读取并发送。
 - 用户命令开头的 `cd backend` 报错只因其已位于 `backend` 目录；后续相对路径命令实际成功运行并启动麦克风捕获。
+
+### 2026-11-08：DeepSeek / OpenRouter 一次性探测实现
+
+- 新增固定 URL/model/region 的 OpenAI chat-completions adapter、macOS `/usr/bin/security` Keychain reader 和 `scripts/probe_remote_provider_poc.py`。每次运行最多发一个 L1 合成文本请求；不重试、不 fallback、不执行模型工具。正确的逐次确认短语后才会生成 60 秒精确 Consent，策略通过后才读取 Keychain；拒绝路径在本机验证无 Keychain 读取/网络请求。
+- MockTransport 验证默认拒绝、文本请求、SSE、工具调用数据（不执行）、`response_format`、OpenRouter provider failover 关闭、选定 Provider/region/token/cost metadata、端点/model/region allowlist 和 HTTP 错误脱敏。局部测试 28 项，全量 Python 139 项，Swift 27 项通过；`compileall` 与 `uv lock --check` 通过。
+- 用户还未把 API Key 保存到 Keychain，故没有真实 Provider 请求。下一步按 `poc/phase0-remote-provider.md` 创建两项登录钥匙串记录，然后由用户分别在 `deepseek` 与 `openrouter` CLI 探测提示中输入授权短语。阶段 0 仍未验收。
 
 ### 2026-11-08：双语流式 ASR 分帧评估与评分修正
 
@@ -116,12 +122,12 @@
 - 官方双语 Streaming Zipformer 已有合成中英文件分帧 partial/final 证据；Qwen3-ASR ONNX 候选另有随包中/英离线评测。双语模型尚无真人麦克风与 SwiftUI 实机验收；不得静默改用云 ASR。
 - 尚未验证 SwiftUI 麦克风链路、中英混合识别质量、P50/P95、资源占用、AEC、TTS 与 ASR 同时工作和锁屏/休眠处理。
 - ASR 资源测量已对同一条合成 WAV 做 3 次独立进程重复，但没有独立语料或实时麦克风端到端统计；重复样本分布和可确认性能阈值仍未验证/未决。
-- Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始，需在本地客户端连接外部服务时经 Consent/Policy、Keychain 和合成数据逐项测试；POC-05 真实系统认证提示、异常自动恢复/退避、锁屏/休眠策略和正式分发仍未验证，SwiftUI demo 的进程握手/启停/退出清理已通过；POC-06 尚未评估密钥生命周期、APFS/外接介质 ENOSPC、断电/checkpoint 执行中断、备份介质故障和产品性能，也未作 ADR。记忆 Embedding 只接入 disposable 内存 repository，产品 schema 与真实检索质量仍未验收。
+- Gateway 已准备 DeepSeek（中国）与 OpenRouter（Global）的固定目标 adapter、Keychain 读取和逐请求确认 CLI；真实远程 Provider 请求、能力矩阵、费用、错误/fallback 尚未验证，需按 `poc/phase0-remote-provider.md` 由用户配置 Keychain 并逐次确认。POC-05 真实系统认证提示、异常自动恢复/退避、锁屏/休眠策略和正式分发仍未验证，SwiftUI demo 的进程握手/启停/退出清理已通过；POC-06 尚未评估密钥生命周期、APFS/外接介质 ENOSPC、断电/checkpoint 执行中断、备份介质故障和产品性能，也未作 ADR。记忆 Embedding 只接入 disposable 内存 repository，产品 schema 与真实检索质量仍未验收。
 - 所有产品待决策项继续保持未定；本地 ASR 模型是临时 POC 候选。
 
 ## 下一步
 
-继续阶段 0：双语流式 ASR 已完成合成文件分帧评估，真实麦克风验收需要用户主动启动采集并说话。Gateway 对照报告已完成桌面资料比较，真实 Provider/Gateway 实测尚缺；本机软件可连接云 Provider，但每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝；凭据只经 Keychain。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：双语流式 ASR 已完成合成文件分帧评估，真实麦克风验收需要用户主动启动采集并说话。Gateway 对照报告已完成桌面资料比较；DeepSeek/OpenRouter 单次合成探测入口和 Keychain 路径已就绪，真实 Provider/Gateway 请求尚缺；每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 
