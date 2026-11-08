@@ -12,11 +12,11 @@
 - 子进程集成测试验证动态端口、无 token 时拒绝、有效 token 健康检查、`stop`、owner 管道关闭和无效命令清理。它验证固定后端进程协议，不代表 Swift `Process` 集成或正式 App 生命周期完成。
 - Swift `LocalBackendSupervisor` 现以 Foundation `Process` 直接执行注入的 Python runtime，并固定参数为 `-m pac_poc.local_service`；runtime 与 backend 目录是本机打包配置接口，不接受 shell/附加命令。子进程环境仅含固定 PATH 和 Python 隔离开关，stderr 接 `/dev/null`，stdout 仅解析受限 JSON 握手。启动等待、优雅停止有界；停止超时会 terminate，随后必要时 SIGKILL。token 只保存在内存并用于 loopback `LocalAPIClient`。
 - Swift 本机集成测试实测 supervisor 启动→握手→正确 token 健康检查/错误 token 拒绝→关闭，并验证重复 start 被拒、停止后可重启。测试运行时从仓库 backend `.venv` 使用本机 Python。
-- SwiftUI 连接 POC 新增可选 backend-controller 接口与主动启动/停止按钮：点击启动后在 detached task 启动服务、创建本机客户端并执行健康检查，健康确认后才显示 connected；点击停止后关闭服务。旧的 `init(client:)` 与“检查本机服务”路径保留。ViewModel fake-controller 测试覆盖成功启停与启动失败清理；尚未在 GUI 中实机点击验收。
+- SwiftUI 连接 POC 新增可选 backend-controller 接口与主动启动/停止按钮：点击启动后在 detached task 启动服务、创建本机客户端并执行健康检查，健康确认后才显示 connected；点击停止后关闭服务。旧的 `init(client:)` 与“检查本机服务”路径保留。ViewModel fake-controller 测试覆盖成功启停与启动失败清理；GUI 启停实机证据见下。
 - 新增独立 `backend-lifecycle-poc` SwiftUI demo target，以及本机 build/run shell scripts；应用运行配置通过 `PAC_POC_PYTHON` 和 `PAC_POC_BACKEND` 显式提供，缺少配置或入口文件时 fail closed。构建输出 bundle 放在忽略目录 `.poc-data/backend-lifecycle-poc.app`，不会纳入 Git。
 - 已通过 `poc/macos-audio/scripts/run_backend_lifecycle_poc.sh` 实机启动本地 `.app`，无服务初始显示“尚未检查”；点击启动后状态变为“本机服务已连接”；点击停止后回到“尚未检查”，停止/检查按钮恢复禁用。此为当前设备一次 GUI 冒烟，不覆盖多轮、休眠或 App 退出期间故障。
 - 失败路径测试在 `.poc-data` 临时夹具下运行固定模块入口：无握手服务在 250 ms 配置期限触发 `startupTimedOut` 并被清理；非法 JSON 握手返回 `invalidHandshake` 且不保留运行子进程。该时限是测试注入值，不是产品启动时限决策。
-- 子进程握手后立即异常退出的回归曾使 supervisor 在向已关闭 pipe 写 `stop` 时收到 SIGPIPE。停止协议已改为关闭 stdin 以发送 EOF；supervisor 会清理已退出的 `Process` 后允许调用方显式重启。测试验证该手动恢复路径，不实现或暗示自动重启。
+- 子进程握手后立即异常退出的回归曾使 supervisor 在向已关闭 pipe 写 `stop` 时收到 SIGPIPE。停止协议已改为关闭 stdin 以发送 EOF；supervisor 会清理已退出的 `Process` 后允许调用方显式重启。回归验证异常退出、清理和调用方显式重启；不实现或暗示自动重启/退避。
 - 新增 owner 生命周期释放测试：释放最后一个 supervisor 引用后，健康端点不再可访问，证明其 deinit 会停止自己拥有的 FastAPI 子进程。本机 GUI 试验也在服务已连接时退出应用，随后未发现残留 `pac_poc.local_service` 进程；macOS 恢复窗口会按系统设置重新打开 demo，但新实例因缺少环境配置而 fail closed。
 - Swift `LocalAPIClient` 仅允许 HTTP `127.0.0.1` / `::1`，使用内存 token，拒绝 HTTP redirect；SwiftUI POC 连接视图只展示状态并提供主动检查按钮。
 - API Key POC 使用 macOS Keychain generic-password，`AfterFirstUnlockThisDeviceOnly`；外部可见的凭据管理 API 只提供写入、删除、存在状态查询，不提供明文读取。
@@ -35,16 +35,16 @@ swift test
 ./scripts/run_backend_lifecycle_poc.sh
 ```
 
-本工作包完成时的全量回归：Python 103 项、Swift 27 项通过；Python 覆盖实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 覆盖本机 Keychain dummy secret 写入/轮换/删除及认证策略/拒绝行为 fake 测试。2026-11-07 最新全量回归为 Python 122 项、Swift 27 项通过，详见 `docs/HANDOFF.md`。网络集成只访问 `127.0.0.1`。
+本工作包的全量回归持续随阶段推进；截至 2026-11-08 本轮记录的 Python 全量 129 项、Swift Testing 27 项通过。Python 覆盖实际 loopback HTTP 服务、Swift CLI → FastAPI 集成和固定 Python 服务模块的 owner pipe 子进程测试；Swift 覆盖 supervisor 子进程失败/显式重启、GUI ViewModel fake 路径、Keychain dummy secret 及认证策略/拒绝行为 fake 测试。网络集成只访问 `127.0.0.1`。
 
 ## 未解决/未验收
 
-- SwiftUI View 已提供可选 backend 启停控制和健康状态，但只通过模型 fake 测试；未在 GUI 中实机交互，也不是完整产品 UI。
+- SwiftUI demo 已实测一次启动/停止并验证退出清理；没有多轮交互、锁屏/休眠场景测试，也不是完整产品 UI。
 - LocalAuthentication API 接入已实现，默认策略覆盖生物识别或设备密码；单测不等于真实系统交互。真实 Touch ID/设备密码提示、拒绝/取消仍未实测。
-- POC Swift supervisor 已验证本机后端进程所有权、随机端口 handshake、优雅关闭、手动停止后重启、启动超时与非法握手清理、owner deinit 清理；未实现异常退出自动重启/退避、锁屏策略、持久化/正式分发 app 运行时配置或面向用户的启动诊断 UI。
+- POC Swift supervisor 已验证本机后端进程所有权、随机端口 handshake、优雅关闭、手动停止后重启、启动超时与非法握手清理、owner deinit 清理及异常退出后的调用方显式重启；未实现异常退出自动重启/退避、锁屏策略、持久化/正式分发 app 运行时配置或面向用户的启动诊断 UI。
 - supervisor 的 stderr 当前定向 `/dev/null`，避免将意外服务日志并入普通输出；正式诊断/脱敏日志策略需在产品阶段设计。
 - Host/Origin、token 和无云出站策略经过 POC 测试；真实用户 Consent UI、完整数据分类/脱敏/审计与撤销竞态未实现。
-- 未做崩溃、重启、磁盘不足、备份恢复故障注入，也未验证静态加密方案；不得将本工作包视为 POC-05 完成。
+- 数据库崩溃/重启、磁盘不足和备份恢复故障注入见独立 `phase0-failure-recovery.md`、`phase0-enospc-recovery.md`；不是本报告的 supervisor/App 故障注入。静态加密方案与 POC 证据见 `phase0-sqlcipher-compat.md`，产品 ADR 仍延期；不得将这些分项证据视为 POC-05 或阶段 0 完成。
 - 未验证真实云端 Provider，符合本轮本机使用边界；云请求仍保持不可用/默认拒绝。
 
 ## 阶段边界
