@@ -90,6 +90,9 @@ def _request(config: RemoteProviderConfig, capability: str) -> LocalModelRequest
             if capability == "tools"
             else None
         ),
+        thinking_enabled=(
+            False if capability == "tools" and config.provider == "deepseek" else None
+        ),
     )
 
 
@@ -203,6 +206,10 @@ def main() -> int:
         print(f"Payload: {request.messages[0]['content']}")
         if args.capability == "tools":
             print("工具调用只作为模型提案显示；本脚本不会执行该工具。")
+            if request.thinking_enabled is False:
+                print("DeepSeek 本次显式关闭 thinking，以支持指定 tool_choice。")
+            print(f"Tool schema: {json.dumps(list(request.tools), ensure_ascii=False)}")
+            print(f"tool_choice: {json.dumps(request.tool_choice, ensure_ascii=False)}")
         elif args.capability == "error":
             print("此项故意发送无效 response_format，以观察 Provider HTTP 错误；服务仍可能计费，不会重试。")
         elif args.capability == "metadata":

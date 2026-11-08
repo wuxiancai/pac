@@ -23,6 +23,7 @@ class LocalModelRequest:
     tools: Sequence[Mapping[str, object]] = ()
     response_format: Mapping[str, object] | None = None
     tool_choice: Mapping[str, object] | str | None = None
+    thinking_enabled: bool | None = None
 
 
 @dataclass(frozen=True)

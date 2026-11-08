@@ -326,6 +326,7 @@ def test_remote_tools_are_returned_as_data_and_never_executed() -> None:
     request = request_for(
         tools=({"type": "function", "function": {"name": "synthetic_lookup"}},),
         tool_choice={"type": "function", "function": {"name": "synthetic_lookup"}},
+        thinking_enabled=False,
     )
 
     result = asyncio.run(gateway.call_with_tools(request))
@@ -336,6 +337,7 @@ def test_remote_tools_are_returned_as_data_and_never_executed() -> None:
     ]
     assert calls == 1
     assert b'"tool_choice":{"type":"function","function":{"name":"synthetic_lookup"}}' in seen[0].read()
+    assert b'"thinking":{"type":"disabled"}' in seen[0].read()
 
 
 def test_structured_response_format_is_forwarded_without_secret_logging() -> None:

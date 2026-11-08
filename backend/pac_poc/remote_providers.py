@@ -257,6 +257,10 @@ class OpenAICompatibleRemoteAdapter:
                 if isinstance(request.tool_choice, Mapping)
                 else request.tool_choice
             )
+        if request.thinking_enabled is not None and self._config.provider == "deepseek":
+            payload["thinking"] = {
+                "type": "enabled" if request.thinking_enabled else "disabled"
+            }
         if request.response_format is not None:
             payload["response_format"] = dict(request.response_format)
         if self._config.provider == "openrouter":

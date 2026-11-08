@@ -59,7 +59,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_capability_poc.py openrouter metadata --repeat 2
 ```
 
-每个外发请求都会打印实际 payload 并要求独立精确确认，短语格式为 `ALLOW <PROVIDER> <CAPABILITY> <序号>`；没有某项确认就不会读取 Keychain 或发送该项请求。`tools` 使用强制 tool_choice，仅返回合成函数提案，不执行工具。`json` 请求 JSON object 并检查响应。`error` 故意发送无效 `response_format` 并只把 HTTP 400 视为预期结果；请求可能计费，不重试。`metadata --repeat 2` 会逐次确认并发送两条请求，打印模型、Provider/region、token 和费用，供重复观察；DeepSeek 若不返回 region/cost 会如实显示缺失。
+每个外发请求都会打印实际 payload 并要求独立精确确认，短语格式为 `ALLOW <PROVIDER> <CAPABILITY> <序号>`；没有某项确认就不会读取 Keychain 或发送该项请求。`tools` 使用强制 tool_choice，仅返回合成函数提案，不执行工具。DeepSeek 工具探测显式设置 `thinking.type=disabled`：官方文档说明 thinking 默认启用，而 thinking mode 不支持指定工具的 named `tool_choice`，会返回 HTTP 400。见 [DeepSeek Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/) 与 [Tool Calls 指南](https://api-docs.deepseek.com/guides/tool_calls/)。`json` 请求 JSON object 并检查响应。`error` 故意发送无效 `response_format` 并只把 HTTP 400 视为预期结果；请求可能计费，不重试。`metadata --repeat 2` 会逐次确认并发送两条请求，打印模型、Provider/region、token 和费用，供重复观察；DeepSeek 若不返回 region/cost 会如实显示缺失。
 
 拒绝边界可在不联网的情况下，分别对 `deepseek` 与 `openrouter` 运行 `UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_capability_poc.py <provider> deny-check`。它将 Consent policy 前接 HTTP MockTransport tripwire，断言无授权时 Keychain 读取数和 transport 调用数都为零。这是进程内网络边界证据，不是操作系统抓包证据。
 
@@ -68,6 +68,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 - 默认拒绝发生在 Keychain 读取和 adapter 网络调用之前。
 - 同一 `ModelGateway` 实例可按 request.provider 分别选中两家固定 adapter；本地 MockTransport 回归验证两条 endpoint 顺序命中、Keychain account 按 provider 读取、两次响应正文精确匹配。这不是远端服务证据。
 - 本地 MockTransport 另外验证 streaming 事件解析、工具调用作为数据返回不执行、`response_format` 与 `tool_choice` 透传、HTTP 错误脱敏。拒绝 tripwire CLI 运行结果为无 Consent 时 Keychain 读取数=0、HTTP transport 调用数=0。
+- DeepSeek 首次真实工具探测已获当次确认但返回 HTTP 400；错误正文按安全设计未保留。根据 DeepSeek 官方文档，thinking 默认启用且 thinking mode 不接受 named `tool_choice`，这是与观察一致的原因推断，非对错误正文的直接确认。POC 已调整为 DeepSeek 工具请求显式关闭 thinking，并在新 Consent 通过后复测。
 - 精确授权后 adapter 才从凭据接口取密钥；HTTP header/body 与固定 model/endpoint 匹配。
 - OpenRouter Global SSE streaming 分块解析；非流式响应 metadata 可报告实际选择的上游 Provider/region、token 数和 cost；请求禁用跨 Provider failover；tool call 仅作为 `ToolCallResult` 数据返回，不执行工具。
 - JSON `response_format` 透传；Provider 非 2xx 错误只暴露 HTTP 状态，不保留 response body；端点/model/region 配置均固定 allowlist。
@@ -87,6 +88,6 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 
 ## 尚未验收
 
-- 两家真实 SSE 各有一次成功；真实工具 schema、结构化输出、服务端 4xx 错误、费用/区域重复结果及拒绝/撤销后的系统级零出站边界尚未充分验证。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
+- 两家真实 SSE 各有一次成功；真实工具提案（DeepSeek 首次尝试 HTTP 400，修正后待复测）、结构化输出、服务端 4xx 错误、费用/区域重复结果及拒绝/撤销后的系统级零出站边界尚未充分验证。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。

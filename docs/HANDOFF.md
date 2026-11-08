@@ -10,6 +10,7 @@
 
 - 新增 `backend/scripts/probe_provider_capability_poc.py`，按 Provider/能力单次运行，覆盖 streaming、强制工具提案（不执行）、JSON、故意触发 4xx、重复 metadata，以及无授权 deny-check。每个真实 HTTP 请求都需要单独输入精确确认；故意错误请求可能计费。
 - Adapter 新增显式 `tool_choice` 透传。窄回归 30 项通过；deny-check tripwire 结果为 Keychain reads=0、HTTP transport calls=0。该结果不是系统级抓包。用户随后完成 DeepSeek 与 OpenRouter 各一次真实 SSE 探测，拼接响应均精确匹配 `phase0-probe-ack`；工具/JSON/错误和重复 metadata 仍待测。
+- DeepSeek 首次工具请求返回 HTTP 400，正文未保留。按 DeepSeek 官方说明，默认 thinking mode 与指定 tool_choice 不兼容的推断已被落实为工具请求显式关闭 thinking；修正后的实测仍须用户逐次确认。
 - 复现命令、payload、确认短语及未决限制见 `poc/phase0-remote-provider.md`。
 
 ### 2026-11-08：0C 同一 Gateway 双 Provider 路由
