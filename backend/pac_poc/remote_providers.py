@@ -53,6 +53,7 @@ class RemoteCompletion:
     completion_tokens: int | None
     total_tokens: int | None
     cost_usd: float | None
+    finish_reason: str | None = None
 
 
 class RemoteProviderError(RuntimeError):
@@ -110,6 +111,8 @@ class OpenAICompatibleRemoteAdapter:
         usage = payload.get("usage")
         usage = usage if isinstance(usage, dict) else {}
         provider, region = self._openrouter_route(payload)
+        choice = payload["choices"][0]
+        finish_reason = choice.get("finish_reason")
         cost = usage.get("cost")
         cost_usd = (
             float(cost)
@@ -132,6 +135,7 @@ class OpenAICompatibleRemoteAdapter:
             completion_tokens=self._optional_nonnegative_int(usage.get("completion_tokens")),
             total_tokens=self._optional_nonnegative_int(usage.get("total_tokens")),
             cost_usd=cost_usd,
+            finish_reason=finish_reason if isinstance(finish_reason, str) else None,
         )
 
     async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:

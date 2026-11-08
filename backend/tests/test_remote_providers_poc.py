@@ -414,7 +414,15 @@ def test_structured_response_format_is_forwarded_without_secret_logging() -> Non
         seen.append(request)
         return httpx.Response(
             200,
-            json={"choices": [{"message": {"content": '{"ok":true}'}}]},
+            json={
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {"content": '{"ok":true}'},
+                    }
+                ],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 3, "total_tokens": 15},
+            },
         )
 
     adapter = OpenAICompatibleRemoteAdapter(
@@ -427,7 +435,11 @@ def test_structured_response_format_is_forwarded_without_secret_logging() -> Non
     gateway = make_gateway(consent, adapter, "deepseek")
     request = request_for(response_format={"type": "json_object"})
 
-    assert asyncio.run(gateway.generate(request)) == '{"ok":true}'
+    result = asyncio.run(gateway.generate_with_metadata(request))
+
+    assert result.text == '{"ok":true}'
+    assert result.finish_reason == "stop"
+    assert (result.prompt_tokens, result.completion_tokens, result.total_tokens) == (12, 3, 15)
     assert b'"response_format":{"type":"json_object"}' in seen[0].read()
     assert credentials.reads == ["deepseek"]
 

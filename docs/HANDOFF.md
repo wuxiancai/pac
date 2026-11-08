@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：DeepSeek JSON 空正文与诊断增强
+
+- 用户逐次确认 `ALLOW DEEPSEEK JSON 1` 后，真实请求返回空 JSON 正文，结构检查失败。旧 CLI 未打印 finish_reason、usage 或路由 metadata，因此原因无法判定；无重试。
+- `RemoteCompletion` 现保留 finish_reason，JSON 探测输出 finish_reason、模型/路由、token/cost；增加本地 MockTransport 解析回归。窄回归 31 项、全量 Python 142 项、compileall、uv lock --check 通过。
+- 下一步逐次确认运行 OpenRouter JSON 探测，观察结构化响应及诊断字段；不要把 DeepSeek 此次结果标记为支持或 Provider 故障定论。0C 仍未验收。
+
 ### 2026-11-08：0C 拒绝边界复核
 
 - 本轮分别运行 DeepSeek 与 OpenRouter `deny-check`。两者均在无 Consent 情况下得到 Keychain reads=0、HTTP transport calls=0；检查未出网。证据是进程内 tripwire，不等同于操作系统级抓包。

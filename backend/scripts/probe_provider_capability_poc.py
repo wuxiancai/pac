@@ -158,6 +158,19 @@ def _print_metadata(result, index: int) -> None:
     print(f"服务报告费用（USD）: {result.cost_usd if result.cost_usd is not None else '未提供'}")
 
 
+def _print_response_diagnostics(result) -> None:
+    print(f"Finish reason: {result.finish_reason or '服务未返回'}")
+    print(f"实际模型: {result.model}")
+    print(f"实际下游 Provider: {result.provider or '服务未返回'}")
+    print(f"服务区域信息: {result.region or '服务未返回'}")
+    print(
+        "Token 用量: "
+        f"prompt={result.prompt_tokens}, completion={result.completion_tokens}, "
+        f"total={result.total_tokens}"
+    )
+    print(f"服务报告费用（USD）: {result.cost_usd if result.cost_usd is not None else '未提供'}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="One capability probe per exact Provider consent"
@@ -266,6 +279,7 @@ def main() -> int:
                     passed = isinstance(parsed, dict) and parsed.get("phase0") == "ack"
                     print(f"JSON 响应: {result.text}")
                     print(f"符合探测结构: {passed}")
+                    _print_response_diagnostics(result)
                 else:
                     _print_metadata(result, index)
                     passed = result.text.strip() == PROBE_ACK

@@ -20,7 +20,7 @@
 |---:|---|---|---|
 | 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；最新本机 Python 142 项、Swift 27 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
 | 0B | 本地语音链路 | IN PROGRESS | 官方中英 Streaming Zipformer 文件分帧 10/10 final、82 partial、weighted CER 0.0254；用户已完成两次真实 CLI 麦克风采集并看到 partial/final。用户将当前目标限定为功能冒烟，识别质量转为后续模型选择/优化项；剩余停止/异常清理、SwiftUI 集成、许可与性能证据仍待补。 |
-| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | DeepSeek 与 OpenRouter 文本、同一 Gateway 顺序路由、两家各一次真实 SSE 均通过；DeepSeek 与 OpenRouter 工具提案实测成功且均未执行；OpenRouter 在前两次空结果后，第三次返回正确 proposal（tool_calls、Relace/HKG）。两家 JSON/错误及重复 metadata 仍待探测；本轮 deny-check 两家均为 Keychain reads=0、HTTP calls=0（进程内 tripwire）。详见 `poc/phase0-remote-provider.md`。 |
+| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | DeepSeek 与 OpenRouter 文本、同一 Gateway 顺序路由、两家各一次真实 SSE 均通过；DeepSeek 与 OpenRouter 工具提案实测成功且均未执行；OpenRouter 在前两次空结果后，第三次返回正确 proposal（tool_calls、Relace/HKG）。DeepSeek JSON 已实测但返回空正文，原因待由 metadata 定位；OpenRouter JSON、两家错误及重复 metadata 仍待探测。本轮 deny-check 两家均为 Keychain reads=0、HTTP calls=0（进程内 tripwire）。详见 `poc/phase0-remote-provider.md`。 |
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；补真实系统认证提示、锁屏/休眠、多轮 GUI、正式分发与恢复策略证据。 |
 | 0F | 静态加密兼容性 | IN PROGRESS | SQLCipher 已有 ARM64、FTS、迁移和恢复证据；完成密钥生命周期、产品性能及发布形态评估，形成 ADR-019 决定。 |
@@ -34,7 +34,7 @@
 2. **本机已完成：0E supervisor 异常退出路径审查。** 子进程握手后异常退出时能清理并由调用方显式重启；GUI 启停与退出清理已实测。自动重启/退避、锁屏/休眠、真实系统认证提示仍缺证据或决策，见安全客户端报告。
 3. **0B 语音功能冒烟已取得用户实机证据。** 两次主动采集均产生 partial/final；用户决定将当前识别质量留待后续模型选择，不作为本轮功能冒烟阻断项。若要关闭该工作包，仍需补停止/异常清理、SwiftUI 集成、许可和性能证据；D-013 阈值继续延期。
 4. **需许可条款：0B 中文 ASR 权重分发。** 原中文候选上游要求接受访问条件，公开页面未展示许可；可提供获准账号所见许可文本供记录，或明确只采用官方双语 Apache-2.0 候选，后者仍需真人语音验证。
-5. **0C DeepSeek 工具提案已实测通过。** 用户重新确认显式关闭 thinking 后的完整请求，DeepSeek 返回合成函数提案，未执行。下一项运行 OpenRouter `tools`；之后补两家 `json`、`error`、`metadata --repeat 2`，每条外发请求仍需独立确认。
+5. **0C DeepSeek 工具提案已实测通过。** 用户重新确认显式关闭 thinking 后的完整请求，DeepSeek 返回合成函数提案，未执行。下一项运行 OpenRouter `tools`；之后补 OpenRouter `json`、两家 `error`、`metadata --repeat 2`，每条外发请求仍需独立确认。
 6. **产品决策继续延期：0F/0G 及规格 D 项。** ADR-019 与 D-014 等照用户要求保持延期；这不关闭对应证据缺口，也不允许开始阶段 1。
 
 麦克风复现命令（从仓库根目录，在本机交互式终端运行）：
