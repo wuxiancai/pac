@@ -1,3 +1,10 @@
+### 2026-11-09：收紧 Consent 操作与来源范围
+
+- Consent grant 增加必填的 `action_scopes` 与 `source_scopes`，并记录 ACTIVE/REVOKED 生命周期；撤销后保留 REVOKED 状态。Gateway 按实际调用入口派生 generate、stream 或 tool-proposal 操作，远端请求缺来源或操作不匹配时在 Adapter 调用前拒绝。Beta GUI 的云请求授权限定到 `beta-gui-chat` 来源及 stream 操作；Provider POC 探测调用已提供明确来源和对应动作授权。
+- 报告与追踪矩阵已更新：授权精确匹配现覆盖 Provider、模型、区域、用途、数据级别、操作和来源；产品级审计持久化、Consent UI、在途请求撤销语义与真实出站门禁证据仍未完成，不提升阶段状态。
+- 验证：`backend/` 下窄回归 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra phase0-security pytest -q tests/test_consent_aware_gateway.py tests/test_remote_providers_poc.py tests/test_security_poc.py` → 47 passed；全量 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q` → 170 passed；`git diff --check` 通过。
+- 本轮未读取 Keychain、未发起网络/云请求、未采集麦克风音频。B0/B1 的 GUI 设置与退出清理手动冒烟仍待用户操作；旧的聊天暴露 `sk-ws-` key 是否已撤销也无闭环记录，需在千问控制台确认。阶段 0 后续从 B0/B1 手动闭环继续。
+
 ### 2026-11-09：校正文档与仓库实际状态的不一致
 
 - 只读复核发现三处权威文档陈述已过期：①全量 Python 回归实际为 **162 项通过**，而 `PROJECT_CONTEXT.md` 与追踪矩阵仍记 154 项；②仓库**已推送**且 `main` 与 `origin/main` 同为 `51b9ab9`、无未推送提交，文档仍写"未推送"；③GitHub Actions `Phase 0 checks` **已在 `main` 真实成功运行两次**（run `42489738004` 对应 `51b9ab9`，日志 `162 passed`、Swift `31 tests passed`；另 run `42475879541` 成功），文档仍写"尚未执行/真实 CI 状态仍未验证"。`docs/beta/macOS-beta-chat.md` 验证记录内还并存 158 与 162 两个数字。

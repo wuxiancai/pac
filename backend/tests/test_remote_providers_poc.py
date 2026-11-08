@@ -29,13 +29,22 @@ from pac_poc.remote_providers import (
     RemoteProviderConfig,
     RemoteProviderError,
 )
-from pac_poc.security_poc import ConsentGrant, ConsentManager, DataLevel, OutboundPolicy
+from pac_poc.security_poc import (
+    ConsentGrant,
+    ConsentManager,
+    DataLevel,
+    ModelAction,
+    OutboundPolicy,
+)
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
 try:
     from probe_provider_capability_poc import _print_metadata, _print_probe_error
 finally:
     sys.path.pop(0)
+
+
+PROBE_SOURCE = "phase0-cli-probe"
 
 
 class FakeCredentials:
@@ -55,6 +64,7 @@ def request_for(config=DEEPSEEK_PROBE_CONFIG, **overrides) -> LocalModelRequest:
         "region": config.region,
         "purpose": "phase0-provider-probe",
         "data_level": DataLevel.L1,
+        "source": PROBE_SOURCE,
     }
     fields.update(overrides)
     return LocalModelRequest(**fields)
@@ -67,7 +77,12 @@ def make_gateway(consent: ConsentManager, adapter, provider: str) -> ModelGatewa
     )
 
 
-def grant_for(consent: ConsentManager, config=DEEPSEEK_PROBE_CONFIG) -> None:
+def grant_for(
+    consent: ConsentManager,
+    config=DEEPSEEK_PROBE_CONFIG,
+    *,
+    actions: frozenset[ModelAction] = frozenset({ModelAction.GENERATE}),
+) -> None:
     consent.grant(
         ConsentGrant(
             provider=config.provider,
@@ -75,6 +90,8 @@ def grant_for(consent: ConsentManager, config=DEEPSEEK_PROBE_CONFIG) -> None:
             region=config.region,
             purpose="phase0-provider-probe",
             data_levels=frozenset({DataLevel.L1}),
+            action_scopes=actions,
+            source_scopes=frozenset({PROBE_SOURCE}),
             expires_at=1e20,
         )
     )
@@ -317,7 +334,7 @@ def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:
         client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
     )
     consent = ConsentManager()
-    grant_for(consent, OPENROUTER_PROBE_CONFIG)
+    grant_for(consent, OPENROUTER_PROBE_CONFIG, actions=frozenset({ModelAction.STREAM}))
     gateway = make_gateway(consent, adapter, "openrouter")
 
     async def collect() -> list[str]:
@@ -359,7 +376,7 @@ def test_closing_remote_sse_after_first_chunk_closes_response_stream() -> None:
         client=client,
     )
     consent = ConsentManager()
-    grant_for(consent, OPENROUTER_PROBE_CONFIG)
+    grant_for(consent, OPENROUTER_PROBE_CONFIG, actions=frozenset({ModelAction.STREAM}))
     gateway = make_gateway(consent, adapter, "openrouter")
 
     async def cancel() -> str:
@@ -516,7 +533,7 @@ def test_remote_tools_are_returned_as_data_and_never_executed() -> None:
         client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
     )
     consent = ConsentManager()
-    grant_for(consent)
+    grant_for(consent, actions=frozenset({ModelAction.TOOL_PROPOSAL}))
     gateway = make_gateway(consent, adapter, "deepseek")
     request = request_for(
         tools=({"type": "function", "function": {"name": "synthetic_lookup"}},),
@@ -576,7 +593,11 @@ def test_openrouter_tool_probe_requires_parameter_capable_provider_without_fallb
         client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
     )
     consent = ConsentManager()
-    grant_for(consent, OPENROUTER_PROBE_CONFIG)
+    grant_for(
+        consent,
+        OPENROUTER_PROBE_CONFIG,
+        actions=frozenset({ModelAction.TOOL_PROPOSAL}),
+    )
     gateway = make_gateway(consent, adapter, "openrouter")
     request = request_for(
         OPENROUTER_PROBE_CONFIG,

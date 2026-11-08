@@ -26,7 +26,13 @@ from pac_poc.remote_providers import (
     RemoteProviderConfig,
     RemoteProviderError,
 )
-from pac_poc.security_poc import ConsentGrant, ConsentManager, DataLevel, OutboundPolicy
+from pac_poc.security_poc import (
+    ConsentGrant,
+    ConsentManager,
+    DataLevel,
+    ModelAction,
+    OutboundPolicy,
+)
 from probe_remote_provider_poc import PROBE_ACK, PROBE_PROMPT, PROBE_PURPOSE
 
 
@@ -36,6 +42,17 @@ CONFIGS = {
     QWEN_TOKEN_PLAN_PROBE_CONFIG.provider: QWEN_TOKEN_PLAN_PROBE_CONFIG,
 }
 CAPABILITIES = ("stream", "cancel", "tools", "json", "error", "metadata", "deny-check")
+PROBE_SOURCE = "phase0-cli-probe"
+# Each capability maps to exactly one ModelAction, so the grant issued for a
+# probe cannot authorize a different operation than the one being confirmed.
+CAPABILITY_ACTIONS: dict[str, ModelAction] = {
+    "stream": ModelAction.STREAM,
+    "cancel": ModelAction.STREAM,
+    "tools": ModelAction.TOOL_PROPOSAL,
+    "json": ModelAction.GENERATE,
+    "error": ModelAction.GENERATE,
+    "metadata": ModelAction.GENERATE,
+}
 TOOL_SCHEMA = {
     "type": "function",
     "function": {
@@ -85,6 +102,7 @@ def _request(config: RemoteProviderConfig, capability: str) -> LocalModelRequest
         region=config.region,
         purpose=PROBE_PURPOSE,
         data_level=DataLevel.L1,
+        source=PROBE_SOURCE,
         tools=tools,
         response_format=response_format,
         tool_choice=(
@@ -134,7 +152,9 @@ def run_denial_check(config: RemoteProviderConfig) -> bool:
     return credentials.reads == 0 and network_calls == 0
 
 
-def _grant(consent: ConsentManager, config: RemoteProviderConfig) -> None:
+def _grant(
+    consent: ConsentManager, config: RemoteProviderConfig, capability: str
+) -> None:
     consent.grant(
         ConsentGrant(
             provider=config.provider,
@@ -142,6 +162,8 @@ def _grant(consent: ConsentManager, config: RemoteProviderConfig) -> None:
             region=config.region,
             purpose=PROBE_PURPOSE,
             data_levels=frozenset({DataLevel.L1}),
+            action_scopes=frozenset({CAPABILITY_ACTIONS[capability]}),
+            source_scopes=frozenset({PROBE_SOURCE}),
             expires_at=time.time() + 60,
         )
     )
@@ -227,6 +249,8 @@ def main() -> int:
         print(f"Purpose: {PROBE_PURPOSE}")
         print("Data level: L1 (synthetic text only)")
         print(f"Capability: {args.capability}")
+        print(f"本次授权的操作类型（action_scope）: {CAPABILITY_ACTIONS[args.capability].value}")
+        print(f"本次授权的来源范围（source_scope）: {PROBE_SOURCE}")
         print(f"Payload: {request.messages[0]['content']}")
         if args.capability == "tools":
             print("工具调用只作为模型提案显示；本脚本不会执行该工具。")
@@ -249,7 +273,7 @@ def main() -> int:
             all_passed = False
             continue
 
-        _grant(consent, config)
+        _grant(consent, config, args.capability)
         try:
             if args.capability == "stream":
                 async def collect() -> str:

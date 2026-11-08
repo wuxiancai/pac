@@ -9,7 +9,12 @@ from urllib.parse import urlparse
 
 import httpx
 
-from pac_poc.security_poc import DataLevel, OutboundPolicy, OutboundRequest
+from pac_poc.security_poc import (
+    DataLevel,
+    ModelAction,
+    OutboundPolicy,
+    OutboundRequest,
+)
 
 
 @dataclass(frozen=True)
@@ -20,6 +25,7 @@ class LocalModelRequest:
     region: str = ""
     purpose: str = ""
     data_level: DataLevel = DataLevel.L0
+    source: str = ""
     tools: Sequence[Mapping[str, object]] = ()
     response_format: Mapping[str, object] | None = None
     tool_choice: Mapping[str, object] | str | None = None
@@ -53,7 +59,12 @@ class LocalProviderAdapter(Protocol):
 
 
 class ModelRequestPolicy(Protocol):
-    def authorize(self, adapter: LocalProviderAdapter, request: LocalModelRequest) -> None: ...
+    def authorize(
+        self,
+        adapter: LocalProviderAdapter,
+        request: LocalModelRequest,
+        action: ModelAction,
+    ) -> None: ...
 
 
 class PolicyDenied(PermissionError):
@@ -69,8 +80,13 @@ class ProviderCapabilityUnsupported(RuntimeError):
 
 
 class LocalOnlyPolicy:
-    def authorize(self, adapter: LocalProviderAdapter, request: LocalModelRequest) -> None:
-        del request
+    def authorize(
+        self,
+        adapter: LocalProviderAdapter,
+        request: LocalModelRequest,
+        action: ModelAction,
+    ) -> None:
+        del request, action
         if not adapter.is_local:
             raise PolicyDenied("local-only POC denies non-local providers")
 
@@ -81,11 +97,18 @@ class ConsentAwarePolicy:
     def __init__(self, outbound_policy: OutboundPolicy) -> None:
         self._outbound_policy = outbound_policy
 
-    def authorize(self, adapter: LocalProviderAdapter, request: LocalModelRequest) -> None:
+    def authorize(
+        self,
+        adapter: LocalProviderAdapter,
+        request: LocalModelRequest,
+        action: ModelAction,
+    ) -> None:
         if adapter.is_local:
             return
         if not request.region.strip() or not request.purpose.strip():
             raise PolicyDenied("remote request requires an explicit region and purpose")
+        if not request.source.strip():
+            raise PolicyDenied("remote request requires an explicit source scope")
         authorized = self._outbound_policy.authorize(
             OutboundRequest(
                 provider=request.provider,
@@ -93,6 +116,8 @@ class ConsentAwarePolicy:
                 region=request.region,
                 purpose=request.purpose,
                 data_level=request.data_level,
+                action=action,
+                source=request.source,
             )
         )
         if not authorized:
@@ -112,11 +137,11 @@ class ModelGateway:
         self._policy = policy
 
     async def generate(self, request: LocalModelRequest) -> str:
-        adapter = self._get_authorized_adapter(request)
+        adapter = self._get_authorized_adapter(request, ModelAction.GENERATE)
         return await adapter.generate(request)
 
     async def generate_with_metadata(self, request: LocalModelRequest) -> Any:
-        adapter = self._get_authorized_adapter(request)
+        adapter = self._get_authorized_adapter(request, ModelAction.GENERATE)
         generate_with_metadata = getattr(adapter, "generate_with_metadata", None)
         if not callable(generate_with_metadata):
             raise ProviderCapabilityUnsupported(
@@ -125,7 +150,7 @@ class ModelGateway:
         return await generate_with_metadata(request)
 
     async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
-        adapter = self._get_authorized_adapter(request)
+        adapter = self._get_authorized_adapter(request, ModelAction.STREAM)
         stream = adapter.stream(request)
         try:
             async for chunk in stream:
@@ -136,7 +161,7 @@ class ModelGateway:
                 await close()
 
     async def call_with_tools(self, request: LocalModelRequest) -> ToolCallResult:
-        adapter = self._get_authorized_adapter(request)
+        adapter = self._get_authorized_adapter(request, ModelAction.TOOL_PROPOSAL)
         call = getattr(adapter, "call_with_tools", None)
         if not callable(call):
             raise ProviderCapabilityUnsupported(
@@ -144,12 +169,14 @@ class ModelGateway:
             )
         return await call(request)
 
-    def _get_authorized_adapter(self, request: LocalModelRequest) -> LocalProviderAdapter:
+    def _get_authorized_adapter(
+        self, request: LocalModelRequest, action: ModelAction
+    ) -> LocalProviderAdapter:
         try:
             adapter = self._adapters[request.provider]
         except KeyError as exc:
             raise ProviderNotFound(request.provider) from exc
-        self._policy.authorize(adapter, request)
+        self._policy.authorize(adapter, request, action)
         return adapter
 
 

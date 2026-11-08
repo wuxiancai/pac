@@ -32,12 +32,14 @@ from .security_poc import (
     ConsentManager,
     DataLevel,
     LocalAPISession,
+    ModelAction,
     OutboundPolicy,
     create_local_api,
 )
 
 
 BETA_MODEL = "qwen3.5:0.8b"
+BETA_SOURCE = "beta-gui-chat"
 MAX_MESSAGES = 20
 MAX_MESSAGE_CHARS = 16_000
 MAX_CONTEXT_CHARS = 40_000
@@ -115,7 +117,9 @@ def create_beta_api(
             return gateway
 
         # Each HTTP request gets a fresh, exact-match consent grant. It cannot
-        # authorize a later request or another provider/model/region.
+        # authorize a later request or another provider/model/region. The grant
+        # is scoped to streaming only, from the beta chat surface only; a tool
+        # proposal or a different source would require a separate grant.
         consent = ConsentManager()
         consent.grant(ConsentGrant(
             provider=config.provider,
@@ -123,6 +127,8 @@ def create_beta_api(
             region=config.region,
             purpose="beta-interactive-chat",
             data_levels=frozenset({DataLevel.L2}),
+            action_scopes=frozenset({ModelAction.STREAM}),
+            source_scopes=frozenset({BETA_SOURCE}),
             expires_at=time() + 30,
         ))
         return ModelGateway(
@@ -149,10 +155,12 @@ def create_beta_api(
             region = config.region
             purpose = "beta-interactive-chat"
             data_level = DataLevel.L2
+            source = BETA_SOURCE
         else:
             region = ""
             purpose = ""
             data_level = DataLevel.L0
+            source = ""
         request = LocalModelRequest(
             provider=payload.provider,
             model=payload.model,
@@ -160,6 +168,7 @@ def create_beta_api(
             region=region,
             purpose=purpose,
             data_level=data_level,
+            source=source,
         )
 
         async def events() -> AsyncIterator[str]:

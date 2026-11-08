@@ -52,6 +52,7 @@ async def _attempt(provider: str, observe_seconds: int) -> bool:
         region=config.region,
         purpose="phase0-provider-probe",
         data_level=DataLevel.L1,
+        source="phase0-cli-probe",
         messages=({"role": "user", "content": "synthetic denial check"},),
     )
     denied = False

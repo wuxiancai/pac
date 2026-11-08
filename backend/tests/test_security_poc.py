@@ -12,8 +12,10 @@ import uvicorn
 from pac_poc.security_poc import (
     ConsentGrant,
     ConsentManager,
+    ConsentStatus,
     DataLevel,
     LocalAPISession,
+    ModelAction,
     OutboundRequest,
     OutboundPolicy,
     create_local_api,
@@ -128,6 +130,8 @@ def test_cloud_egress_defaults_to_deny_and_l3_is_never_authorized() -> None:
         region="region-a",
         purpose="answer-question",
         data_level=DataLevel.L1,
+        action=ModelAction.GENERATE,
+        source="cli-probe",
     )
 
     assert not policy.authorize(request)
@@ -138,6 +142,8 @@ def test_cloud_egress_defaults_to_deny_and_l3_is_never_authorized() -> None:
             region="region-a",
             purpose="answer-question",
             data_levels=frozenset({DataLevel.L1, DataLevel.L3}),
+            action_scopes=frozenset({ModelAction.GENERATE}),
+            source_scopes=frozenset({"cli-probe"}),
             expires_at=9999999999,
         )
     )
@@ -158,6 +164,8 @@ def test_cloud_egress_defaults_to_deny_and_l3_is_never_authorized() -> None:
             region="region-a",
             purpose="answer-question",
             data_levels=frozenset({DataLevel.L1}),
+            action_scopes=frozenset({ModelAction.GENERATE}),
+            source_scopes=frozenset({"cli-probe"}),
             expires_at=0,
         )
     )
@@ -169,9 +177,85 @@ def test_cloud_egress_defaults_to_deny_and_l3_is_never_authorized() -> None:
             region="region-a",
             purpose="answer-question",
             data_levels=frozenset({DataLevel.L1}),
+            action_scopes=frozenset({ModelAction.GENERATE}),
+            source_scopes=frozenset({"cli-probe"}),
             expires_at=9999999999,
         )
     )
     assert policy.authorize(request)
     consent.revoke("example-provider", "model-a", "region-a", "answer-question")
     assert not policy.authorize(request)
+
+
+def test_consent_action_and_source_scopes_are_matched_exactly() -> None:
+    """FR-SEC-002: a grant cannot cover an operation or surface it did not list."""
+    consent = ConsentManager()
+    policy = OutboundPolicy(consent)
+    base = dict(
+        provider="example-provider",
+        model="model-a",
+        region="region-a",
+        purpose="answer-question",
+        data_level=DataLevel.L1,
+        action=ModelAction.GENERATE,
+        source="cli-probe",
+    )
+    consent.grant(
+        ConsentGrant(
+            provider="example-provider",
+            model="model-a",
+            region="region-a",
+            purpose="answer-question",
+            data_levels=frozenset({DataLevel.L1}),
+            action_scopes=frozenset({ModelAction.GENERATE}),
+            source_scopes=frozenset({"cli-probe"}),
+            expires_at=9999999999,
+        )
+    )
+    assert policy.authorize(OutboundRequest(**base))
+
+    # A text-only grant must not authorize streaming or a tool proposal.
+    for action in (ModelAction.STREAM, ModelAction.TOOL_PROPOSAL):
+        assert not policy.authorize(OutboundRequest(**{**base, "action": action}))
+    # A grant for one originating surface must not authorize another.
+    assert not policy.authorize(OutboundRequest(**{**base, "source": "other-surface"}))
+
+
+def test_revoked_grant_retains_revoked_status_and_blocks_new_requests() -> None:
+    """FR-SEC-002 status field: revocation is observable, not merely absent."""
+    consent = ConsentManager()
+    policy = OutboundPolicy(consent)
+    key = ("example-provider", "model-a", "region-a", "answer-question")
+    consent.grant(
+        ConsentGrant(
+            provider=key[0],
+            model=key[1],
+            region=key[2],
+            purpose=key[3],
+            data_levels=frozenset({DataLevel.L1}),
+            action_scopes=frozenset({ModelAction.GENERATE}),
+            source_scopes=frozenset({"cli-probe"}),
+            expires_at=9999999999,
+        )
+    )
+    assert consent.exact_grant(*key).status is ConsentStatus.ACTIVE
+
+    assert consent.revoke(*key) is True
+
+    grant = consent.exact_grant(*key)
+    assert grant is not None
+    assert grant.status is ConsentStatus.REVOKED
+    assert not policy.authorize(
+        OutboundRequest(
+            provider=key[0],
+            model=key[1],
+            region=key[2],
+            purpose=key[3],
+            data_level=DataLevel.L1,
+            action=ModelAction.GENERATE,
+            source="cli-probe",
+        )
+    )
+    # Revoking an already-revoked grant reports no state change.
+    assert consent.revoke(*key) is False
+    assert consent.revoke("example-provider", "model-a", "region-a", "never-granted") is False

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hmac
 import ipaddress
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from collections.abc import Callable
 from enum import StrEnum
 from urllib.parse import urlsplit
@@ -98,14 +98,45 @@ class DataLevel(StrEnum):
     L3 = "L3"
 
 
+class ModelAction(StrEnum):
+    """The operation actually performed against a Provider.
+
+    Derived by the Gateway from the method invoked, never supplied by a caller,
+    so a grant cannot be used for an action it did not enumerate.
+    """
+
+    GENERATE = "generate"
+    STREAM = "stream"
+    TOOL_PROPOSAL = "tool-proposal"
+
+
+class ConsentStatus(StrEnum):
+    """Lifecycle state of a Consent grant (FR-SEC-002 status field)."""
+
+    ACTIVE = "active"
+    REVOKED = "revoked"
+
+
 @dataclass(frozen=True)
 class ConsentGrant:
+    """Exact-match Consent record bound to the FR-SEC-002 field set.
+
+    `action_scopes` and `source_scopes` are required with no default: a grant
+    must state which operations and which originating surfaces it covers.
+    """
+
     provider: str
     model: str
     region: str
     purpose: str
     data_levels: frozenset[DataLevel]
+    action_scopes: frozenset[ModelAction]
+    source_scopes: frozenset[str]
     expires_at: float
+    status: ConsentStatus = ConsentStatus.ACTIVE
+
+    def is_live(self, now: float) -> bool:
+        return self.status is ConsentStatus.ACTIVE and now < self.expires_at
 
 
 @dataclass(frozen=True)
@@ -115,6 +146,8 @@ class OutboundRequest:
     region: str
     purpose: str
     data_level: DataLevel
+    action: ModelAction
+    source: str
 
 
 class ConsentManager:
@@ -127,8 +160,17 @@ class ConsentManager:
         self._grants[(grant.provider, grant.model, grant.region, grant.purpose)] = grant
 
     def revoke(self, provider: str, model: str, region: str, purpose: str) -> bool:
+        """Mark a grant REVOKED instead of dropping it, so the state is observable.
+
+        FR-SEC-003 requires revocation to block new requests; a retained REVOKED
+        record makes that transition explicit rather than an absent key.
+        """
         key = (provider, model, region, purpose)
-        return self._grants.pop(key, None) is not None
+        existing = self._grants.get(key)
+        if existing is None or existing.status is ConsentStatus.REVOKED:
+            return False
+        self._grants[key] = replace(existing, status=ConsentStatus.REVOKED)
+        return True
 
     def exact_grant(
         self, provider: str, model: str, region: str, purpose: str
@@ -148,6 +190,8 @@ class OutboundPolicy:
         )
         return bool(
             grant
-            and time.time() < grant.expires_at
+            and grant.is_live(time.time())
             and request.data_level in grant.data_levels
+            and request.action in grant.action_scopes
+            and request.source in grant.source_scopes
         )

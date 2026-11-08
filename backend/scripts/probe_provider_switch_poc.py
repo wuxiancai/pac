@@ -15,11 +15,18 @@ from pac_poc.remote_providers import (
     OpenAICompatibleRemoteAdapter,
     RemoteProviderError,
 )
-from pac_poc.security_poc import ConsentGrant, ConsentManager, DataLevel, OutboundPolicy
+from pac_poc.security_poc import (
+    ConsentGrant,
+    ConsentManager,
+    DataLevel,
+    ModelAction,
+    OutboundPolicy,
+)
 from probe_remote_provider_poc import PROBE_ACK, PROBE_PROMPT, PROBE_PURPOSE
 
 
 CONFIGS = (DEEPSEEK_PROBE_CONFIG, OPENROUTER_PROBE_CONFIG)
+PROBE_SOURCE = "phase0-cli-probe"
 
 
 def main() -> int:
@@ -65,6 +72,8 @@ def main() -> int:
                 region=config.region,
                 purpose=PROBE_PURPOSE,
                 data_levels=frozenset({DataLevel.L1}),
+                action_scopes=frozenset({ModelAction.GENERATE}),
+                source_scopes=frozenset({PROBE_SOURCE}),
                 expires_at=time.time() + 60,
             )
         )
@@ -75,6 +84,7 @@ def main() -> int:
             region=config.region,
             purpose=PROBE_PURPOSE,
             data_level=DataLevel.L1,
+            source=PROBE_SOURCE,
         )
         try:
             result = asyncio.run(gateway.generate_with_metadata(request))
