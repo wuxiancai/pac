@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -27,6 +28,12 @@ from pac_poc.remote_providers import (
     RemoteProviderError,
 )
 from pac_poc.security_poc import ConsentGrant, ConsentManager, DataLevel, OutboundPolicy
+
+sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
+try:
+    from probe_provider_capability_poc import _print_metadata
+finally:
+    sys.path.pop(0)
 
 
 class FakeCredentials:
@@ -477,6 +484,26 @@ def test_remote_provider_422_is_classified_as_expected_client_error() -> None:
     assert error.is_client_error
     assert not RemoteProviderError("Provider request failed with HTTP 503", status_code=503).is_client_error
     assert not RemoteProviderError("Provider returned invalid JSON").is_client_error
+
+
+def test_metadata_probe_prints_json_encoded_text_when_response_mismatches(capsys) -> None:
+    _print_metadata(
+        SimpleNamespace(
+            text="different\nresponse",
+            model="deepseek-flash",
+            provider=None,
+            region=None,
+            prompt_tokens=42,
+            completion_tokens=3,
+            total_tokens=45,
+            cost_usd=None,
+        ),
+        1,
+    )
+
+    output = capsys.readouterr().out
+    assert "请求 1 响应精确匹配: False" in output
+    assert '响应正文: "different\\nresponse"' in output
 
 
 def test_remote_adapter_rejects_changed_model_region_and_endpoint() -> None:

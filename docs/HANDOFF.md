@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：DeepSeek metadata 重复观察完成
+
+- 用户分别确认 DeepSeek metadata 两条请求。两次均报告模型 `deepseek-flash`，服务未返回下游 Provider/区域/费用；token 分别 42/29/71 与 42/16/58。第 1 次 ACK 不匹配，第 2 次匹配；旧 CLI 未输出第 1 次正文，原因未知。
+- metadata 探测现会在 ACK 不匹配时显示 JSON 编码的实际正文（转义控制字符）。窄回归 33 项、全量 Python 144 项、compileall、uv lock --check 通过。没有重发远端请求。
+- 下一步可用增强后的脚本重新逐次确认 DeepSeek JSON，以观察 finish_reason、usage 与空正文诊断；另需完成系统级拒绝零出站验证。阶段 0 仍未验收。
+
 ### 2026-11-08：OpenRouter 费用与区域重复核验
 
 - 用户对 `openrouter metadata --repeat 2` 两次请求分别给出精确确认；两次均精确匹配，均报告 Relace/HKG。Token 分别 42/17/59、42/16/58；cost 分别 USD 0.000008752、0.000008252。小样本只记录观察，不推导定价规律。

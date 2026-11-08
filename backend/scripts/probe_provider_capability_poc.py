@@ -146,7 +146,10 @@ def _grant(consent: ConsentManager, config: RemoteProviderConfig) -> None:
 
 
 def _print_metadata(result, index: int) -> None:
-    print(f"请求 {index} 响应精确匹配: {result.text.strip() == PROBE_ACK}")
+    matches = result.text.strip() == PROBE_ACK
+    print(f"请求 {index} 响应精确匹配: {matches}")
+    if not matches:
+        print(f"响应正文: {json.dumps(result.text, ensure_ascii=False)}")
     print(f"实际模型: {result.model}")
     print(f"实际下游 Provider: {result.provider or '服务未返回'}")
     print(f"服务区域信息: {result.region or '服务未返回'}")
