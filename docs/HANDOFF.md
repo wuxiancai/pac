@@ -6,6 +6,7 @@
 - Token Plan 语音接口并非 chat-compatible：非实时 ASR `qwen-audio-3.0-asr-flash`、TTS `qwen-audio-3.0-tts-plus`、实时语音对话 `qwen-audio-3.0-realtime-plus` 需各自协议适配。文本 adapter 已有 mock，但没有真实出站；任何真实请求还需单项精确确认。
 - 窄验证：`pytest -q tests/test_remote_providers_poc.py tests/test_phase0_traceability_report.py`，29 passed。阶段 0 仍未验收；更新 DECISIONS、TASKS、PROJECT_CONTEXT、Provider POC 报告和追踪矩阵。
 - 后续官方资料核对补充：Token Plan Base URL 明确“仅限 Claude Code、Codex 等 AI 工具交互式使用，不能用于后端服务”。当前 qwen adapter 只供阶段 0 交互式 CLI POC，不可移入本机 FastAPI 产品服务；产品后端要调用千问需换成允许后端的普通百炼计费方案/API Key。
+- 用户已选择“交互式 POC（sk-sp-）”；目前真实探测前置仍是撤销已暴露 key、创建新的 Token Plan 专属 key 并保存到 login Keychain 的 service `com.personal-ai-assistant.phase0.provider` / account `qwen`。key 不应回传聊天。真实请求须在 CLI 显示 payload 后单独输入 `ALLOW QWEN`；本轮没有发出云请求。
 
 ### 2026-11-08：0B 第二组合成负载并发资源复测
 
