@@ -1,6 +1,6 @@
 # 阶段 0 POC：真实 Provider 探测准备（工作包 0C）
 
-状态：`IN PROGRESS`。固定目标 adapter、Keychain reader、一次性终端授权入口已实现。用户已分别尝试 DeepSeek 与 OpenRouter 探测，两次均在 Keychain 凭据查找阶段失败，尚未发送真实 Provider 请求。
+状态：`IN PROGRESS`。固定目标 adapter、Keychain reader、一次性终端授权入口已实现。用户报告 DeepSeek 合成探测成功；OpenRouter 探测未完成，用户判断是账户余额不足，并要求按预期失败记录。尚缺 OpenRouter 成功端到端证据。
 
 ## 用户确认与固定范围
 
@@ -20,6 +20,8 @@
 | Password | 该 Provider 的 API Key | 该 Provider 的 API Key |
 
 2026-11-08 用户已按流程输入两次确认短语，但两次均返回 `provider credential is missing or unavailable in Keychain`。脚本已进入 Keychain 查询，但未取得凭据，因此未发送 HTTP 请求。请检查钥匙串访问中是否在 **login** 钥匙串创建了“通用密码”项，且名称/Service、账户名完全匹配上表；不要删除或覆盖其他钥匙串项。可先只创建一项，再重试对应 Provider。
+
+随后用户提供 Keychain Access 截图；只读元数据查询确认 `login` 钥匙串中 `deepseek` 与 `openrouter` 两条 generic-password 记录均匹配上述 service/account（未读取密钥值）。用户之后报告 DeepSeek 探测正常成功；未提供响应、token/cost 或实际上游元数据，因此只记录为一次用户报告的合成文本端到端成功。OpenRouter 未成功，用户判断账户无余额并要求按预期失败处理；此原因未经响应码/账单验证，不能作为 OpenRouter 连通或模型能力证据。
 
 `MacOSKeychainCredentialProvider` 通过 argv 固定的 `/usr/bin/security find-generic-password` 从登录钥匙串读取；不使用 shell，不将密钥放进进程参数，stdout 只由当前 Python 进程捕获在内存中。只有 CLI 的精确确认短语通过后，Gateway 才会通过 `ConsentAwarePolicy`，之后 adapter 才会请求读取对应条目。每次请求的 Consent grant 最长 60 秒，完成后立即撤销。
 
@@ -48,7 +50,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_remote_prov
 
 ## 尚未验收
 
-- 两次 Keychain 凭据查询均未取得密钥；尚未发生 DeepSeek 或 OpenRouter 网络请求。需要先核对 login 钥匙串中的服务名和账户名是否完全匹配上表。
+- DeepSeek：用户报告一条合成文本真实探测成功，未提供返回 metadata，尚未复核响应/model/usage/cost。OpenRouter：未成功；按用户说明记录为账户余额不足导致的预期失败，原因未通过 Provider 响应验证；需补余额后重新做一次性探测，才能形成成功的端到端证据。
 - 真实费用、模型/区域可用性、错误码、实际 SSE、工具 schema、结构化输出、Usage 统计、同内容跨 Provider 切换尚未验证。当前 `ModelGateway` 文本适配路径只验证计划中的单次合成文本探测；MockTransport 能力不能作为供应商能力证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。

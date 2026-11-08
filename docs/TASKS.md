@@ -20,7 +20,7 @@
 |---:|---|---|---|
 | 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；本机 Python 139 项、Swift 27 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
 | 0B | 本地语音链路 | IN PROGRESS | 官方中英 Streaming Zipformer 文件分帧 10/10 final、82 partial、weighted CER 0.0254；用户已完成一次真实麦克风采集，出现多个 partial、两个 final，但混合中英输出存在错词，未有逐字 ground truth，不能计 CER。下一步需受控短句多轮复测、异常/停止清理与 TTS 打断；Qwen ONNX 转换包许可仍待核，性能目标暂缓。 |
-| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | 用户确认 DeepSeek（中国）和 OpenRouter（Global）；已新增固定目标 OpenAI-compatible adapter、Keychain 读取和逐请求终端确认探测入口。用户已尝试两家探测，Keychain 查找均未取得凭据，未发送请求；下一步核对 login 钥匙串的 service/account 字段。报告见 `poc/phase0-remote-provider.md`。 |
+| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | 用户确认 DeepSeek（中国）和 OpenRouter（Global）；固定 adapter、Keychain 与逐请求确认入口已就绪。用户报告 DeepSeek 一次合成探测成功；OpenRouter 按用户说明因账户余额不足未完成，需后续有余额时补一次成功探测。报告见 `poc/phase0-remote-provider.md`。 |
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；补真实系统认证提示、锁屏/休眠、多轮 GUI、正式分发与恢复策略证据。 |
 | 0F | 静态加密兼容性 | IN PROGRESS | SQLCipher 已有 ARM64、FTS、迁移和恢复证据；完成密钥生命周期、产品性能及发布形态评估，形成 ADR-019 决定。 |
@@ -34,7 +34,7 @@
 2. **本机已完成：0E supervisor 异常退出路径审查。** 子进程握手后异常退出时能清理并由调用方显式重启；GUI 启停与退出清理已实测。自动重启/退避、锁屏/休眠、真实系统认证提示仍缺证据或决策，见安全客户端报告。
 3. **需用户参与：0B 双语实时麦克风验收。** 用户已完成一次主动采集，暴露了混合语句错词；需按固定短句多轮复测并测试停止/异常清理和 TTS 打断。上次命令已从 backend 目录成功运行，开头 `cd backend` 的报错可忽略。D-013 性能阈值继续延期。
 4. **需许可条款：0B 中文 ASR 权重分发。** 原中文候选上游要求接受访问条件，公开页面未展示许可；可提供获准账号所见许可文本供记录，或明确只采用官方双语 Apache-2.0 候选，后者仍需真人语音验证。
-5. **需用户本机操作：0C 真实远端 Provider/Gateway。** 用户已确认 DeepSeek 按中国处理、OpenRouter 选 Global。两家探测均已在用户输入确认后尝试查询 Keychain，但返回凭据缺失，未发送请求。请按 `poc/phase0-remote-provider.md` 检查 login 钥匙串项目的 service/account 字段；密钥不要贴到聊天。修正后每家仍需单独输入一次性确认短语。
+5. **需用户本机操作：0C 真实远端 Provider/Gateway。** 用户报告 DeepSeek 合成请求成功；OpenRouter 因余额不足的判断按用户说明记录，未取得成功请求证据。后续有余额后重试 OpenRouter，每次仍须核对范围并输入单次确认短语。不要把密钥贴到聊天。
 6. **产品决策继续延期：0F/0G 及规格 D 项。** ADR-019 与 D-014 等照用户要求保持延期；这不关闭对应证据缺口，也不允许开始阶段 1。
 
 麦克风复现命令（从仓库根目录，在本机交互式终端运行）：
