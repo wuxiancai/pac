@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：OpenRouter 费用与区域重复核验
+
+- 用户对 `openrouter metadata --repeat 2` 两次请求分别给出精确确认；两次均精确匹配，均报告 Relace/HKG。Token 分别 42/17/59、42/16/58；cost 分别 USD 0.000008752、0.000008252。小样本只记录观察，不推导定价规律。
+- OpenRouter 的费用/区域已完成两次重复观察；DeepSeek metadata 重复观察仍待执行，服务此前未提供实际 Provider/区域/费用。下一项命令为 `deepseek metadata --repeat 2`，会逐次确认两条请求。
+- 本轮只更新文档；提交前执行 `git diff --check`。
+
 ### 2026-11-08：OpenRouter 错误路径返回 HTTP 400
 
 - 用户逐次确认 OpenRouter `error` 探测后，故意无效的 `response_format` 返回已脱敏 HTTP 400，脚本报告预期 4xx 路径通过。与 DeepSeek HTTP 422 结果一致；每家目前只有一次真实错误路径样本。
