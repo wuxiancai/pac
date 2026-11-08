@@ -9,8 +9,9 @@
 ### 2026-11-08：0C Provider 能力探测工具
 
 - 新增 `backend/scripts/probe_provider_capability_poc.py`，按 Provider/能力单次运行，覆盖 streaming、强制工具提案（不执行）、JSON、故意触发 4xx、重复 metadata，以及无授权 deny-check。每个真实 HTTP 请求都需要单独输入精确确认；故意错误请求可能计费。
-- Adapter 新增显式 `tool_choice` 透传。窄回归 30 项通过；deny-check tripwire 结果为 Keychain reads=0、HTTP transport calls=0。该结果不是系统级抓包。用户随后完成 DeepSeek 与 OpenRouter 各一次真实 SSE 探测，拼接响应均精确匹配 `phase0-probe-ack`；工具/JSON/错误和重复 metadata 仍待测。
+- Adapter 新增显式 `tool_choice` 透传。窄回归 31 项通过；deny-check tripwire 结果为 Keychain reads=0、HTTP transport calls=0。该结果不是系统级抓包。用户随后完成 DeepSeek 与 OpenRouter 各一次真实 SSE 探测，拼接响应均精确匹配 `phase0-probe-ack`；DeepSeek tool proposal 成功，OpenRouter 首次没有返回提案，已增加受支持参数路由过滤并等待复测。
 - DeepSeek 首次工具请求返回 HTTP 400，正文未保留。按 DeepSeek 官方说明，默认 thinking mode 与指定 tool_choice 不兼容的推断已被落实为工具请求显式关闭 thinking；用户重新确认后获得正确的合成 `phase0_echo_synthetic` 提案，未执行工具。下一项为 OpenRouter tools。
+- OpenRouter 工具探测经确认后返回空 proposal list，未显示普通文本，端点 metadata 也未包含在工具结果中，原因尚未确认。根据 OpenRouter 文档，部分不支持工具的上游会忽略 tools 字段；已添加 `provider.require_parameters=true`（仍禁用 fallback）及空提案文本诊断，等待重新授权复测。
 - 复现命令、payload、确认短语及未决限制见 `poc/phase0-remote-provider.md`。
 
 ### 2026-11-08：0C 同一 Gateway 双 Provider 路由

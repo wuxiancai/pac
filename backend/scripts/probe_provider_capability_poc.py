@@ -208,6 +208,8 @@ def main() -> int:
             print("工具调用只作为模型提案显示；本脚本不会执行该工具。")
             if request.thinking_enabled is False:
                 print("DeepSeek 本次显式关闭 thinking，以支持指定 tool_choice。")
+            if config.provider == "openrouter":
+                print("OpenRouter 仅选择支持本次 tools/tool_choice 参数的端点，且不启用 Provider fallback。")
             print(f"Tool schema: {json.dumps(list(request.tools), ensure_ascii=False)}")
             print(f"tool_choice: {json.dumps(request.tool_choice, ensure_ascii=False)}")
         elif args.capability == "error":
@@ -238,6 +240,8 @@ def main() -> int:
                     for call in result.tool_calls
                 ]
                 print(f"工具调用提案（未执行）: {json.dumps(calls, ensure_ascii=False)}")
+                if not calls:
+                    print(f"模型文本响应: {result.text or '（空）'}")
                 passed = any(call["name"] == "phase0_echo_synthetic" for call in calls)
             elif args.capability == "error":
                 try:

@@ -340,6 +340,58 @@ def test_remote_tools_are_returned_as_data_and_never_executed() -> None:
     assert b'"thinking":{"type":"disabled"}' in seen[0].read()
 
 
+def test_openrouter_tool_probe_requires_parameter_capable_provider_without_fallback() -> None:
+    credentials = FakeCredentials()
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "phase0_echo_synthetic",
+                                        "arguments": '{"marker":"phase0-probe-ack"}',
+                                    }
+                                }
+                            ],
+                        }
+                    }
+                ]
+            },
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        OPENROUTER_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent, OPENROUTER_PROBE_CONFIG)
+    gateway = make_gateway(consent, adapter, "openrouter")
+    request = request_for(
+        OPENROUTER_PROBE_CONFIG,
+        tools=(
+            {
+                "type": "function",
+                "function": {"name": "phase0_echo_synthetic", "parameters": {"type": "object"}},
+            },
+        ),
+        tool_choice={"type": "function", "function": {"name": "phase0_echo_synthetic"}},
+    )
+
+    result = asyncio.run(gateway.call_with_tools(request))
+
+    assert result.tool_calls[0].name == "phase0_echo_synthetic"
+    assert b'"provider":{"allow_fallbacks":false,"require_parameters":true}' in seen[0].read()
+
+
 def test_structured_response_format_is_forwarded_without_secret_logging() -> None:
     credentials = FakeCredentials()
     seen: list[httpx.Request] = []

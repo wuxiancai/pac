@@ -266,6 +266,9 @@ class OpenAICompatibleRemoteAdapter:
         if self._config.provider == "openrouter":
             # OpenRouter otherwise enables cross-provider failover by default.
             payload["provider"] = {"allow_fallbacks": False}
+            if request.tools:
+                # Avoid endpoints that silently ignore tools/tool_choice.
+                payload["provider"]["require_parameters"] = True
         return payload
 
     @staticmethod
