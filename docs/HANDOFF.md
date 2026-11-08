@@ -1,3 +1,8 @@
+### 2026-11-08：0D MemoryStore Embedding 检索集扩展
+
+- 将 disposable MemoryStore 的固定合成评估由 3 条记忆/查询扩为 4 条，新增 Swift 编程语言记忆与 macOS 开发语言 query；不使用私人数据。
+- 固定候选权重离线合成检索 4/4 top-1；严格离线输出 `memory_count=4`、`query_count=4`、`top1_matches=4`、来源证据完整，没有输出 query/记忆原文。仍是小型合成集，产品 schema 和默认模型选择保持不变。详见 `poc/phase0-memory-embedding.md`。
+
 ### 2026-11-08：0B ASR/TTS 验收缺口复核
 
 - 对照规格书 §13 并新增 manifest 样本 ASR-final → AVSpeechSynthesizer 冒烟脚本；5 条中英/混说系统合成 WAV 共 7/7 得到 final 并正常完成播放，未落盘 transcript。已有独立 AVSpeechSynthesizer 立即打断实测。

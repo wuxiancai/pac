@@ -24,7 +24,7 @@ XDG_CACHE_HOME=.poc-data/xdg-cache HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 uv run --locked --extra phase0-embedding python scripts/evaluate_memory_embedding_poc.py
 ```
 
-- 本机运行输出只含聚合统计：`memory_count=3`、`query_count=3`、`top1_matches=3`、`source_evidence_returned=true`、`query_or_memory_text_logged=false`。这是 3 个合成记忆与 3 个合成查询的一次结果，不代表真实用户数据质量、稳定检索率或性能指标。
+- 2026-11-08 扩展固定合成案例后，离线运行输出只含聚合统计：`memory_count=4`、`query_count=4`、`top1_matches=4`、`source_evidence_returned=true`、`query_or_memory_text_logged=false`。四组覆盖中文回复偏好、编程语言、周末爱好和工作城市。小型合成集的一次 4/4 结果不代表真实用户数据质量、稳定检索率或性能指标。
 - 测试命令：
 
 ```bash
@@ -35,6 +35,6 @@ uv run --locked pytest -q tests/test_memory_store_poc.py tests/test_memory_embed
 ## 未解决/未验收
 
 - 产品默认 Embedding 型号、许可、CPU/RSS/延迟目标、语言覆盖及是否启用仍未决；当前 provider 是显式注入的 POC 候选。
-- 合成检索集过小；未使用真实用户数据或有标注的代表性查询集，也未形成 Recall@k、稳定性能分布。
+- 合成检索集仍很小；未使用真实用户数据或有标注的代表性查询集，也未形成 Recall@k、稳定性能分布。
 - 没有持久化 repository、SQLCipher/Alembic 产品 schema、索引重建/模型升级迁移或长期故障恢复验证。
 - 阶段 0 仍未验收，阶段 1 未开始。

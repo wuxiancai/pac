@@ -54,9 +54,9 @@ def test_memory_embedding_report_preserves_opt_in_and_non_product_scope() -> Non
     assert "`PARTIAL`" in report
     assert "默认不配置 embedding provider" in report
     assert "没有修改产品 schema" in report
-    assert "top1_matches=3" in report
+    assert "top1_matches=4" in report
     assert "产品模型、持久化 schema 与真实检索质量仍 OPEN" in traceability
-    assert "固定候选权重离线合成检索 3/3 top-1" in handoff
+    assert "固定候选权重离线合成检索 4/4 top-1" in handoff
 
 
 def test_failure_recovery_report_distinguishes_reader_contention_from_crash_mid_checkpoint() -> None:

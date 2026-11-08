@@ -9,12 +9,14 @@ from pac_poc.memory_poc import MemoryStore
 
 MEMORIES = (
     ("用户偏好简洁直接的中文回答", "fixture:language-preference", "user_confirmed_fact"),
+    ("用户常用的编程语言是 Swift", "fixture:programming-language", "user_confirmed_fact"),
     ("周末喜欢爬山和户外徒步", "fixture:weekend-hobby", "user_confirmed_fact"),
     ("用户的工作地点在上海", "fixture:work-city", "user_confirmed_fact"),
 )
 
 QUERIES = (
     ("更希望以中文简短回复", "fixture:language-preference"),
+    ("macOS 应用通常用什么语言开发", "fixture:programming-language"),
     ("周末会做什么户外运动", "fixture:weekend-hobby"),
     ("现在工作的城市", "fixture:work-city"),
 )
