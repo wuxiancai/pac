@@ -1,6 +1,6 @@
 # 项目上下文
 
-最后核对：2026-11-08（Asia/Shanghai）
+最后核对：2026-11-09（Asia/Shanghai）
 
 ## 项目目标
 
@@ -15,7 +15,7 @@
 - SwiftUI 安全客户端：显式系统认证测试按钮已在真实 demo 窗口两次成功验证、一次用户取消验证，均确认未访问钥匙串；UI 按 LocalAuthentication 错误码区分用户取消和系统中断；GUI 后端启停另经两轮复测且无重复子进程。
 - Gateway、安全、记忆、Embedding、SQLCipher 和后端生命周期均有 POC；MemoryStore 显式注入固定 Embedding 权重的严格离线合成检索最新为 4/4 top-1。它们不等同于产品功能验收。详情按需查阅 [`docs/poc/`](poc/)。
 - 0G 许可审查现覆盖当前 macOS Python arm64 wheel：Pillow 自带 SBOM 包含 GPL/LGPL 组件，SQLCipher/PortAudio/sherpa 内嵌 ONNX Runtime 有独立许可或 notices。实际产品安装依赖未定，模型工件及完整发行通知闭包仍开放，详见 `docs/poc/phase0-model-license-review.md`。
-- 根目录现有 `README.md`、`AGENTS.md` 和 `.github/workflows/ci.yml`；最新本机 CI 等价全量验证通过（Python 154 项、Swift 31 项、Python compileall、`uv lock --check`），GitHub Actions 尚未执行。用户选择暂不配置/操作 Git 远端；当前工作树检查发现已有 `origin`，未推送。D-001–D-015 与 ADR-019/020/021/022 按用户 2026-11-08 指示延期。用户随后确认单用户 macOS 测试版优先；阶段 0 全量证据改为 V1/正式发布门禁，详见 C-007。
+- 根目录现有 `README.md`、`AGENTS.md` 和 `.github/workflows/ci.yml`；2026-11-09 本机复核：Python 全量 162 项通过、Swift 31 项通过、`compileall` 与 `uv lock --check` 通过。仓库已推送到 `origin`（GitHub `wuxiancai/pac`），本机 `main` 与 `origin/main` 同为 commit `51b9ab9`、无未推送提交。GitHub Actions `Phase 0 checks` 已在 `main` 上真实成功运行（run `42489738004`，对应该 commit，日志记录 `162 passed`、Swift `31 tests passed`，用时约 2 分钟）；此前记录的"未推送、CI 未验证"已过期并更正。`uv.lock` SHA-256 仍为 SBOM 报告记录的 `b201746b…`，故 Python SBOM 证据锚点未失效。D-001–D-015 与 ADR-019/020/021/022 按用户 2026-11-08 指示延期。用户随后确认单用户 macOS 测试版优先；阶段 0 全量证据改为 V1/正式发布门禁，详见 C-007。
 - 每次工作的 Git 基线以 `git log -1` 为准；工作开始前先检查 `git status`，保护已有改动。
 
 ## 架构和安全边界

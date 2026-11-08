@@ -1,3 +1,12 @@
+### 2026-11-09：校正文档与仓库实际状态的不一致
+
+- 只读复核发现三处权威文档陈述已过期：①全量 Python 回归实际为 **162 项通过**，而 `PROJECT_CONTEXT.md` 与追踪矩阵仍记 154 项；②仓库**已推送**且 `main` 与 `origin/main` 同为 `51b9ab9`、无未推送提交，文档仍写"未推送"；③GitHub Actions `Phase 0 checks` **已在 `main` 真实成功运行两次**（run `42489738004` 对应 `51b9ab9`，日志 `162 passed`、Swift `31 tests passed`；另 run `42475879541` 成功），文档仍写"尚未执行/真实 CI 状态仍未验证"。`docs/beta/macOS-beta-chat.md` 验证记录内还并存 158 与 162 两个数字。
+- 已更正 `PROJECT_CONTEXT.md`、`docs/poc/phase0-traceability.md`（工程基线/CI 行）、`docs/TASKS.md`（把 GitHub Actions 实际运行移出延期清单）、`README.md`（CI 段补充已真实运行；关窗停止后端的表述改为与 `onDisappear` → `supervisor.stop()` 实现一致并保留"残留进程待实机冒烟"）、`docs/beta/macOS-beta-chat.md`（标注 158 为该轮记录）。
+- 本文件内 2026-11-08 各条历史交接（含 154/158、"未执行推送或远端 CI"）在当时是准确的，按日志性质保留原文，不作追溯改写。
+- 追踪矩阵工程基线/CI 行仍保持 `PARTIAL`：push 触发的 CI 已验证，但 PR 触发路径尚未经历；是否改判 `PASS` 属阶段验收决定，未由实现者自行变更。
+- 本次实测命令：`backend/` 下 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q` → 162 passed；`swift test --package-path poc/macos-audio` → 31 项通过；`uv lock --check`、`compileall` 通过；`uv.lock` SHA-256 仍为 `b201746b…`，SBOM 证据锚点未失效。本轮只读复核与文档更正，未改动任何代码、未发起云请求、未采集音频、未读取 Keychain。
+- 顺带记录一项仍未闭环的安全事项：`docs/poc/phase0-remote-provider.md` 提到用户曾在聊天中贴出一把 `sk-ws-` 临时 key，建议"在控制台撤销"，但后续记录只确认了新 key 已存入 Keychain，**旧 key 是否已撤销至今无闭环记录**，应按已泄露处理并由用户在控制台确认。
+
 ### 2026-11-08：移除逐消息云端确认弹窗并澄清 Token Plan 边界
 
 - 用户明确反馈选择了云模型后每条消息再弹窗影响体验。聊天发送不再显示确认 sheet；模型设置解释选中云端 Provider 即持续授权后续消息直接发送，切回本地即可停止云出站。后端仍按具体 Provider/model/region/data level 建立单请求 Policy grant，保留 L3 凭据拦截、Keychain、固定目标和禁用 fallback。
@@ -227,7 +236,7 @@
 
 > 文档入口：稳定项目约束见 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)，已确认/待决选择见 [DECISIONS.md](DECISIONS.md)，阶段任务与下一步见 [TASKS.md](TASKS.md)，阶段证据见 [追踪矩阵](poc/phase0-traceability.md)。本文件仅作为最近交接摘要；避免在这里重复维护完整任务和决策清单。
 
-最近更新：2026-11-08（Asia/Shanghai）
+最近更新：2026-11-09（Asia/Shanghai）
 
 ## 最近交接
 

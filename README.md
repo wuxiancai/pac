@@ -47,8 +47,10 @@ swift test
 ./poc/macos-audio/scripts/run_beta_app.sh
 ```
 
-测试版窗口关闭时会停止由应用管理的本机后端。该脚本依赖当前仓库环境，不是独立安装包。
+测试版在窗口视图消失时会调用清理逻辑停止由应用管理的本机后端（`onDisappear` → `supervisor.stop()`）；关闭窗口后是否确定无残留后端进程仍待实机冒烟确认，见 `docs/beta/macOS-beta-chat.md`。该脚本依赖当前仓库环境，不是独立安装包。
 
 ## CI
 
 `.github/workflows/ci.yml` 在 GitHub Actions 的 macOS arm64 runner 上运行锁定依赖的 Python 全量测试、编译检查和 Swift 测试。它只使用仓库依赖，不注入 Provider 密钥，不下载模型，不启动麦克风。
+
+该 workflow 已在 `main` 分支上由 push 真实触发并成功通过（最近一次对应 commit `51b9ab9`，日志记录 Python `162 passed`、Swift `31 tests passed`）。PR 触发路径尚未实际经历。
