@@ -9,7 +9,7 @@
 ### 2026-11-08：0G Python 依赖 SBOM
 
 - 从锁文件导出 CycloneDX 1.5 SBOM，覆盖所有 54 个 Python 锁定依赖（包括所有 extras 与 dev 组），并核对 BOM 的 `(name, version)` 集合与 `uv.lock` 完全一致。复现步骤、SHA-256 和范围限制见 `poc/phase0-python-sbom.md`。
-- uv 导出的组件未包含许可证字段；当前平台的 package metadata / license file 已取得多数直接线索，但 Windows-only 两个锁定包、许可证闭包、模型权重许可及通知义务仍待核。真实标注记忆检索集和 D-014 模型决定仍未完成。
+- uv 导出的组件未包含许可证字段；54 个锁定 Python 包现均有 metadata、随包 LICENSE 或对应 PyPI 精确版本页的初步许可证线索。完整许可证范围/通知审查、模型权重许可、真实标注记忆检索集和 D-014 模型决定仍未完成。
 
 ### 2026-11-08：两家 Provider 实测与本地语音功能复测
 

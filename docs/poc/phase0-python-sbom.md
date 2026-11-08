@@ -27,5 +27,5 @@ UV_CACHE_DIR=.poc-data/uv-cache uv export \
 ## 范围与限制
 
 - 这是完整的 **Python 锁定依赖清单**，不包含 Swift Package 依赖、macOS/Xcode 系统组件、下载的模型权重、模型 tokenizer/词表、测试音频或其他外部运行时资产。
-- uv 生成的组件条目未附许可证字段，故该 BOM 本身不构成许可证闭包。当前平台已安装包的 metadata 有 50 项提供许可证标识；另检查 `py-rust-stemmers`、`sqlcipher3` 的随包 `LICENSE` 文本；`colorama`、`win32-setctime` 在 macOS 环境未安装，其许可证仍需从固定版本的上游发行物核对。此检查不是法律批准。
+- uv 生成的组件条目未附许可证字段，故该 BOM 本身不构成许可证闭包。当前平台已安装包的 metadata 有 50 项提供许可证标识；另检查 `py-rust-stemmers`、`sqlcipher3` 的随包 `LICENSE` 文本。macOS 环境未安装的 `colorama==0.4.6` 与 `win32-setctime==1.2.1`，分别由 [PyPI 固定版本页](https://pypi.org/project/colorama/0.4.6/)确认 BSD 3-Clause、[PyPI 固定版本页](https://pypi.org/project/win32-setctime/1.2.1/)确认 MIT。54 个锁定包现均有一个初步许可证来源线索；仍需审查许可证适用范围、通知义务、原生依赖和发行打包内容，这不是法律批准。
 - `phase0-embedding` 模型权重许可、ASR 模型/音频许可及其数据来源仍按 [`phase0-model-license-review.md`](phase0-model-license-review.md) 单独核验。D-014 仍延期，候选未被批准为产品默认项。

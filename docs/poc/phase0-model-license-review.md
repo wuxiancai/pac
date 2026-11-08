@@ -7,7 +7,7 @@
 - 固定权重来自 `Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q` revision `faf4aa4225822f3bc6376869cb1164e8e3feedd0`。该 revision 的 [Hugging Face 模型页](https://huggingface.co/Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q/tree/faf4aa4225822f3bc6376869cb1164e8e3feedd0) 标注 `apache-2.0`。
 - 对应上游 [Sentence Transformers 模型页](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2) 也标注 `apache-2.0`。
 - 本机固定安装 FastEmbed `0.9.1` 的 Python package metadata 标注 `Apache-2.0`；通过 `uv run --locked --extra phase0-embedding` 读取。
-- 以上建立了模型候选与直接运行库的初步线索。Python 锁定依赖 CycloneDX SBOM 已生成，54/54 个 `uv.lock` 包均纳入，见 [`phase0-python-sbom.md`](phase0-python-sbom.md)。该导出没有内嵌许可证字段，50 个当前安装包可由 distribution metadata 取得许可证线索，另检查 2 个本机 LICENSE 文件；2 个仅在 Windows 安装的锁定包和完整通知义务仍需核查。模型权重/词表和模型随包依赖也不在此 SBOM 内。D-014 仍待产品负责人决定；目前没有把该模型设为默认或纳入产品 schema。
+- 以上建立了模型候选与直接运行库的初步线索。Python 锁定依赖 CycloneDX SBOM 已生成，54/54 个 `uv.lock` 包均纳入，见 [`phase0-python-sbom.md`](phase0-python-sbom.md)。该导出没有内嵌许可证字段；50 个当前安装包可由 distribution metadata 取得许可证线索，另检查 2 个本机 LICENSE 文件，剩余 2 个 Windows-only 包已由其精确版本 PyPI 页面取得许可证标识。54 个依赖现均有初步许可证来源线索，但许可证适用范围、通知义务、原生依赖和随包内容仍需审查。模型权重/词表和模型随包依赖也不在此 SBOM 内。D-014 仍待产品负责人决定；目前没有把该模型设为默认或纳入产品 schema。
 - 2026-11-07 新增三次离线重复：每次 4 个合成 query 均 top-1 命中 4/4；wall 0.81–1.19 秒；`/usr/bin/time -l` observed maximum RSS 883,130,368–883,490,816 bytes。仅为固定小型合成集和本机进程观察，不代表检索质量、产品资源目标或稳定分布。
 
 ## 中文 ASR 候选
