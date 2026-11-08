@@ -18,8 +18,8 @@
 
 | 顺序 | 工作包 | 状态 | 下一步 / 完成条件 |
 |---:|---|---|---|
-| 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；本机等价 Python/Swift 回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
-| 0B | 本地语音链路 | IN PROGRESS | Qwen3-ASR 0.6B INT8 ONNX 已完成 5 条随包中文/英语/混说 WAV 的离线评估；待确认转换 ONNX 包/音频许可，评估其是否满足 streaming 集成，完成 SwiftUI 真实麦克风 partial/final、停止/异常清理与 TTS 打断验收。目标阈值按用户指示暂缓。 |
+| 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；本机 Python 129 项、Swift 27 项回归通过。仓库没有 Git remote，首次 GitHub Actions 运行仍待验证。 |
+| 0B | 本地语音链路 | IN PROGRESS | 除 Qwen3 离线候选外，官方中英双语 Streaming Zipformer 已对 10 条本机合成中英/混说音频完成 200 ms 分帧测试（10/10 final、82 partial、weighted CER 0.0254）。下一步由用户实际参与麦克风多轮 partial/final、停止/异常清理测试；Qwen ONNX 转换包许可仍待核，性能目标暂缓。 |
 | 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | 本机 Ollama 与模拟接口已有证据。D-010 按用户要求延期，用户将另提供 Provider 组合；在供应商和区域明确、凭据经 Keychain 配置且 Consent/Policy 明确放行前，不发送远端请求。 |
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；补真实系统认证提示、锁屏/休眠、多轮 GUI、正式分发与恢复策略证据。 |
@@ -32,7 +32,7 @@
 
 1. **继续 0H：原子替换边界恢复审查。** 子进程在 `os.replace` 调用前 SIGKILL 后旧备份有效；在调用成功返回后 SIGKILL，新备份有效；两种情况下源库完整。没有声称系统调用内部中断或断电持久性。下一步审查恢复结果并同步报告；真实活动卷/外接介质故障需单独设计和记录。
 2. **可本机继续：0E supervisor 异常退出路径。** 现有策略是异常退出后显式由调用方重启；需对照规格梳理调用方 GUI、退出清理与错误提示证据。自动重启/退避和锁屏策略若无产品决定，保持 OPEN。
-3. **需设备操作：0B SwiftUI 真实麦克风验收。** 需要用户实际多轮说话、停止/异常清理与 TTS 打断；D-013 的性能阈值由产品负责人确认。中文当前模型继续使用，多语言 ASR 按 C-003 延后。
+3. **需用户参与：0B 双语实时麦克风验收。** 双语流式候选的文件分帧 partial/final 已测；下一步需要用户按隐私提示主动启动采集并说中英/混合句，检查停止/异常清理与 TTS 打断；D-013 性能阈值继续延期。
 4. **需许可条款：0B 中文 ASR 权重分发。** 上游模型页要求接受访问条件，公开页面无条款；需授权账号下人工查看并归档许可/再分发条件，或选择其他许可清晰模型。
 5. **需用户提供组合及凭据授权：0C 真实远端 Provider/Gateway。** 用户已表示会另提供组合；名单/区域确定后，才可用合成输入和 Keychain 凭据逐家验证，并在每次请求前通过 Consent/Policy。
 6. **已延期产品输入：0F/0G。** ADR-019 与 D-014 已按用户要求延期；如要恢复决策，仍需真实标注记忆/query 语料、资源目标及安全/许可证据。

@@ -6,6 +6,13 @@
 
 ## 最近交接
 
+### 2026-11-08：双语流式 ASR 分帧评估与评分修正
+
+- 官方 sherpa-onnx `sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20` 已下载至忽略目录 `backend/.poc-data/models/`。包内 README 声明 Apache-2.0；模型页、来源和四个关键文件 SHA-256 记录在 `poc/phase0-local-asr.md`。
+- 使用项目 streaming adapter 按 200 ms 输入 8 条 Tingting 中文、1 条 Samantha 英语、1 条中英混说合成 WAV，尾部追加 3 秒静音：10/10 final、82 partial、weighted CER 0.0254。小型合成样本只证明适配器文件分帧路径可运行；真实麦克风及 SwiftUI 流程仍需用户操作。
+- 修复 CER 对英语大小写敏感的问题，并修复多段 final 只评分最后一段的问题；ASR 评测回归 8 项通过，Python 全量 129 项、Swift 27 项通过。
+- 下一步由用户主动参与麦克风中英混说测试；其余阶段缺口与门禁以 `poc/phase0-traceability.md`、`TASKS.md` 为准。阶段 0 未验收。
+
 ### 2026-11-08：用户提供 Qwen3-ASR 多语言候选
 
 - 将 `~/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25` 移至 `backend/.poc-data/models/` 下同名目录；972 MB 权重与样本目录被 Git 忽略。三份 ONNX 权重 SHA-256 和复现入口记录于 `poc/phase0-local-asr.md`。
@@ -93,7 +100,7 @@
 
 ## 当前限制
 
-- 旧 Streaming ASR 模型的实机反馈仅覆盖中文；新增 Qwen3-ASR ONNX 候选已有随包中/英离线测试，尚无 streaming 接入或 SwiftUI 麦克风实测。不得静默改用云 ASR。
+- 官方双语 Streaming Zipformer 已有合成中英文件分帧 partial/final 证据；Qwen3-ASR ONNX 候选另有随包中/英离线评测。双语模型尚无真人麦克风与 SwiftUI 实机验收；不得静默改用云 ASR。
 - 尚未验证 SwiftUI 麦克风链路、中英混合识别质量、P50/P95、资源占用、AEC、TTS 与 ASR 同时工作和锁屏/休眠处理。
 - ASR 资源测量已对同一条合成 WAV 做 3 次独立进程重复，但没有独立语料或实时麦克风端到端统计；重复样本分布和可确认性能阈值仍未验证/未决。
 - Gateway 的真实远程 Provider/能力矩阵/费用/错误/fallback 对照未开始，需在本地客户端连接外部服务时经 Consent/Policy、Keychain 和合成数据逐项测试；POC-05 真实系统认证提示、异常自动恢复/退避、锁屏/休眠策略和正式分发仍未验证，SwiftUI demo 的进程握手/启停/退出清理已通过；POC-06 尚未评估密钥生命周期、APFS/外接介质 ENOSPC、断电/checkpoint 执行中断、备份介质故障和产品性能，也未作 ADR。记忆 Embedding 只接入 disposable 内存 repository，产品 schema 与真实检索质量仍未验收。
@@ -101,7 +108,7 @@
 
 ## 下一步
 
-继续阶段 0：收尾 POC-01/02/04/05/06/0G/0H。多语言 ASR 按用户安排留待后续模型补充；当前不当作代码 bug。Gateway 对照报告已完成桌面资料比较，真实 Provider/Gateway 实测尚缺；本机软件可连接云 Provider，但每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝；凭据只经 Keychain。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、原子替换中断、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：双语流式 ASR 已完成合成文件分帧评估，真实麦克风验收需要用户主动启动采集并说话。Gateway 对照报告已完成桌面资料比较，真实 Provider/Gateway 实测尚缺；本机软件可连接云 Provider，但每个出站请求仍必须经 Consent Manager 与 Policy Engine，默认拒绝；凭据只经 Keychain。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 

@@ -15,10 +15,10 @@ class ASREvaluationScore:
 
 
 def normalize_asr_text(text: str) -> str:
-    """Keep Unicode letters and numbers; ignore punctuation and whitespace."""
+    """Keep case-folded Unicode letters and numbers; ignore punctuation/space."""
     return "".join(
         character
-        for character in text
+        for character in text.casefold()
         if unicodedata.category(character)[0] in {"L", "N"}
     )
 

@@ -41,7 +41,9 @@ def resolve_sample_audio(manifest_path: Path, audio_name: str) -> Path:
     return candidate
 
 
-def recognize_sample(wav_path: Path, recognizer: SherpaOnnxRecognizer, *, tail_ms: int) -> tuple[str, int, int]:
+def recognize_sample(
+    wav_path: Path, recognizer: SherpaOnnxRecognizer, *, tail_ms: int
+) -> tuple[str, int, int]:
     with wave.open(str(wav_path), "rb") as source:
         if (source.getframerate(), source.getnchannels(), source.getsampwidth()) != (
             16_000,
@@ -56,7 +58,7 @@ def recognize_sample(wav_path: Path, recognizer: SherpaOnnxRecognizer, *, tail_m
     asr = LocalStreamingASR(recognizer, sample_rate_hz=16_000)
     frame_size = 16_000 * 200 // 1_000
     partial_count = 0
-    final_text = ""
+    final_texts: list[str] = []
     final_count = 0
     for sequence, offset in enumerate(range(0, len(pcm), frame_size)):
         samples = tuple(sample / 32768.0 for sample in pcm[offset : offset + frame_size])
@@ -65,10 +67,10 @@ def recognize_sample(wav_path: Path, recognizer: SherpaOnnxRecognizer, *, tail_m
             partial_count += 1
         elif event is not None and event.kind == "final":
             final_count += 1
-            final_text = event.text
+            final_texts.append(event.text)
     if final_count == 0:
         recognizer.reset()
-    return final_text, partial_count, final_count
+    return "".join(final_texts), partial_count, final_count
 
 
 def main() -> int:

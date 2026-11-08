@@ -29,6 +29,7 @@
 
 - 初始 ASR 事件契约测试：4 项通过（2026-11-07）。
 - Python 全量测试：11 项通过；包括麦克风缓冲、PCM 转换、回调 PCM 帧长度、非交互环境拒绝采集和直接脚本入口导入回归。
+- 2026-11-08 双语 CER 与多 final 聚合修正后，局部评测测试 8 项通过；Python 全量回归 129 项通过（`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`），Swift Testing 27 项通过（`swift test`）。
 - Swift TTS 控制器单元测试：3 项通过；Swift 包构建通过。
 - AVSpeechSynthesizer 本机播放后按回车中断，返回 `interrupted=true speaking=false`。
 - `uv lock --check` 通过；sounddevice 默认输入设备检查支持 16 kHz、单声道、PCM16。
@@ -58,6 +59,9 @@
 
   五条的加权 CER 为 0.1564。音频与 reference 来自随包测试目录；它们不是独立留出语料或真人麦克风录音。不同运行的资源峰值/解码延迟受 `max_total_len`、OS 缓存和进程情况影响；这是一轮观察，不代表稳定性能分布。
 - 三个模型文件 SHA-256：`conv_frontend.onnx` `d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e`；`encoder.int8.onnx` `60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9`；`decoder.int8.onnx` `4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771`。
+- 2026-11-08 为验证实时中英路径，另下载 sherpa-onnx 官方发布的 `sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20` 至忽略目录 `backend/.poc-data/models/`。官方模型页将其列为中英双语 Streaming Zipformer，并给出相同发布包下载地址；包内 README 声明 Apache-2.0，来源为 `csukuangfj/k2fsa-zipformer-chinese-english-mixed`。当前模型文件 SHA-256：encoder INT8 `8fa764187a261844f859d7143ebaa563af5d10adfece4c18a8f414c88cba2a9b`；decoder FP32 `2e3b5ec371f8899ee6acd829fd753ba45772df57a91bdf37cde3136354e7db7d`；joiner INT8 `1ed689c5ed19dbaa725d9d191bb4822b5f4855a39e1ffd28cbc1f340d25b2ee0`；tokens `a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3`。模型页面：[sherpa-onnx 双语流式 Zipformer](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html)。
+- 该双语 Streaming 模型用现有 200 ms 分帧适配器评测 8 条 Tingting 中文合成句、1 条 Samantha 英语合成句、1 条中英混说合成句；附加 3,000 ms 静音尾段。10/10 产生 final，82 个 partial；大小写/标点/空白归一化后的 weighted CER 为 0.0254（197 个参考字符、5 个字符错误）。8 条中文与混说各自 CER 为 0；英语 CER 为 0.0633。只是小型系统合成音频的流式接口冒烟，不是独立语料、真人口音、麦克风实时或产品准确率验收。
+- 本轮修复 `pac_poc/asr_evaluation.py`：CER 预处理现对文本执行 Unicode `casefold()`，避免模型常见的大写英语输出被全部计作替换错误；另确保多段流式 final 会拼接后一起评分。新增回归覆盖大小写不敏感以及跨多个 final 累计。
 - 最初以 max-total-len 1024 跑 88 秒 `noise1-en.wav` 时，运行时明确警告输入上下文被截断，该结果已排除；将上下文提高到 4096 后重测。默认脚本使用 4096/1024 以覆盖随包长音频。
 
 ## 复现
@@ -75,6 +79,9 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_local_asr_poc
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/evaluate_synthetic_asr_poc.py \
   .poc-data/audio/asr-synthetic-a3ecd94d/manifest.json \
   .poc-data/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30
+UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/evaluate_synthetic_asr_poc.py \
+  .poc-data/audio/bilingual-manifest.json \
+  .poc-data/models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/measure_local_asr_poc.py \
   .poc-data/audio/mandarin-16k.wav \
   .poc-data/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30
@@ -96,6 +103,7 @@ swift run tts-interrupt-poc
 ## 尚未解决
 
 - 需要由用户明确启动真实麦克风测试，验证 partial/final、VAD、背压、停止和异常后的缓冲清理。
+- 双语 streaming 候选已产生中英及混说的文件分帧 partial/final；仍需用户参与实时麦克风多轮说话，检查真实说话节奏、停止/异常清理及 SwiftUI 链路。合成语音分数不能替代此门槛。
 - Qwen3-ASR 候选已在五条随包音频上完成离线中/英/混说检查；尚无独立留出中英语料。其 ONNX 离线整段路径不能证明实时流式延迟、partial/final、打断、SwiftUI 麦克风处理或长时运行能力。Qwen 官方当前说明流式推理需 vLLM backend；本机现有 sherpa-onnx API 测试使用 `OfflineRecognizer`，因此不能把 RTF<1 写成实时流式验收。
 - sherpa-onnx 官方 Python API 样例将此类模型通过 `OfflineRecognizer.from_qwen3_asr` 整段解码；参见 [官方 Qwen3-ASR 文件解码样例](https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-qwen3-asr-decode-files.py)。Qwen 官方说明 Qwen3-ASR 的 streaming inference 当前只在 vLLM backend 提供，详见 [Qwen3-ASR 官方文档](https://github.com/QwenLM/Qwen3-ASR#streaming-inference)。
 - 当前 8 条合成中文集只有一轮，CER 不能代表真人麦克风或真实用户话语分布；需要更广语料与多轮实机验证，阈值待产品负责人确认。
