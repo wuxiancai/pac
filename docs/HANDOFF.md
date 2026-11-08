@@ -1,3 +1,10 @@
+### 2026-11-08：Qwen Token Plan 真实文本探测
+
+- 用户在 `backend/` 运行 `scripts/probe_remote_provider_poc.py qwen` 并输入本次确认短语。一次真实非流式 L1 合成文本请求成功，响应精确匹配 `phase0-probe-ack`；模型 `qwen3.8-flash`，usage prompt/completion/total=73/50/123。服务未返回下游 Provider、实际区域或费用。
+- 证据仅覆盖一次文本请求；stream/tools/JSON/error/cancel/重复稳定性以及千问语音接口仍未实测。Token Plan 仅交互式 POC，不得接入产品后端。
+- 此前停在 Consent 提示的本机 CLI session 已消失（工具报告 Unknown process id）；该 session 未发送请求。
+- 已更新 Provider 报告、追踪矩阵、任务和项目上下文；阶段 0 仍未验收。
+
 ### 2026-11-08：千问 Token Plan 默认测试路径
 
 - 用户指定后续云模型默认优先千问 Token Plan；D-011 阶段 0 候选方向定为千问/北京，但 D-010 的 V1 Provider 最终组合仍延期。文本默认测试型号暂取截图所列 `qwen3.8-flash`。
