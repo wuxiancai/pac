@@ -19,10 +19,10 @@
 | 顺序 | 工作包 | 状态 | 完成条件 / 说明 |
 |---:|---|---|---|
 | B0 | 应用可运行骨架 | IN PROGRESS | 新增 SwiftUI 测试版 `.app` 构建/启动入口；真实启动后显示本机模型已连接，supervisor 管理后端。仍需关闭窗口后确认服务清理，并完善启动失败体验。 |
-| B1 | 本机文字对话闭环 | IN PROGRESS | 新增 Loopback `/chat/stream`、输入校验及 SwiftUI 输入/流式显示/停止控件；本机 Ollama API 真实合成短句返回 7 个增量；GUI 实际输入并显示模型回复通过，停止按钮仍需验证。详见 `beta/macOS-beta-chat.md`。 |
+| B1 | 本机文字对话闭环 | IN PROGRESS | 新增 Loopback `/chat/stream`、输入校验及 SwiftUI 输入/流式显示/停止控件；本机 Ollama API 真实合成短句返回 7 个增量；GUI 实际输入并显示模型回复通过。已修复取消后新旧请求状态竞态；停止按钮 GUI 行为与关窗后端清理仍需实机复核。详见 `beta/macOS-beta-chat.md`。 |
 | B2 | 本地语音闭环 | OPEN | 在应用内显式开始/停止麦克风，连接已验证本地 ASR 和本机 TTS；原始音频不落盘，失败不静默上云。 |
 | B3 | 会话保存与恢复 | DEFERRED | 等待最小数据保留和静态加密决策；在决定前不持久化敏感对话。 |
-| B4 | 千问 Token Plan 文本/实时语音 | DEFERRED | 官方支持文本 OpenAI-compatible 与 `qwen-audio-3.0-realtime-plus` Realtime WebSocket；文本 adapter 已有，Beta UI 尚未接入；实时语音未实现/实测。按用户主动交互会话集成，不使用常驻后台/批处理。Base URL、事件、PCM 参数和安全边界见 `beta/qwen-token-plan-integration.md`。 |
+| B4 | 千问文本/实时语音 | DEFERRED | Token Plan 服务端支持文本和 Realtime WebSocket，但个人版条款仅允许在编程/智能体工具内交互使用，排除自建应用后端；因此不把个人版 Key 接入本项目 SwiftUI/FastAPI 测试版。取得适用于自定义应用的 API 凭据后再评估启用。协议、地址和事件见 `beta/qwen-token-plan-integration.md`。 |
 | B5 | 正式发布与扩展功能 | DEFERRED | 文件导入、Embedding 记忆、云语音、备份/恢复、自动恢复、完整许可通知、正式签名分发在对应功能实现前再补决策和测试。 |
 
 ## 阶段 0 证据状态（保留追踪，不作为测试版总门禁）

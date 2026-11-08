@@ -1,3 +1,10 @@
+### 2026-11-08：修复本机对话停止后的请求状态竞态并核对千问实时语音范围
+
+- SwiftUI 本机聊天给每轮生成分配 request ID；取消后清除当前 ID，流片段和结束/错误回调仅在 ID 仍匹配时更新 UI，避免旧请求收尾清掉新请求状态。
+- 验证：`swift test --package-path poc/macos-audio` 构建成功，31 项 Swift 测试通过；该请求竞态尚无专门单元测试，GUI 停止与立即重发仍需手动冒烟。
+- 核对千问官方当前 Token Plan 个人版条款：服务端支持 Realtime WebSocket，但个人版 Key 仅供编程/智能体工具内交互，排除自定义应用后端。本项目自建 Beta 不接该 Key；如要应用内云语音，需适用自定义应用的凭据或官方允许的 Agent 扩展方式。已更新 `docs/beta/qwen-token-plan-integration.md`、DECISIONS、TASKS 和 PROJECT_CONTEXT。当前没有发起云请求或采集音频。
+- 下一步：按 Beta 队列完成 B0 关窗服务清理、B1 停止/立即重发 GUI 复核，再进入 B2 本机语音应用闭环；不要把 Token Plan 个人版 Key 接到自建应用。
+
 ### 2026-11-08：补齐千问 Token Plan 实时语音接入说明
 
 - 用户指出 Token Plan 也支持实时语音。已核对官方 Token Plan 实时语音页和 Realtime API 支持矩阵：`qwen-audio-3.0-realtime-plus` 支持 Token Plan，通过独立 WebSocket 地址；不是 OpenAI Chat Completions，也不是现有本地 ASR/TTS 链路。

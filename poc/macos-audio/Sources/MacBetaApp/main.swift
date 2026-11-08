@@ -47,6 +47,7 @@ final class BetaChatModel {
     private let supervisor: LocalBackendSupervisor
     private var client: LocalAPIClient?
     private var activeRequest: Task<Void, Never>?
+    private var activeRequestID: UUID?
     private(set) var status = "正在连接本机服务…"
     private(set) var messages: [LocalChatMessage] = []
     var draft = ""
@@ -82,36 +83,46 @@ final class BetaChatModel {
         messages.append(LocalChatMessage(role: "user", content: text))
         messages.append(LocalChatMessage(role: "assistant", content: ""))
         let context = Array(messages.dropLast())
+        let requestID = UUID()
+        activeRequestID = requestID
         status = "正在生成…"
         activeRequest = Task { [weak self] in
             do {
                 for try await delta in client.streamChat(messages: context) {
                     guard let self else { return }
+                    guard self.activeRequestID == requestID else { return }
                     if !Task.isCancelled, let index = self.messages.indices.last {
                         self.messages[index] = LocalChatMessage(
                             role: "assistant", content: self.messages[index].content + delta
                         )
                     }
                 }
-                self?.status = "已连接本机模型 qwen3.5:0.8b（Ollama）"
+                guard let self, self.activeRequestID == requestID else { return }
+                self.status = "已连接本机模型 qwen3.5:0.8b（Ollama）"
             } catch is CancellationError {
-                self?.status = "已停止本轮生成"
+                guard let self, self.activeRequestID == requestID else { return }
+                self.status = "已停止本轮生成"
             } catch {
-                self?.status = "本机模型请求失败：\(error.localizedDescription)"
+                guard let self, self.activeRequestID == requestID else { return }
+                self.status = "本机模型请求失败：\(error.localizedDescription)"
             }
-            self?.activeRequest = nil
+            guard let self, self.activeRequestID == requestID else { return }
+            self.activeRequest = nil
+            self.activeRequestID = nil
         }
     }
 
     func stop() {
         activeRequest?.cancel()
         activeRequest = nil
+        activeRequestID = nil
         status = "已停止本轮生成"
     }
 
     func shutdown() async {
         activeRequest?.cancel()
         activeRequest = nil
+        activeRequestID = nil
         client = nil
         do {
             let backendSupervisor = supervisor
