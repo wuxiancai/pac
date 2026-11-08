@@ -41,9 +41,9 @@
 - 测试文本“你好，今天天气很好。我想测试本地实时语音识别。”的最终识别为“你好今天天气很好我想测试本地实时语音识别”。这是单条合成样本观察，不构成准确率结论。
 - 新增显式 JSON manifest 的本机合成语音评估脚本 `scripts/evaluate_synthetic_asr_poc.py`。它只读取 manifest 明确列出的音频，音频路径限制在 manifest 同目录；只输出字符错误率、事件数等统计，不输出转写正文，也不保存 hypothesis/transcript。
 - 固定 Tingting 本机合成 8 条本机合成中文句，逐条新建 Streaming ASR recognizer，每条追加 3,000 ms 静音尾段；8/8 final，59 个 partial，字符级加权 `weighted CER 0.0`（76 个规范化参考字符）。本结果仅表示该 8 条合成中文音频在该本机模型/端点参数下匹配，不是真人麦克风准确率、真实语料泛化或英语测试。该次历史测量之后新增 Qwen3-ASR 离线英语样本评估，见 2026-11-08 记录。
-- 本轮重复测量不包含 concurrent LLM；真实麦克风端到端延迟和独立语料的重复统计尚未测。
-- 新增固定同步屏障的本机 ASR + Ollama 模型并发观察。对同一 6.94 秒合成 WAV 与 `qwen3.5:0.8b` 一次本机合成请求，在真实重叠期间处理 35 帧，ASR wall 0.785 秒、帧 P50 21.78 ms、P95 52.17 ms、最大 75.45 ms，15 partial / 1 final，ASR worker thread CPU 0.626 秒。本机模型请求 wall 20.326 秒，与 ASR 重叠 0.785 秒。
-- 以 1 秒间隔采样 Python ASR 进程和 Ollama serve/runner 进程，本次观察到进程 RSS 合计峰值 702,267,392 bytes、合计 CPU 时间差约 10.95 秒；不是全系统资源统计。GPU 未测。进程采样、单样本、同步请求和调度抖动都会影响观测；P95 抖动高于独立 ASR 的单次观察，不是产品性能验收或稳定分布。
+- 独立 ASR 重复测量不包含 concurrent LLM；真实麦克风端到端延迟和独立语料的重复统计尚未测。
+- 固定同步屏障的本机 ASR + Ollama 并发观察：此前已有一轮记录（35 帧、15 partial/1 final、重叠 0.785 秒）。2026-11-08 又对同一 6.94 秒合成 WAV 与 `qwen3.5:0.8b` 做三轮本机重复，每轮均完成 35 帧、15 partial/1 final，且 `overlap_confirmed=true`。三轮观察范围：ASR wall/重叠 0.420–0.553 秒；帧延迟 P50 16.65–20.82 ms、P95 19.55–30.17 ms、最大 35.41–36.90 ms；ASR worker thread CPU 0.396–0.515 秒；模型加载 1.57–1.83 秒；本机模型请求 wall 11.04–31.10 秒。每轮模型均返回非空结果，正文只输出长度统计，不记录模型文本。
+- 三轮测量以 1 秒间隔采样 Python ASR 进程和 Ollama serve/runner，观察 RSS 合计峰值 585,367,552–1,126,219,776 bytes、进程 CPU 时间差合计 1.48–13.17 秒；采样窗口与运行时长不同，CPU 估算不适合横向比较。该数据不是全系统资源统计，GPU 未测。同一合成样本的三轮复测不代表独立语料；并发和调度会影响帧延迟，不能作为产品性能验收或稳定分布。
 - 并发 probe 不输出 transcript 或模型正文，只输出指标和正文长度；此处是 LLM 生成而非完整 Agent，工具未执行，网络目标固定为本机 loopback。
 - 新增可重复的离线资源测量命令 `scripts/measure_local_asr_poc.py`；它只读取用户明确传入的 WAV、只输出统计指标，不输出识别文本或另存音频。
 - 对已有本机合成样本单次实测：处理音频 6.94 秒（含 1.6 秒端点静音）、35 帧；ASR 阶段 wall time 0.397 秒、RTF 0.057；模型加载 1.901 秒；进程峰值 RSS 461,209,600 bytes；帧处理延迟 P50 16.34 ms、P95 20.78 ms、最大 25.79 ms；观察到 15 个 partial、1 个 final。以上为单机单样本单次观测，且峰值 RSS 是脚本进程峰值，不是 ASR 子组件增量；不构成麦克风实时链路、稳定性或性能承诺。
@@ -111,7 +111,7 @@ swift run tts-interrupt-poc
 - Qwen3-ASR 候选已在五条随包音频上完成离线中/英/混说检查；尚无独立留出中英语料。其 ONNX 离线整段路径不能证明实时流式延迟、partial/final、打断、SwiftUI 麦克风处理或长时运行能力。Qwen 官方当前说明流式推理需 vLLM backend；本机现有 sherpa-onnx API 测试使用 `OfflineRecognizer`，因此不能把 RTF<1 写成实时流式验收。
 - sherpa-onnx 官方 Python API 样例将此类模型通过 `OfflineRecognizer.from_qwen3_asr` 整段解码；参见 [官方 Qwen3-ASR 文件解码样例](https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-qwen3-asr-decode-files.py)。Qwen 官方说明 Qwen3-ASR 的 streaming inference 当前只在 vLLM backend 提供，详见 [Qwen3-ASR 官方文档](https://github.com/QwenLM/Qwen3-ASR#streaming-inference)。
 - 当前 8 条合成中文集只有一轮，CER 不能代表真人麦克风或真实用户话语分布；需要更广语料与多轮实机验证，阈值待产品负责人确认。
-- ASR + LLM 并发目前只有一条合成音频/本机模型观察；需要重复轮次、负载时段、GPU 和冷/热启动分开测量，才能评估资源与性能。
+- ASR + LLM 并发已有同一条合成音频的四轮本机观察（此前一轮加本次三轮）；仍需独立语料、不同负载时段、GPU 和冷/热启动分开测量，才能评估资源与性能。
 - 当前为本机 CLI POC；规格书将 SwiftUI 采集/播放与 WebSocket 闭环列入阶段 3。阶段 0 仍需将 ASR/TTS 稳定链路证据及现有资源测量归档。
 - 新 Qwen3-ASR ONNX 候选的模型来源为 ModelScope 第三方转换包，模型目录没有 LICENSE 文件；Qwen 官方项目标注 Apache-2.0，但转换包及随附测试音频的分发许可/来源仍需单独核实。设备内存观察峰值约 4.47 GB；需要更多样本和并发负载后评估资源预算。
 - 本中文 ASR 权重的公开上游仓库要求接受访问条件，公开页面未展示许可条款；具体证据与待核验范围见 [`phase0-model-license-review.md`](phase0-model-license-review.md)。

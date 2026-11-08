@@ -10,7 +10,7 @@
 
 - 当前阶段：阶段 0 POC，未验收；阶段 1 未开始。
 - 实现形态：macOS SwiftUI 客户端 + 本机 Python/FastAPI 服务；仓库内各工作包的当前状态和证据见 [阶段 0 追踪矩阵](poc/phase0-traceability.md)。
-- 本机语音：中文 Streaming ASR、麦克风捕获 CLI、TTS 打断已有 POC 和部分实测；用户提供的 Qwen3-ASR 0.6B INT8 ONNX 已完成随包中/英离线评估。另下载 sherpa-onnx 官方中英双语 Streaming Zipformer，10 条合成音频均产生 final；用户三次实机运行 CLI 均观察到 partial/final；另一次麦克风未打开时验证 Ctrl-C 可停止；自动回归已模拟验证识别器异常会关闭输入流并清空缓冲。用户指定当前真人语音目标为功能冒烟，模型识别质量后续再优化；本机驱动异常仍未做专项注入，资源结果需按阶段 0 门禁归档；SwiftUI 麦克风/AEC 属规格书阶段 3，当前不列为阶段 0 阻塞；详情见 `docs/poc/phase0-local-asr.md`。
+- 本机语音：中文 Streaming ASR、麦克风捕获 CLI、TTS 打断已有 POC 和部分实测；用户提供的 Qwen3-ASR 0.6B INT8 ONNX 已完成随包中/英离线评估。另下载 sherpa-onnx 官方中英双语 Streaming Zipformer，10 条合成音频均产生 final；用户三次实机运行 CLI 均观察到 partial/final；另一次麦克风未打开时验证 Ctrl-C 可停止；自动回归已模拟验证识别器异常会关闭输入流并清空缓冲。用户指定当前真人语音目标为功能冒烟，模型识别质量后续再优化；本机驱动异常仍未做专项注入；ASR+LLM 有四轮同一合成样本并发观察，独立语料/多负载资源结果未覆盖；SwiftUI 麦克风/AEC 属规格书阶段 3，当前不列为阶段 0 阻塞；详情见 `docs/poc/phase0-local-asr.md`。
 - SwiftUI 安全客户端：显式系统认证测试按钮已在真实 demo 窗口成功验证一次，确认未访问钥匙串；GUI 后端启停另经两轮复测且无重复子进程；取消/拒绝认证路径仍待测。
 - Gateway、安全、记忆、Embedding、SQLCipher 和后端生命周期均有 POC；它们不等同于产品功能验收。详情按需查阅 [`docs/poc/`](poc/)。
 - 根目录现有 `README.md`、`AGENTS.md` 和 `.github/workflows/ci.yml`；本机 CI 等价命令已通过（Python 151 项、Swift 29 项），GitHub Actions 尚未执行（当前仓库无 remote）。D-001–D-015 与 ADR-019/020/021/022 按用户 2026-11-08 指示延期；延期不豁免阶段验收证据。

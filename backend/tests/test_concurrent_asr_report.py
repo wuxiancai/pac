@@ -9,13 +9,12 @@ def test_asr_report_records_concurrent_local_model_sample_and_limits() -> None:
 
     for required in (
         "qwen3.5:0.8b",
-        "重叠 0.785 秒",
-        "P95 52.17 ms",
-        "最大 75.45 ms",
-        "702,267,392 bytes",
-        "10.95 秒",
+        "做三轮本机重复",
+        "重叠 0.420–0.553 秒",
+        "P95 19.55–30.17 ms",
+        "585,367,552–1,126,219,776 bytes",
         "GPU 未测",
-        "不是产品性能验收",
+        "不能作为产品性能验收",
         "工具未执行",
     ):
         assert required in report
