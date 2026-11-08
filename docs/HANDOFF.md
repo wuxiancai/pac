@@ -1,3 +1,9 @@
+### 2026-11-08：0G Python arm64 wheel 原生依赖审计
+
+- 检查 `.venv` 反向依赖树、当前已安装 wheel 和 Mach-O `otool -L`。`fastembed` 引入 ONNX Runtime 与 Pillow；运行环境另含 sherpa-onnx、sounddevice/PortAudio、SQLCipher 原生扩展。
+- Pillow wheel 自带 CycloneDX 组件 SBOM，19 个组件中包括 LGPL-2.1-or-later FriBidi、GPL-3.0-or-later libimagequant、FTL FreeType 等；SQLCipher 扩展静态链接的运行时报告 `4.12.0 community`，需遵守 Zetetic attribution；PortAudio 与 sherpa wheel 内嵌 ONNX Runtime 也各有独立许可/notice 对象。详细对象和来源写入 `phase0-model-license-review.md`。
+- 该项明确了 54 包锁文件 SBOM 不足以代表原生发行通知闭包。用户选择暂不配置/操作 Git 远端；复核时发现工作树已有 `origin`，未执行推送或远端 CI。ModelScope 工件许可资料当前不可得（用户暂时拿不到）。阶段 0 仍未验收。
+
 ### 2026-11-08：0H APFS 满卷备份复制恢复
 
 - 扩展 `run_sqlcipher_enospc_poc.py`，在仓库 `.poc-data` 下的 128 MiB APFS 临时映像中先留存旧加密备份，再扩展源库并填满目标卷，真实执行新备份直到 SQLCipher 返回 `database or disk is full`。释放填充文件后，源库的基线与 12 条新记录可检索，旧备份可用旧密钥检索；两边 `integrity_check=ok`，失败 staging 已清理。
