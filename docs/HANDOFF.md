@@ -6,6 +6,11 @@
 
 ## 最近交接
 
+### 2026-11-08：0G Python 依赖 SBOM
+
+- 从锁文件导出 CycloneDX 1.5 SBOM，覆盖所有 54 个 Python 锁定依赖（包括所有 extras 与 dev 组），并核对 BOM 的 `(name, version)` 集合与 `uv.lock` 完全一致。复现步骤、SHA-256 和范围限制见 `poc/phase0-python-sbom.md`。
+- uv 导出的组件未包含许可证字段；当前平台的 package metadata / license file 已取得多数直接线索，但 Windows-only 两个锁定包、许可证闭包、模型权重许可及通知义务仍待核。真实标注记忆检索集和 D-014 模型决定仍未完成。
+
 ### 2026-11-08：两家 Provider 实测与本地语音功能复测
 
 - 用户在每条命令中分别输入精确确认短语后，DeepSeek 与 OpenRouter 各完成一次 L1 合成文本请求，均返回 `phase0-probe-ack`。DeepSeek：`deepseek-flash`，prompt/completion/total=42/41/83，服务未返回 downstream Provider、region 或 cost。OpenRouter：`deepseek/deepseek-v4.1-flash-1017`，下游 `Relace` / `HKG`，token=42/17/59，cost USD 0.000008752。报告见 `poc/phase0-remote-provider.md`。

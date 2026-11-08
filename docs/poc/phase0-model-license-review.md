@@ -7,7 +7,7 @@
 - 固定权重来自 `Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q` revision `faf4aa4225822f3bc6376869cb1164e8e3feedd0`。该 revision 的 [Hugging Face 模型页](https://huggingface.co/Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q/tree/faf4aa4225822f3bc6376869cb1164e8e3feedd0) 标注 `apache-2.0`。
 - 对应上游 [Sentence Transformers 模型页](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2) 也标注 `apache-2.0`。
 - 本机固定安装 FastEmbed `0.9.1` 的 Python package metadata 标注 `Apache-2.0`；通过 `uv run --locked --extra phase0-embedding` 读取。
-- 以上建立了模型候选与直接运行库的初步线索；仍需生成完整依赖 SBOM、核对所有随包依赖和通知义务，并由产品负责人确定是否采用（D-014）。目前没有把该模型设为默认或纳入产品 schema。
+- 以上建立了模型候选与直接运行库的初步线索。Python 锁定依赖 CycloneDX SBOM 已生成，54/54 个 `uv.lock` 包均纳入，见 [`phase0-python-sbom.md`](phase0-python-sbom.md)。该导出没有内嵌许可证字段，50 个当前安装包可由 distribution metadata 取得许可证线索，另检查 2 个本机 LICENSE 文件；2 个仅在 Windows 安装的锁定包和完整通知义务仍需核查。模型权重/词表和模型随包依赖也不在此 SBOM 内。D-014 仍待产品负责人决定；目前没有把该模型设为默认或纳入产品 schema。
 - 2026-11-07 新增三次离线重复：每次 4 个合成 query 均 top-1 命中 4/4；wall 0.81–1.19 秒；`/usr/bin/time -l` observed maximum RSS 883,130,368–883,490,816 bytes。仅为固定小型合成集和本机进程观察，不代表检索质量、产品资源目标或稳定分布。
 
 ## 中文 ASR 候选
@@ -25,7 +25,7 @@
 
 ## 阶段影响
 
-- Embedding 候选：许可初核完成，真实标注集、完整依赖清单、资源阈值和产品模型决定仍开放。
+- Embedding 候选：模型卡和直接运行库许可初核完成，Python 锁定依赖清单已生成；许可证闭包、真实标注集、资源阈值和产品模型决定仍开放。
 - 原中文 ASR 候选：产品分发条款仍未核实，是 0B 发布/分发证据缺口。新 Qwen3-ASR 候选可做本机离线英语识别，但转换权重/测试音频的分发许可仍待核，且还未通过实时麦克风验收。
 - Qwen3-ASR ONNX 候选：上游 Qwen 项目是 Apache-2.0，但第三方转换权重包/随附测试 WAV 的具体许可未确认；只在本地 POC 使用，不纳入产品打包判断。
 - 阶段 0 保持未验收；不得将公开页面标签、访问成功或本机推理通过解释为完整许可审批。

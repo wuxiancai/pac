@@ -23,7 +23,7 @@
 | POC-05 / FR-SEC-001/002/003 | L0–L3、授权和撤销策略 | PARTIAL | 内存 Consent/Policy 测试覆盖 exact match、过期、L3 deny、撤销 | action/source scope 和持久审计未齐；无真实云出站验证 |
 | POC-05 / FR-SEC-007/008 | 静态加密兼容性、备份恢复及 ADR 证据 | PARTIAL | SQLCipher ARM64/Python 3.12、FTS5、错误密钥拒绝、加密备份/恢复（含 WAL 数据库）；复制/校验/原子替换失败时保留旧备份，校验后原子替换；复制部分页面后子进程 SIGKILL，在 DELETE/WAL 两种 mode 下旧目标仍可恢复、源库完整；新增在 `os.replace` 调用前/成功返回后 SIGKILL，旧/新目标分别可完整恢复，源库均完整；WAL reader/writer/checkpoint 注入；目标路径错误不损坏源 DB；临时 Alembic upgrade/downgrade、合成性能观察和 HFS+/APFS 有界映像 ENOSPC，详见相关 POC 报告 | 持续并发负载、WAL 生命周期、密钥管理、正式应用包分发、真实负载性能、外接介质/断电/介质故障未齐；系统调用内部中断与 fsync 持久性未测；ADR-019 按用户要求延期；崩溃 staging 清理策略待定 |
 | 阶段 0 工程/恢复 | 崩溃、重启、磁盘不足和备份恢复故障注入 | PARTIAL | `os._exit` 与 DELETE/WAL 两种模式下子进程 SIGKILL 后未提交事务恢复；WAL TRUNCATE checkpoint 等待读锁期间 SIGKILL 恢复；活动 WAL reader 下 `busy=1` 可见且释放后 checkpoint 重试成功；页数上限、HFS+/APFS 有界映像 ENOSPC 回滚；复制中断保留旧备份；新增 `os.replace` 调用前 SIGKILL 保留旧目标、成功返回后 SIGKILL 保留新目标，两边源库/备份完整 | 边界测试不模拟系统调用内部中断或断电/fsync 持久性；临时映像不代表活动卷/外接介质；正式 App 重启、真实介质故障及崩溃 staging 清理策略待定 |
-| POC-04 本地 Embedding | 候选权重、真实向量与检索质量 | PARTIAL | 固定 revision 权重 SHA-256 完整校验；本机 FastEmbed 真实推理，4 个合成 query top-1 命中 4/4；HF/Transformers offline 环境二次加载通过；2026-11-07 离线三次重复均 4/4 top-1，`/usr/bin/time -l` observed max RSS 883,130,368–883,490,816 bytes；候选模型卡许可初核完成，见 `phase0-local-embedding.md` 和 `phase0-model-license-review.md` | 仅 4 条合成 query，不代表真实语义质量；真实检索集、SQLCipher memory 集成和模型选择未完成；完整依赖 SBOM 与性能目标未确认 |
+| POC-04 本地 Embedding | 候选权重、真实向量与检索质量 | PARTIAL | 固定 revision 权重 SHA-256 完整校验；本机 FastEmbed 真实推理，4 个合成 query top-1 命中 4/4；HF/Transformers offline 环境二次加载通过；离线三次重复均 4/4 top-1，observed max RSS 883,130,368–883,490,816 bytes；Python 锁定依赖 CycloneDX SBOM 覆盖 uv.lock 54/54 个包，见 `phase0-python-sbom.md` | 仅 4 条合成 query，不代表真实语义质量；真实检索集、SQLCipher memory 集成和模型选择未完成；SBOM 未携许可证字段，完整许可证闭包及产品性能目标未确认 |
 | 全阶段安全边界 | 不自动扫描；无任意 Shell/文件访问；无外部写/后台队列/专业 Agent 团队 | PASS（范围审计） | 当前 POC 结构无产品文件扫描、任意 Shell、外部写或后台任务；Agent 仅模拟 | 后续实现须持续做静态与集成门禁，当前不构成产品级验收 |
 
 ## 2. 模块依赖图
@@ -66,7 +66,7 @@ flowchart TD
 ### 阶段 0（当前阶段，未验收）
 
 1. 0A 仓库审计与基线记录：完成，不改动原功能/章节/schema/API。
-2. 0B 本地语音链路：旧模型有中文 Streaming ASR；官方双语 Streaming Zipformer 已在本项目适配器上对合成中英音频产生 partial/final；用户提供的 Qwen3-ASR ONNX 另有随包离线评估。真人麦克风端到端验收仍未完成。
+2. 0B 本地语音链路：旧模型有中文 Streaming ASR；官方双语 Streaming Zipformer 对合成中英音频产生 partial/final；Qwen3-ASR ONNX 另有随包离线评估。用户已两次在真实设备上运行麦克风 CLI 并观察到 partial/final，按用户指示当前以功能冒烟为准，模型质量留待后续选择；SwiftUI 集成、异常/停止清理和性能仍未验收。
 3. 0C 本地 Gateway/能力注册/Agent 模拟：可测试骨架完成；DeepSeek 与 OpenRouter 各有一次经用户逐次确认的合成文本实测，完整能力矩阵及同一 orchestrator 跨 Provider 切换仍待补证。
 4. 0D 记忆 POC：SQLite/FTS/来源/纠错/删除/恢复已测；本地 Embedding 候选以 opt-in provider 接入内存仓库并完成 3 条合成查询；产品模型、持久化 schema 与真实检索质量仍 OPEN。
 5. 0E Swift/Loopback/Keychain/Consent：部分完成；策略支持 Touch ID 或设备密码，fake evaluator 路径已测；POC SwiftUI demo 启停/退出清理已实机验证；真实认证提示、异常自动恢复/退避、锁屏行为及正式分发配置仍 OPEN。
@@ -96,10 +96,10 @@ V1.1 及 V2–V5 仅按规格书规划；当前不实施后台任务、专业 Ag
 |---|---|---|---|
 | ASR 候选与流式能力 | 中文与官方中英双语 Streaming 模型均已接入本机候选；Qwen3-ASR 0.6B INT8 ONNX 为单独离线候选 | 保持本地推理；不静默云 fallback；区分文件分帧和 OfflineRecognizer 证据 | 双语 Zipformer 10 条合成音频 weighted CER 0.0254；Qwen3 五条随包 WAV CER/RTF 见报告；独立语料、真人麦克风和 Qwen ONNX 转换包许可待测 |
 | 短合成样本无法代表真实语音 | 延迟/准确率/噪声鲁棒性被高估 | 明确记录同一 WAV 三次的观察范围，不设承诺 | 独立语料、真人麦克风重复与产品阈值待定 |
-| 真实云 Provider 证据缺失 | 无法证明多 Provider/费用/取消/区域 | 能力默认 UNKNOWN；远端请求接入 ConsentAwarePolicy 默认拒绝 | 需合成请求的明确 Consent、Keychain 凭据及逐 Provider 端到端验证 |
+| 真实 Provider 能力矩阵不完整 | 无法证明跨 Provider 切换、流式/工具/JSON/错误/费用/区域能力 | DeepSeek 与 OpenRouter 各有一次经逐次 Consent 的 L1 合成非流式请求成功；unknown-by-default；ConsentAwarePolicy 默认拒绝 | 同一 orchestrator 跨 Provider 切换与各项能力真实验证仍缺 |
 | Consent 仅内存、策略字段不全 | 重启/持久审计后授权可能无法证明 | POC 无云出站、默认拒绝 | 产品阶段实现完整 schema/migration/audit |
 | SQLCipher POC 不是发布形态验证 | DB/备份/打包或恢复失败；异常终止可能遗留加密 staging 文件 | ARM64 本机 migration；备份复制中 SIGKILL 后旧目标仍可恢复且源库完整；三轮合成性能对照；有界 HFS+ 映像 `SQLITE_FULL` 后源库与备份均恢复；候选资料对照已记录、未作选型 | ADR、SEE/文件容器实测、打包、灾难恢复、staging 生命周期和真实负载性能；未测 APFS/外接介质 ENOSPC、断电/介质故障 |
-| Embedding 合成集过小且 observed RSS 较高 | 语义质量或资源占用不达产品目标 | 固定 revision 权重校验；离线加载；报告仅记两次观察值 | 真实标注检索集、重复性能分布、模型许可与产品阈值 |
+| Embedding 合成集过小且 observed RSS 较高 | 语义质量或资源占用不达产品目标 | 固定 revision 权重校验；离线加载；4 条合成 query 的三次进程观察见报告；锁定依赖 SBOM 已生成 | 真实标注检索集、许可证闭包、扩展性能分布与产品阈值 |
 | 真实认证与正式运行策略未验收 | 敏感入口和进程恢复风险 | `.deviceOwnerAuthentication` fake evaluator 测试；SwiftUI POC demo 启停/退出清理实测；supervisor 超时/退出集成回归 | 系统认证提示、正式签名分发、自动恢复/退避、锁屏/休眠策略 |
 | POC 与产品容易混淆 | 误将模拟视为完成承诺 | 报告标 POC、能力需要证据 | 每项产品功能进入正式实现仍需独立契约与验收 |
 
