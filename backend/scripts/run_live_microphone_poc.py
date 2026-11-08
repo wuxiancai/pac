@@ -151,6 +151,8 @@ def main() -> None:
                 print(f"[{event.kind}] {event.text}", flush=True)
     except KeyboardInterrupt:
         print("\n用户停止了本机采集；未补造 final。")
+    except getattr(sd, "PortAudioError", ()) as exc:
+        raise SystemExit(f"本机麦克风设备错误；采集缓冲已丢弃：{exc}") from None
     finally:
         frame_buffer.close()
 

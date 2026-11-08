@@ -37,6 +37,7 @@
 - 2026-11-08 新增 ASR→TTS 链路脚本 `scripts/run_asr_tts_chain_poc.py`：只处理显式 JSON manifest 中的一条音频，使用现有 Streaming ASR 得到 final；只有交互终端输入 `PLAY FINAL LOCALLY` 后才把 final 交给 `poc/macos-audio` 中的 AVSpeechSynthesizer。脚本不打印或保存 transcript，非交互终端拒绝执行，不启用麦克风或云端。
 - `bilingual-manifest.json` 第 1 条中文合成 WAV 连续运行三轮，第 2、3 条中文各一轮，第 9 条英语和第 10 条中英混说各一轮；共 5 条 manifest 样本、7 次链路运行。七轮均有 1 个 final，partial 数为 6/6/6/6/7/14/15，final 字符数为 8/8/8/9/9/86/50；本机 AVSpeechSynthesizer 七轮均报告 `playback_completed=true speaking=false`，进程退出码为 0。说明中、英及混说合成样本上的接口顺序与播放完成路径可运行，不等于真人语料、长时运行或性能稳定性验收。
 - 新增 `tts-interrupt-poc --wait-for-completion` 模式，超时为 45 秒；已有的交互式立即打断路径保持独立。Swift 测试 29 项通过；Python 脚本编译检查通过；非交互拒绝检查返回 2 并确认未启动麦克风或 TTS。
+- 设备异常补证：用 fake `sounddevice.RawInputStream` 分别注入 PortAudio 启动失败和 callback status 错误。前者 CLI 给出设备错误并清空排队 PCM；后者停止采集，退出 stream context 并清空缓冲。麦克风专项测试 11 项通过，Python 全量回归 153 项通过（`UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`）。这些是 mock 故障注入，不是实际设备/驱动故障。
 - `uv lock --check` 通过；sounddevice 默认输入设备检查支持 16 kHz、单声道、PCM16。
 - 本地模型加载：通过。
 - 16 kHz、单声道、PCM16 WAV 分为 200 ms 帧输入：通过。
@@ -113,7 +114,7 @@ ASR→TTS 链路脚本只处理 manifest 明列的 WAV；在终端输入 `PLAY F
 ## 尚未解决
 
 - 2026-11-08 实机停止冒烟：用户启动双语 Streaming Zipformer 麦克风 CLI 后，观察到“正在本机识别”；停止前没有 partial/final 输出，按 Ctrl-C 后 CLI 打印“用户停止了本机采集；未补造 final。”并正常回到 shell。用户随后澄清当时麦克风未打开；该次只作为静音期间手动停止路径证据，不计为语音识别通过。
-- 自动回归现以模拟 `sounddevice` callback 和故意失败/中断的 decoder 验证：普通异常向上传递，KeyboardInterrupt 显示用户停止提示；两种情况下输入流上下文均关闭且有界缓冲清空。该结果不覆盖真实设备驱动故障或 Ctrl-C 的硬件行为；已有一次真实设备 Ctrl-C 停止证据；真实设备驱动异常仍待测。
+- 自动回归现以模拟 `sounddevice` callback、PortAudio 打开失败和故意失败/中断的 decoder 验证：打开失败明确报告且丢弃有界缓冲；callback status 错误终止采集并关闭 stream context；decoder 普通异常向上传递，KeyboardInterrupt 显示用户停止提示。真实设备驱动故障和 Ctrl-C 硬件行为仍未测；已有一次真实设备 Ctrl-C 停止证据。
 - 2026-11-08 首次实机运行的历史观察：产生多个增量 partial 和两个 final；混合中英内容有错词。用户后来将当前真人语音标准限定为功能冒烟、把模型识别质量留待后续，因此此观察不计 CER，也不作为本轮功能验证的阻断项。开麦后的后续实机复测也已观察到中英 partial/final；当前补证项为真实设备驱动异常和重复功能稳定性；SwiftUI 集成按规格书属于阶段 3。
 - 双语 streaming 候选已产生中英及混说的文件分帧 partial/final；用户已补三次 CLI 实机功能冒烟，并指定识别质量留待后续模型选择。真实麦克风 Ctrl-C 停止已有一次证据；之后开麦实测又观察到中文和英文 partial/final。识别词句存在偏差，按用户决定留待后续模型优化；驱动异常和额外重复功能稳定性仍未覆盖；SwiftUI 链路按规格书属于阶段 3。合成语音分数不能替代真实麦克风功能冒烟。
 - Qwen3-ASR 候选已在五条随包音频上完成离线中/英/混说检查；尚无独立留出中英语料。其 ONNX 离线整段路径不能证明实时流式延迟、partial/final、打断、SwiftUI 麦克风处理或长时运行能力。Qwen 官方当前说明流式推理需 vLLM backend；本机现有 sherpa-onnx API 测试使用 `OfflineRecognizer`，因此不能把 RTF<1 写成实时流式验收。

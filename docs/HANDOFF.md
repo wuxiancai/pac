@@ -1,3 +1,8 @@
+### 2026-11-08：0B 模拟设备故障注入
+
+- 新增 PortAudio stream open failure 与 callback status error 注入；打开失败被清楚报告并丢弃 PCM 缓冲，callback 状态错误会停止采集、退出 stream context 并清空缓冲。decoder 异常/用户 Ctrl-C 路径继续通过原有测试。
+- `tests/test_microphone_buffer.py` 11 项通过；完整 Python 回归 153 项通过。均为 mock 故障，不替代真实麦克风驱动故障测试。阶段 0 仍未验收。
+
 ### 2026-11-08：0E 真实系统认证再次成功
 
 - 真实 demo 窗口的状态显示“系统认证成功；未访问钥匙串”，累计成功观察两次。此轮没有得到取消结果；应以界面状态记录，而非预期的取消动作。

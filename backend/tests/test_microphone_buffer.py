@@ -155,3 +155,94 @@ def test_microphone_cli_closes_stream_and_discards_buffer_on_exit(
     assert stream_closed
     assert frame_buffer.closed
     assert frame_buffer.queued_frames == 0
+
+
+def test_microphone_device_open_error_is_reported_and_buffer_is_discarded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frame_buffer = MicrophoneFrameBuffer(max_frames=25)
+
+    class FakePortAudioError(Exception):
+        pass
+
+    class FakeInputStream:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            frame_buffer.offer(b"synthetic buffered audio")
+            raise FakePortAudioError("synthetic input device unavailable")
+
+        def __exit__(self, *_args) -> None:
+            pass
+
+    monkeypatch.setattr(run_live_microphone_poc.sys, "stdin", SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr("builtins.input", lambda _prompt="": "")
+    monkeypatch.setattr(run_live_microphone_poc, "MicrophoneFrameBuffer", lambda **_kwargs: frame_buffer)
+    monkeypatch.setattr(run_live_microphone_poc, "resolve_model_files", lambda _path: SimpleNamespace())
+    monkeypatch.setattr(run_live_microphone_poc, "SherpaOnnxRecognizer", lambda **_kwargs: object())
+    monkeypatch.setattr(run_live_microphone_poc, "LocalStreamingASR", lambda *_args, **_kwargs: object())
+    monkeypatch.setitem(
+        sys.modules,
+        "sounddevice",
+        SimpleNamespace(RawInputStream=FakeInputStream, PortAudioError=FakePortAudioError),
+    )
+    monkeypatch.setattr(sys, "argv", ["run_live_microphone_poc.py", "unused-model-dir"])
+
+    with pytest.raises(SystemExit, match="本机麦克风设备错误.*synthetic input device unavailable"):
+        run_live_microphone_poc.main()
+
+    assert frame_buffer.closed
+    assert frame_buffer.queued_frames == 0
+
+
+def test_microphone_callback_status_error_stops_and_clears_capture(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frame_buffer = MicrophoneFrameBuffer(max_frames=25)
+    stream_closed = False
+
+    class FakePortAudioError(Exception):
+        pass
+
+    class FakeCallbackAbort(Exception):
+        pass
+
+    class FakeInputStream:
+        def __init__(self, **kwargs) -> None:
+            self.callback = kwargs["callback"]
+
+        def __enter__(self):
+            try:
+                self.callback(b"\x00\x00" * 3200, 3200, None, "synthetic overflow")
+            except FakeCallbackAbort:
+                pass
+            return self
+
+        def __exit__(self, *_args) -> None:
+            nonlocal stream_closed
+            stream_closed = True
+
+    monkeypatch.setattr(run_live_microphone_poc.sys, "stdin", SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr("builtins.input", lambda _prompt="": "")
+    monkeypatch.setattr(run_live_microphone_poc, "MicrophoneFrameBuffer", lambda **_kwargs: frame_buffer)
+    monkeypatch.setattr(run_live_microphone_poc, "resolve_model_files", lambda _path: SimpleNamespace())
+    monkeypatch.setattr(run_live_microphone_poc, "SherpaOnnxRecognizer", lambda **_kwargs: object())
+    monkeypatch.setattr(run_live_microphone_poc, "LocalStreamingASR", lambda *_args, **_kwargs: object())
+    monkeypatch.setitem(
+        sys.modules,
+        "sounddevice",
+        SimpleNamespace(
+            RawInputStream=FakeInputStream,
+            PortAudioError=FakePortAudioError,
+            CallbackAbort=FakeCallbackAbort,
+        ),
+    )
+    monkeypatch.setattr(sys, "argv", ["run_live_microphone_poc.py", "unused-model-dir"])
+
+    with pytest.raises(RuntimeError, match="audio input status: synthetic overflow"):
+        run_live_microphone_poc.main()
+
+    assert stream_closed
+    assert frame_buffer.closed
+    assert frame_buffer.queued_frames == 0
