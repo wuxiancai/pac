@@ -9,7 +9,7 @@
 ### 2026-11-08：0C 同一 Gateway 双 Provider 路由
 
 - 新增 `backend/scripts/probe_provider_switch_poc.py`：同一 ModelGateway 注册 DeepSeek 与 OpenRouter 两个固定 adapter，逐家展示合成请求并要求独立精确确认；拒绝或失败不触发自动 failover。
-- 新增 MockTransport 回归证明双路由端点和对应 Keychain account 均按 Provider 选择；窄回归 29 项通过，脚本 compileall 通过。真实跨 Provider 请求仍待用户执行新脚本并逐家确认；复现命令和边界见 `poc/phase0-remote-provider.md`。
+- 新增 MockTransport 回归证明双路由端点和对应 Keychain account 均按 Provider 选择；窄回归 29 项通过，脚本 compileall 通过。用户之后已分别确认并完成真实顺序路由，两家均精确匹配；OpenRouter 返回 Relace/HKG。该路径不代表自动 fallback；更广能力矩阵仍待验证，见 `poc/phase0-remote-provider.md`。
 - 更新后全量 Python 回归 **140 passed**。阶段 0 仍未验收；真实 SSE/工具/JSON/错误能力、其他阶段缺口和延期决策仍需按矩阵处理。
 
 ### 2026-11-08：0G Python 依赖 SBOM
@@ -150,7 +150,7 @@
 
 ## 下一步
 
-继续阶段 0：Provider 方面，DeepSeek 与 OpenRouter 各有一次用户逐次授权后的真实合成文本请求成功；同一 ModelGateway 双 adapter 本地路由回归通过，真实跨 Provider 切换及流式/工具/JSON/错误能力对照仍缺。用户可逐次确认运行 `backend/scripts/probe_provider_switch_poc.py`。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：Provider 方面，DeepSeek 与 OpenRouter 各有经用户逐次授权的真实合成文本请求成功；同一 ModelGateway 顺序跨 Provider 路由也真实通过一次，OpenRouter 返回 Relace/HKG。真实流式/工具/JSON/错误能力、拒绝后的真实零出站与重复费用/区域核验仍缺。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 
