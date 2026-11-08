@@ -24,7 +24,7 @@
 | 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；MemoryStore + 固定 Embedding 权重新增四组严格离线合成检索，4/4 top-1 且来源证据完整；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
 | 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；系统认证测试真实成功两次、用户取消一次；状态分类按 LocalAuthentication 错误码区分取消和系统中断，测试代码不访问钥匙串；两轮 GUI 停止/启动/健康检查完成，进程数符合预期；锁屏/休眠、正式分发与异常恢复策略证据仍待补。 |
 | 0F | 静态加密兼容性 | IN PROGRESS | SQLCipher 已有 ARM64、FTS、迁移和恢复证据；完成密钥生命周期、产品性能及发布形态评估，形成 ADR-019 决定。 |
-| 0G | Embedding 候选 | IN PROGRESS | 固定候选已离线推理三次，均为 4/4 合成 query top-1；observed max RSS 883,130,368–883,490,816 bytes；Python 锁定依赖 CycloneDX SBOM 覆盖 54/54 个包，见 `poc/phase0-python-sbom.md`。本轮确认 Qwen 官方源模型声明 Apache-2.0，但第三方 ONNX 转换仓库无可见 LICENSE、ModelScope 工件许可及随包样例音频许可未核；补全 Swift/macOS 运行时和实际发行物清单、许可通知闭包，真实标注检索集及 D-014 仍待处理。 |
+| 0G | Embedding 候选 | IN PROGRESS | 固定候选已离线推理三次，均为 4/4 合成 query top-1；observed max RSS 883,130,368–883,490,816 bytes；Python 锁定依赖 CycloneDX SBOM 覆盖 54/54 个包，见 `poc/phase0-python-sbom.md`。Qwen 官方源模型声明 Apache-2.0，但第三方 ONNX 转换仓库无可见 LICENSE、ModelScope 工件与随包样例音频许可未核。当前 SwiftPM 无第三方 package，demo 使用外部 `.venv`；正式发行依赖/原生 wheel 和通知闭包、真实标注检索集及 D-014 仍待处理。 |
 | 0H | 故障注入与性能 | IN PROGRESS | 已测 WAL 备份的活动 reader + 三次 writer 提交、checkpoint 等待读锁期间 SIGKILL 后恢复、备份复制在 DELETE/WAL 下 SIGKILL、HFS+ 与 APFS 有界映像 ENOSPC；新增 `os.replace` 调用前/成功返回后的 SIGKILL 边界测试。边界测试不代表系统调用内部中断或断电持久性；备份复制路径的确定性 ENOSPC 注入已通过且旧备份/源库保全；真实备份目标满载仍未实测。实际外接介质/产品 WAL 生命周期与崩溃后 staging 清理规则仍待处理。 |
 | 0I | 阶段追踪与验收 | OPEN | D-001–D-015 与 ADR-019/020/021/022 已按用户要求标记延期（D-010 候选及区域已明确，V1 选型仍延期）。ASR-final→本机 TTS 已有合成链路报告（5 条中英/混说 WAV、7/7 完成），仍缺独立真人语料/长时多负载资源评估；其他缺口包括 GitHub Actions 真实运行、Provider 服务端取消/稳定性、模型/依赖许可闭包及恢复边界；SwiftUI 麦克风/AEC 属阶段 3，完成证据审查后才能签收。 |
 

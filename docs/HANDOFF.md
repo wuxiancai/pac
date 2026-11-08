@@ -5,6 +5,11 @@
 - 更新 `phase0-model-license-review.md`、`TASKS.md` 和阶段追踪矩阵。阶段 0 仍未验收；下一步继续核对实际 Swift/macOS 发行物及原生依赖，并保留真实标注语料、D-014 与模型权利链缺口。
 - 公开来源：[Qwen 模型页](https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf)、[Qwen 官方 LICENSE](https://github.com/QwenLM/Qwen3-ASR/blob/main/LICENSE)、[转换仓库](https://github.com/Wasser1462/Qwen3-ASR-onnx)、[ModelScope 文件页](https://modelscope.cn/models/zengshuishui/Qwen3-ASR-onnx/files)、[Qwen 样例页](https://qwen.ai/blog?id=qwen3asr)。
 
+### 2026-11-08：0G 当前 macOS POC 依赖边界审查
+
+- `poc/macos-audio/Package.swift` 未声明 SwiftPM 外部 package，未发现 `Package.resolved`；Swift 源码只导入 Apple SDK 模块。当前 lifecycle demo 从仓库外部 venv 路径 `backend/.venv/bin/python` 启动后端，并未定义独立 Python 安装器/随包策略。
+- 依赖边界已补入 `phase0-model-license-review.md`、`TASKS.md` 和追踪矩阵。此项只说明当前 POC；正式发布的 Python wheel/native 依赖、模型和通知文件仍需根据最终安装包另审。
+
 ### 2026-11-08：0G Python 依赖许可证线索复核
 
 - 核实 `tokenizers==0.23.3` 的本机 Trove classifier 与固定版本 PyPI 页均声明 Apache，发布对应的上游 tag 有 LICENSE 文件。更新 SBOM 报告以明确 metadata 分类来源。

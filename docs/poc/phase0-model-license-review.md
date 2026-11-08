@@ -45,3 +45,9 @@
 - 原中文 ASR 候选：产品分发条款仍未核实，是 0B 发布/分发证据缺口。实际使用的中英 Streaming Zipformer 模型仓库声明 Apache-2.0，但来源标识不一致且内部训练数据权利链未核验。新 Qwen3-ASR 候选可做本机离线英语识别，但转换权重/测试音频的分发许可仍待核，且还未通过实时麦克风验收。
 - Qwen3-ASR ONNX 候选：上游 Qwen 项目是 Apache-2.0，但第三方转换权重包/随附测试 WAV 的具体许可未确认；只在本地 POC 使用，不纳入产品打包判断。
 - 阶段 0 保持未验收；不得将公开页面标签、访问成功或本机推理通过解释为完整许可审批。
+
+## 当前 macOS POC 的依赖边界
+
+- `poc/macos-audio/Package.swift` 声明了 POC 自身的 targets，没有 SwiftPM `.package` 外部依赖；仓库也没有该 package 的 `Package.resolved`。源码导入 Foundation、SwiftUI、AVFoundation、LocalAuthentication、Security、Darwin、Observation 等 Apple SDK 模块，没有在 SwiftPM 声明第三方 framework。此项只描述当前源码/构建配置，不是未来产品发布物清单。
+- 当前 lifecycle demo 启动脚本从 `backend/.venv/bin/python` 启动仓库后端，Python 环境独立于 Swift app bundle；Python 依赖以 `backend/uv.lock` 和 `phase0-python-sbom.md` 为准。POC 启动脚本使用本机已准备的环境，不能证明生产安装器会如何携带 Python、wheel、模型或原生库。
+- 因此当前 Swift 源码未发现额外 SwiftPM 第三方包许可项；macOS/Xcode SDK 与正式打包、签名、安装器、Python/native wheel、模型权重及其通知文件仍需在产品发布形态确定后另做发行物审计。当前证据不关闭 0G 的完整许可闭环。
