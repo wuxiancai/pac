@@ -1,3 +1,9 @@
+### 2026-11-08：阶段 0 本机全量回归复核
+
+- 在 `backend/` 运行 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q`、`uv run --locked python -m compileall -q pac_poc scripts tests` 与 `uv lock --check`：Python 153 项通过，compileall 与锁文件检查通过。
+- 在 `poc/macos-audio/` 运行 `swift test`：31 项通过。`git diff --check` 通过。
+- 将上下文、任务清单和追踪矩阵的旧 Python 151/Swift 29 结果更新为当前结果。GitHub Actions 实际运行仍受仓库未配置 remote 阻塞。
+
 ### 2026-11-08：0B/0G Qwen3-ASR 许可来源交叉核对
 
 - 官方 `Qwen/Qwen3-ASR-0.6B-hf` 模型页和 `QwenLM/Qwen3-ASR` LICENSE 均给出 Apache-2.0 许可线索；该许可不能直接推定覆盖第三方 ONNX 导出仓库、ModelScope 工件或随包音频。
