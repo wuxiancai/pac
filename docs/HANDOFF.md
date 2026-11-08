@@ -1,3 +1,10 @@
+### 2026-11-08：测试版优先范围调整（C-007）
+
+- 用户明确：前期只在 macOS 单用户使用，先交付能用的测试版；未来功能先留扩展点，待实际开发该功能时再验证。
+- 记录 C-007：阶段 0 未闭环事项不再整体阻塞测试版，但不得将延期项标成已验证。安全底线（本机优先、远端逐次 Consent、Keychain、默认拒绝）继续生效。
+- 测试版按 B0 应用骨架、B1 本机文字对话、B2 本地语音闭环推进；会话持久化等因加密/保留决策延期，云模型需合规后端凭据，Token Plan 不接产品后端。
+- 下一步从现有 supervisor/loopback POC 建可运行应用入口，再实现文字对话 API 和 UI。阶段 0 追踪矩阵保留原始证据/缺口，改为完整 V1/正式发布追踪。
+
 ### 2026-11-08：Qwen Token Plan 真实文本探测
 
 - 用户在 `backend/` 运行 `scripts/probe_remote_provider_poc.py qwen` 并输入本次确认短语。一次真实非流式 L1 合成文本请求成功，响应精确匹配 `phase0-probe-ack`；模型 `qwen3.8-flash`，usage prompt/completion/total=73/50/123。服务未返回下游 Provider、实际区域或费用。

@@ -8,7 +8,8 @@
 
 ## Scope and safety
 
-- The current objective is phase 0 POC. Keep phase 1 product implementation gated until phase 0 acceptance is recorded.
+- Current objective: build a usable single-user macOS beta from the validated POCs. Phase 0 evidence gaps that do not affect the beta path may be deferred; do not treat deferred evidence as passed. Record the beta scope and defer feature-specific verification until before that feature is enabled or distributed.
+- Prioritize a working local-first vertical slice. Keep later capabilities behind interfaces and disabled until their own decisions, implementation, and verification are complete.
 - Keep proof-of-concept evidence separate from product guarantees. Do not resolve product decisions by assumption.
 - Any remote Provider request requires exact Consent and Policy approval; default to deny and retrieve credentials only from Keychain.
 - Keep local model and audio evaluations offline unless the task explicitly authorizes otherwise. Do not start microphone capture without an explicit user action in the capture flow.

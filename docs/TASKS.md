@@ -10,33 +10,33 @@
 - `BLOCKED`：依赖产品决定、用户操作、凭据或外部条件；记录解除阻塞所需输入。
 - `DEFERRED`：按用户或基线范围暂缓，不作为当前缺陷。
 
-执行顺序：开始前读取根目录 `AGENTS.md`（如存在）、`PROJECT_CONTEXT.md`、`TASKS.md`、`DECISIONS.md`、`HANDOFF.md`；检查 Git 状态；按下面的顺序选取未阻塞任务；实现后执行适用验证、更新 POC 报告与追踪矩阵、更新本清单和交接文档，最后提交 Git。不得因任务清单中的 POC 把阶段 1 提前启动。
+执行顺序：开始前读取根目录 `AGENTS.md`（如存在）、`PROJECT_CONTEXT.md`、`TASKS.md`、`DECISIONS.md`、`HANDOFF.md`；检查 Git 状态；按下面的顺序选取未阻塞任务；实现后执行适用验证、更新 POC 报告与追踪矩阵、更新本清单和交接文档，最后提交 Git。用户已按 C-007 授权先建设单用户 macOS 测试版。阶段 0 仍保留为完整 V1/正式发布证据清单，但不再整体阻塞测试版；延期验证须在对应能力启用或正式分发前补齐。
 
-阶段 0 的验收证据详情以 [追踪矩阵](poc/phase0-traceability.md) 为准；本清单负责执行排程和下一步。
+阶段 0 的原始证据以 [追踪矩阵](poc/phase0-traceability.md) 为准；本清单另行定义当前测试版交付顺序。
 
-## 阶段 0 工作包
+## 单用户 macOS 测试版交付队列
 
-| 顺序 | 工作包 | 状态 | 下一步 / 完成条件 |
+| 顺序 | 工作包 | 状态 | 完成条件 / 说明 |
 |---:|---|---|---|
-| 0A | 仓库审计与基线 | IN PROGRESS | 已新增根 README、AGENTS、macOS arm64 CI workflow；本机 CI 等价验证：Python 154 项、Swift 31 项、compileall、`uv lock --check` 均通过。GitHub Actions 仍未运行；用户选择暂不配置/操作远端，当前工作树虽有 `origin`，本轮未推送。 |
-| 0B | 本地语音链路 | IN PROGRESS | 官方中英 Streaming Zipformer 文件分帧 10/10 final、82 partial、weighted CER 0.0254；用户已完成三次真实 CLI 麦克风采集并看到 partial/final；另一次麦克风未打开时按 Ctrl-C 正常停止。用户将当前目标限定为功能冒烟，识别质量转为后续模型选择/优化项；mock 已覆盖识别器异常、PortAudio 启动失败和 callback status 异常时流/缓冲清理；真实设备 Ctrl-C 停止路径已有一次记录。新增 ASR-final→AVSpeechSynthesizer 合成链路，5 条中文/英文/混说 WAV 共 7/7 完成；ASR+LLM 在两条合成 WAV 有七轮并发观察。D-011 现选千问 Token Plan/北京作为交互式 POC 候选；官方限定该套餐不能用于后端服务。其非实时云 ASR、TTS 和实时语音候选尚未接入/测试；产品后端若需云语音需另选计费方案/API Key。按规格书 §13，SwiftUI 麦克风/AEC 属阶段 3，不作 0B 门禁；独立语料/多负载资源、真实驱动故障及模型许可仍需补证。 |
-| 0C | Gateway、能力注册、Agent 模拟 | IN PROGRESS | DeepSeek 与 OpenRouter 文本、同一 Gateway 顺序路由、两家各一次真实 SSE 均通过；工具提案、JSON、错误、取消和费用/区域重复观察证据见 `poc/phase0-remote-provider.md`。新增千问 Token Plan 北京 `qwen3.8-flash` chat adapter、逐次 Consent 探测入口与 Keychain allowlist；用户已逐次确认真实合成文本请求并精确匹配，usage=73/50/123。Provider/区域/费用未返回；stream/tools/JSON/error/cancel/重复稳定性仍需逐项验证。 |
-| 0D | 记忆存储 | IN PROGRESS | 内存 SQLite/FTS 与派生索引 POC 已完成；MemoryStore + 固定 Embedding 权重新增四组严格离线合成检索，4/4 top-1 且来源证据完整；补真实标注检索集、模型重建/崩溃覆盖和产品 schema 决策。持久化产品实现留待阶段 1/后续阶段门禁。 |
-| 0E | Swift、Loopback、Keychain、Consent | IN PROGRESS | POC demo 启停和退出清理已有实机证据；系统认证测试真实成功两次、用户取消一次；状态分类按 LocalAuthentication 错误码区分取消和系统中断，测试代码不访问钥匙串；两轮 GUI 停止/启动/健康检查完成，进程数符合预期；锁屏/休眠、正式分发与异常恢复策略证据仍待补。 |
-| 0F | 静态加密兼容性 | IN PROGRESS | SQLCipher 已有 ARM64、FTS、迁移和恢复证据；完成密钥生命周期、产品性能及发布形态评估，形成 ADR-019 决定。 |
-| 0G | Embedding 候选 | IN PROGRESS | 固定候选已离线推理三次，均为 4/4 合成 query top-1；observed max RSS 883,130,368–883,490,816 bytes；Python SBOM 覆盖 uv.lock 54/54。实际 macOS arm64 wheel 审查发现 Pillow bundle 含 GPL/LGPL 组件、SQLCipher 静态嵌入 Community Edition 需 attribution、PortAudio 与 sherpa 内嵌 ONNX Runtime 有独立通知要求。Qwen 官方源模型声明 Apache-2.0，但第三方 ONNX 转换仓库无可见 LICENSE、ModelScope 工件与随包样例音频许可未核；正式依赖/通知闭包、真实标注检索集及 D-014 仍待处理。 |
-| 0H | 故障注入与性能 | IN PROGRESS | 已测 WAL reader/writer/checkpoint 与崩溃边界；HFS+/APFS 临时映像数据库写入 ENOSPC；新增 APFS 临时映像真实备份目标 ENOSPC，旧备份/源库完整且 staging 清理，详见 `phase0-enospc-recovery.md`。真实系统卷/外接介质、断电持久性、产品 WAL 生命周期、崩溃后 staging 清理和产品性能目标仍待处理。 |
-| 0I | 阶段追踪与验收 | OPEN | D-001–D-015 与 ADR-019/020/021/022 已按用户要求标记延期（D-010 候选及区域仍延期；D-011 已选择千问 Token Plan/北京用于 POC）。ASR-final→本机 TTS 已有合成链路报告；仍缺 Qwen 云语音适配/逐次实测、文本能力矩阵和重复稳定性、独立语料/长时多负载资源评估、GitHub Actions 真实运行、Provider 服务端取消/稳定性、模型/依赖许可闭包及恢复边界。SwiftUI 麦克风/AEC 属阶段 3；全部证据审查后才能签收。 |
+| B0 | 应用可运行骨架 | OPEN | 将现有 POC supervisor/loopback 能力整理为可启动的 macOS 应用入口；显示服务状态、错误和退出清理。 |
+| B1 | 本机文字对话闭环 | OPEN | UI 提交文字、显示流式回答、停止当前轮次；先连接本机 Ollama，远端模型不作为启动前置。 |
+| B2 | 本地语音闭环 | OPEN | 在应用内显式开始/停止麦克风，连接已验证本地 ASR 和本机 TTS；原始音频不落盘，失败不静默上云。 |
+| B3 | 会话保存与恢复 | DEFERRED | 等待最小数据保留和静态加密决策；在决定前不持久化敏感对话。 |
+| B4 | 云模型接入 | DEFERRED | 默认偏好千问，但当前 Token Plan key 只可用于交互式 POC，不能接入产品后端；取得适用于后端的方案后再接入并逐项验证。 |
+| B5 | 正式发布与扩展功能 | DEFERRED | 文件导入、Embedding 记忆、云语音、备份/恢复、自动恢复、完整许可通知、正式签名分发在对应功能实现前再补决策和测试。 |
 
-## 近期执行队列
+## 阶段 0 证据状态（保留追踪，不作为测试版总门禁）
 
-1. **本机已完成：0H 原子替换边界恢复审查。** 调用 `os.replace` 前 SIGKILL 保留旧备份，成功返回后 SIGKILL 保留新备份，两条路径源库均完整；不覆盖 syscall 内部中断或断电持久性。报告和测试已记录。
-2. **本机已完成：0E supervisor 异常退出路径审查。** 子进程握手后异常退出时能清理并由调用方显式重启；GUI 启停与退出清理已实测。真实系统认证成功两次、用户取消一次和两轮 GUI 启停已记录；自动重启/退避、锁屏/休眠及正式分发仍缺证据或决策，见安全客户端报告。
-3. **0B 语音功能冒烟已取得用户实机证据。** 用户主动采集已产生 partial/final；用户决定将当前识别质量留待后续模型选择，不作为本轮功能冒烟阻断项。按规格书 §13，SwiftUI 麦克风/AEC 在阶段 3，不作为 0B 关闭条件。ASR→TTS 合成链路报告已记录；真实设备驱动故障、独立语料和多负载资源证据仍待补，D-013 数值目标继续延期。
-4. **0B/0G 许可闭环。** 本轮确认 Qwen 官方源模型 Apache-2.0 许可线索；其第三方 ONNX 转换仓库没有可见 LICENSE，ModelScope 下载工件许可与随包 WAV 再分发许可仍不明。双语 Streaming Zipformer 的来源标识和训练数据权利链、原中文权重授权条件也未闭环。继续核对实际发行物/原生依赖并整理通知清单；不据此自动选定模型或分发方案。
-5. **0C DeepSeek 工具提案已实测通过。** 用户重新确认显式关闭 thinking 后的完整请求，DeepSeek 返回合成函数提案，未执行。DeepSeek 空 JSON 的原因仍未知，不能由单次空正文认定为 Key 错误；新增 HTTP 状态分类与本地回归。继续处理 Provider 侧取消证据及其他 0C 缺口，每条外发请求仍需独立确认。
-6. **产品决策继续延期：0F/0G 及规格 D 项。** ADR-019 与 D-014 等照用户要求保持延期；这不关闭对应证据缺口，也不允许开始阶段 1。
+0A–0H 的历史证据和未闭环项仍见追踪矩阵。GitHub Actions 实际运行、独立标注语料/长时压力、Provider 服务端取消与更广稳定性、云 ASR/TTS、许可闭包、锁屏/休眠、系统卷/断电恢复等均延期至对应能力开发或正式发布前；不要将其记作已验证。用户已明确识别质量可后续优化，SwiftUI 麦克风/AEC 属原规格阶段 3。
 
+## 当前执行顺序
+
+1. **B0 应用可运行骨架**：基于现有 SwiftUI lifecycle demo，形成开发者可重复启动的单用户 app 入口；本机后端启动、健康状态、错误提示和退出清理纳入该闭环。
+2. **B1 本机文字对话**：扩展 Loopback API 与客户端，打通文字提交、流式回答、停止；先用 Ollama，暂不引入云端依赖或会话持久化。
+3. **B2 本地语音**：把已有 ASR、麦克风捕获和 TTS 接入 app；录音只在用户明确开始后采集并留在内存，识别失败不得转云。
+4. 后续再按用户实际使用反馈决定会话持久化、云模型、记忆、文件导入和备份。新增能力进入可用路径前再做对应验证。
+
+当前首要实现是 B0/B1 的真实端到端应用体验，不继续扩展与当前测试版无关的 POC 矩阵。
 麦克风复现命令（从仓库根目录，在本机交互式终端运行）：
 
 ```bash
@@ -44,8 +44,8 @@ cd backend
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_live_microphone_poc.py .poc-data/models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20 --seconds 30
 ```
 
-## 阶段门禁
+## 测试版门禁
 
-- 阶段 0 必需验收、报告和未决事项状态以规格书 §13、§14 与追踪矩阵为准。
-- 只有阶段 0 签收并确认关键 ADR/产品决策后，才开始阶段 1。
-- 每个工作包关闭时，将结果、修改文件、验证命令与结果、剩余风险写入对应 POC 报告；同步更新追踪矩阵、本文件和 `HANDOFF.md`，并提交 Git。
+- 每个可用闭环先做必要的本机验证并记录实际范围；不为未启用的后期能力预先重复验证。
+- 涉及敏感数据持久化、远端出站、麦克风采集或正式分发的能力，必须先满足对应安全与授权要求。
+- 每个工作包关闭时，更新实现文档、任务状态和 `HANDOFF.md`，列明验证与剩余限制，并提交 Git。

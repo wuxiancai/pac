@@ -4,17 +4,17 @@
 
 ## 项目目标
 
-依据 [个人 AI 助理开发规格 v1.2](../个人AI助理可执行开发规格书%20v1.2.md)，建设本机优先的个人 AI 助理。当前处于阶段 0：验证关键技术路径和工程基线；阶段 0 未验收前，不进入阶段 1 的完整产品实现。
+依据 [个人 AI 助理开发规格 v1.2](../个人AI助理可执行开发规格书%20v1.2.md)，建设本机优先的个人 AI 助理。当前按 C-007 建设单用户 macOS 测试版。阶段 0 的未完成验证按功能启用或正式发布需要逐项补齐，不再整体阻塞测试版核心闭环。
 
 ## 当前状态
 
-- 当前阶段：阶段 0 POC，未验收；阶段 1 未开始。
+- 当前目标：单用户 macOS 本机优先测试版；POC 证据仍标为 POC，阶段 0 完整 V1/正式发布验收未完成。当前优先实现可运行的文字对话闭环，再接入本地语音；延期能力仅保留清晰扩展边界，不宣称已通过验证。
 - 实现形态：macOS SwiftUI 客户端 + 本机 Python/FastAPI 服务；仓库内各工作包的当前状态和证据见 [阶段 0 追踪矩阵](poc/phase0-traceability.md)。
 - 本机语音：中文 Streaming ASR、麦克风捕获 CLI、TTS 打断已有 POC 和部分实测；用户提供的 Qwen3-ASR 0.6B INT8 ONNX 已完成随包中/英离线评估。另下载 sherpa-onnx 官方中英双语 Streaming Zipformer，10 条合成音频均产生 final；用户三次实机运行 CLI 均观察到 partial/final；5 条中英/混说 manifest 合成 WAV 的本机 ASR-final→AVSpeechSynthesizer 链路共 7/7 完成；另一次麦克风未打开时验证 Ctrl-C 可停止；自动回归模拟覆盖 ASR 解码异常、PortAudio 启动失败和 callback status 错误时的流/缓冲清理，真实设备驱动故障仍未测。用户指定当前真人语音目标为功能冒烟，模型识别质量后续再优化；中英 Streaming Zipformer 仓库声明 Apache-2.0，但上游来源标识和训练数据权利链尚未核清；ASR+LLM 已在两条合成 WAV 上有七轮并发观察，独立语料/多负载资源结果未覆盖；SwiftUI 麦克风/AEC 属规格书阶段 3，当前不列为阶段 0 阻塞；详情见 `docs/poc/phase0-local-asr.md`。
 - SwiftUI 安全客户端：显式系统认证测试按钮已在真实 demo 窗口两次成功验证、一次用户取消验证，均确认未访问钥匙串；UI 按 LocalAuthentication 错误码区分用户取消和系统中断；GUI 后端启停另经两轮复测且无重复子进程。
 - Gateway、安全、记忆、Embedding、SQLCipher 和后端生命周期均有 POC；MemoryStore 显式注入固定 Embedding 权重的严格离线合成检索最新为 4/4 top-1。它们不等同于产品功能验收。详情按需查阅 [`docs/poc/`](poc/)。
 - 0G 许可审查现覆盖当前 macOS Python arm64 wheel：Pillow 自带 SBOM 包含 GPL/LGPL 组件，SQLCipher/PortAudio/sherpa 内嵌 ONNX Runtime 有独立许可或 notices。实际产品安装依赖未定，模型工件及完整发行通知闭包仍开放，详见 `docs/poc/phase0-model-license-review.md`。
-- 根目录现有 `README.md`、`AGENTS.md` 和 `.github/workflows/ci.yml`；最新本机 CI 等价全量验证通过（Python 154 项、Swift 31 项、Python compileall、`uv lock --check`），GitHub Actions 尚未执行。用户选择暂不配置/操作 Git 远端；当前工作树检查发现已有 `origin`，未推送。D-001–D-015 与 ADR-019/020/021/022 按用户 2026-11-08 指示延期；延期不豁免阶段验收证据。
+- 根目录现有 `README.md`、`AGENTS.md` 和 `.github/workflows/ci.yml`；最新本机 CI 等价全量验证通过（Python 154 项、Swift 31 项、Python compileall、`uv lock --check`），GitHub Actions 尚未执行。用户选择暂不配置/操作 Git 远端；当前工作树检查发现已有 `origin`，未推送。D-001–D-015 与 ADR-019/020/021/022 按用户 2026-11-08 指示延期。用户随后确认单用户 macOS 测试版优先；阶段 0 全量证据改为 V1/正式发布门禁，详见 C-007。
 - 每次工作的 Git 基线以 `git log -1` 为准；工作开始前先检查 `git status`，保护已有改动。
 
 ## 架构和安全边界
@@ -31,7 +31,7 @@
 ## 记录规则
 
 - 稳定事实和架构边界写在本文件；产品或架构取舍写在 [DECISIONS.md](DECISIONS.md)；当前状态、负责人和验收条件写在 [TASKS.md](TASKS.md)；每次交接摘要写在 [HANDOFF.md](HANDOFF.md)。
-- 阶段验收的详细证据以 `docs/poc/phase0-traceability.md` 及其链接的 POC 报告为准。避免在多个文档复制长篇测试结果。
+- POC 的详细证据以 `docs/poc/phase0-traceability.md` 及其链接报告为准；测试版可用范围和发布门禁以 `docs/TASKS.md`、`docs/DECISIONS.md` 为准。避免在多个文档复制长篇测试结果。
 - 每项工作记录状态和可复核证据。没有实际验证的能力不得标记为已验证；产品待决事项不得由实现者自行假定。
 - 每次变更后更新相关进度文档并提交 Git；交接或中断前更新 `HANDOFF.md`。
 

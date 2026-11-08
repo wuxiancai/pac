@@ -1,6 +1,6 @@
-# Personal AI Assistant — Phase 0 POC
+# Personal AI Assistant — macOS Beta
 
-本仓库目前处于阶段 0 技术验证，**尚未验收，也尚未开始阶段 1**。POC 结果不构成产品承诺。
+本仓库从技术 POC 转入单用户 macOS 测试版开发（决策 C-007）。阶段 0 的未闭环验证仍保留在追踪矩阵中，按功能启用或正式发布需要补齐；它们不再整体阻塞测试版核心闭环。POC 结果不构成产品承诺。
 
 ## 项目文档
 
