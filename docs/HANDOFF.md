@@ -1,3 +1,9 @@
+### 2026-11-08：千问 Token Plan Base URL 纠正
+
+- 用户提供官方截图，指出 Token Plan 的 OpenAI 兼容 Base URL 为 `https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1`。此前 adapter 仍用旧北京 `maas.aliyuncs.com` 域名，现已切换到截图/千问AI平台文档中的品牌域名，固定模型和 `sk-sp-` Keychain 检查不变。
+- 澄清使用范围：协议兼容确实允许在支持的 AI/Agent 工具中接入，官方明确列出 OpenClaw；Token Plan 个人版范围也明确排除自动化脚本和自定义应用后端。我们当前自建 FastAPI beta 属自定义应用后端，所以 Base URL 改正不自动意味着可将该 Key 放入 beta 后端。官方链接见 `DECISIONS.md` 与 Provider 报告。
+- 历史 Qwen 真实请求曾通过旧区域域名成功；尚未对新品牌域名另行出站。
+
 ### 2026-11-08：测试版本机服务会话时长修正
 
 - 发现复用 POC 默认会令本机 API token 五分钟后过期，长时间打开测试版会导致聊天 401。Beta 服务改为 token 仅在 supervisor 管理的进程存活期间有效；随机 token 不落盘，owner pipe 关闭即停止服务并销毁 token。POC 其他调用继续保留短时过期默认值。
@@ -32,7 +38,7 @@
 - 用户贴出的临时 key 没有被使用或保存；它以 `sk-ws-` 开头，而 Token Plan 官方说明套餐专属 key 为 `sk-sp-`，`sk-ws-` 属于按量付费 API Key 类型。需在控制台撤销这把暴露的 key，另建 `sk-sp-` 并只存 Keychain（service `com.personal-ai-assistant.phase0.provider`、account `qwen`）。
 - Token Plan 语音接口并非 chat-compatible：非实时 ASR `qwen-audio-3.0-asr-flash`、TTS `qwen-audio-3.0-tts-plus`、实时语音对话 `qwen-audio-3.0-realtime-plus` 需各自协议适配。文本 adapter 已有 mock，但没有真实出站；任何真实请求还需单项精确确认。
 - 窄验证：`pytest -q tests/test_remote_providers_poc.py tests/test_phase0_traceability_report.py`，29 passed。阶段 0 仍未验收；更新 DECISIONS、TASKS、PROJECT_CONTEXT、Provider POC 报告和追踪矩阵。
-- 后续官方资料核对补充：Token Plan Base URL 明确“仅限 Claude Code、Codex 等 AI 工具交互式使用，不能用于后端服务”。当前 qwen adapter 只供阶段 0 交互式 CLI POC，不可移入本机 FastAPI 产品服务；产品后端要调用千问需换成允许后端的普通百炼计费方案/API Key。
+- （本段结论已由文首“千问 Token Plan Base URL 纠正”更新）当时因只查到旧版阿里云文档，记录为不能用于后端；现按千问AI平台当前文档保留具体边界：OpenClaw 等交互式 Agent 工具允许接入，自定义应用后端不在支持范围。
 - 用户已选择“交互式 POC（sk-sp-）”；目前真实探测前置仍是撤销已暴露 key、创建新的 Token Plan 专属 key 并保存到 login Keychain 的 service `com.personal-ai-assistant.phase0.provider` / account `qwen`。key 不应回传聊天。真实请求须在 CLI 显示 payload 后单独输入 `ALLOW QWEN`；本轮没有发出云请求。
 
 ### 2026-11-08：0B 第二组合成负载并发资源复测

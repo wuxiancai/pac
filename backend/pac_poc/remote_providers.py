@@ -48,7 +48,7 @@ QWEN_TOKEN_PLAN_PROBE_CONFIG = RemoteProviderConfig(
     model="qwen3.8-flash",
     region="china-beijing",
     endpoint=(
-        "https://token-plan.cn-beijing.maas.aliyuncs.com/"
+        "https://token-plan.maas.qianwenaiapi.com/"
         "compatible-mode/v1/chat/completions"
     ),
 )
@@ -103,7 +103,7 @@ class OpenAICompatibleRemoteAdapter:
         expected_hosts = {
             "deepseek": "api.deepseek.com",
             "openrouter": "openrouter.ai",
-            "qwen": "token-plan.cn-beijing.maas.aliyuncs.com",
+            "qwen": "token-plan.maas.qianwenaiapi.com",
         }
         expected_configs = {
             DEEPSEEK_PROBE_CONFIG.provider: DEEPSEEK_PROBE_CONFIG,

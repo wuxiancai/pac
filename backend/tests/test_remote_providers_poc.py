@@ -155,6 +155,10 @@ def test_deepseek_text_request_requires_exact_consent_and_uses_keychain_secret()
 
 def test_qwen_token_plan_uses_fixed_beijing_endpoint_and_keychain_credential() -> None:
     config = QWEN_TOKEN_PLAN_PROBE_CONFIG
+    assert config.endpoint == (
+        "https://token-plan.maas.qianwenaiapi.com/"
+        "compatible-mode/v1/chat/completions"
+    )
 
     class PlanCredentials(FakeCredentials):
         def get(self, account: str) -> str:
