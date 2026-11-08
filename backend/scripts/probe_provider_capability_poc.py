@@ -283,9 +283,11 @@ def main() -> int:
                     asyncio.run(gateway.generate_with_metadata(request))
                 except RemoteProviderError as exc:
                     print(f"Provider 返回已脱敏错误: {exc}")
-                    passed = exc.is_client_error
+                    passed = exc.is_request_validation_error
                     if passed:
-                        print("错误路径验证通过：Provider 返回 4xx 客户端错误。")
+                        print("错误路径验证通过：Provider 拒绝了无效请求参数。")
+                    elif exc.is_authentication_error:
+                        print("API Key 认证失败：请检查对应 Provider 的 Keychain 项；密钥内容未读取或显示在此提示中。")
                 else:
                     print("Provider 接受了预期无效格式；未观察到 4xx 错误。")
                     passed = False

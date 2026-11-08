@@ -517,6 +517,8 @@ def test_remote_error_is_sanitized_and_does_not_expose_body_or_key() -> None:
     assert "test-secret" not in str(error.value)
     assert error.value.status_code == 401
     assert error.value.is_client_error
+    assert error.value.is_authentication_error
+    assert not error.value.is_request_validation_error
     assert credentials.reads == ["deepseek"]
 
 
@@ -527,7 +529,12 @@ def test_remote_provider_422_is_classified_as_expected_client_error() -> None:
     )
 
     assert error.is_client_error
+    assert error.is_request_validation_error
+    assert not error.is_authentication_error
     assert not RemoteProviderError("Provider request failed with HTTP 503", status_code=503).is_client_error
+    assert not RemoteProviderError("Provider rejected API credentials", status_code=401).is_request_validation_error
+    assert not RemoteProviderError("Provider account requires payment", status_code=402).is_request_validation_error
+    assert not RemoteProviderError("Provider rate limit reached", status_code=429).is_request_validation_error
     assert not RemoteProviderError("Provider returned invalid JSON").is_client_error
 
 

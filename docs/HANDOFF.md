@@ -1,3 +1,9 @@
+### 2026-11-08：Provider API Key 错误分类与 DeepSeek JSON 复核
+
+- 用户再次授权的 DeepSeek JSON 请求成功返回 `{"phase0":"ack"}`，结构匹配，finish_reason=`stop`，tokens=68/28/96。结合前一次成功（68/46/114），此前空正文不是 API Key 错误的证据；空正文根因仍未知。
+- 适配器对 HTTP 401 给出凭据认证失败提示，并区分 402 余额、403 权限、429 限流；Keychain 缺失仍是独立提示。`error` probe 只把 HTTP 400/422 作为预期请求校验错误，不会把认证/余额等 4xx 误报为通过。错误响应正文仍丢弃；没有发送验证 Key 的额外远端请求。
+- 验证通过：窄回归 34 passed；全量 Python 145 passed；`python -m compileall -q pac_poc scripts`、`uv lock --check`、`git diff --check` 均通过。0C 仍未验收。后续 Provider 请求仍需逐项 Consent。
+
 # HANDOFF
 
 > 文档入口：稳定项目约束见 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)，已确认/待决选择见 [DECISIONS.md](DECISIONS.md)，阶段任务与下一步见 [TASKS.md](TASKS.md)，阶段证据见 [追踪矩阵](poc/phase0-traceability.md)。本文件仅作为最近交接摘要；避免在这里重复维护完整任务和决策清单。

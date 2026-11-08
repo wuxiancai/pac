@@ -83,6 +83,13 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 
 ## 用户实机真实请求结果（2026-11-08）
 
+### API Key 错误提示与 DeepSeek JSON 第三次观察
+
+- 用户询问 JSON 空正文是否可能由 API Key 错误导致。随后一次 DeepSeek JSON 请求成功返回 `{"phase0":"ack"}`，结构检查 True，finish_reason=`stop`，模型 `deepseek-flash`，tokens=68/28/96。成功的 chat completion 表明该次请求的 Key 已被 Provider 接受；先前空正文不能单独证明 Key 错误。
+- 适配器现在对 HTTP 401 输出明确的“Provider rejected API credentials”提示；本地 Keychain 缺失仍沿用单独的凭据不可用错误。HTTP 402、403、429 分别提示余额/付款、权限和限流状态；错误响应正文仍丢弃，不泄露密钥。这里只按状态码分类，不尝试探测或回显 Key。
+- `error` 能力探测只把 HTTP 400/422 视为无效请求格式的预期拒绝。认证、余额、权限、限流及服务端错误不会被误记为 payload 错误路径通过。新增本地 MockTransport 回归；未为验证 API Key 额外发送请求。
+- DeepSeek 官方错误码将 401 定义为认证失败（错误 API Key），402 为余额不足，422 为参数无效，429 为限流：[官方错误码说明](https://api-docs.deepseek.com/quick_start/error_codes/)。OpenRouter chat completions 文档区分 401、402、403、422、429 等响应状态：[官方 Chat Completions API](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request)。
+
 - **DeepSeek**：用户在 CLI 输入 `ALLOW DEEPSEEK` 后发送一条 L1 合成文本请求，返回 `phase0-probe-ack`，与期望文本完全匹配。实际模型 `deepseek-flash`；token 用量 prompt 42 / completion 41 / total 83。服务未返回下游 Provider、区域或费用信息。
 - **OpenRouter Global**：用户在 CLI 输入 `ALLOW OPENROUTER` 后发送一条 L1 合成文本请求，返回 `phase0-probe-ack`，与期望文本完全匹配。实际模型 `deepseek/deepseek-v4.1-flash-1017`；下游 Provider `Relace`、服务区域 `HKG`；token 用量 prompt 42 / completion 17 / total 59；报告费用 USD 0.000008752。
 - **同一 Gateway 顺序路由复测**：用户随后运行 `probe_provider_switch_poc.py`，分别输入 `ALLOW DEEPSEEK` 与 `ALLOW OPENROUTER`。同一 Gateway 实例向 DeepSeek（`deepseek-flash` / China）和 OpenRouter（`deepseek/deepseek-v4.1-flash-1017` / Global）各发送一条 L1 合成非流式请求；两条响应均精确匹配 `phase0-probe-ack`。OpenRouter 报告下游 Provider `Relace`、区域 `HKG`。本轮输出未包含 token、费用或 DeepSeek 下游/区域元数据，故不补记这些值。
@@ -91,9 +98,9 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 - **DeepSeek SSE 客户端取消**：用户输入 `ALLOW DEEPSEEK CANCEL 1` 后，收到首个文本片段 `phase`，客户端随即主动关闭 SSE。证明一次客户端侧中断路径运行；Provider 是否因此停止生成/计费未由响应或服务端记录证明。
 - **OpenRouter SSE**：用户按 `probe_provider_capability_poc.py openrouter stream` 输入 `ALLOW OPENROUTER STREAM 1` 后，流式分块拼接得到 `phase0-probe-ack`，精确匹配为 True。未提供 token/cost 或流式 metadata；只证明 OpenRouter `deepseek/deepseek-v4.1-flash-1017` Global 的一次真实流式合成文本成功，不代表稳定性或其他能力。
 - **OpenRouter SSE 客户端取消**：用户输入 `ALLOW OPENROUTER CANCEL 1` 后，收到首个文本片段 `phase0-probe-`，客户端随即主动关闭 SSE。证明一次客户端侧中断路径运行；Provider 是否因此停止生成/计费未由响应或服务端记录证明。
-- **DeepSeek JSON**：首次用户确认后返回空正文、结构检查失败；该次旧 CLI 未打印 finish_reason/usage/路由 metadata，没有重试。增强诊断后用户再次确认，返回 `{"phase0":"ack"}`，结构检查 True，finish_reason=`stop`，模型 `deepseek-flash`，prompt/completion/total tokens=68/46/114；下游 Provider、region、cost 未提供。当前两次实测一空一成功，说明本配置至少一次通过，但重复一致性与首次空正文原因未知。
+- **DeepSeek JSON**：首次用户确认后返回空正文、结构检查失败；该次旧 CLI 未打印 finish_reason/usage/路由 metadata，没有重试。增强诊断后第二、第三次用户分别确认，均返回 `{"phase0":"ack"}`，结构检查 True、finish_reason=`stop`，模型 `deepseek-flash`，tokens 分别为 68/46/114 与 68/28/96；下游 Provider、region、cost 未提供。三次观察为一次空正文、两次成功，说明此前空正文不是 API Key 错误的证据，且后续请求证明凭据可用；空正文原因仍未知，样本也不足以推断稳定性。
 - **OpenRouter JSON**：用户输入 `ALLOW OPENROUTER JSON 1` 后返回 `{"phase0":"ack"}`，结构检查为 True，finish_reason=`stop`。实际模型 `deepseek/deepseek-v4.1-flash-1017`，下游 Provider `Relace`、区域 `HKG`；prompt/completion/total tokens=46/36/82，服务报告费用 USD `0.000018276`。只证明本配置的一次结构化输出成功。
-- **DeepSeek 错误路径**：用户输入 `ALLOW DEEPSEEK ERROR 1` 后，对故意无效的 `response_format` 收到 HTTP 422；CLI 只输出状态码，未暴露响应正文/凭据。原 CLI 只认 HTTP 400，导致这次合理的 4xx 拒绝未被识别为预期路径；现已改为任何 4xx 均通过、5xx 不通过，并以 MockTransport 回归覆盖 401/422/503 分类。该真实请求未输出费用 metadata。
+- **DeepSeek 错误路径**：用户输入 `ALLOW DEEPSEEK ERROR 1` 后，对故意无效的 `response_format` 收到 HTTP 422；CLI 只输出状态码，未暴露响应正文/凭据。原 CLI 只认 HTTP 400，导致这次合理的 4xx 拒绝未被识别为预期路径；本轮已收紧为仅 HTTP 400/422 计作预期无效请求拒绝；401/402/403/429 不再被误报为该错误路径通过，并以 MockTransport 回归覆盖分类。该真实请求未输出费用 metadata。
 - **OpenRouter 错误路径**：用户输入 `ALLOW OPENROUTER ERROR 1` 后，对同一故意无效 `response_format` 收到 HTTP 400；CLI 输出脱敏状态码并报告错误路径验证通过。两家各一次真实 4xx 拒绝，不等于所有服务错误类别已覆盖。此请求未输出费用或路由 metadata。
 - **OpenRouter metadata 重复观察**：用户对 `metadata --repeat 2` 两条请求分别输入精确确认。两次响应均精确匹配；模型均为 `deepseek/deepseek-v4.1-flash-1017`，下游均为 Relace、区域均为 HKG。第 1 次 tokens=42/17/59，cost USD `0.000008752`；第 2 次 tokens=42/16/58，cost USD `0.000008252`。观察到路由与区域一致，费用差异与 completion token 数差异同时出现；样本仅两次，不据此推断定价公式或稳定性。
 - **DeepSeek metadata 重复观察**：用户分别输入 `ALLOW DEEPSEEK METADATA 1`、`ALLOW DEEPSEEK METADATA 2`。两次模型均为 `deepseek-flash`，服务均未返回下游 Provider、区域或费用。第 1 次 tokens=42/29/71，响应未精确匹配；第 2 次 tokens=42/16/58，精确匹配。旧 CLI 未显示不匹配的实际正文，无法分析第 1 次差异；现已加入 JSON 字符串编码后的正文诊断，未自动重发。只证明模型标识与 token usage 可读取，不证明服务返回区域/计费 metadata 的能力。

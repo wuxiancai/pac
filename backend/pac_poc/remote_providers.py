@@ -67,6 +67,14 @@ class RemoteProviderError(RuntimeError):
     def is_client_error(self) -> bool:
         return self.status_code is not None and 400 <= self.status_code < 500
 
+    @property
+    def is_authentication_error(self) -> bool:
+        return self.status_code == 401
+
+    @property
+    def is_request_validation_error(self) -> bool:
+        return self.status_code in {400, 422}
+
 
 class OpenAICompatibleRemoteAdapter:
     """Fixed-endpoint OpenAI chat-completions adapter for Phase 0 remote probes."""
@@ -314,9 +322,20 @@ class OpenAICompatibleRemoteAdapter:
     def _raise_for_status(response: httpx.Response) -> None:
         if response.is_error:
             # Deliberately discard provider response bodies; they may echo request data.
+            status_code = response.status_code
+            if status_code == 401:
+                message = "Provider rejected API credentials (HTTP 401)"
+            elif status_code == 402:
+                message = "Provider account requires payment or has insufficient balance (HTTP 402)"
+            elif status_code == 403:
+                message = "Provider denied access or permission (HTTP 403)"
+            elif status_code == 429:
+                message = "Provider rate limit reached (HTTP 429)"
+            else:
+                message = f"Provider request failed with HTTP {status_code}"
             raise RemoteProviderError(
-                f"Provider request failed with HTTP {response.status_code}",
-                status_code=response.status_code,
+                message,
+                status_code=status_code,
             )
 
     def _client_or_new(self) -> tuple[httpx.AsyncClient, bool]:
