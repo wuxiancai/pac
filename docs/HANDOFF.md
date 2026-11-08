@@ -18,6 +18,7 @@
 - 新增固定 URL/model/region 的 OpenAI chat-completions adapter、macOS `/usr/bin/security` Keychain reader 和 `scripts/probe_remote_provider_poc.py`。每次运行最多发一个 L1 合成文本请求；不重试、不 fallback、不执行模型工具。正确的逐次确认短语后才会生成 60 秒精确 Consent，策略通过后才读取 Keychain；拒绝路径在本机验证无 Keychain 读取/网络请求。
 - MockTransport 验证默认拒绝、文本请求、SSE、工具调用数据（不执行）、`response_format`、OpenRouter provider failover 关闭、选定 Provider/region/token/cost metadata、端点/model/region allowlist 和 HTTP 错误脱敏。局部测试 28 项，全量 Python 139 项，Swift 27 项通过；`compileall` 与 `uv lock --check` 通过。
 - 用户还未把 API Key 保存到 Keychain，故没有真实 Provider 请求。下一步按 `poc/phase0-remote-provider.md` 创建两项登录钥匙串记录，然后由用户分别在 `deepseek` 与 `openrouter` CLI 探测提示中输入授权短语。阶段 0 仍未验收。
+- 用户随后已分别运行两家探测并输入对应确认短语；两次均返回 `provider credential is missing or unavailable in Keychain`。查询未取得密钥，因此无 HTTP 请求。下一步核对 login 钥匙串“通用密码”项的 service/account 与报告完全一致；具体结果写入 `poc/phase0-remote-provider.md`。
 
 ### 2026-11-08：双语流式 ASR 分帧评估与评分修正
 

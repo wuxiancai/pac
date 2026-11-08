@@ -1,6 +1,6 @@
 # 阶段 0 POC：真实 Provider 探测准备（工作包 0C）
 
-状态：`IN PROGRESS`。固定目标 adapter、Keychain reader、一次性终端授权入口已实现；尚未在用户账户上创建 Keychain 条目或发送真实 Provider 请求。
+状态：`IN PROGRESS`。固定目标 adapter、Keychain reader、一次性终端授权入口已实现。用户已分别尝试 DeepSeek 与 OpenRouter 探测，两次均在 Keychain 凭据查找阶段失败，尚未发送真实 Provider 请求。
 
 ## 用户确认与固定范围
 
@@ -18,6 +18,8 @@
 | Keychain Item Name / Service | `com.personal-ai-assistant.phase0.provider` | `com.personal-ai-assistant.phase0.provider` |
 | Account Name | `deepseek` | `openrouter` |
 | Password | 该 Provider 的 API Key | 该 Provider 的 API Key |
+
+2026-11-08 用户已按流程输入两次确认短语，但两次均返回 `provider credential is missing or unavailable in Keychain`。脚本已进入 Keychain 查询，但未取得凭据，因此未发送 HTTP 请求。请检查钥匙串访问中是否在 **login** 钥匙串创建了“通用密码”项，且名称/Service、账户名完全匹配上表；不要删除或覆盖其他钥匙串项。可先只创建一项，再重试对应 Provider。
 
 `MacOSKeychainCredentialProvider` 通过 argv 固定的 `/usr/bin/security find-generic-password` 从登录钥匙串读取；不使用 shell，不将密钥放进进程参数，stdout 只由当前 Python 进程捕获在内存中。只有 CLI 的精确确认短语通过后，Gateway 才会通过 `ConsentAwarePolicy`，之后 adapter 才会请求读取对应条目。每次请求的 Consent grant 最长 60 秒，完成后立即撤销。
 
@@ -46,7 +48,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_remote_prov
 
 ## 尚未验收
 
-- 用户尚未保存 Keychain 凭据；尚未发生 DeepSeek 或 OpenRouter 网络请求。
+- 两次 Keychain 凭据查询均未取得密钥；尚未发生 DeepSeek 或 OpenRouter 网络请求。需要先核对 login 钥匙串中的服务名和账户名是否完全匹配上表。
 - 真实费用、模型/区域可用性、错误码、实际 SSE、工具 schema、结构化输出、Usage 统计、同内容跨 Provider 切换尚未验证。当前 `ModelGateway` 文本适配路径只验证计划中的单次合成文本探测；MockTransport 能力不能作为供应商能力证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。
