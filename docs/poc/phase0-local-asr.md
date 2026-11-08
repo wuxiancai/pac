@@ -102,7 +102,7 @@ swift run tts-interrupt-poc
 
 ## 尚未解决
 
-- 需要由用户明确启动真实麦克风测试，验证 partial/final、VAD、背压、停止和异常后的缓冲清理。
+- 2026-11-08 用户在 MacBook Air 主动运行双语流式麦克风 CLI 并贴回终端结果：产生多个增量 partial 和两个 final；中文大意可辨，但其中夹杂英文词/缩写的句子发生若干错词，第二段英语短语亦未稳定识别。用户运行时 `cd backend` 因已位于 backend 目录而失败，随后相对路径命令仍正常启动。未提供逐字 ground truth，故不计算 CER；这是一次、用户现场话语的主观质量观察，不代表可重复质量或性能验收。脚本未保存音频，终端文本由用户贴入对话。仍需按屏幕提示的受控中英句子重复多轮，并核验停止、异常/背压清理与 TTS 打断。
 - 双语 streaming 候选已产生中英及混说的文件分帧 partial/final；仍需用户参与实时麦克风多轮说话，检查真实说话节奏、停止/异常清理及 SwiftUI 链路。合成语音分数不能替代此门槛。
 - Qwen3-ASR 候选已在五条随包音频上完成离线中/英/混说检查；尚无独立留出中英语料。其 ONNX 离线整段路径不能证明实时流式延迟、partial/final、打断、SwiftUI 麦克风处理或长时运行能力。Qwen 官方当前说明流式推理需 vLLM backend；本机现有 sherpa-onnx API 测试使用 `OfflineRecognizer`，因此不能把 RTF<1 写成实时流式验收。
 - sherpa-onnx 官方 Python API 样例将此类模型通过 `OfflineRecognizer.from_qwen3_asr` 整段解码；参见 [官方 Qwen3-ASR 文件解码样例](https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-qwen3-asr-decode-files.py)。Qwen 官方说明 Qwen3-ASR 的 streaming inference 当前只在 vLLM backend 提供，详见 [Qwen3-ASR 官方文档](https://github.com/QwenLM/Qwen3-ASR#streaming-inference)。

@@ -6,12 +6,19 @@
 
 ## 最近交接
 
+### 2026-11-08：首次双语麦克风实测与 Provider 组合输入
+
+- 用户主动运行官方中英 Streaming Zipformer 麦克风 CLI，回报多个 partial、两个 final。混合中文/英语话语出现可见错词，第二段英语也未稳定识别；无逐字 ground truth，未算 CER。该轮只作为一次真实设备观察，原始音频未保存。复测要求见 `poc/phase0-local-asr.md` 和 `TASKS.md`。
+- 用户给出两家 Provider 候选：DeepSeek、OpenRouter。官方资料显示 DeepSeek API 端点为 `api.deepseek.com`，隐私政策称该服务数据在中国处理；OpenRouter 默认域名全球路由，US/EU 区域路由需要符合 Business/Enterprise 条件。链接记录于任务文档。
+- 已向用户澄清：不要把 API Key 发到聊天。当前 Keychain 凭据 POC 仅实现写入、删除和存在状态；尚未集成真实 Provider Adapter 的安全读取/使用路径，也没有为用户准备好固定 service/account 名称，因此现在不要手动创建凭据项。待确认区域后会先把本机安全路径补齐。
+- 用户命令开头的 `cd backend` 报错只因其已位于 `backend` 目录；后续相对路径命令实际成功运行并启动麦克风捕获。
+
 ### 2026-11-08：双语流式 ASR 分帧评估与评分修正
 
 - 官方 sherpa-onnx `sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20` 已下载至忽略目录 `backend/.poc-data/models/`。包内 README 声明 Apache-2.0；模型页、来源和四个关键文件 SHA-256 记录在 `poc/phase0-local-asr.md`。
 - 使用项目 streaming adapter 按 200 ms 输入 8 条 Tingting 中文、1 条 Samantha 英语、1 条中英混说合成 WAV，尾部追加 3 秒静音：10/10 final、82 partial、weighted CER 0.0254。小型合成样本只证明适配器文件分帧路径可运行；真实麦克风及 SwiftUI 流程仍需用户操作。
 - 修复 CER 对英语大小写敏感的问题，并修复多段 final 只评分最后一段的问题；ASR 评测回归 8 项通过，Python 全量 129 项、Swift 27 项通过。
-- 下一步由用户主动参与麦克风中英混说测试；其余阶段缺口与门禁以 `poc/phase0-traceability.md`、`TASKS.md` 为准。阶段 0 未验收。
+- 下一步由用户按固定中英短句重复麦克风测试；其余阶段缺口与门禁以 `poc/phase0-traceability.md`、`TASKS.md` 为准。阶段 0 未验收。
 
 ### 2026-11-08：0E/0H 交接记录去重与差异核对
 
