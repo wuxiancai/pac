@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：DeepSeek 错误路径返回 HTTP 422
+
+- 用户逐次确认 DeepSeek `error` 探测后，故意无效的 `response_format` 收到 HTTP 422；响应正文与凭据均未输出。初次脚本只接受 400，错误地把该请求记为未通过。
+- `RemoteProviderError` 现安全保留 HTTP 状态码，`is_client_error` 将 4xx 识别为预期客户端错误；5xx 和无 HTTP 状态错误不计通过。测试窄回归 32 项、全量 Python 143 项、compileall、uv lock --check 均通过。
+- 下一项是 OpenRouter `error`（可能计费，需独立确认），然后费用/区域重复核验。阶段 0 仍未验收。
+
 ### 2026-11-08：OpenRouter JSON 实测通过
 
 - 用户逐次确认 `ALLOW OPENROUTER JSON 1` 后，返回 `{"phase0":"ack"}`，结构检查 True，finish_reason=`stop`。模型 `deepseek/deepseek-v4.1-flash-1017`，下游 Relace/HKG，tokens=46/36/82，服务报告费用 USD 0.000018276。

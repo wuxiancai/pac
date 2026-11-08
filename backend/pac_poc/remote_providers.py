@@ -59,6 +59,14 @@ class RemoteCompletion:
 class RemoteProviderError(RuntimeError):
     """Sanitized Provider error; response bodies and credentials are not retained."""
 
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+    @property
+    def is_client_error(self) -> bool:
+        return self.status_code is not None and 400 <= self.status_code < 500
+
 
 class OpenAICompatibleRemoteAdapter:
     """Fixed-endpoint OpenAI chat-completions adapter for Phase 0 remote probes."""
@@ -306,7 +314,10 @@ class OpenAICompatibleRemoteAdapter:
     def _raise_for_status(response: httpx.Response) -> None:
         if response.is_error:
             # Deliberately discard provider response bodies; they may echo request data.
-            raise RemoteProviderError(f"Provider request failed with HTTP {response.status_code}")
+            raise RemoteProviderError(
+                f"Provider request failed with HTTP {response.status_code}",
+                status_code=response.status_code,
+            )
 
     def _client_or_new(self) -> tuple[httpx.AsyncClient, bool]:
         if self._client is not None:
