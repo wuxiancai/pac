@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：OpenRouter 错误路径返回 HTTP 400
+
+- 用户逐次确认 OpenRouter `error` 探测后，故意无效的 `response_format` 返回已脱敏 HTTP 400，脚本报告预期 4xx 路径通过。与 DeepSeek HTTP 422 结果一致；每家目前只有一次真实错误路径样本。
+- 0C 下一项是 OpenRouter `metadata --repeat 2`，每次请求会分别展示目标并要求确认，用于观察重复费用/区域信息；另需考虑 DeepSeek metadata 是否返回可核验的区域/费用数据。
+- 更新 Provider 报告、追踪矩阵和任务状态后提交。
+
 ### 2026-11-08：DeepSeek 错误路径返回 HTTP 422
 
 - 用户逐次确认 DeepSeek `error` 探测后，故意无效的 `response_format` 收到 HTTP 422；响应正文与凭据均未输出。初次脚本只接受 400，错误地把该请求记为未通过。

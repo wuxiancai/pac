@@ -88,11 +88,12 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 - **DeepSeek JSON**：用户输入 `ALLOW DEEPSEEK JSON 1` 后，命令返回空 JSON 正文，结构检查失败；输出未包含 finish_reason、token 用量或路由 metadata，故暂不能区分输出预算耗尽与上游正常结束但正文为空。没有重试。CLI 已补充这些字段，之后由 OpenRouter JSON 单次探测做能力对照；如需重测 DeepSeek，须另行逐次确认。
 - **OpenRouter JSON**：用户输入 `ALLOW OPENROUTER JSON 1` 后返回 `{"phase0":"ack"}`，结构检查为 True，finish_reason=`stop`。实际模型 `deepseek/deepseek-v4.1-flash-1017`，下游 Provider `Relace`、区域 `HKG`；prompt/completion/total tokens=46/36/82，服务报告费用 USD `0.000018276`。只证明本配置的一次结构化输出成功。
 - **DeepSeek 错误路径**：用户输入 `ALLOW DEEPSEEK ERROR 1` 后，对故意无效的 `response_format` 收到 HTTP 422；CLI 只输出状态码，未暴露响应正文/凭据。原 CLI 只认 HTTP 400，导致这次合理的 4xx 拒绝未被识别为预期路径；现已改为任何 4xx 均通过、5xx 不通过，并以 MockTransport 回归覆盖 401/422/503 分类。该真实请求未输出费用 metadata。
+- **OpenRouter 错误路径**：用户输入 `ALLOW OPENROUTER ERROR 1` 后，对同一故意无效 `response_format` 收到 HTTP 400；CLI 输出脱敏状态码并报告错误路径验证通过。两家各一次真实 4xx 拒绝，不等于所有服务错误类别已覆盖。此请求未输出费用或路由 metadata。
 - **DeepSeek 工具提案**：首次请求返回 HTTP 400。依据 DeepSeek 官方说明，thinking 默认启用且 named `tool_choice` 在 thinking mode 不受支持；脚本随后显式关闭 thinking，并由用户对更新后的完整 schema/payload 再次独立确认。第二次请求返回 `phase0_echo_synthetic`，参数为 `{"marker":"phase0-probe-ack"}`。提案只作为数据展示，未执行任何工具。该实测证明 DeepSeek `deepseek-flash` 在此配置下的一次工具提案成功；不证明 OpenRouter、执行安全或稳定性。
 - **OpenRouter 工具提案**：前两次逐次确认后均返回空 proposal list（第二次普通文本也为空）。加入 finish_reason/路由诊断后，用户再次输入 `ALLOW OPENROUTER TOOLS 1`，第三次请求成功返回 `phase0_echo_synthetic`，参数为 `{"marker":"phase0-probe-ack"}`；finish_reason=`tool_calls`，实际模型 `deepseek/deepseek-v4.1-flash-1017`，下游 Provider `Relace`、区域 `HKG`。工具仅作为提案展示，未执行。此证据证明该固定配置的一次真实工具提案成功，不证明稳定性或执行安全；前两次空结果的原因仍未知。
 
 ## 尚未验收
 
-- 两家真实 SSE 各有一次成功；DeepSeek 与 OpenRouter 工具提案各有一次成功且均未执行（OpenRouter 前两次曾为空）；DeepSeek JSON 空正文原因、OpenRouter 错误路径、费用/区域重复结果及拒绝/撤销后的系统级零出站边界尚未充分验证。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
+- 两家真实 SSE 各有一次成功；DeepSeek 与 OpenRouter 工具提案各有一次成功且均未执行（OpenRouter 前两次曾为空）；DeepSeek JSON 空正文原因、费用/区域重复结果及拒绝/撤销后的系统级零出站边界尚未充分验证。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。
