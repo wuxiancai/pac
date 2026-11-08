@@ -90,8 +90,16 @@ def test_microphone_script_entrypoint_imports_project_package() -> None:
     assert "Explicitly started, local-only microphone" in result.stdout
 
 
-def test_microphone_cli_closes_stream_and_discards_buffer_when_asr_raises(
+@pytest.mark.parametrize(
+    ("failure", "raises_to_caller"),
+    [(RuntimeError, True), (KeyboardInterrupt, False)],
+    ids=["decoder-error", "user-interrupt"],
+)
+def test_microphone_cli_closes_stream_and_discards_buffer_on_exit(
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    failure: type[BaseException],
+    raises_to_caller: bool,
 ) -> None:
     frame_buffer = MicrophoneFrameBuffer(max_frames=25)
     stream_closed = False
@@ -110,7 +118,7 @@ def test_microphone_cli_closes_stream_and_discards_buffer_when_asr_raises(
 
     class FailingASR:
         def accept(self, _frame):
-            raise RuntimeError("synthetic decoder failure")
+            raise failure("synthetic decoder failure")
 
     monkeypatch.setattr(run_live_microphone_poc.sys, "stdin", SimpleNamespace(isatty=lambda: True))
     monkeypatch.setattr("builtins.input", lambda _prompt="": "")
@@ -137,8 +145,12 @@ def test_microphone_cli_closes_stream_and_discards_buffer_when_asr_raises(
         ["run_live_microphone_poc.py", "unused-model-dir", "--seconds", "1"],
     )
 
-    with pytest.raises(RuntimeError, match="synthetic decoder failure"):
+    if raises_to_caller:
+        with pytest.raises(RuntimeError, match="synthetic decoder failure"):
+            run_live_microphone_poc.main()
+    else:
         run_live_microphone_poc.main()
+        assert "用户停止了本机采集" in capsys.readouterr().out
 
     assert stream_closed
     assert frame_buffer.closed

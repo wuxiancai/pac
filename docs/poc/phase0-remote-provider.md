@@ -78,7 +78,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 - JSON `response_format` 透传；Provider 非 2xx 错误只保留状态码并分类提示，不保留 response body；端点/model/region 配置均固定 allowlist。
 - Keychain reader 只允许 `deepseek` / `openrouter` 两个 account，CLI 参数不包含秘密，缺失/拒绝读取错误不暴露原始 stderr。
 - 窄回归命令：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q tests/test_remote_providers_poc.py tests/test_local_model_gateway.py tests/test_consent_aware_gateway.py`；当前 0C 窄回归为 **36 passed**，含同一 Gateway 双 adapter 切换、OpenRouter tool 参数过滤、拒绝 tripwire 和错误分类提示回归。这些都是本地测试，不是 Provider 端到端证据。
-- 当前全量 Python：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`：**148 passed**（2026-11-08，含 Provider 错误分类和 API Key 认证提示回归）。`compileall`、`uv lock --check` 均通过；macOS Swift Testing `swift test`：**27 passed**（既有基线）。
+- 当前全量 Python：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`：**149 passed**（2026-11-08，含 Provider 错误分类和 API Key 认证提示回归）。`compileall`、`uv lock --check` 均通过；macOS Swift Testing `swift test`：**27 passed**（既有基线）。
 - DeepSeek SSE 的一次真实结果已补记；其他能力矩阵脚本的真实 Provider 请求仍待用户执行逐项确认。本地拒绝 tripwire 与远端 adapter 窄回归见本轮 HANDOFF。不得把本地 transport 测试记作真实 Provider 能力。
 
 ## 用户实机真实请求结果（2026-11-08）

@@ -1,3 +1,9 @@
+### 2026-11-08：0B 用户中断路径清理回归
+
+- 将 mock 麦克风清理回归扩展为两种退出：识别器普通异常时错误向上传递；模拟 `KeyboardInterrupt` 时显示停止提示。两条路径都会退出输入流上下文并清空有界缓冲，没有启动真实麦克风。
+- 0B 仍需真实设备上的停止/驱动异常冒烟、SwiftUI 音频链路和其他阶段验收证据。
+- 验证通过：`tests/test_microphone_buffer.py` 9 passed；全量 Python 149 passed；compileall、`uv lock --check`、`git diff --check` 通过。
+
 ### 2026-11-08：0B 识别器异常时的本地清理回归
 
 - 新增模拟麦克风 callback 与故障 decoder 回归：decoder 抛出异常后，输入流上下文退出，音频缓冲关闭并清空；测试没有启用真实麦克风。
