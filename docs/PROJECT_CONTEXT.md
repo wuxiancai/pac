@@ -1,6 +1,6 @@
 # 项目上下文
 
-最后核对：2026-11-07（Asia/Shanghai）
+最后核对：2026-11-08（Asia/Shanghai）
 
 ## 项目目标
 
@@ -12,7 +12,7 @@
 - 实现形态：macOS SwiftUI 客户端 + 本机 Python/FastAPI 服务；仓库内各工作包的当前状态和证据见 [阶段 0 追踪矩阵](poc/phase0-traceability.md)。
 - 本机语音：中文 Streaming ASR、麦克风捕获 CLI、TTS 打断已有 POC 和部分实测；SwiftUI 语音闭环、真人端到端质量与性能验收仍未完成。当前 ASR 模型是中文专用，用户计划后续补充多语言模型。
 - Gateway、安全、记忆、Embedding、SQLCipher 和后端生命周期均有 POC；它们不等同于产品功能验收。详情按需查阅 [`docs/poc/`](poc/)。
-- 根目录现有 `README.md`、`AGENTS.md` 和 `.github/workflows/ci.yml`；本机 CI 等价命令已通过，GitHub Actions 尚未执行（当前仓库无 remote）。
+- 根目录现有 `README.md`、`AGENTS.md` 和 `.github/workflows/ci.yml`；本机 CI 等价命令已通过，GitHub Actions 尚未执行（当前仓库无 remote）。D-001–D-015 与 ADR-019/020/021/022 按用户 2026-11-08 指示延期；延期不豁免阶段验收证据。
 - 每次工作的 Git 基线以 `git log -1` 为准；工作开始前先检查 `git status`，保护已有改动。
 
 ## 架构和安全边界

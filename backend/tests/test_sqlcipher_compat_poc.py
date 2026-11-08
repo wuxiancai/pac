@@ -583,6 +583,90 @@ def test_sigkill_during_backup_copy_preserves_previous_backup(
             Path(f"{partial}{suffix}").unlink(missing_ok=True)
 
 
+@pytest.mark.parametrize(
+    ("boundary", "expected_key", "expected_content"),
+    [
+        ("before", "old-replace-boundary-key", "previous replace boundary backup"),
+        ("after", "new-replace-boundary-key", "new source at replace boundary"),
+    ],
+)
+def test_sigkill_at_atomic_replace_boundary_recovers_expected_backup(
+    database_paths,
+    boundary: str,
+    expected_key: str,
+    expected_content: str,
+) -> None:
+    source_path, backup_path = database_paths
+    source = SQLCipherFTSDatabase(path=source_path, key="replace-boundary-source-key")
+    source.add("new source at replace boundary")
+    source.close()
+
+    old_backup = SQLCipherFTSDatabase(
+        path=backup_path, key="old-replace-boundary-key"
+    )
+    old_backup.add("previous replace boundary backup")
+    old_backup.close()
+
+    backend = Path(__file__).resolve().parents[1]
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "scripts/crash_sqlcipher_replace_poc.py",
+            str(source_path.resolve()),
+            str(backup_path.resolve()),
+            boundary,
+        ],
+        cwd=backend,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert process.stdin is not None
+        process.stdin.write("replace-boundary-source-key\nnew-replace-boundary-key\n")
+        process.stdin.flush()
+        assert process.stdout is not None
+        ready, _, _ = select.select([process.stdout], [], [], 15)
+        assert ready, f"replace injector did not reach {boundary} boundary"
+        marker = process.stdout.readline().strip()
+        assert marker == f"REPLACE_{boundary.upper()}"
+        process.send_signal(signal.SIGKILL)
+        stdout, stderr = process.communicate(timeout=10)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate(timeout=10)
+
+    assert process.returncode == -signal.SIGKILL
+    assert "replace-boundary-source-key" not in stdout + stderr
+    assert "new-replace-boundary-key" not in stdout + stderr
+
+    recovered_backup = SQLCipherFTSDatabase.open_existing(
+        path=backup_path, key=expected_key
+    )
+    try:
+        assert recovered_backup.search('"replace boundary"') == [expected_content]
+        assert recovered_backup.integrity_check() == "ok"
+    finally:
+        recovered_backup.close()
+
+    recovered_source = SQLCipherFTSDatabase.open_existing(
+        path=source_path, key="replace-boundary-source-key"
+    )
+    try:
+        assert recovered_source.search('"new source"') == [
+            "new source at replace boundary"
+        ]
+        assert recovered_source.integrity_check() == "ok"
+    finally:
+        recovered_source.close()
+
+    for partial in backup_path.parent.glob(f".{backup_path.name}.*.partial"):
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            Path(f"{partial}{suffix}").unlink(missing_ok=True)
+
+
 def test_sqlalchemy_and_alembic_migration_work_on_encrypted_fts_database(database_paths) -> None:
     path, _ = database_paths
     engine = create_sqlalchemy_compat_engine(path=path, key="poc-alembic-key")

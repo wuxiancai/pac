@@ -90,7 +90,7 @@ def test_sqlcipher_compat_report_reflects_latest_recovery_evidence() -> None:
 
     assert "WAL 数据库备份/恢复" in report
     assert "SIGKILL" in report
-    assert "SQLCipher 专项测试：19 项通过" in report
+    assert "SQLCipher 专项测试：21 项通过" in report
     assert "48 MiB 临时 HFS+ 映像 ENOSPC POC" in report
     assert "APFS 系统卷/外接介质 ENOSPC" in report
 

@@ -8,21 +8,21 @@
 
 | 基线条目 | 阶段 0 要求 / 验收 | 状态 | 现有证据 | 缺口 / 下一步 |
 |---|---|---|---|---|
-| 阶段 0 工程基线 / CI | 仓库入口、依赖安装、Python/Swift 回归可重复运行 | PARTIAL | 新增根 `README.md`、`AGENTS.md`、GitHub Actions macOS arm64 workflow；本机等价命令 Python 122 项、Swift 27 项通过，`uv lock --check`、`compileall` 和 YAML 语法通过 | 仓库未配置 Git remote，GitHub Actions 首次执行未验证；PR/push 真实 CI 状态仍待有 remote 后取得 |
-| D-001、阶段 0 设备记录 | 记录型号、内存、macOS、磁盘、音频设备 | PARTIAL | 2026-11-07 快照：MacBook Air `MacBookAir10,1`、M1/16 GiB、macOS 26.5.1 (25F80)、Xcode 26.6、Swift 6.3.3、uv Python 3.12.13、数据卷剩余约 18 GiB、内建音频输入/输出 48 kHz，见 ASR 报告 | 磁盘与音频设备为时点快照；主力设备身份和最低 macOS 仍待产品负责人确认 |
+| 阶段 0 工程基线 / CI | 仓库入口、依赖安装、Python/Swift 回归可重复运行 | PARTIAL | 新增根 `README.md`、`AGENTS.md`、GitHub Actions macOS arm64 workflow；本机等价命令 Python 127 项、Swift 27 项通过，`uv lock --check`、`compileall` 和 YAML 语法通过 | 仓库未配置 Git remote，GitHub Actions 首次执行未验证；PR/push 真实 CI 状态仍待有 remote 后取得 |
+| D-001、阶段 0 设备记录 | 记录型号、内存、macOS、磁盘、音频设备 | PARTIAL | 2026-11-07 快照：MacBook Air `MacBookAir10,1`、M1/16 GiB、macOS 26.5.1 (25F80)、Xcode 26.6、Swift 6.3.3、uv Python 3.12.13、数据卷剩余约 18 GiB、内建音频输入/输出 48 kHz，见 ASR 报告；2026-11-08 用户将未决事项延期 | 记录了设备快照，但用户未确认其为产品主力设备；最低 macOS 与设备门槛按用户要求延期 |
 | POC-01 / FR-VOICE-002/004 | 本地流式 partial/final、语句端点 | PARTIAL | 8 条本机中文合成句在 3,000 ms 静音尾段下均产生 final，59 个 partial，weighted CER 0.0；用户实机反馈麦克风可录音 | 该结果仅为小型合成集；真人麦克风/SwiftUI partial/final、重复轮次、停止/异常清理仍不完整；中文 ASR 权重的公开许可/再分发条款待核；英语取决于用户后续多语言模型，不是当前代码阻塞 |
 | POC-01 / FR-VOICE-005/008 | 本机 TTS 可打断；ASR/TTS 独立 | PARTIAL | AVSpeechSynthesizer CLI 实测打断；ASR、TTS POC 分开 | SwiftUI 集成与 ASR/TTS 并发未验证 |
 | POC-01 / FR-VOICE-006/007/010 | 本地默认；本地失败显式失败；不落盘、不静默云切换 | PARTIAL | ASR adapter 无云 fallback；麦克风仅内存队列；测试覆盖拒绝/溢出 | 麦克风真实异常与系统级出站监测未完整执行 |
 | POC-01 性能 | ASR 与 Agent 同时运行的延迟、内存、CPU/GPU | PARTIAL | 同一条本机合成 WAV 的独立 ASR 进程重复 3 次，帧 P50 16.01–16.51 ms、P95 17.22–31.78 ms、RTF 0.0527–0.0665；另有一次同步 barrier 的 ASR + 本机 Ollama LLM 生成，重叠 0.785 秒、帧 P95 52.17 ms、Python + Ollama 进程 RSS 采样峰值 702,267,392 bytes、CPU 时间差约 10.95 秒；不是完整 Agent | 同一短合成 WAV 重复不代表独立样本；并发只有单次；不是麦克风端到端；采样间隔 1 秒；GPU 未测；目标阈值未决 |
 | POC-02 / FR-MODEL-001/002 | Adapter、统一流式契约、精确型号能力注册 | PARTIAL | 本机 Ollama generate/stream；qwen3.5:0.8b 一次真实本机 tool proposal；unknown-by-default registry；MockTransport 测试 schema 与解析 | 并行/严格 JSON Schema、费用、错误、远端取消、区域及其他型号能力仍无完整证据 |
-| POC-02 阶段验收 | 2–3 家 Provider 端到端、开源 Gateway 对照、跨 Provider 切换 | PARTIAL | 当前仅本机 Ollama 有真实请求证据；fake local adapter 只覆盖路由契约；新增 ConsentAwarePolicy 在适配器调用前默认拒绝远端并校验精确授权；LiteLLM/Bifrost/Portkey 第一方资料对照见 `phase0-gateway-comparison.md` | 真实供应商测试需经 Consent/Policy 的合成请求、有效 Keychain 凭据和费用/区域核验；Gateway 对照目前是桌面资料评估，不是安装/集成 POC，ADR-020 仍 Deferred |
+| POC-02 阶段验收 | 2–3 家 Provider 端到端、开源 Gateway 对照、跨 Provider 切换 | PARTIAL | 当前仅本机 Ollama 有真实请求证据；fake local adapter 只覆盖路由契约；新增 ConsentAwarePolicy 在适配器调用前默认拒绝远端并校验精确授权；LiteLLM/Bifrost/Portkey 第一方资料对照见 `phase0-gateway-comparison.md`；用户 2026-11-08 表示稍后提供其他 Provider 组合 | D-010 已延期；用户提供具体名称/区域、Keychain 凭据并为每次合成请求明确通过 Consent/Policy 前，不执行远端请求。Gateway 对照仍为桌面资料评估；ADR-020 已延期 |
 | POC-02 / FR-SEC-002/003/010 | 云请求严格 Consent + Policy，L3 默认拒绝 | PARTIAL | 新增 Gateway `ConsentAwarePolicy`，无授权时 generate/stream 均在 adapter 前拒绝；精确匹配/撤销/过期/L3 路径测试，无真实外发 | 尚无真实 Provider 网络路径验证、action/source scope 和持久审计；V1 尚未实现，详见 `phase0-consent-aware-gateway.md` |
 | POC-03 / FR-AGENT-001/004 | Registry/Result 契约、权限不扩张、模拟与产品隔离 | PASS | 显式 simulation 标记、父权限交集、测试验证不运行产品 Agent | V1 总助理未实现；本项只限模拟接口验证 |
 | POC-04 / FR-MEMORY-002/003/006/007/008 | 来源/claim/时间、纠错、FTS/派生索引删除和恢复 | PARTIAL | 内存 SQLite/FTS5，纠错 supersede、FTS/fixture embedding 删除、内存备份恢复测试；固定候选 provider 可显式注入 disposable `MemoryStore`；本机离线合成记忆检索 3/3 top-1 且返回来源，纠错/删除/恢复的派生向量测试通过，详见 `phase0-memory-embedding.md` | 无持久化产品 schema；Embedding 型号/性能目标未决，候选许可初核见 `phase0-model-license-review.md`；检索集仅 3 条合成查询；无模型重建 migration/多次崩溃/大数据评估 |
 | POC-05 / FR-SEC-006/009/014 | Keychain 凭据、Touch ID/设备密码 gate、本机认证/Loopback | PARTIAL | Swift Keychain 写/删/状态接口；LocalAuthentication `.deviceOwnerAuthentication` 策略常量测试；token/Host/Origin/loopback 测试；集成 harness 两次重启 FastAPI 后由 Swift CLI 用新端口/新 token 重新握手；固定 Python 服务入口真实子进程测试；Swift `Foundation.Process` supervisor 实际启动固定模块、验证握手并经 LocalAPIClient 健康检查，再经 stdin stop/EOF 关闭，重复启动受保护且停止后可重启；无握手/非法 JSON 测试验证超时与子进程清理；异常退出后 caller 显式 restart 测试通过；owner deinit 后端不可访问测试通过；SwiftUI ViewModel 的启动/健康/停止 fake-controller 路径通过；本机 demo `.app` 实际点击启停、退出后无残留服务 | 真实系统认证提示、异常退出自动恢复/有限退避、锁屏策略、多轮/休眠 GUI 交互、正式分发配置未测；Secret scan 仅限 POC 范围 |
 | POC-05 / FR-SEC-001/002/003 | L0–L3、授权和撤销策略 | PARTIAL | 内存 Consent/Policy 测试覆盖 exact match、过期、L3 deny、撤销 | action/source scope 和持久审计未齐；无真实云出站验证 |
-| POC-05 / FR-SEC-007/008 | 静态加密兼容性、备份恢复及 ADR 证据 | PARTIAL | SQLCipher ARM64/Python 3.12、FTS5、错误密钥拒绝、加密备份/恢复（含 WAL 数据库）；复制/校验/原子替换失败时保留旧备份，校验后原子替换；复制部分页面后子进程 SIGKILL，在 DELETE/WAL 两种 mode 下旧目标仍可恢复、源库完整；WAL backup progress callback 中独立 writer 提交 memory/FTS 后，源库和备份均完整且含并发提交；活动 reader 固定 snapshot 时进行备份并在复制期间提交三次写入，reader snapshot 稳定且源库/备份均完整、完整性检查通过；阻塞的 WAL TRUNCATE checkpoint 等待 reader 锁时 SIGKILL，释放 reader 后恢复、checkpoint 重试和重开完整性通过；目标路径错误不损坏源 DB；临时 Alembic upgrade/downgrade；同工作量 SQLite/SQLCipher 合成性能三轮观察；48 MiB HFS+ 与 128 MiB APFS 临时映像均触发 `SQLITE_FULL`，源库与先前加密备份重开完整，详见 `phase0-enospc-recovery.md` | 持续并发负载、WAL 生命周期、密钥管理、正式应用包分发、真实负载性能、外接介质/断电/介质故障未齐；SQLite SEE 与文件容器未本机集成；产品加密方案 ADR 未冻结；崩溃 staging 的产品清理策略待定 |
-| 阶段 0 工程/恢复 | 崩溃、重启、磁盘不足和备份恢复故障注入 | PARTIAL | `os._exit` 与 DELETE/WAL 两种模式下子进程 SIGKILL 后未提交事务恢复；WAL checkpoint 等待 reader 锁期间 SIGKILL 后已提交数据恢复，释放 reader 后 TRUNCATE 重试成功；活动 WAL reader 下 `busy=1` 可见、释放 reader 后 checkpoint 重试成功并重开完整性检查通过；页数上限、48 MiB HFS+ 和 128 MiB APFS 映像 `SQLITE_FULL` 均触发事务回滚；复制错误和 DELETE/WAL 模式下部分页后 SIGKILL 均证明保留旧备份 | 临时 APFS image 不代表活动 APFS 系统卷/外接介质；断电、checkpoint 正在写页时 SIGKILL、原子替换系统调用期间 SIGKILL、正式 App 重启及真实介质故障未测；崩溃 staging 清理策略待定 |
+| POC-05 / FR-SEC-007/008 | 静态加密兼容性、备份恢复及 ADR 证据 | PARTIAL | SQLCipher ARM64/Python 3.12、FTS5、错误密钥拒绝、加密备份/恢复（含 WAL 数据库）；复制/校验/原子替换失败时保留旧备份，校验后原子替换；复制部分页面后子进程 SIGKILL，在 DELETE/WAL 两种 mode 下旧目标仍可恢复、源库完整；新增在 `os.replace` 调用前/成功返回后 SIGKILL，旧/新目标分别可完整恢复，源库均完整；WAL reader/writer/checkpoint 注入；目标路径错误不损坏源 DB；临时 Alembic upgrade/downgrade、合成性能观察和 HFS+/APFS 有界映像 ENOSPC，详见相关 POC 报告 | 持续并发负载、WAL 生命周期、密钥管理、正式应用包分发、真实负载性能、外接介质/断电/介质故障未齐；系统调用内部中断与 fsync 持久性未测；ADR-019 按用户要求延期；崩溃 staging 清理策略待定 |
+| 阶段 0 工程/恢复 | 崩溃、重启、磁盘不足和备份恢复故障注入 | PARTIAL | `os._exit` 与 DELETE/WAL 两种模式下子进程 SIGKILL 后未提交事务恢复；WAL TRUNCATE checkpoint 等待读锁期间 SIGKILL 恢复；活动 WAL reader 下 `busy=1` 可见且释放后 checkpoint 重试成功；页数上限、HFS+/APFS 有界映像 ENOSPC 回滚；复制中断保留旧备份；新增 `os.replace` 调用前 SIGKILL 保留旧目标、成功返回后 SIGKILL 保留新目标，两边源库/备份完整 | 边界测试不模拟系统调用内部中断或断电/fsync 持久性；临时映像不代表活动卷/外接介质；正式 App 重启、真实介质故障及崩溃 staging 清理策略待定 |
 | POC-04 本地 Embedding | 候选权重、真实向量与检索质量 | PARTIAL | 固定 revision 权重 SHA-256 完整校验；本机 FastEmbed 真实推理，4 个合成 query top-1 命中 4/4；HF/Transformers offline 环境二次加载通过；2026-11-07 离线三次重复均 4/4 top-1，`/usr/bin/time -l` observed max RSS 883,130,368–883,490,816 bytes；候选模型卡许可初核完成，见 `phase0-local-embedding.md` 和 `phase0-model-license-review.md` | 仅 4 条合成 query，不代表真实语义质量；真实检索集、SQLCipher memory 集成和模型选择未完成；完整依赖 SBOM 与性能目标未确认 |
 | 全阶段安全边界 | 不自动扫描；无任意 Shell/文件访问；无外部写/后台队列/专业 Agent 团队 | PASS（范围审计） | 当前 POC 结构无产品文件扫描、任意 Shell、外部写或后台任务；Agent 仅模拟 | 后续实现须持续做静态与集成门禁，当前不构成产品级验收 |
 
@@ -50,11 +50,11 @@ flowchart TD
 
 ## 3. 待确认 / 未决项
 
-以下均保留为问题，不以本 POC 代替产品决定：
+以下事项已按用户 2026-11-08 指示延期；延期不视为阶段 0 中明确要求的 POC/验收通过：
 
 - 规格书 D-001–D-015：主力设备；最低 macOS；对话/日志/缓存/备份保留期限；音频缓存期限；月预算/币种/软硬阈值；备份 RPO/RTO/份数/目的地；应用静态加密方案；活动数据目录是否支持外接盘；固定专业 Agent 属 V2 还是 V3；V1 首批 2–3 Provider；云 ASR/TTS 供应商及区域；导入白名单/容量限制；性能目标；Embedding 型号/格式；导出格式/默认加密。
 - 多语言 ASR：当前加载的是中文专用模型，不属于实现 bug；用户安排后续补下载多语言模型。当前不声称英语覆盖通过，也不把模型替换列为当前代码工作包。
-- 多 Provider 实测与开源 Gateway 对照：后续可在本机运行客户端/后端连接云供应商；任何真实出站请求仍须由 Consent Manager + Policy Engine 明确放行，凭据只从 Keychain 取得，未经授权不得发送。
+- 多 Provider 实测与开源 Gateway 对照：D-010 延期，用户将另提供组合；名单/区域和凭据到位后，任何真实出站请求仍须由 Consent Manager + Policy Engine 明确放行，凭据只从 Keychain 取得，未经授权不得发送。
 - 真实 Provider/Gateway 实测尚缺；LiteLLM、Bifrost、Portkey 第一方桌面资料对照已记录，但不代表运行集成或供应商端到端证据。
 - 真实 Touch ID 提示、应用正式进程生命周期、SwiftUI 麦克风链路及 AEC/插话。
 - SQLCipher 产品 ADR 与密钥轮换/恢复体验、并发 WAL 备份、APFS/外接介质 ENOSPC、断电/备份介质故障、发布打包和产品性能。
@@ -75,7 +75,7 @@ flowchart TD
 8. 0H 故障注入/性能：事务崩溃、页数限制、WAL reader contention/checkpoint 重试、48 MiB HFS+ 临时映像 ENOSPC 已测；APFS/外接介质 ENOSPC、checkpoint 执行中断、介质故障和语音并发性能未验证。
 9. 0I 阶段追踪与验收：本矩阵建立；待所有必须验收项有证据且待决项被确认或延期，才能评审阶段 0。
 
-阶段 0 未签收前禁止开始阶段 1 完整产品实现。
+阶段 0 未签收前禁止开始阶段 1 完整产品实现。D-001–D-015 与 ADR-019/020/021/022 的延期记录不等于对应阶段验收证据齐全；0I 仍须逐条复核必需验收项。
 
 ### 后续基线阶段（尚未开始）
 

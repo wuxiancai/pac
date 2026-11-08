@@ -2,9 +2,15 @@
 
 > 文档入口：稳定项目约束见 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)，已确认/待决选择见 [DECISIONS.md](DECISIONS.md)，阶段任务与下一步见 [TASKS.md](TASKS.md)，阶段证据见 [追踪矩阵](poc/phase0-traceability.md)。本文件仅作为最近交接摘要；避免在这里重复维护完整任务和决策清单。
 
-最近更新：2026-11-07（Asia/Shanghai）
+最近更新：2026-11-08（Asia/Shanghai）
 
-## 最近交接（2026-11-07）
+## 最近交接
+
+### 2026-11-08 补充
+
+- 用户要求先延期未决事项。`DECISIONS.md` 已将 D-001–D-015 和 ADR-019/020/021/022 记为延期；D-010 Provider 组合待用户另行提供。尚无 Provider 名称/区域或请求授权，因此未读取凭据、未发出云请求。延期不等同于相关阶段验收证据通过。
+- 继续 0H：新增子进程在 `os.replace` 调用前与成功返回后暂停，再经 SIGKILL 的两条边界用例。调用前中断保留旧加密备份，成功返回后中断保留新备份；两条路径源库和预期备份均可查询且 `integrity_check=ok`。不声称 syscall 内部中断或断电持久性。
+- SQLCipher 专项回归 21 项通过；本轮全量 Python 回归 127 项通过。首次全量运行发现两项追踪文档契约断言需随报告术语同步，已修订后通过。阶段 0 仍未验收。
 
 - 建立 `PROJECT_CONTEXT.md`、`DECISIONS.md`、`TASKS.md` 文档入口；阶段 0 证据权威来源仍是 `poc/phase0-traceability.md` 和各 POC 报告。
 - 继续 0H：WAL backup progress callback 中独立 writer 提交一条及活动 reader 固定 snapshot 下三次 writer 提交，源库/备份检索与完整性检查均通过。SQLCipher 专项现为 19 项通过。
@@ -15,7 +21,7 @@
 - 新增根 `README.md`、`AGENTS.md` 和 macOS arm64 GitHub Actions workflow；本机等价 Python 125 项、Swift 27 项通过，`uv lock --check`、`compileall`、锁定依赖安装和 workflow YAML 语法通过。仓库没有 Git remote，因此 GitHub Actions 尚未实际运行。
 - ENOSPC 额外尝试“满卷时覆盖既有备份”时，HFS+/APFS 结果不稳定，未纳入验收证据；保留稳定的源库 ENOSPC 回滚与事先生成备份恢复证据。备份目标自身 ENOSPC 仍为缺口。
 - 本轮修改还包括根 `AGENTS.md`、`README.md`、`.github/workflows/ci.yml`，SQLCipher checkpoint crash helper、APFS ENOSPC 支持，以及相关 POC 报告、追踪/任务/决策记录。
-- 下一步：0H 原子替换中断证据可复现性评估；随后需用户实际完成 0B 麦克风验收，并提供 ASR 许可条款、Provider 选择/凭据授权、性能/加密/Embedding 决策或明确延期。阶段 0 未验收，阶段 1 未开始。
+- 下一步：审查并记录原子替换边界证据；继续补 0E supervisor 异常退出策略的可验证路径。0B 真人麦克风验收与 ASR 授权条款仍待设备/许可输入；0C Provider 组合待用户提供并逐请求明确授权；D-001–D-015 与 ADR-019/020/021/022 已延期。阶段 0 未验收，阶段 1 未开始。
 
 ## 当前阶段
 

@@ -29,7 +29,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security python -
 uv lock --check
 ```
 
-- SQLCipher 专项测试：19 项通过（2026-11-07；包含 WAL 并发 reader/writer 期间备份、checkpoint 等待读锁 SIGKILL、DELETE/WAL 备份复制 SIGKILL）。
+- SQLCipher 专项测试：21 项通过（2026-11-08；包含 WAL 并发 reader/writer 期间备份、checkpoint 等待读锁 SIGKILL、DELETE/WAL 备份复制 SIGKILL，以及 `os.replace` 调用前/成功返回后的 SIGKILL 边界恢复）。
 - 全量本机 Python 测试：125 项通过（2026-11-07，包含 `phase0-security` 与 `phase0-embedding` extras）；最新结果以 `docs/HANDOFF.md` 为准。
 - `compileall`、`uv lock --check` 与 `git diff --check` 通过。
 - 已有一项相同合成工作负载的 SQLite/SQLCipher + FTS5 三轮本机观察，详见 `phase0-sqlcipher-performance.md`；它不是完整 App 或产品负载性能验收。
