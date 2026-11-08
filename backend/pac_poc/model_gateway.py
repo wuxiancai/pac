@@ -36,6 +36,10 @@ class ToolCall:
 class ToolCallResult:
     text: str
     tool_calls: tuple[ToolCall, ...] = ()
+    finish_reason: str | None = None
+    model: str | None = None
+    provider: str | None = None
+    region: str | None = None
 
 
 class LocalProviderAdapter(Protocol):

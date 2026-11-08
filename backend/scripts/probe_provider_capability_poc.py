@@ -240,6 +240,10 @@ def main() -> int:
                     for call in result.tool_calls
                 ]
                 print(f"工具调用提案（未执行）: {json.dumps(calls, ensure_ascii=False)}")
+                print(f"Finish reason: {result.finish_reason or '服务未返回'}")
+                print(f"实际模型: {result.model or config.model}")
+                print(f"实际下游 Provider: {result.provider or '服务未返回'}")
+                print(f"服务区域信息: {result.region or '服务未返回'}")
                 if not calls:
                     print(f"模型文本响应: {result.text or '（空）'}")
                 passed = any(call["name"] == "phase0_echo_synthetic" for call in calls)

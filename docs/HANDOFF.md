@@ -6,6 +6,12 @@
 
 ## 最近交接
 
+### 2026-11-08：OpenRouter 工具探测诊断增强
+
+- 用户在保持 `provider.require_parameters=true`、`allow_fallbacks=false` 的配置下再次确认 OpenRouter 工具探测；结果仍为 `工具调用提案（未执行）: []` 与空模型文本。此请求发生在 finish_reason/路由诊断输出加入前，故上游返回形态和原因仍未知。
+- 为下一次可复核探测，`ToolCallResult` 现传递 finish_reason、model，以及 OpenRouter metadata 中选中的 downstream Provider/region；CLI 会展示这些字段。工具仍仅作为数据展示、不执行。
+- 本地 MockTransport 回归覆盖 OpenRouter 成功响应的这些 metadata 字段；窄回归 31 项、全量 Python 142 项、compileall、uv lock --check 与 git diff --check 均通过。下一步可由用户再次逐项确认 OpenRouter tools，以取得诊断字段；阶段 0 仍未验收。
+
 ### 2026-11-08：0C Provider 能力探测工具
 
 - 新增 `backend/scripts/probe_provider_capability_poc.py`，按 Provider/能力单次运行，覆盖 streaming、强制工具提案（不执行）、JSON、故意触发 4xx、重复 metadata，以及无授权 deny-check。每个真实 HTTP 请求都需要单独输入精确确认；故意错误请求可能计费。

@@ -349,8 +349,10 @@ def test_openrouter_tool_probe_requires_parameter_capable_provider_without_fallb
         return httpx.Response(
             200,
             json={
+                "model": OPENROUTER_PROBE_CONFIG.model,
                 "choices": [
                     {
+                        "finish_reason": "tool_calls",
                         "message": {
                             "content": None,
                             "tool_calls": [
@@ -363,7 +365,13 @@ def test_openrouter_tool_probe_requires_parameter_capable_provider_without_fallb
                             ],
                         }
                     }
-                ]
+                ],
+                "openrouter_metadata": {
+                    "region": "hkg",
+                    "endpoints": {
+                        "available": [{"provider": "Relace", "selected": True}]
+                    },
+                },
             },
         )
 
@@ -389,6 +397,12 @@ def test_openrouter_tool_probe_requires_parameter_capable_provider_without_fallb
     result = asyncio.run(gateway.call_with_tools(request))
 
     assert result.tool_calls[0].name == "phase0_echo_synthetic"
+    assert (result.finish_reason, result.model, result.provider, result.region) == (
+        "tool_calls",
+        OPENROUTER_PROBE_CONFIG.model,
+        "Relace",
+        "hkg",
+    )
     assert b'"provider":{"allow_fallbacks":false,"require_parameters":true}' in seen[0].read()
 
 

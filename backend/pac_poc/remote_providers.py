@@ -109,25 +109,7 @@ class OpenAICompatibleRemoteAdapter:
             raise RemoteProviderError("Provider returned non-text content")
         usage = payload.get("usage")
         usage = usage if isinstance(usage, dict) else {}
-        provider: str | None = None
-        region: str | None = None
-        if self._config.provider == "openrouter":
-            metadata = payload.get("openrouter_metadata")
-            if isinstance(metadata, dict):
-                region = metadata.get("region") if isinstance(metadata.get("region"), str) else None
-                endpoints = metadata.get("endpoints")
-                available = endpoints.get("available") if isinstance(endpoints, dict) else None
-                if isinstance(available, list):
-                    selected = next(
-                        (
-                            endpoint
-                            for endpoint in available
-                            if isinstance(endpoint, dict) and endpoint.get("selected") is True
-                        ),
-                        None,
-                    )
-                    if selected is not None and isinstance(selected.get("provider"), str):
-                        provider = selected["provider"]
+        provider, region = self._openrouter_route(payload)
         cost = usage.get("cost")
         cost_usd = (
             float(cost)
@@ -201,7 +183,16 @@ class OpenAICompatibleRemoteAdapter:
                 if not isinstance(name, str) or not name or not isinstance(arguments, dict):
                     raise TypeError
                 calls.append(ToolCall(name=name, arguments=arguments))
-            return ToolCallResult(text=text, tool_calls=tuple(calls))
+            finish_reason = payload["choices"][0].get("finish_reason")
+            provider, region = self._openrouter_route(payload)
+            return ToolCallResult(
+                text=text,
+                tool_calls=tuple(calls),
+                finish_reason=(finish_reason if isinstance(finish_reason, str) else None),
+                model=(payload.get("model") if isinstance(payload.get("model"), str) else self._config.model),
+                provider=provider,
+                region=region,
+            )
         except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
             raise RemoteProviderError("Provider returned invalid tool-call data") from exc
 
@@ -280,6 +271,32 @@ class OpenAICompatibleRemoteAdapter:
         if not isinstance(payload, dict):
             raise RemoteProviderError("Provider returned invalid JSON")
         return payload
+
+    def _openrouter_route(self, payload: Mapping[str, Any]) -> tuple[str | None, str | None]:
+        if self._config.provider != "openrouter":
+            return None, None
+        metadata = payload.get("openrouter_metadata")
+        if not isinstance(metadata, dict):
+            return None, None
+        region = metadata.get("region") if isinstance(metadata.get("region"), str) else None
+        endpoints = metadata.get("endpoints")
+        available = endpoints.get("available") if isinstance(endpoints, dict) else None
+        if isinstance(available, list):
+            selected = next(
+                (
+                    endpoint
+                    for endpoint in available
+                    if isinstance(endpoint, dict) and endpoint.get("selected") is True
+                ),
+                None,
+            )
+            provider = (
+                selected.get("provider")
+                if selected is not None and isinstance(selected.get("provider"), str)
+                else None
+            )
+            return provider, region
+        return None, region
 
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:
