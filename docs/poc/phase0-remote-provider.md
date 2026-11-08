@@ -7,7 +7,7 @@
 - 用户指定两个测试候选：DeepSeek、OpenRouter。
 - 用户确认 DeepSeek 按中国处理，OpenRouter 使用 Global 路由。DeepSeek 官方隐私政策称其服务数据在中国处理；OpenRouter 默认 `openrouter.ai` 为全球路由，US/EU in-region routing 另需 Business/Enterprise 账户条件。见 [DeepSeek 隐私政策](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html?os=v0)、[OpenRouter US/EU in-region routing](https://openrouter.ai/business/eu/)。
 - 本 POC 固定使用 DeepSeek `deepseek-flash`、`https://api.deepseek.com/chat/completions`（[官方模型/API 文档](https://api-docs.deepseek.com/api/create-chat-completion)）；OpenRouter `deepseek/deepseek-v4.1-flash-1017`、`https://openrouter.ai/api/v1/chat/completions`（[官方模型目录](https://openrouter.ai/deepseek)）。模型和费用可能变化，真实请求前应按官方当前账号目录再次确认。
-- 唯一探测正文为 `Reply with exactly this text: phase0-probe-ack`，L1 合成文本，最多 64 output tokens；只执行一次非流式 chat-completions 请求，不带工具、不重试。OpenRouter Global 初始选择一个符合条件的上游端点，adapter 设置 `provider.allow_fallbacks=false` 禁止跨 Provider 故障切换；请求启用路由 metadata，并输出实际选择的 Provider、服务区域、token 用量和服务报告的 USD cost（如 API 返回）。
+- 基础探测正文为 `Reply with exactly this text: phase0-probe-ack`，L1 合成文本，最多 64 output tokens；基础 CLI 每次只执行一条非流式 chat-completions 请求，不带工具、不重试。能力矩阵探测使用同等级合成内容，按独立命令测试 SSE、工具提案、JSON、错误处理和 metadata。OpenRouter Global 初始选择一个符合条件的上游端点，adapter 设置 `provider.allow_fallbacks=false` 禁止跨 Provider 故障切换；请求启用路由 metadata，并输出实际选择的 Provider、服务区域、token 用量和服务报告的 USD cost（如 API 返回）。
 
 ## 本机 Keychain 配置
 
@@ -74,7 +74,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 - Keychain reader 只允许 `deepseek` / `openrouter` 两个 account，CLI 参数不包含秘密，缺失/拒绝读取错误不暴露原始 stderr。
 - 窄回归命令：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q tests/test_remote_providers_poc.py tests/test_local_model_gateway.py tests/test_consent_aware_gateway.py`；当前 **30 passed**，含同一 Gateway 双 adapter 切换和拒绝 tripwire 回归。这些都是本地测试，不是 Provider 端到端证据。
 - 当前全量 Python：`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`：**141 passed**（2026-11-08，含能力脚本拒绝检查与 Gateway tool_choice 回归）。`compileall`、`uv lock --check` 均通过；macOS Swift Testing `swift test`：**27 passed**（既有基线）。
-- 能力矩阵脚本的真实 Provider 请求尚待用户执行逐项确认；本地拒绝 tripwire 与远端 adapter 窄回归见本轮 HANDOFF。不得把本地 transport 测试记作真实 Provider 能力。
+- DeepSeek SSE 的一次真实结果已补记；其他能力矩阵脚本的真实 Provider 请求仍待用户执行逐项确认。本地拒绝 tripwire 与远端 adapter 窄回归见本轮 HANDOFF。不得把本地 transport 测试记作真实 Provider 能力。
 
 ## 用户实机真实请求结果（2026-11-08）
 
@@ -82,9 +82,10 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 - **OpenRouter Global**：用户在 CLI 输入 `ALLOW OPENROUTER` 后发送一条 L1 合成文本请求，返回 `phase0-probe-ack`，与期望文本完全匹配。实际模型 `deepseek/deepseek-v4.1-flash-1017`；下游 Provider `Relace`、服务区域 `HKG`；token 用量 prompt 42 / completion 17 / total 59；报告费用 USD 0.000008752。
 - **同一 Gateway 顺序路由复测**：用户随后运行 `probe_provider_switch_poc.py`，分别输入 `ALLOW DEEPSEEK` 与 `ALLOW OPENROUTER`。同一 Gateway 实例向 DeepSeek（`deepseek-flash` / China）和 OpenRouter（`deepseek/deepseek-v4.1-flash-1017` / Global）各发送一条 L1 合成非流式请求；两条响应均精确匹配 `phase0-probe-ack`。OpenRouter 报告下游 Provider `Relace`、区域 `HKG`。本轮输出未包含 token、费用或 DeepSeek 下游/区域元数据，故不补记这些值。
 - 本次真实跨 Provider 证据证明在相同 Gateway 配置下可按请求 provider 顺序调用两家适配器；不是失败后的自动 fallback，也不证明真实 SSE、工具、结构化输出、错误路径或可重复性能。所有真实请求均由用户对当次显示的 Provider、model、区域和固定合成正文分别确认。OpenRouter 用户早先报告的一次余额不足失败已由后续成功请求补充；早期 Keychain 缺失错误也已解决。
+- **DeepSeek SSE**：用户按 `probe_provider_capability_poc.py deepseek stream` 执行并输入本次精确确认。流式分块拼接后得到 `phase0-probe-ack`，精确匹配为 True。未提供 token/cost 或服务侧 Provider/region metadata；只证明 DeepSeek `deepseek-flash` 的一次真实流式合成文本成功，不代表 OpenRouter 或稳定性。
 
 ## 尚未验收
 
-- 真实 SSE、工具 schema、结构化输出、服务端 4xx 错误、费用/区域重复结果及拒绝/撤销后的真实零出站边界尚未充分验证。跨 Provider 顺序路由已真实通过一次；能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
+- OpenRouter 真实 SSE、两家真实工具 schema、结构化输出、服务端 4xx 错误、费用/区域重复结果及拒绝/撤销后的系统级零出站边界尚未充分验证。DeepSeek 真实 SSE 已有一次成功；能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。拒绝 tripwire 不是系统级网络抓包；Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
 - D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。

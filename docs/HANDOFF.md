@@ -9,7 +9,7 @@
 ### 2026-11-08：0C Provider 能力探测工具
 
 - 新增 `backend/scripts/probe_provider_capability_poc.py`，按 Provider/能力单次运行，覆盖 streaming、强制工具提案（不执行）、JSON、故意触发 4xx、重复 metadata，以及无授权 deny-check。每个真实 HTTP 请求都需要单独输入精确确认；故意错误请求可能计费。
-- Adapter 新增显式 `tool_choice` 透传。窄回归 30 项通过；deny-check tripwire 结果为 Keychain reads=0、HTTP transport calls=0。该结果不是系统级抓包，所有真实能力请求仍未执行。
+- Adapter 新增显式 `tool_choice` 透传。窄回归 30 项通过；deny-check tripwire 结果为 Keychain reads=0、HTTP transport calls=0。该结果不是系统级抓包。用户随后完成 DeepSeek SSE 一次真实探测，拼接响应精确匹配 `phase0-probe-ack`；OpenRouter SSE、工具/JSON/错误和重复 metadata 仍待测。
 - 复现命令、payload、确认短语及未决限制见 `poc/phase0-remote-provider.md`。
 
 ### 2026-11-08：0C 同一 Gateway 双 Provider 路由
@@ -156,7 +156,7 @@
 
 ## 下一步
 
-继续阶段 0：Provider 方面，DeepSeek 与 OpenRouter 各有经用户逐次授权的真实合成文本请求成功；同一 ModelGateway 顺序跨 Provider 路由也真实通过一次，OpenRouter 返回 Relace/HKG。真实流式/工具/JSON/错误能力、拒绝后的真实零出站与重复费用/区域核验仍缺。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
+继续阶段 0：Provider 方面，DeepSeek 与 OpenRouter 各有经用户逐次授权的真实合成文本请求成功；同一 ModelGateway 顺序跨 Provider 路由也真实通过一次，OpenRouter 返回 Relace/HKG；DeepSeek SSE 一次真实探测精确匹配。OpenRouter SSE、两家工具/JSON/错误能力、拒绝后的系统级零出站与重复费用/区域核验仍缺。Embedding 候选已集成至可注入的内存记忆 POC 并在本机离线合成检索，但真实检索集、资源目标、持久化迁移与产品模型选择未验收。备份 staging 经校验后原子替换目标，真实子进程备份期间 SIGKILL 后旧备份/源数据恢复通过；崩溃 staging 清理策略、断电和介质故障仍未验证。阶段 0 验收前不得进入阶段 1。
 
 ## 交接要求
 
