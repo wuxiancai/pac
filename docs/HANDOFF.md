@@ -6,6 +6,13 @@
 
 ## 最近交接
 
+### 2026-11-08：拒绝路径 PID 级 socket 检查完成
+
+- 用户提供的全局 `tcpdump -i en0` 捕获 546 个 TCP/443 窗口包；输出包含已建立的会话，未按 PID 过滤，不能据此归因给测试进程。
+- 用真实 HTTPX、无 Consent、凭据读取 tripwire 的 harness 分别运行 OpenRouter 与 DeepSeek；两者都在 Adapter 前拒绝，Keychain credential reads=0。Policy 拒绝后在 harness hold 窗口内通过 PID 运行 `lsof -nP -a -p <PID> -i`，均无活动 socket；loopback 正向对照证明 lsof 能列出进程 TCP socket。
+- 当前证据支持这两个拒绝路径未建立网络 socket；限制是 lsof 只观察活动 socket，非完整包级/全系统零流量证明。deny-check、真实 HTTPX harness 和证据边界已记录。
+- 下一步逐次确认重跑 DeepSeek JSON，使用增强诊断取得 finish_reason、usage 与实际正文；再审查 0C 剩余验收。
+
 ### 2026-11-08：拒绝路径真实 HTTPX 与系统监测准备
 
 - 新增 `backend/scripts/probe_denied_egress_poc.py <provider>`：走真实 HTTPX client、默认无 Consent，并以 credential tripwire 避免读取真实凭据；观察窗口内 OpenRouter 被 Policy 在 Adapter 前拒绝，credential reads=0。无 Provider 请求发出。
