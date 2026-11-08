@@ -1,3 +1,9 @@
+### 2026-11-08：0B 第二组合成负载并发资源复测
+
+- 用本机 `bilingual-mandarin-16k.wav`、官方双语 Streaming Zipformer 与 Ollama `qwen3.5:0.8b` 运行三轮同步屏障观察；每轮 28 帧、10 partial/1 final，模型返回非空，ASR 与 LLM 确认重叠 0.243–0.254 秒。
+- ASR wall 0.243–0.254 秒，帧 P50 11.45–14.08 ms、P95 15.86–16.47 ms、max 19.89–28.55 ms；LLM wall 14.05–38.97 秒。1 秒采样下 Python+Ollama 峰值 RSS 671,645,696–775,536,640 bytes，CPU 时间差 1.27–21.65 秒。未记录正文，GPU 未测；样本为合成音频，不构成独立语料或产品性能验收。
+- 报告、PROJECT_CONTEXT、TASKS 和追踪矩阵已同步更新。阶段 0 仍未验收；后续仍需独立语料、长时/不同负载指标、设备故障补证及用户延期/不可得项处理。
+
 ### 2026-11-08：0G Python arm64 wheel 原生依赖审计
 
 - 检查 `.venv` 反向依赖树、当前已安装 wheel 和 Mach-O `otool -L`。`fastembed` 引入 ONNX Runtime 与 Pillow；运行环境另含 sherpa-onnx、sounddevice/PortAudio、SQLCipher 原生扩展。
