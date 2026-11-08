@@ -1,3 +1,9 @@
+### 2026-11-08：0B ASR/TTS 验收缺口复核
+
+- 对照规格书 §13 并新增合成样本 ASR-final → AVSpeechSynthesizer 冒烟脚本；同一 manifest WAV 连续 3/3 得到 6 partial、1 final，播放均报告完成且未落盘 transcript。已有独立 AVSpeechSynthesizer 立即打断实测。
+- 此证据满足本机候选链路的基本连通性；独立语料、长时/多负载资源稳定性、真实驱动异常和产品性能目标仍未覆盖。`TASKS.md` 已去掉过时的“选择中文或双语模型”建议；当前模型许可只记录公开声明，权利链及转换包许可仍需核验，不隐含产品选型。
+- 阶段 0 仍未验收；下一步优先继续 0B 独立样本/资源补证或推进其他无外部授权依赖的工作包，不启动麦克风或云请求。
+
 ### 2026-11-08：0B/0G 双语 ASR 许可线索复核
 
 - 第一方资料核对发现，归档模型包 README 声明 Apache-2.0 并指向 `pfluo/k2fsa-zipformer-chinese-english-mixed`；sherpa-onnx 官方索引将转换来源列为 `csukuangfj/k2fsa-zipformer-chinese-english-mixed`。两个 Hugging Face 模型页都声明 Apache-2.0，但官方索引只称其使用内部训练数据，权利链未给出可核验细节。

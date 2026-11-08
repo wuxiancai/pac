@@ -34,6 +34,9 @@
 - 2026-11-08 双语 CER 与多 final 聚合修正后，局部评测测试 8 项通过；Python 全量回归 129 项通过（`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --extra phase0-security --extra phase0-embedding --group dev pytest -q`），Swift Testing 27 项通过（`swift test`）。
 - Swift TTS 控制器单元测试：3 项通过；Swift 包构建通过。
 - AVSpeechSynthesizer 本机播放后按回车中断，返回 `interrupted=true speaking=false`。
+- 2026-11-08 新增 ASR→TTS 链路脚本 `scripts/run_asr_tts_chain_poc.py`：只处理显式 JSON manifest 中的一条音频，使用现有 Streaming ASR 得到 final；只有交互终端输入 `PLAY FINAL LOCALLY` 后才把 final 交给 `poc/macos-audio` 中的 AVSpeechSynthesizer。脚本不打印或保存 transcript，非交互终端拒绝执行，不启用麦克风或云端。
+- 对 `bilingual-manifest.json` 第 1 条本机合成 WAV 连续运行三轮，每轮 ASR 都产生 6 个 partial、1 个 final；每轮本机 AVSpeechSynthesizer 都报告 `playback_completed=true speaking=false`，进程退出码为 0。该链路只在同一合成样本上重复，说明接口顺序和播放完成路径可运行；不等于独立样本、长时运行或性能稳定性验收。
+- 新增 `tts-interrupt-poc --wait-for-completion` 模式，超时为 45 秒；已有的交互式立即打断路径保持独立。Swift 测试 29 项通过；Python 脚本编译检查通过；非交互拒绝检查返回 2 并确认未启动麦克风或 TTS。
 - `uv lock --check` 通过；sounddevice 默认输入设备检查支持 16 kHz、单声道、PCM16。
 - 本地模型加载：通过。
 - 16 kHz、单声道、PCM16 WAV 分为 200 ms 帧输入：通过。
@@ -84,6 +87,9 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/evaluate_syntheti
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/evaluate_synthetic_asr_poc.py \
   .poc-data/audio/bilingual-manifest.json \
   .poc-data/models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
+UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_asr_tts_chain_poc.py \
+  .poc-data/audio/bilingual-manifest.json \
+  .poc-data/models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20 --sample 1
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/measure_local_asr_poc.py \
   .poc-data/audio/mandarin-16k.wav \
   .poc-data/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30
@@ -100,6 +106,8 @@ swift run tts-interrupt-poc
 
 麦克风脚本必须在本机交互式终端运行；显示本地隐私提示后按回车才开始采集。按 Ctrl-C 可停止。它不保存音频文件或文本。
 
+ASR→TTS 链路脚本只处理 manifest 明列的 WAV；在终端输入 `PLAY FINAL LOCALLY` 才会本机朗读识别 final。它不启动麦克风、不上传或保存 transcript。
+
 首次运行前，按 sherpa-onnx 官方模型说明下载 `sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2` 到 `backend/.poc-data/models/` 并解压。模型权重与测试音频不提交 Git。
 
 ## 尚未解决
@@ -112,7 +120,7 @@ swift run tts-interrupt-poc
 - sherpa-onnx 官方 Python API 样例将此类模型通过 `OfflineRecognizer.from_qwen3_asr` 整段解码；参见 [官方 Qwen3-ASR 文件解码样例](https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-qwen3-asr-decode-files.py)。Qwen 官方说明 Qwen3-ASR 的 streaming inference 当前只在 vLLM backend 提供，详见 [Qwen3-ASR 官方文档](https://github.com/QwenLM/Qwen3-ASR#streaming-inference)。
 - 当前 8 条合成中文集只有一轮，CER 不能代表真人麦克风或真实用户话语分布；需要更广语料与多轮实机验证，阈值待产品负责人确认。
 - ASR + LLM 并发已有同一条合成音频的四轮本机观察（此前一轮加本次三轮）；仍需独立语料、不同负载时段、GPU 和冷/热启动分开测量，才能评估资源与性能。
-- 当前为本机 CLI POC；规格书将 SwiftUI 采集/播放与 WebSocket 闭环列入阶段 3。阶段 0 仍需将 ASR/TTS 稳定链路证据及现有资源测量归档。
+- 当前为本机 CLI POC；规格书将 SwiftUI 采集/播放与 WebSocket 闭环列入阶段 3。规格书 §13 的最低 ASR→TTS 链路现有同一合成样本三轮完成记录；仍缺独立样本/长时运行和目标性能阈值证据，不能据此声称产品稳定性。
 - 新 Qwen3-ASR ONNX 候选的模型来源为 ModelScope 第三方转换包，模型目录没有 LICENSE 文件；Qwen 官方项目标注 Apache-2.0，但转换包及随附测试音频的分发许可/来源仍需单独核实。设备内存观察峰值约 4.47 GB；需要更多样本和并发负载后评估资源预算。
 - 本中文 ASR 权重的公开上游仓库要求接受访问条件，公开页面未展示许可条款；具体证据与待核验范围见 [`phase0-model-license-review.md`](phase0-model-license-review.md)。
 - 其他阶段 0 工作包状态见 [`phase0-traceability.md`](phase0-traceability.md)。
