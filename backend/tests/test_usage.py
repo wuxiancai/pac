@@ -68,3 +68,15 @@ def test_usage_record_preserves_explicit_actual_usage_without_content_fields() -
     assert "prompt" not in UsageRecord.__dataclass_fields__
     assert "messages" not in UsageRecord.__dataclass_fields__
     assert "content" not in UsageRecord.__dataclass_fields__
+
+
+def test_usage_ledger_rejects_cached_prompt_tokens_above_prompt_total() -> None:
+    record = UsageRecord(
+        **{
+            **_record("invalid-cache").__dict__,
+            "prompt_tokens": 10,
+            "cached_prompt_tokens": 11,
+        }
+    )
+    with pytest.raises(ValueError, match="cached prompt tokens"):
+        UsageLedger().record(record)

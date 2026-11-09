@@ -1,3 +1,10 @@
+# 2026-11-09：透传 Provider 缓存命中 token
+
+- 根据阿里云 Model Studio 与 DeepSeek 官方文档补齐原始用量字段：OpenAI-compatible `usage.prompt_tokens_details.cached_tokens`、DeepSeek `usage.prompt_cache_hit_tokens`。Gateway 在数值为非负整数且不超过已知 prompt 总数时才保留；UsageLedger 做一致性校验；认证 `/usage` 返回该字段，Swift client 解码并在用量面板显示。没有按价目表推算费用，也没有启用 D-005 预算门。
+- 资料核对：Qwen 官方资料说明 cached token 字段及地区/cache 定价；DeepSeek 官方资料说明 cache hit/miss 与峰谷定价；OpenRouter 说明 `usage.cost` 为 USD 推理费用，credit 购买另收平台费。来源链接和预算实现缺口已写入 `docs/beta/orchestrator-framework.md` 与 `docs/poc/phase0-traceability.md`。
+- 验证：定向 8 passed；Ruff、mypy 通过；后端全量 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 242 passed，1 条既有 Starlette/httpx 弃用警告；`swift test --package-path poc/macos-audio` → 40 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。未发起 Provider API 请求、未读取 Keychain、未操作 GUI。
+- D-005 未完成：估价依据/版本和更新、外币归一、未知值 fail-closed、跨进程累计、并发与自然月边界仍需闭环。
+
 # 2026-11-09：校正用量报告中的过期说明
 
 - 审阅阶段 2 编排报告时发现 Usage 首段仍称流式 Provider 不透传 token，与下方已记录的 Ollama/OpenAI-compatible 最终帧 token 透传及 OpenRouter 实际 USD 处理相矛盾。

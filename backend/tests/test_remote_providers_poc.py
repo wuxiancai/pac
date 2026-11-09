@@ -172,6 +172,39 @@ def test_deepseek_text_request_requires_exact_consent_and_uses_keychain_secret()
     )
 
 
+def test_deepseek_stream_preserves_official_cache_hit_usage_field() -> None:
+    credentials = FakeCredentials()
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=(
+                b'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n'
+                b'data: {"choices":[],"usage":{"prompt_tokens":12,"prompt_cache_hit_tokens":5,"completion_tokens":2}}\n\n'
+                b"data: [DONE]\n\n"
+            ),
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent, DEEPSEEK_PROBE_CONFIG, actions=frozenset({ModelAction.STREAM}))
+    gateway = make_gateway(consent, adapter, "deepseek")
+
+    async def collect() -> list[ProviderStreamChunk]:
+        return [chunk async for chunk in gateway.stream_with_usage(
+            request_for(DEEPSEEK_PROBE_CONFIG)
+        )]
+
+    chunks = asyncio.run(collect())
+    assert chunks[-1].prompt_tokens == 12
+    assert chunks[-1].cached_prompt_tokens == 5
+
+
 def test_qwen_token_plan_uses_fixed_beijing_endpoint_and_keychain_credential() -> None:
     config = QWEN_TOKEN_PLAN_PROBE_CONFIG
     assert config.endpoint == (
@@ -325,7 +358,7 @@ def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:
             content=(
                 b'data: {"choices":[{"delta":{"content":"phase0"}}]}\n\n'
                 b'data: {"choices":[{"delta":{"content":"-stream"}}]}\n\n'
-                b'data: {"choices":[],"usage":{"prompt_tokens":7,"completion_tokens":2,"total_tokens":9,"cost":0.0012}}\n\n'
+                b'data: {"choices":[],"usage":{"prompt_tokens":7,"prompt_tokens_details":{"cached_tokens":3},"completion_tokens":2,"total_tokens":9,"cost":0.0012}}\n\n'
                 b"data: [DONE]\n\n"
             ),
         )
@@ -346,7 +379,7 @@ def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:
         ProviderStreamChunk(text="phase0"),
         ProviderStreamChunk(text="-stream"),
         ProviderStreamChunk(
-            text="", prompt_tokens=7, completion_tokens=2,
+            text="", prompt_tokens=7, completion_tokens=2, cached_prompt_tokens=3,
             cost_amount=0.0012, cost_currency="USD"
         ),
     ]
@@ -424,6 +457,7 @@ def test_openrouter_metadata_reports_selected_provider_region_usage_and_cost() -
                 },
                 "usage": {
                     "prompt_tokens": 12,
+                    "prompt_tokens_details": {"cached_tokens": 4},
                     "completion_tokens": 5,
                     "total_tokens": 17,
                     "cost": 0.000123,
@@ -449,6 +483,7 @@ def test_openrouter_metadata_reports_selected_provider_region_usage_and_cost() -
     assert result.provider == "DeepSeek"
     assert result.region == "iad"
     assert (result.prompt_tokens, result.completion_tokens, result.total_tokens) == (12, 5, 17)
+    assert result.cached_prompt_tokens == 4
     assert result.cost_usd == 0.000123
     assert seen[0].headers["x-openrouter-metadata"] == "enabled"
     assert b'"provider":{"allow_fallbacks":false}' in seen[0].read()

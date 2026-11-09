@@ -88,6 +88,7 @@ public struct LocalUsageRecord: Decodable, Identifiable, Sendable {
     public let latencyMS: Int
     public let promptTokens: Int?
     public let completionTokens: Int?
+    public let cachedPromptTokens: Int?
     public let costAmount: Double?
     public let costCurrency: String?
     public let usageState: String
@@ -104,6 +105,7 @@ public struct LocalUsageRecord: Decodable, Identifiable, Sendable {
         case latencyMS = "latency_ms"
         case promptTokens = "prompt_tokens"
         case completionTokens = "completion_tokens"
+        case cachedPromptTokens = "cached_prompt_tokens"
         case costAmount = "cost_amount"
         case costCurrency = "cost_currency"
         case usageState = "usage_state"

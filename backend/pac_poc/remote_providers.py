@@ -71,6 +71,7 @@ class RemoteCompletion:
     region: str | None
     prompt_tokens: int | None
     completion_tokens: int | None
+    cached_prompt_tokens: int | None
     total_tokens: int | None
     cost_usd: float | None
     finish_reason: str | None = None
@@ -176,6 +177,7 @@ class OpenAICompatibleRemoteAdapter:
             region=region,
             prompt_tokens=self._optional_nonnegative_int(usage.get("prompt_tokens")),
             completion_tokens=self._optional_nonnegative_int(usage.get("completion_tokens")),
+            cached_prompt_tokens=self._cached_prompt_tokens(usage),
             total_tokens=self._optional_nonnegative_int(usage.get("total_tokens")),
             cost_usd=cost_usd,
             finish_reason=finish_reason if isinstance(finish_reason, str) else None,
@@ -212,6 +214,7 @@ class OpenAICompatibleRemoteAdapter:
                         usage = raw_usage if isinstance(raw_usage, dict) else {}
                         prompt_tokens = self._optional_nonnegative_int(usage.get("prompt_tokens"))
                         completion_tokens = self._optional_nonnegative_int(usage.get("completion_tokens"))
+                        cached_prompt_tokens = self._cached_prompt_tokens(usage)
                         cost_amount = (
                             self._optional_nonnegative_number(usage.get("cost"))
                             if self._config.provider == "openrouter"
@@ -221,6 +224,7 @@ class OpenAICompatibleRemoteAdapter:
                         if choices == [] and (
                             prompt_tokens is not None
                             or completion_tokens is not None
+                            or cached_prompt_tokens is not None
                             or cost_amount is not None
                         ):
                             content = ""
@@ -228,13 +232,20 @@ class OpenAICompatibleRemoteAdapter:
                             content = choices[0]["delta"].get("content", "")
                     except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError) as exc:
                         raise RemoteProviderError("Provider returned an invalid stream event") from exc
-                    if content or prompt_tokens is not None or completion_tokens is not None or cost_amount is not None:
+                    if (
+                        content
+                        or prompt_tokens is not None
+                        or completion_tokens is not None
+                        or cached_prompt_tokens is not None
+                        or cost_amount is not None
+                    ):
                         if not isinstance(content, str):
                             raise RemoteProviderError("Provider returned non-text stream content")
                         yield ProviderStreamChunk(
                             text=content,
                             prompt_tokens=prompt_tokens,
                             completion_tokens=completion_tokens,
+                            cached_prompt_tokens=cached_prompt_tokens,
                             cost_amount=cost_amount,
                             cost_currency="USD" if cost_amount is not None else None,
                         )
@@ -419,6 +430,25 @@ class OpenAICompatibleRemoteAdapter:
         if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
             return value
         return None
+
+    def _cached_prompt_tokens(self, usage: Mapping[str, Any]) -> int | None:
+        prompt_tokens = self._optional_nonnegative_int(usage.get("prompt_tokens"))
+        if self._config.provider == "deepseek":
+            cached_tokens = self._optional_nonnegative_int(
+                usage.get("prompt_cache_hit_tokens")
+            )
+        else:
+            details = usage.get("prompt_tokens_details")
+            if not isinstance(details, dict):
+                return None
+            cached_tokens = self._optional_nonnegative_int(details.get("cached_tokens"))
+        if (
+            prompt_tokens is None
+            or cached_tokens is None
+            or cached_tokens > prompt_tokens
+        ):
+            return None
+        return cached_tokens
 
     @staticmethod
     def _optional_nonnegative_number(value: object) -> float | None:

@@ -639,6 +639,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         async def events() -> AsyncIterator[str]:
             prompt_tokens: int | None = None
             completion_tokens: int | None = None
+            cached_prompt_tokens: int | None = None
             cost_amount: float | None = None
             cost_currency: str | None = None
             try:
@@ -653,6 +654,8 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                         prompt_tokens = delta.prompt_tokens
                     if delta.completion_tokens is not None:
                         completion_tokens = delta.completion_tokens
+                    if delta.cached_prompt_tokens is not None:
+                        cached_prompt_tokens = delta.cached_prompt_tokens
                     if delta.cost_amount is not None and delta.cost_currency is not None:
                         cost_amount = delta.cost_amount
                         cost_currency = delta.cost_currency
@@ -727,6 +730,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                             latency_ms=max(0, round((monotonic() - started_monotonic) * 1000)),
                             prompt_tokens=prompt_tokens,
                             completion_tokens=completion_tokens,
+                            cached_prompt_tokens=cached_prompt_tokens,
                             usage_state=(
                                 UsageState.ACTUAL
                                 if prompt_tokens is not None or completion_tokens is not None

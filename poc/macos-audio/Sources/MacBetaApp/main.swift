@@ -953,7 +953,7 @@ private struct UsageHistoryView: View {
                             Text("\(record.usageState == "actual" ? "实际 token" : record.usageState == "estimated" ? "估算 token" : "token 未知")")
                         }
                         HStack {
-                            Text("输入 \(record.promptTokens.map { String($0) } ?? "—") / 输出 \(record.completionTokens.map { String($0) } ?? "—")")
+                            Text("输入 \(record.promptTokens.map { String($0) } ?? "—")（缓存命中 \(record.cachedPromptTokens.map { String($0) } ?? "—")）/ 输出 \(record.completionTokens.map { String($0) } ?? "—")")
                             Spacer()
                             Text(costDescription(record))
                         }

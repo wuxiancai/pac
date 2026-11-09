@@ -32,6 +32,7 @@ class UsageRecord:
     latency_ms: int
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    cached_prompt_tokens: int | None = None
     audio_seconds: float | None = None
     cost_amount: float | None = None
     cost_currency: str | None = None
@@ -51,9 +52,21 @@ class UsageLedger:
     def record(self, record: UsageRecord) -> None:
         if record.latency_ms < 0 or record.completed_at < record.started_at:
             raise ValueError("usage record timestamps are invalid")
-        for value in (record.prompt_tokens, record.completion_tokens):
+        for value in (
+            record.prompt_tokens,
+            record.completion_tokens,
+            record.cached_prompt_tokens,
+        ):
             if value is not None and (type(value) is not int or value < 0):
                 raise ValueError("token counts must be non-negative integers or unknown")
+        if record.cached_prompt_tokens is not None and record.prompt_tokens is None:
+            raise ValueError("cached prompt tokens must not exceed known prompt tokens")
+        if (
+            record.cached_prompt_tokens is not None
+            and record.prompt_tokens is not None
+            and record.cached_prompt_tokens > record.prompt_tokens
+        ):
+            raise ValueError("cached prompt tokens must not exceed known prompt tokens")
         if record.cost_amount is not None and (
             isinstance(record.cost_amount, bool)
             or not isinstance(record.cost_amount, (int, float))
@@ -106,6 +119,7 @@ def usage_record_to_dict(record: UsageRecord) -> dict[str, str | float | int | N
         "latency_ms": record.latency_ms,
         "prompt_tokens": record.prompt_tokens,
         "completion_tokens": record.completion_tokens,
+        "cached_prompt_tokens": record.cached_prompt_tokens,
         "audio_seconds": record.audio_seconds,
         "cost_amount": record.cost_amount,
         "cost_currency": record.cost_currency,

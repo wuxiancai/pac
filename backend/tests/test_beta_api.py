@@ -263,7 +263,7 @@ def test_beta_usage_ledger_records_provider_reported_stream_tokens() -> None:
             self.request = request
             yield ProviderStreamChunk(text="done")
             yield ProviderStreamChunk(
-                prompt_tokens=11, completion_tokens=4,
+                prompt_tokens=11, completion_tokens=4, cached_prompt_tokens=5,
                 cost_amount=0.00012, cost_currency="USD"
             )
 
@@ -284,6 +284,7 @@ def test_beta_usage_ledger_records_provider_reported_stream_tokens() -> None:
         record = usage.json()["records"][0]
         assert record["prompt_tokens"] == 11
         assert record["completion_tokens"] == 4
+        assert record["cached_prompt_tokens"] == 5
         assert record["usage_state"] == "actual"
         assert record["cost_state"] == "actual"
         assert record["cost_amount"] == 0.00012
