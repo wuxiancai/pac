@@ -1,5 +1,11 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 2 B1 云 Provider 错误映射 API 回归（2026-11-09）
+
+- `backend/tests/test_beta_api.py` 新增 fake adapter 参数化回归，覆盖 HTTP 401/402/403/429/503；每种响应均检查 SSE 使用经分类的安全提示、不回显 adapter 错误正文、run 状态最终为 FAILED，且所选 adapter 只调用一次（没有 fallback）。
+- 验证：定向 `tests/test_beta_api.py -k cloud_provider_errors_are_sanitized_and_never_fallback` → 5 passed；后端全量 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 238 passed，1 条既有 Starlette/httpx 弃用警告；Ruff、mypy、`git diff --check` 通过。全部为 fake adapter，无云请求、无 Keychain 读取。
+- 仍需实机确认错误消息在 GUI 中的呈现；这里的 API 测试不替代 GUI 验收。下一段继续 B1 本机错误 UI 或 B5 文件导入冒烟主线。
+
 ## 阶段 2 B1 HTTP 错误正文脱敏回归（2026-11-09）
 
 - Swift `LocalAPIClient` 增加内部测试用 `URLSessionConfiguration` 注入 initializer；生产入口仍创建 ephemeral session，使用 loopback-only delegate 并拒绝重定向。

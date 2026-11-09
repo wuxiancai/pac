@@ -24,6 +24,7 @@ from pac_poc.model_gateway import (
     LocalOnlyPolicy,
     ProviderStreamChunk,
 )
+from pac_poc.remote_providers import RemoteProviderError
 from pac_poc.security_poc import LocalAPISession
 
 
@@ -112,6 +113,29 @@ class StubCloudAdapter:
         self.calls += 1
         self.request = request
         yield "云端回答"
+
+
+class FailingCloudAdapter:
+    is_local = False
+
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+        self.calls = 0
+
+    async def generate(self, request: LocalModelRequest) -> str:
+        raise AssertionError("stream endpoint must use streaming")
+
+    async def call_with_tools(self, request: LocalModelRequest):
+        raise AssertionError("chat endpoint must not invoke tools")
+
+    async def stream(self, request: LocalModelRequest):
+        self.calls += 1
+        if False:
+            yield "unreachable"
+        secret_marker = "provider-body-secret-marker"
+        raise RemoteProviderError(
+            f"Provider returned {secret_marker}", status_code=self.status_code
+        )
 
 
 class SpyCredentials:
@@ -507,6 +531,49 @@ def test_cloud_chat_requires_one_time_consent_before_adapter_access() -> None:
         assert credentials.reads == 0
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_message"),
+    [
+        (401, "云端 API Key 认证失败"),
+        (402, "余额或套餐额度不足"),
+        (403, "云端服务拒绝了本次请求"),
+        (429, "请求频率受限"),
+        (503, "HTTP 503"),
+    ],
+)
+def test_cloud_provider_errors_are_sanitized_and_never_fallback(
+    status_code: int, expected_message: str
+) -> None:
+    adapter = FailingCloudAdapter(status_code)
+    app = create_beta_api(
+        session=LocalAPISession(token="test-token"),
+        remote_adapters_override={"deepseek": adapter},
+    )
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/stream",
+            headers={"authorization": "Bearer test-token", "host": "127.0.0.1"},
+            json={
+                "provider": "deepseek",
+                "model": CLOUD_PROVIDERS["deepseek"].model,
+                "confirmed_for_this_request": True,
+                "messages": [{"role": "user", "content": "synthetic error test"}],
+            },
+        )
+        assert response.status_code == 200, response.text
+        run_id = response.headers["x-pac-run-id"]
+        run_status = client.get(
+            f"/chat/runs/{run_id}",
+            headers={"authorization": "Bearer test-token", "host": "127.0.0.1"},
+        )
+
+    assert response.status_code == 200
+    assert expected_message in response.text
+    assert "provider-body-secret-marker" not in response.text
+    assert adapter.calls == 1
+    assert run_status.json()["status"] == "failed"
 
 
 def test_qwen_application_route_is_available_with_exact_region_and_model() -> None:
