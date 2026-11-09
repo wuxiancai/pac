@@ -1,3 +1,8 @@
+## 2026-11-09：跨端回归复核
+
+- 当前 `main` 提交 `06c077e` 后复跑 Swift 全量：`swift test --package-path poc/macos-audio` → 40 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。测试目标为 arm64e/macOS 14.0。
+- 与前一段后端全量 252 passed（1 条既有 Starlette/httpx 弃用警告）合并记录；此复核没有更改代码。远端 GitHub Actions 尚未运行当前提交。
+
 ## 2026-11-09：阶段 3 Uvicorn WebSocket 消息上限
 
 - 实时语音路由在应用层会拒绝大于 12,800 字节的 PCM，但此前 Uvicorn 使用默认 16 MiB WebSocket 消息上限，单帧在应用拒绝前仍可被服务器完整接收。现将服务端 `ws_max_size` 设为 12,804 字节，容纳 4 字节序号和协议最大 12,800 字节 PCM。
