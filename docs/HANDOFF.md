@@ -2,11 +2,15 @@
 
 ## B1 本机流式保活继续开发（2026-11-09）
 
-- 发现本机 Ollama 默认 thinking 阶段暂时没有可见 `message.content`，Gateway 不发 SSE 数据，Swift URLSession 因空闲超时；`/chat/stream` 现在每 15 秒输出 SSE 注释 keep-alive，不暴露 thinking 或提示词。断开时会取消待取的上游 delta 并关闭 iterator。
+- 之前一次 GUI 等待 50 秒无回复时没有记录 Ollama 服务状态，因此不能判定是服务未启动还是模型延迟；SSE keep-alive 的自动回归有效，真实 thinking 原因尚未单独确认。Ollama 服务须在本机运行且所选模型已安装；后台本机错误提示会指引检查这两项。用户本轮已打开 Ollama 并确认 PAC 本地模型可以聊天。
+- 本机 `/chat/stream` 每 15 秒输出 SSE 注释 keep-alive，不暴露 thinking 或提示词；断开时会取消待取的上游 delta 并关闭 iterator。
 - 回归：`tests/test_beta_api.py tests/test_local_model_gateway.py` 22 passed；Ruff、mypy（相关 3 文件）、`uv lock --check`、compileall 通过。Python 全量 193 passed，1 failed：`test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup[APFS-128]` 受磁盘耗尽脚本 OSError 失败，与本次代码无关；1 条 Starlette/httpx deprecation warning。
-- GUI 观察：thinking 中取消后立即发送新提示，等待 50 秒 UI 未再报超时，但没有出现可见文本，之后停止。保活修复解决空闲断流，不代表模型响应延迟已解决；下一步应评估向用户显示思考/等待状态及重试策略，不擅自改变模型 thinking 默认或产品决策。测试后已恢复 OpenRouter 模型选择；未发云请求。
+- 实机复核：从 `poc/macos-audio/scripts/run_beta_app.sh` 启动后，GUI 显示本机服务已连接、模型 `ollama / qwen3.5:0.8b`。干净会话中的短句得到精确回复；同时本机 Ollama 默认参数 `/api/chat` 合成短句返回完成，耗时约 2.51 秒；显式 `think:false` 对照约 0.88 秒，未记录回复正文。用户也确认打开 Ollama 后 PAC 本地模型可以聊天。
+- 停流/重发：长故事请求开始生成后点停止，UI 立即显示“已停止本轮生成”；随后立即发短句，30 秒内仍显示生成中、没有文本，手动停止。该对话含长请求及未完成上下文，尚不能区分 Ollama 旧生成清理、上下文思考或模型延迟。请求停止期间 UI 未超时；这不能证明供应商/模型进程已经停止计算。
+- 测试对话清理后，已再次从仓库脚本启动 Beta，当前为空白本地会话且服务进程在运行；未发云请求。下一步是确认停止请求后的上游实际关闭/队列行为，或用隔离的新会话重试简短提示；B1 暂不关闭。
+- 一次桌面自动化重绑定短暂显示“无法找到本机运行环境”，原因是启动了没有 `PAC_POC_PYTHON`/`PAC_POC_BACKEND` 的 app 实例；已将其关闭并用仓库脚本正常重启，现无启动错误。
 - B0 最终完成：SwiftUI 主窗口从 `WindowGroup` 改为单实例 `Window`，使最后/唯一窗口关闭即退出，符合单会话 Beta 生命周期；启动错误及 GUI 重试已以本机 fixture 实测，fixture 已删除；真实后端连接后关闭唯一窗口，确认 app/backend 均无进程残留。Swift Beta build 成功，`swift test --package-path poc/macos-audio` 34 passed。
-- 当前代码改动待提交：`backend/pac_poc/beta_api.py`、`backend/tests/test_beta_api.py`，以及本次进度文档。继续 B1；B0 已关闭。交接前检查 diff 并提交。
+- 上述 keep-alive 实现已在提交 `fa721e1`；本次仅更正实机根因判断与验证记录。继续 B1；B0 已关闭。交接前检查 diff 并提交。
 
 ## B0 继续开发（2026-11-09）
 

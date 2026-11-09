@@ -23,7 +23,11 @@
 
 ## 验证记录
 
-- 2026-11-09 本机模型流式保活：Ollama 模型在 thinking 阶段可能暂时不发可见 `message.content`，后端原先因此没有 SSE bytes，Swift URLSession 在空闲期超时。`/chat/stream` 现在每 15 秒发 SSE 注释 keep-alive，不转发 thinking 或提示词；客户端断开时会取消并关闭上游迭代器。设置拒绝非有限/非正值和 bool。验证：`uv run --locked --all-extras --all-groups pytest -q tests/test_beta_api.py tests/test_local_model_gateway.py` → 22 passed；`ruff check pac_poc tests`、`mypy`（相关 3 个文件）、`uv lock --check`、`python3 -m compileall -q pac_poc scripts tests` 均通过。完整 Python `pytest -q` → 193 passed、1 failed：`test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup[APFS-128]` 在磁盘耗尽脚本返回 `OSError`，与流式保活无关；另有 1 条既有 Starlette/httpx 弃用警告。实机在 thinking 期间取消并立即重发后观察 50 秒，未再出现 UI 超时，但始终没有可见文本，随后停止；这只验证连接仍存活，不代表该轮生成完成或响应及时。测试后将模型选择恢复为 OpenRouter（只恢复本机偏好，没有云请求）。
+- 2026-11-09 本机模型流式保活：为避免流式响应长时间无 SSE 数据时客户端空闲超时，`/chat/stream` 现在每 15 秒发 SSE 注释 keep-alive，不转发 thinking 或提示词；客户端断开时会取消并关闭上游迭代器。具体无数据根因尚未确认。设置拒绝非有限/非正值和 bool。验证：`uv run --locked --all-extras --all-groups pytest -q tests/test_beta_api.py tests/test_local_model_gateway.py` → 22 passed；`ruff check pac_poc tests`、`mypy`（相关 3 个文件）、`uv lock --check`、`python3 -m compileall -q pac_poc scripts tests` 均通过。完整 Python `pytest -q` → 193 passed、1 failed：`test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup[APFS-128]` 在磁盘耗尽脚本返回 `OSError`，与流式保活无关；另有 1 条既有 Starlette/httpx 弃用警告。早先 50 秒 GUI 观察没有记下 Ollama 进程状态，不能据此认定是 thinking；随后发现桌面绑定到了无仓库环境的 app，已用仓库脚本重启。
+
+- 更正实机解释（2026-11-09）：上次 50 秒观察未核对 Ollama 进程，根因不明。用户已确认启动 Ollama 后 PAC 可以聊天；本轮在仓库启动的 GUI 中确认 `ollama / qwen3.5:0.8b` 已连接，并在干净会话收到 `PAC-LOCAL-READY` 精确短答。随后 Ollama loopback `/api/chat` 默认参数下的合成短句成功（返回长度 21，服务端总耗时约 2.51 秒）；仅作本机诊断的 `think:false` 对照耗时约 0.88 秒，没有记录回复正文。模型是否开启 thinking 不是根因结论。Ollama 必须运行且目标模型已安装；本机请求错误会提示检查 Ollama 和模型。未发起云请求。
+
+- GUI 停流/重发复核：在 Ollama 正常运行下启动约 300 字故事请求，点击停止后 UI 立即显示“已停止本轮生成”；随后立即发出“只回复 PAC-RESEND-OK”，等待 30 秒仍显示生成中且无文本，手动停止。对话当时包含长请求/未完成上下文，因此原因未定，不能判为取消实现故障，也不能判通过。关闭合成测试会话并用仓库脚本重启，现在 app/backend 已连接且对话为空；所有请求均留在本机。
 
 - 2026-11-09 修复模型切换反馈：SwiftUI 模型选择变更会取消在途客户端请求、清除其 request ID 并更新当前 Provider/模型状态；发送时仍以当前设置建立不可变请求快照，完成状态显示本轮实际 Provider/模型。`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；本轮未运行测试、未启动 GUI、未发起云请求。
 
