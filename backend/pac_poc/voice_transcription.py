@@ -55,16 +55,24 @@ class LocalVoiceTranscriber:
         with self._lock:
             if self._stream is None:
                 return None
-            event = self._stream.finish(sequence=sequence)
-            self._stream.reset()
-            self._stream = None
-            return event
+            stream = self._stream
+            try:
+                return stream.finish(sequence=sequence)
+            finally:
+                try:
+                    if self._recognizer is not None:
+                        self._recognizer.reset()
+                finally:
+                    self._stream = None
 
     def abort_stream(self) -> None:
         with self._lock:
             if self._stream is not None:
-                self._stream.reset()
-                self._stream = None
+                try:
+                    if self._recognizer is not None:
+                        self._recognizer.reset()
+                finally:
+                    self._stream = None
 
     def _get_recognizer(self) -> SherpaOnnxRecognizer:
         if self._recognizer is None:

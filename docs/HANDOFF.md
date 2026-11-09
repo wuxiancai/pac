@@ -1,3 +1,11 @@
+### 2026-11-09：修复实时语音停止时 ASR reset 错误与会话锁泄漏
+
+- 根因已复现：`LocalVoiceTranscriber.end_stream()` 与 `abort_stream()` 调用不存在的 `LocalStreamingASR.reset()`，在真实 ASR stop 路径抛 `AttributeError`。异常清理也调用同一错误方法，WebSocket handler 的 `finally` 因清理再次抛错而未运行锁释放语句，导致第一轮 socket 中断、后续连接一直 busy。
+- 修复：结束/取消时改为重置底层 recognizer，并在 `finally` 中清除当前 stream；WebSocket handler 的 finally 再加一层 finally，保证 ASR 清理无论成功失败都释放 asyncio 锁。
+- 复现/验证：修复前真实 Uvicorn WebSocket + 仓库本机 ASR 模型 + 固定 PCM WAV 在 end 时返回 1011；独立调用确认 `AttributeError`。修复后 Apple `URLSessionWebSocketTask` 直接连接真实 Uvicorn、使用项目 sherpa-onnx 模型和仓库 PCM WAV，连续 3 轮均收到 partial、final、ended。GUI 实机麦克风采集与草稿更新仍待用户完成。
+- 本轮新增回归覆盖 LocalVoiceTranscriber 的 end reset、abort 清理与重新开始；Python 全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q` → 180 passed，1 条既有 Starlette/httpx 弃用警告。此前反复修改未能解决，是因为测试只用 Starlette TestClient 和假的 transcriber，未执行真实 `LocalVoiceTranscriber.end_stream()`；并且 supervisor 将后端 stderr 丢弃，缺少运行期异常日志。
+- 全量 Python 回归已完成：180 passed，1 条既有 Starlette/httpx 弃用警告；`compileall`、`uv lock --check`、`git diff --check` 通过。下一步由用户 Cmd-Q 干净退出并从根目录执行 `PAC_BETA_PERF_DIAGNOSTICS=1 ./poc/macos-audio/scripts/run_beta_app.sh`，实测两轮麦克风录音停止 final 和立即重录。
+
 ### 2026-11-09：排查实时语音停止后 socket 断开
 
 - 用户截图显示第一次录音停止时报 `The operation couldn’t be completed. Socket is not connected.`，partial n=2、停止→final n=0；第二次录音被服务端拒绝为 ASR 忙。该证据确认客户端停止时 socket 已断开且服务端会话锁未释放，但尚未揭示最初断连根因。

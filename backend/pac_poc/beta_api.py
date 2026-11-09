@@ -268,10 +268,12 @@ def create_beta_api(
             except RuntimeError:
                 pass
         finally:
-            if started:
-                await asyncio.to_thread(voice_transcriber.abort_stream)
-            if lock_acquired:
-                voice_stream_lock.release()
+            try:
+                if started:
+                    await asyncio.to_thread(voice_transcriber.abort_stream)
+            finally:
+                if lock_acquired:
+                    voice_stream_lock.release()
 
     @router.post("/voice/transcribe")
     async def transcribe_voice(request: Request) -> dict[str, str]:
