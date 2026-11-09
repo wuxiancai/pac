@@ -1,3 +1,16 @@
+# 2026-11-09：阶段 4 PDF POC 文本长度上限回归
+
+- 再新增实际提取文本边界测试：合成 PDF 页面含 200,001 个字符，worker 在 200,000 字符限制处安全拒绝。PDF POC 自动回归现为 7 项，包含有效/无效输入、输入大小、页数、FlateDecode 解压、提取文本上限和父进程超时转换（超时转换为模拟）。
+- 验证：`tests/test_pdf_import_poc.py` 7 passed；Ruff/myPy/格式检查通过；后端全量 all-extras/all-groups 265 passed，1 条既有 Starlette/httpx 弃用警告。PDF 产品入口仍禁用，硬内存上限、恶意语料、实际 CPU/墙钟压力和 GUI 验收缺口不变。
+- APFS-128 偶发失败记录仍有效：先前一轮全量测试中该项失败，隔离复跑通过；随后 264 项和当前 265 项两次全量回归通过，原因未知。
+- 同步文件导入报告、TASKS、PROJECT_CONTEXT、阶段 0 追踪矩阵、ENOSPC 报告和此交接。未操作 GUI、Provider、Keychain 或麦克风。
+
+# 2026-11-09：阶段 4 PDF POC 解压上限回归
+
+- 在隔离 PDF worker 测试中新增一个合成 FlateDecode 解压炸弹：压缩后 PDF 小于 10 KB，声明流解压后约 2.07 MB，超过 worker 的 2 MB/过滤器配置并由子进程安全拒绝。PDF 仍保持禁用，单个合成案例不替代恶意语料或资源隔离验收。
+- 验证：PDF 窄回归 6 passed；Ruff 与 mypy 通过；后端全量 264 passed（1 条既有 Starlette/httpx 弃用警告）。全量首跑有一项无关的 APFS-128 临时映像用例通用 `RuntimeError`；目标用例单独复跑 1 passed，随后完整后端回归 264 项再次通过，原因未判定。已记录为非阻塞外部映像观察，不归因为代码或系统缺陷。
+- 更新文件导入报告、阶段 0 矩阵、TASKS、PROJECT_CONTEXT、APFS ENOSPC POC 报告和此交接记录。没有操作 GUI、访问 Keychain、采集麦克风或发起云请求。
+
 # 2026-11-09：更正阶段 0 记忆与文件导入追踪状态
 
 - 复核发现矩阵把 D-014 长期记忆/Embedding 未纳入 V1，与 D-012 下已接入 Beta 的 TXT/Markdown 导入合并成“记忆、Embedding、文件导入尚未进入 Beta”，与当前实现及 TASKS 冲突。
