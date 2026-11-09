@@ -589,3 +589,4 @@
 - 根因是服务端在向客户端发送 WebSocket `ended` 后才释放 ASR 单会话锁，快速重连可能撞锁。现改为结束并清理 ASR 流、释放锁后才发 `ended`；同一客户端结束后立即新建会话回归通过。`tests/test_beta_api.py tests/test_local_streaming_asr.py` 15 passed；全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` 176 passed（1 条 Starlette/httpx deprecation warning）。GUI 重构建后的二次录音仍需手动验证。
 - 下一步：用户 Cmd-Q 退出旧 Beta，运行 `PAC_BETA_PERF_DIAGNOSTICS=1 ./poc/macos-audio/scripts/run_beta_app.sh` 构建并重开；先验证停止后立即再次语音可用，再继续累计 20 个 partial 与 20 个停止→final 样本。避免重复做云端请求。
 - 修复提交：`46bca45`（语音锁在 `ended` 前释放）。用户报告的 20 次启动值均低于 5 秒，因此启动门槛有用户观测支持；原范围文本仍需更正精确上下界。partial/final 性能尚无有效 GUI 分布，阶段 0 不能据此验收。
+- 用户回报重构建后第二次语音仍无响应；随后 CUA 查看当前窗口显示“测试版尚未配置”，进程快照只有 App、没有 backend。该运行没有加载启动脚本注入的 `PAC_POC_PYTHON`/`PAC_POC_BACKEND`，因此尚不能判断 `46bca45` 的 GUI 复测结果。用户已收到先 Cmd-Q，再从仓库根目录运行诊断启动命令，并确认新窗口显示“本机服务已连接”后再测的步骤。
