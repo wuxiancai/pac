@@ -32,7 +32,9 @@
 }
 ```
 
-当前装配 API 是框架入口；运行时仍不从外部文件自动加载能力清单，也没有因此新增已启用能力。只有核对具体报告证据后，才应把构造出的 registry 注入 Orchestrator。
+Beta 运行时现从随包的 `pac_poc/beta_model_capabilities.json` 装配默认 registry 并注入 Orchestrator。清单只收录已有本地证据锚点的精确型号：`ollama/qwen3.5:0.8b`、`deepseek/deepseek-flash` 和 `openrouter/deepseek/deepseek-v4.1-flash-1017`。文本生成与流式状态有对应报告；工具能力因样本有限标为 `limited`，不会通过支持门。千问应用 API 型号未有成功的本产品请求证据，因此仍为 `UNKNOWN`。
+
+认证 `GET /model-capabilities?provider_id=...&model_id=...` 返回报告证据引用及全部能力状态；未收录型号或省略能力都返回 `unknown`。该查询不发模型请求。当前聊天不声明额外工具/多模态能力，因此加载清单没有改变基本文本流行为。静态 JSON 已作为 Python package data，并通过 wheel 内容检查确认随包。
 
 ## 进程内 Usage 首段
 
@@ -57,12 +59,12 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked mypy pac_poc/usage.py pac_poc/be
 swift test --package-path poc/macos-audio
 ```
 
-结果：本轮 Provider usage 透传窄回归 56 passed；Ruff 和相关模块 mypy 通过；Python 全量 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 226 passed，1 条既有 Starlette/httpx 弃用警告。上一段用量面板接入后 `swift test --package-path poc/macos-audio` → 36 项通过，Beta target build 成功。面板 GUI 手动冒烟尚未做；未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
+结果：本轮能力清单/API 窄回归 39 passed；Ruff 与相关模块 mypy 通过；wheel 检查确认 manifest 随包。Python 全量 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 228 passed，1 条既有 Starlette/httpx 弃用警告。上一段用量面板接入后 Swift 36 项与 Beta target build 通过。GUI 手动冒烟尚未做；未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
 
 ## 下一步
 
 - 补齐客户端断连与取消路径的生命周期 GUI 手动冒烟；不提供退出后后台续跑。
 - 在正常启动 Beta 时手动检查“用量”面板的空记录、UNKNOWN/null 呈现和加载失败提示。
 - 将真实 Provider 可获得的 usage metadata 安全透传到 UsageLedger；逐 Provider 明确 usage 来源和 actual/estimated/unknown 语义后，再实现预算检查。当前无真实云 usage 验证，不做云调用。
-- 将已核对 POC 的精确型号报告装配为本机静态 manifest；未提供的能力继续默认 UNKNOWN。
-- 下一步选取具体、已核对证据的 Provider/model 报告接入运行时；工具、多模态和持久化仍须各自完成决策、实现与验证后再启用。
+- 在正常启动 Beta 时检查精确型号 capability 查询、用量面板、空记录和认证失败状态。
+- 精确云型号的 usage 兼容性尚需依产品功能触发条件验证；工具、多模态和持久化仍须各自完成决策、实现与验证后再启用。

@@ -41,6 +41,8 @@ from .orchestrator import (
     RunRegistry,
     RunStatus,
 )
+from .model_capabilities import Capability, ModelCapabilityRegistry
+from .beta_capabilities import load_beta_capability_registry
 from .remote_providers import (
     DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG,
@@ -201,6 +203,7 @@ class BetaAPIDependencies:
     credentials: CredentialProvider | None = None
     remote_adapters: Mapping[str, LocalProviderAdapter] | None = None
     voice_transcriber: BetaVoiceTranscriber | None = None
+    capability_registry: ModelCapabilityRegistry | None = None
     settings: BetaAPISettings = DEFAULT_BETA_API_SETTINGS
 
 
@@ -250,6 +253,11 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
     remote_adapters_override = dependencies.remote_adapters
     voice_transcriber_override = dependencies.voice_transcriber
     settings = dependencies.settings
+    capability_registry = (
+        dependencies.capability_registry
+        if dependencies.capability_registry is not None
+        else load_beta_capability_registry()
+    )
     app = create_local_api(session=session)
     ollama = OllamaAdapter()
     credential_provider = credentials or MacOSKeychainCredentialProvider()
@@ -509,6 +517,26 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             ],
         }
 
+    @router.get("/model-capabilities")
+    async def get_model_capabilities(
+        provider_id: str = Query(min_length=1, max_length=64),
+        model_id: str = Query(min_length=1, max_length=128),
+    ) -> dict[str, object]:
+        report = capability_registry.report(provider_id, model_id)
+        return {
+            "provider_id": provider_id,
+            "model_id": model_id,
+            "verified_at": report.verified_at if report is not None else None,
+            "evidence_refs": list(report.evidence_refs) if report is not None else [],
+            "region": report.region if report is not None else None,
+            "capabilities": {
+                capability.value: capability_registry.state(
+                    provider_id, model_id, capability
+                ).value
+                for capability in Capability
+            },
+        }
+
     @router.post("/imports/text", status_code=201)
     async def import_selected_text(request: Request) -> dict[str, str | int]:
         display_name = request.query_params.get("filename", "")
@@ -594,7 +622,9 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             source=source,
             documents=imported_documents,
         )
-        orchestrator = MainAssistantOrchestrator(selected_gateway)
+        orchestrator = MainAssistantOrchestrator(
+            selected_gateway, capability_registry=capability_registry
+        )
         model_request = orchestrator.prepare_request(turn)
         actual_context_chars = sum(len(item["content"]) for item in model_request.messages)
         if actual_context_chars > settings.max_context_chars:

@@ -37,6 +37,9 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["pac_poc*"]
 
+[tool.setuptools.package-data]
+pac_poc = ["*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

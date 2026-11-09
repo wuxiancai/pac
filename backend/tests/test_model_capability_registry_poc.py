@@ -13,6 +13,7 @@ from pac_poc.model_capabilities import (
     ModelCapabilityRegistry,
     ModelCapabilityReport,
 )
+from pac_poc.beta_capabilities import load_beta_capability_registry
 
 
 def test_unknown_model_and_capabilities_stay_unknown_without_evidence() -> None:
@@ -23,6 +24,19 @@ def test_unknown_model_and_capabilities_stay_unknown_without_evidence() -> None:
     )
     with pytest.raises(CapabilityNotVerified, match="unknown"):
         registry.require("ollama-local", "qwen3.5:0.8b", Capability.TOOLS)
+
+
+def test_bundled_beta_manifest_contains_only_exact_evidence_and_limits_tools() -> None:
+    registry = load_beta_capability_registry()
+
+    assert registry.require("ollama", "qwen3.5:0.8b", Capability.STREAMING)
+    assert registry.state("ollama", "qwen3.5:0.8b", Capability.TOOLS) is CapabilityState.LIMITED
+    assert registry.state("ollama", "qwen3.5:8b", Capability.STREAMING) is CapabilityState.UNKNOWN
+    assert registry.state("qwen-app", "qwen3.8-flash", Capability.TEXT_GENERATION) is CapabilityState.UNKNOWN
+    assert registry.state("deepseek", "deepseek-flash", Capability.STREAMING) is CapabilityState.SUPPORTED
+    assert registry.state(
+        "openrouter", "deepseek/deepseek-v4.1-flash-1017", Capability.TOOLS
+    ) is CapabilityState.LIMITED
 
 
 def test_verified_capability_requires_exact_model_and_keeps_other_capabilities_unknown() -> None:

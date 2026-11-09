@@ -244,6 +244,36 @@ def test_beta_usage_ledger_records_provider_reported_stream_tokens() -> None:
     asyncio.run(run())
 
 
+def test_model_capability_endpoint_is_authenticated_and_exact_match_only() -> None:
+    async def run() -> None:
+        app = create_beta_api(session=LocalAPISession(token="test-token"))
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            denied = await client.get(
+                "/model-capabilities", params={"provider_id": "ollama", "model_id": "qwen3.5:0.8b"}
+            )
+            known = await client.get(
+                "/model-capabilities",
+                headers={"authorization": "Bearer test-token"},
+                params={"provider_id": "ollama", "model_id": "qwen3.5:0.8b"},
+            )
+            unknown = await client.get(
+                "/model-capabilities",
+                headers={"authorization": "Bearer test-token"},
+                params={"provider_id": "ollama", "model_id": "qwen3.5:8b"},
+            )
+        assert denied.status_code == 401
+        report = known.json()
+        assert report["verified_at"] == "2026-11-09T00:00:00Z"
+        assert report["capabilities"]["streaming"] == "supported"
+        assert report["capabilities"]["tools"] == "limited"
+        assert unknown.json()["verified_at"] is None
+        assert set(unknown.json()["capabilities"].values()) == {"unknown"}
+
+    asyncio.run(run())
+
+
 def test_user_selected_text_import_is_bounded_ephemeral_and_local_only() -> None:
     async def run() -> None:
         adapter = StubLocalAdapter()

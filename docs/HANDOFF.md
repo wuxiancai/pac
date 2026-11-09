@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 2 精确型号能力清单接入（2026-11-09）
+
+- 新增随包 `beta_model_capabilities.json`，按现有 POC 精确登记本机 `qwen3.5:0.8b`、DeepSeek `deepseek-flash`、OpenRouter `deepseek/deepseek-v4.1-flash-1017` 的文本/流式证据。工具能力样本有限，状态为 LIMITED；千问应用 API 型号和其他未收录型号保持 UNKNOWN。
+- 默认 Beta composition root 装配并注入该 registry；认证 `GET /model-capabilities?provider_id=...&model_id=...` 查询状态与证据。没有启用新工具能力，基本聊天行为未变。JSON 已包含于 wheel package data。
+- 验证：能力/API 窄回归 39 passed；Ruff、mypy 通过；wheel 内容检查确认清单已打包；全量 Python 228 passed，1 条既有 Starlette/httpx 弃用警告。无云请求、无 Keychain 读取。
+- 下一步继续阶段 2 主线；正常 Beta 启动时顺带验收用量面板和 capability 查询。真实云 usage、费用预算依各自验证门槛继续追踪。
+
 ## 阶段 2 Provider token usage 透传（2026-11-09）
 
 - Gateway 新增 `ProviderStreamChunk`，适配器可将文本增量与最终帧的 input/output token 分开返回；聊天 SSE 仍仅发送文本 delta。Ollama 读取完成帧的 `prompt_eval_count`/`eval_count`；固定云 Provider 请求带 `stream_options.include_usage=true` 并解析 OpenAI-compatible usage 帧。

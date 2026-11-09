@@ -130,6 +130,9 @@ class ModelCapabilityRegistry:
             raise CapabilityNotVerified(capability, state)
         return True
 
+    def report(self, provider_id: str, model_id: str) -> ModelCapabilityReport | None:
+        return self._reports.get((provider_id, model_id))
+
     @property
     def models(self) -> tuple[tuple[str, str], ...]:
         return tuple(self._reports)

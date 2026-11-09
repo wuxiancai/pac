@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "reports": [
+    {
+      "provider_id": "ollama",
+      "model_id": "qwen3.5:0.8b",
+      "entries": [
+        {"capability": "text_generation", "state": "supported"},
+        {"capability": "streaming", "state": "supported"},
+        {"capability": "tools", "state": "limited"}
+      ],
+      "verified_at": "2026-11-09T00:00:00Z",
+      "evidence_refs": ["docs/poc/phase0-model-gateway-local.md"]
+    },
+    {
+      "provider_id": "deepseek",
+      "model_id": "deepseek-flash",
+      "entries": [
+        {"capability": "text_generation", "state": "supported"},
+        {"capability": "streaming", "state": "supported"},
+        {"capability": "tools", "state": "limited"}
+      ],
+      "verified_at": "2026-11-09T00:00:00Z",
+      "evidence_refs": ["docs/poc/phase0-remote-provider.md"]
+    },
+    {
+      "provider_id": "openrouter",
+      "model_id": "deepseek/deepseek-v4.1-flash-1017",
+      "entries": [
+        {"capability": "text_generation", "state": "supported"},
+        {"capability": "streaming", "state": "supported"},
+        {"capability": "tools", "state": "limited"}
+      ],
+      "verified_at": "2026-11-09T00:00:00Z",
+      "evidence_refs": ["docs/poc/phase0-remote-provider.md"]
+    }
+  ]
+}
