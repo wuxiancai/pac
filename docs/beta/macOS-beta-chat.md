@@ -28,13 +28,16 @@
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked pytest -q`：158 项通过（该轮记录，其后新增测试使全量升至 162 项）；`uv run --locked python -m compileall -q pac_poc scripts tests`：通过。
 - 千问应用选项改动后：千问相关后端窄回归 26 项通过；Python 全量回归 162 项通过；`swift test --package-path poc/macos-audio` 31 项通过；Beta `.app` 构建成功。运行中 GUI Accessibility 树显示模型 `qwen3.8-flash` 与“模型设置”按钮；设置 sheet 手动操作、Keychain 保存和真实千问 API 请求尚未验证。
 - 2026-11-09 用户确认千问应用 API Key 已轮换，曾暴露的 Key 已删除。本轮通过 `scripts/run_beta_app.sh` 启动后 GUI 显示本机服务已连接、当前云模型为 `qwen3.8-flash`；模型设置页对 `qwen-app` 的 Keychain 状态查询显示“未配置”。没有输入、读取 Key 内容或保存 Key，也没有发送云请求。用户需在本机设置页保存新 `sk-ws-` Key 后，才能进行真实 API 验证。
+- 用户随后确认已在应用中保存新 API Key。设置页状态显示 `已保存（qwen-app）`。经 GUI 向千问 `qwen3.8-flash` 发出一次固定合成提示 `Reply exactly: PAC-QWEN-SMOKE-20261109`；界面进入云端生成状态后返回“云端凭据不可用或请求失败；已停止发送，不会自动切换 Provider。”目前此脱敏错误不能区分 Keychain 读取失败、网络层错误或 Provider 端失败，不能证明请求到达 Provider；未收到回复/usage/cost，因此费用情况也未知。本轮没有重试。
+- 针对该错误诊断缺口，`backend/pac_poc/beta_api.py` 现分别映射 Keychain 不可用、HTTPX 传输错误、明确的 Provider HTTP 状态，以及无法识别/处理错误；消息不包含密钥和上游响应正文。传输错误明确提示服务端是否收到请求/是否计费未知，并要求先查用量再重试。只做 Python 编译检查，尚未运行测试或再次出站请求；历史那次错误无法追溯分类。
 - 移除聊天逐条云确认弹窗后：`swift test --package-path poc/macos-audio` 31 项通过，Beta target 构建通过；尚未在运行 GUI 中发起消息做无弹窗手动复核。用户选择云端即持续授权，设置页告知发送目标和切回本地的方法。
 - `scripts/run_beta_app.sh` 构建并启动更新后的应用；GUI Accessibility 树确认右上角“模型设置”按钮和当前模型状态显示。设置 sheet 本身以及真实云端请求尚未进行手动 GUI 验收。
 - 使用真实本机 Ollama 模型对 `/chat/stream` 发送合成短句，HTTP 200，收到 7 个非空增量片段；未记录回复正文。服务经 supervisor stop 正常退出。
 
 ## 下一步与限制
 
-- GUI 已确认可以提交消息并显示回答，也观察到模型设置按钮；本轮确认设置页仍未配置 `qwen-app`。启动脚本启动并显示服务连接；Cmd-Q 后进程检查未见 app/backend 残留。窗口关闭路径和停止按钮行为仍待手动复核。
+- GUI 已确认可以提交消息并显示回答，也观察到模型设置按钮；`qwen-app` 当前显示已保存，但单次合成云发送返回通用错误，根因和 Provider 收到请求与否均未知，避免重复请求。启动脚本启动并显示服务连接；Cmd-Q 后进程检查未见 app/backend 残留。窗口关闭路径和停止按钮行为仍待手动复核。
+- 下一步由用户检查千问控制台是否记录了这次合成请求及用量；确认后再决定是否使用新版错误提示重试。窗口关闭清理和停止行为仍待 GUI 冒烟。
 - 生成请求用 request ID 隔离流片段和收尾状态，避免停止后立即发起的新请求被旧请求回调清除。`swift test --package-path poc/macos-audio` 构建通过，31 项既有 Swift 测试通过；当前尚无专门覆盖 SwiftUI 请求竞态的单元测试。
 - 对话不持久化是当前范围选择，不是故障；持久化等用户确认数据保留和加密方案后再做。
 - 语音接入作为 B2；开始录音必须由用户在应用内明确操作，音频不落盘，识别失败不切云。

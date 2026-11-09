@@ -19,7 +19,7 @@
 | 顺序 | 工作包 | 状态 | 完成条件 / 说明 |
 |---:|---|---|---|
 | B0 | 应用可运行骨架 | IN PROGRESS | 新增 SwiftUI 测试版 `.app` 构建/启动入口；本轮经启动脚本实机显示本机服务已连接，Cmd-Q 后进程检查未见 app/backend 残留。窗口关闭路径及启动失败恢复体验仍需复核。 |
-| B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或千问应用 API（默认云服务商）、DeepSeek、OpenRouter 固定路由；本地模型 ID 可配置。选择云端模型即持续授权后续消息发送到该服务商，设置中明确告知，无逐条弹窗；Keychain 保存、固定目标、L3 凭据拦截、错误脱敏和无自动 fallback 保留。用户确认已轮换千问按量 API Key 并删除暴露 Key；本轮设置页 Keychain 状态显示 `qwen-app` 未配置，需用户在本机应用内保存新 `sk-ws-` Key 后才能实测真实 API。未发起云请求。Token Plan `sk-sp-` 个人版官方条款排除自建应用后端，不做直连。D-010 仍待决。详见 `beta/macOS-beta-chat.md`。 |
+| B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或千问应用 API（默认云服务商）、DeepSeek、OpenRouter 固定路由；本地模型 ID 可配置。选择云端模型即持续授权后续消息发送到该服务商，设置中明确告知，无逐条弹窗；Keychain 保存、固定目标、L3 凭据拦截、错误脱敏和无自动 fallback 保留。用户确认已轮换千问按量 API Key 并删除暴露 Key；本轮 GUI 确认 `qwen-app` 已保存，并发送一次固定合成消息，但页面返回通用错误，无法判定 Keychain 读取、网络或 Provider 侧原因，也无 Provider 接收/usage 证据。后端已补细分安全错误提示，尚未对新代码发起请求；真实重试前需检查该次用量记录，避免潜在重复计费。详见 `beta/macOS-beta-chat.md`。Token Plan `sk-sp-` 个人版官方条款排除自建应用后端，不做直连。D-010 仍待决。 |
 | B2 | 本地语音闭环 | OPEN | 在应用内显式开始/停止麦克风，连接已验证本地 ASR 和本机 TTS；原始音频不落盘，失败不静默上云。 |
 | B3 | 会话保存与恢复 | DEFERRED | 等待最小数据保留和静态加密决策；在决定前不持久化敏感对话。 |
 | B4 | 千问 Token Plan 扩展接入 | DEFERRED | 个人版条款仅允许经官方支持的编程/智能体工具扩展交互使用，排除本项目自建应用后端。只有取得允许自建应用的官方授权/套餐，或实现受支持工具扩展集成后，才能纳入应用选项。协议、地址和状态见 `beta/qwen-token-plan-integration.md`。 |

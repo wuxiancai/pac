@@ -6,11 +6,16 @@ from collections.abc import AsyncIterator, Mapping
 from time import time
 from typing import Literal
 
+import httpx
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from .keychain_credentials import CredentialProvider, MacOSKeychainCredentialProvider
+from .keychain_credentials import (
+    CredentialProvider,
+    CredentialUnavailable,
+    MacOSKeychainCredentialProvider,
+)
 from .model_gateway import (
     ConsentAwarePolicy,
     LocalModelRequest,
@@ -183,15 +188,37 @@ def create_beta_api(
                     message = "云端账户余额或套餐额度不足。"
                 elif exc.status_code == 403:
                     message = "云端服务拒绝了本次请求。"
+                elif exc.status_code == 429:
+                    message = "云端请求频率受限；请稍后再试。"
+                elif exc.status_code is not None:
+                    message = (
+                        f"云端服务返回 HTTP {exc.status_code}；已停止发送，"
+                        "不会自动切换 Provider。"
+                    )
                 else:
-                    message = "云端模型请求失败；已停止发送，不会自动切换 Provider。"
+                    message = (
+                        "云端服务返回无法识别的响应；是否已计费未知，"
+                        "请先检查服务商用量记录再重试。"
+                    )
+                yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
+            except CredentialUnavailable:
+                message = "本机无法从 Keychain 读取已保存的云端凭据；未能发起云端请求。"
+                yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
+            except httpx.RequestError:
+                message = (
+                    "连接云端服务失败或超时；服务端是否收到请求无法确认，"
+                    "请先检查服务商用量记录再重试。"
+                )
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except Exception:
                 # Keep local service details and upstream error text out of the UI stream.
                 if payload.provider == "ollama":
                     message = "本机模型请求失败，请确认 Ollama 正在运行且模型已安装。"
                 else:
-                    message = "云端凭据不可用或请求失败；已停止发送，不会自动切换 Provider。"
+                    message = (
+                        "云端请求处理失败；错误详情已省略，服务端是否收到请求未知。"
+                        "请先检查服务商用量记录再重试；不会自动切换 Provider。"
+                    )
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
 
         return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
