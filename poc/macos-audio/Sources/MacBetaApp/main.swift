@@ -89,13 +89,22 @@ final class BetaChatModel {
     private(set) var voiceSeconds = 0
     var draft = ""
     var source: ModelSource {
-        didSet { defaults.set(source.rawValue, forKey: "beta.model.source") }
+        didSet {
+            defaults.set(source.rawValue, forKey: "beta.model.source")
+            if oldValue != source { modelSelectionDidChange() }
+        }
     }
     var localModel: String {
-        didSet { defaults.set(localModel, forKey: "beta.model.local") }
+        didSet {
+            defaults.set(localModel, forKey: "beta.model.local")
+            if oldValue != localModel { modelSelectionDidChange() }
+        }
     }
     var cloudProvider: CloudProvider {
-        didSet { defaults.set(cloudProvider.rawValue, forKey: "beta.model.cloud-provider") }
+        didSet {
+            defaults.set(cloudProvider.rawValue, forKey: "beta.model.cloud-provider")
+            if oldValue != cloudProvider { modelSelectionDidChange() }
+        }
     }
 
     var isStreaming: Bool { activeRequest != nil }
@@ -134,7 +143,7 @@ final class BetaChatModel {
             let localClient = try LocalAPIClient(baseURL: handshake.baseURL, token: handshake.token)
             guard try await localClient.health() else { throw LocalAPIClientError.invalidResponse }
             client = localClient
-            status = "本机服务已连接；当前模型：\(selectedModel)"
+            status = "本机服务已连接；当前模型：\(selectedProvider) / \(selectedModel)"
         } catch {
             status = "本机服务启动失败：\(error.localizedDescription)"
         }
@@ -157,7 +166,7 @@ final class BetaChatModel {
         let confirmedForThisRequest = usesCloud
         let requestID = UUID()
         activeRequestID = requestID
-        status = "正在使用\(usesCloud ? "云端" : "本地")模型生成…"
+        status = "正在使用\(usesCloud ? "云端" : "本地")模型生成：\(provider) / \(modelID)"
         activeRequest = Task { [weak self] in
             do {
                 for try await delta in client.streamChat(
@@ -175,7 +184,7 @@ final class BetaChatModel {
                     }
                 }
                 guard let self, self.activeRequestID == requestID else { return }
-                self.status = "本机服务已连接；当前模型：\(modelID)"
+                self.status = "本机服务已连接；本轮使用：\(provider) / \(modelID)"
             } catch is CancellationError {
                 guard let self, self.activeRequestID == requestID else { return }
                 self.status = "已停止本轮生成"
@@ -194,6 +203,16 @@ final class BetaChatModel {
         activeRequest = nil
         activeRequestID = nil
         status = "已停止本轮生成"
+    }
+
+    private func modelSelectionDidChange() {
+        if activeRequest != nil {
+            activeRequest?.cancel()
+            activeRequest = nil
+            activeRequestID = nil
+        }
+        guard client != nil else { return }
+        status = "本机服务已连接；当前模型：\(selectedProvider) / \(selectedModel)"
     }
 
     func startVoiceCapture() async {

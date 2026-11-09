@@ -19,7 +19,7 @@
 | 顺序 | 工作包 | 状态 | 完成条件 / 说明 |
 |---:|---|---|---|
 | B0 | 应用可运行骨架 | IN PROGRESS | 新增 SwiftUI 测试版 `.app` 构建/启动入口；本轮经启动脚本实机显示本机服务已连接，Cmd-Q 后进程检查未见 app/backend 残留。窗口关闭路径及启动失败恢复体验仍需复核。 |
-| B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或千问应用 API、DeepSeek、OpenRouter 固定路由；本地模型 ID 可配置。选择云端即持续授权后续消息发往该服务商，设置有告知且无逐条弹窗；Keychain、固定目标、L3 拦截、错误脱敏和无自动 fallback 保留。此前本机一次千问合成请求结果不明；用户随后反馈千问已可正常聊天（本轮未独立复测）。D-010 仍待决；Token Plan `sk-sp-` 个人版不直连自建应用。详见 `beta/macOS-beta-chat.md`。 |
+| B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或千问应用 API、DeepSeek、OpenRouter 固定路由；本地模型 ID 可配置。选择云端即持续授权后续消息发往该服务商，设置有告知且无逐条弹窗；Keychain、固定目标、L3 拦截、错误脱敏和无自动 fallback 保留。每次发送快照当前 Provider/模型；切换时取消旧客户端流并屏蔽迟到回调，状态栏显示当前及本轮实际路由（已构建，GUI 手动切换/请求冒烟待复核）。此前本机一次千问合成请求结果不明；用户随后反馈千问已可正常聊天（本轮未独立复测）。D-010 仍待决；Token Plan `sk-sp-` 个人版不直连自建应用。详见 `beta/macOS-beta-chat.md`。 |
 | B2 | 本地语音闭环 | IN PROGRESS | 已接入“点击才录音”的 SwiftUI 流程、30 秒内存 PCM、受认证 loopback 本机 ASR、草稿预填和手动本机朗读；构建/编译通过。尚未触发麦克风权限、做实机录音识别或 TTS 播放。用户需手动完成语音按钮、停止/取消、草稿复核及朗读冒烟。详见 `beta/macOS-beta-voice.md`。 |
 | B3 | 会话保存与恢复 | DEFERRED | 等待最小数据保留和静态加密决策；在决定前不持久化敏感对话。 |
 | B4 | 千问 Token Plan 扩展接入 | DEFERRED | 个人版条款仅允许经官方支持的编程/智能体工具扩展交互使用，排除本项目自建应用后端。只有取得允许自建应用的官方授权/套餐，或实现受支持工具扩展集成后，才能纳入应用选项。协议、地址和状态见 `beta/qwen-token-plan-integration.md`。 |

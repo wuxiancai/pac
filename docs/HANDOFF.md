@@ -509,3 +509,10 @@
 ## 交接要求
 
 后续每阶段完成或中断时更新本文件，并在报告中列修改文件、设计、测试命令与结果、未决项和验收对照。
+
+### 2026-11-09：修复模型切换后的旧请求反馈
+
+- 用户报告在模型设置切换后，当前聊天仍像是在使用旧模型。检查发现新请求会从 `selectedProvider`/`selectedModel` 获取当前值，但若切换发生在流式请求期间，旧请求仍可继续生成，且状态可能显示旧模型。
+- `poc/macos-audio/Sources/MacBetaApp/main.swift`：source、本地模型 ID 或云 Provider 变更时取消旧客户端流、清除 request ID 以忽略迟到回调，并把状态更新为当前 Provider/模型。发送和完成状态显示本轮实际 Provider/模型。
+- 验证：`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。本轮未运行测试、未启动 GUI、未发送云请求；GUI 切换和连续聊天手动复核仍待做。客户端取消不保证 Provider 服务端同步停止生成。
+- 更新 `docs/beta/macOS-beta-chat.md`、`docs/TASKS.md`。如需确认实机行为，请在模型设置中切换本地/千问/DeepSeek/OpenRouter 后观察状态栏，再分别发消息核对显示的本轮 Provider/模型；无需更改任何 Key。接续任务应从 B1 GUI 手动复核开始。
