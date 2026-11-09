@@ -564,3 +564,4 @@
 - 用户确认 ADR-020：V1 继续使用项目自有轻量 ModelGateway，不引入开源 Gateway 运行依赖；LiteLLM/Bifrost/Portkey 研究留作后续评估参考。
 - 用户确认 ADR-021：V1 本机点击触发实时 ASR，语音按钮可打断文字生成，final 入草稿；不做 AEC、自动声学插话或云 Realtime。GUI 停止后 final、取消清理和打断仍待用户实机验证。
 - 用户在最新 Beta GUI 完成三项语音冒烟并确认均通过：停止后 final 进入草稿；取消丢弃 partial、草稿不变；本地文字生成时点击语音会打断生成并开始采集。录音中退出清理、真实驱动异常、TTS 手动播放和 P95 端到端性能仍待验证。
+- 用户随后实机验证录音中 Cmd-Q：app 和 backend 均退出，重启后没有残留转写或录音。D-004 的用户可执行路径已覆盖；真实 AVAudioEngine 驱动故障仍未注入，D-013 P95 样本仍待采集。
