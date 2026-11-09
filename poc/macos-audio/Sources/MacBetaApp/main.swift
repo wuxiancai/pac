@@ -78,6 +78,7 @@ final class BetaChatModel {
     private var client: LocalAPIClient?
     private var activeRequest: Task<Void, Never>?
     private var activeRequestID: UUID?
+    private var lastAssistantResponseInterrupted = false
     private let microphone = LocalMicrophoneCapture()
     private let speechPlayback = SpeechPlaybackController(engine: AVSpeechEngine())
     private var voiceTimerTask: Task<Void, Never>?
@@ -126,7 +127,8 @@ final class BetaChatModel {
     var latestAssistantText: String? {
         guard let message = messages.last, message.role == "assistant",
               !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              activeRequest == nil
+              activeRequest == nil,
+              !lastAssistantResponseInterrupted
         else { return nil }
         return message.content
     }
@@ -167,7 +169,12 @@ final class BetaChatModel {
         draft = ""
         messages.append(LocalChatMessage(role: "user", content: text))
         messages.append(LocalChatMessage(role: "assistant", content: ""))
-        let context = nonemptyMessages(Array(messages.dropLast()))
+        var contextMessages = Array(messages.dropLast())
+        if lastAssistantResponseInterrupted, contextMessages.last?.role == "assistant" {
+            contextMessages.removeLast()
+        }
+        lastAssistantResponseInterrupted = false
+        let context = nonemptyMessages(contextMessages)
         let provider = selectedProvider
         let modelID = selectedModel
         let confirmedForThisRequest = usesCloud
@@ -206,14 +213,21 @@ final class BetaChatModel {
     }
 
     func stop() {
+        let interrupted = activeRequest != nil
         activeRequest?.cancel()
         activeRequest = nil
         activeRequestID = nil
+        if interrupted, messages.last?.role == "assistant" {
+            lastAssistantResponseInterrupted = true
+        }
         status = "已停止本轮生成"
     }
 
     private func modelSelectionDidChange() {
         if activeRequest != nil {
+            if messages.last?.role == "assistant" {
+                lastAssistantResponseInterrupted = true
+            }
             activeRequest?.cancel()
             activeRequest = nil
             activeRequestID = nil

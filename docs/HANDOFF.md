@@ -533,3 +533,9 @@
 - 根因已定位：`backend/pyproject.toml` 仅依赖 `uvicorn==0.54.0`，环境里没有 `websockets` 或 `wsproto`，Uvicorn 无法接收 WebSocket Upgrade。`websockets` 当前版本资料列出 17.4（BSD-3-Clause），Uvicorn 官方安装说明指出安装 `websockets` 后默认使用它处理 WebSocket；见 [Uvicorn installation](https://uvicorn.dev/installation/) 与 [websockets on PyPI](https://pypi.org/project/websockets/)。
 - 锁定 `websockets==17.4` 并通过 `uv sync --locked --all-extras --all-groups` 安装，同时恢复所有项目 extras。运行时检查显示 `WebSocketsSansIOProtocol`。正常重启空白 Beta 实例，GUI 已显示新控件且本机服务已连接；没有再次开启麦克风。当前真实语音握手/partial/final 仍待用户复试。
 - 更新 `docs/beta/macOS-beta-voice.md`、`docs/TASKS.md`。下一步请用户再点“语音输入”说一句不含敏感信息的话，确认系统权限后 UI 是否显示录音计时和 partial；停止后确认 final 写入草稿。若仍失败，回报状态栏完整错误文本；不要重复连续录音。
+
+### 2026-11-09：确认实时 partial 并完善打断语义
+
+- 用户确认语音输入时能在控件右侧看到正在说的话的文字，证明依赖修复后的实时 partial 已在 GUI 工作。final 在停止后是否稳定写入草稿、取消丢弃和生成中点击打断尚未反馈。
+- 为避免把被打断的回复当作完整上下文，`BetaChatModel` 现在保留部分回答供界面查看，但将其从下一次模型请求的消息历史中排除，并禁用对该部分回答的本机朗读。正常模型切换取消在途请求时也适用。
+- `swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；未运行测试或启动麦克风。新二进制已经构建，但运行中的应用需重启后才载入上下文处理改动。下一步请在保存必要草稿后重启，测试“停止并识别”后 final 进入草稿，再在文字生成中点“打断并语音输入”；不需要切换 Provider 或发送云请求。
