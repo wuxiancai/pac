@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from collections.abc import AsyncIterator, Mapping
+from pathlib import Path
 from time import time
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -41,6 +43,7 @@ from .security_poc import (
     OutboundPolicy,
     create_local_api,
 )
+from .voice_transcription import LocalVoiceTranscriber
 
 
 BETA_MODEL = "qwen3.5:0.8b"
@@ -48,6 +51,13 @@ BETA_SOURCE = "beta-gui-chat"
 MAX_MESSAGES = 20
 MAX_MESSAGE_CHARS = 16_000
 MAX_CONTEXT_CHARS = 40_000
+MAX_VOICE_PCM_BYTES = 960_000  # 30 seconds of 16 kHz mono PCM16
+VOICE_MODEL_DIR = (
+    Path(__file__).resolve().parent.parent
+    / ".poc-data"
+    / "models"
+    / "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20"
+)
 
 
 class ChatMessage(BaseModel):
@@ -103,7 +113,34 @@ def create_beta_api(
         )
         for provider, config in CLOUD_PROVIDERS.items()
     }
+    voice_transcriber = LocalVoiceTranscriber(VOICE_MODEL_DIR)
     router = APIRouter()
+
+    @router.post("/voice/transcribe")
+    async def transcribe_voice(request: Request) -> dict[str, str]:
+        if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/octet-stream":
+            raise HTTPException(status_code=415, detail="expected in-memory PCM audio")
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                if int(content_length) > MAX_VOICE_PCM_BYTES:
+                    raise HTTPException(status_code=413, detail="audio exceeds 30 seconds")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="invalid content length") from None
+        pcm = await request.body()
+        if not pcm or len(pcm) % 2:
+            raise HTTPException(status_code=422, detail="audio must be non-empty PCM16LE")
+        if len(pcm) > MAX_VOICE_PCM_BYTES:
+            raise HTTPException(status_code=413, detail="audio exceeds 30 seconds")
+        try:
+            text = await asyncio.to_thread(voice_transcriber.transcribe_pcm16le, pcm)
+        except FileNotFoundError:
+            raise HTTPException(status_code=503, detail="本机双语语音模型尚未安装") from None
+        except RuntimeError:
+            raise HTTPException(status_code=503, detail="本机语音识别当前不可用") from None
+        if not text.strip():
+            raise HTTPException(status_code=422, detail="本次录音未识别到语音")
+        return {"text": text}
 
     def gateway_for(payload: StreamChatRequest) -> ModelGateway:
         if payload.provider == "ollama":

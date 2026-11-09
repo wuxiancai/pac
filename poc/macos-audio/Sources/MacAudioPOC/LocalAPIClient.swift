@@ -61,6 +61,35 @@ public final class LocalAPIClient: @unchecked Sendable {
         return value.status == "ok"
     }
 
+    public func transcribeVoice(pcm16LE: Data) async throws -> String {
+        guard !pcm16LE.isEmpty, pcm16LE.count <= 960_000, pcm16LE.count.isMultiple(of: 2) else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard let url = URL(string: "/voice/transcribe", relativeTo: baseURL)?.absoluteURL else {
+            throw LocalAPIClientError.invalidEndpoint
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = pcm16LE
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard httpResponse.statusCode == 200 else {
+            throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+        guard let value = try? JSONDecoder().decode(VoiceTranscriptionResponse.self, from: data),
+              !value.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        return value.text
+    }
+
     public func streamChat(
         messages: [LocalChatMessage],
         provider: String = "ollama",
@@ -155,6 +184,10 @@ public struct LocalAPIStreamError: Error, LocalizedError {
 
 private struct HealthResponse: Decodable {
     let status: String
+}
+
+private struct VoiceTranscriptionResponse: Decodable {
+    let text: String
 }
 
 private final class LocalOnlyURLSessionDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

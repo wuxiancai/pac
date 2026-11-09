@@ -19,6 +19,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <key>CFBundleName</key><string>个人 AI 助理测试版</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>NSMicrophoneUsageDescription</key><string>仅在你点击“语音输入”后采集最多 30 秒音频，并在本机识别；音频不会写入文件或发送到云端。</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST

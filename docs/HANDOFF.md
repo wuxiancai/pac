@@ -1,3 +1,12 @@
+### 2026-11-09：接入 B2 本机语音首个切片
+
+- 用户反馈千问已可正常聊天；本仓库没有该次成功响应或 usage 证据。按测试版队列开始 B2。
+- 新增 Swift `LocalMicrophoneCapture`：只在按钮调用时请求系统麦克风权限，AVAudioEngine 转为 16 kHz 单声道 PCM16LE，最多保留 30 秒；取消/关窗丢弃，停止后经认证 loopback `POST /voice/transcribe` 发给本机 sherpa-onnx 双语 Streaming Zipformer。识别文本只进入草稿，用户还需单独按发送；无自动云 ASR。assistant 完整回复提供手动本机朗读和停止按钮。Beta Info.plist 增加麦克风用途说明。
+- 新增 `backend/pac_poc/voice_transcription.py` 和本机 endpoint；请求体强制 octet-stream、PCM16LE、≤960,000 bytes，模型 lazy-load，原音频不写盘/日志。缺模型或 ASR 错误会显式失败，不切换云端。
+- 验证：`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功；`backend/` 下 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python -m compileall -q pac_poc` 成功；`scripts/run_beta_app.sh` 构建启动成功；读回 Info.plist 权限文案；GUI Accessibility 树确认“语音输入”按钮可见。没有点击录音按钮，未请求麦克风权限/采集/朗读，未运行测试。
+- 新增 `docs/beta/macOS-beta-voice.md`，更新 `PROJECT_CONTEXT.md`、`TASKS.md` 和 B1 聊天报告。当前 app 模型选择为 OpenRouter（Global）；转写仅在草稿，任何发送前需用户检查并选择目标。
+- 下一步需用户在应用点击“语音输入”，按系统提示授权并说一条不含敏感信息的短句；停止后确认草稿转写，再手动朗读 assistant 回复。真实录音质量、停止/取消与 TTS 尚未验证。双语模型来源/训练数据权利链仍待核，当前仅单机 Beta 使用。
+
 ### 2026-11-09：千问 Beta 合成请求失败待诊断
 
 - 用户确认新千问 API Key 已在测试版保存。模型设置页显示 `已保存（qwen-app）`，GUI 当前选择千问应用 API、中国区、`qwen3.8-flash`。

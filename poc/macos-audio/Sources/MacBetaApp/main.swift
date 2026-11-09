@@ -78,9 +78,15 @@ final class BetaChatModel {
     private var client: LocalAPIClient?
     private var activeRequest: Task<Void, Never>?
     private var activeRequestID: UUID?
+    private let microphone = LocalMicrophoneCapture()
+    private let speechPlayback = SpeechPlaybackController(engine: AVSpeechEngine())
+    private var voiceTimerTask: Task<Void, Never>?
     private let defaults = UserDefaults.standard
     private(set) var status = "正在连接本机服务…"
     private(set) var messages: [LocalChatMessage] = []
+    private(set) var isRecordingVoice = false
+    private(set) var isTranscribingVoice = false
+    private(set) var voiceSeconds = 0
     var draft = ""
     var source: ModelSource {
         didSet { defaults.set(source.rawValue, forKey: "beta.model.source") }
@@ -93,11 +99,21 @@ final class BetaChatModel {
     }
 
     var isStreaming: Bool { activeRequest != nil }
+    var canStartVoiceCapture: Bool {
+        client != nil && activeRequest == nil && !isRecordingVoice && !isTranscribingVoice
+    }
     var usesCloud: Bool { source == .cloud }
     var selectedProvider: String { usesCloud ? cloudProvider.rawValue : "ollama" }
     var selectedModel: String { usesCloud ? cloudProvider.model : localModel }
     var selectedRegion: String { usesCloud ? cloudProvider.region : "仅本机" }
     var selectedModelTitle: String { usesCloud ? cloudProvider.title : "Ollama 本地模型" }
+    var latestAssistantText: String? {
+        guard let message = messages.last, message.role == "assistant",
+              !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              activeRequest == nil
+        else { return nil }
+        return message.content
+    }
     init(configuration: BackendLifecycleConfiguration) {
         source = ModelSource(rawValue: defaults.string(forKey: "beta.model.source") ?? "local") ?? .local
         localModel = defaults.string(forKey: "beta.model.local") ?? "qwen3.5:0.8b"
@@ -125,7 +141,7 @@ final class BetaChatModel {
     }
 
     func send() {
-        guard activeRequest == nil, let client else { return }
+        guard activeRequest == nil, !isRecordingVoice, !isTranscribingVoice, let client else { return }
         guard !selectedModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             status = "请先在模型设置中选择模型。"
             return
@@ -180,11 +196,96 @@ final class BetaChatModel {
         status = "已停止本轮生成"
     }
 
+    func startVoiceCapture() async {
+        guard client != nil, activeRequest == nil, !isRecordingVoice, !isTranscribingVoice else { return }
+        status = "正在请求麦克风权限…"
+        do {
+            try await microphone.start()
+            isRecordingVoice = true
+            voiceSeconds = 0
+            status = "本机录音中；音频只暂存在内存，最长 30 秒。"
+            voiceTimerTask?.cancel()
+            voiceTimerTask = Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    guard let self, self.isRecordingVoice else { return }
+                    self.voiceSeconds += 1
+                    if self.voiceSeconds >= LocalMicrophoneCapture.maximumDurationSeconds {
+                        await self.finishVoiceCapture()
+                        return
+                    }
+                }
+            }
+        } catch {
+            microphone.discard()
+            status = error.localizedDescription
+        }
+    }
+
+    func finishVoiceCapture() async {
+        guard isRecordingVoice else { return }
+        voiceTimerTask?.cancel()
+        voiceTimerTask = nil
+        isRecordingVoice = false
+        guard let client else {
+            microphone.discard()
+            status = "本机服务已断开；录音已丢弃。"
+            return
+        }
+
+        isTranscribingVoice = true
+        status = "正在本机识别；音频不会发送到云端…"
+        do {
+            var pcm = try microphone.finish()
+            defer { if !pcm.isEmpty { pcm.resetBytes(in: 0..<pcm.count) } }
+            let transcript = try await client.transcribeVoice(pcm16LE: pcm)
+            let existing = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+            draft = existing.isEmpty ? transcript : existing + "\n" + transcript
+            status = "本机识别完成；转写已放入输入框，请检查后发送。"
+        } catch LocalAPIClientError.requestFailed(let statusCode) where statusCode == 422 {
+            status = "本次录音未识别到语音；音频已丢弃，请重试。"
+        } catch LocalAPIClientError.requestFailed(let statusCode) where statusCode == 503 {
+            status = "本机语音模型不可用；录音已丢弃，没有切换到云端。"
+        } catch {
+            microphone.discard()
+            status = "本机语音识别失败；录音已丢弃，没有切换到云端。"
+        }
+        isTranscribingVoice = false
+    }
+
+    func cancelVoiceCapture() {
+        guard isRecordingVoice else { return }
+        voiceTimerTask?.cancel()
+        voiceTimerTask = nil
+        isRecordingVoice = false
+        microphone.discard()
+        status = "录音已取消并丢弃。"
+    }
+
+    func speakLocally(_ text: String) {
+        guard !speechPlayback.speak(text) else {
+            status = "正在本机朗读回复。"
+            return
+        }
+        status = "没有可朗读的回复。"
+    }
+
+    func stopLocalSpeech() {
+        if speechPlayback.interrupt() {
+            status = "已停止本机朗读。"
+        }
+    }
+
     private func nonemptyMessages(_ values: [LocalChatMessage]) -> [LocalChatMessage] {
         values.filter { $0.role != "assistant" || !$0.content.isEmpty }
     }
 
     func shutdown() async {
+        voiceTimerTask?.cancel()
+        voiceTimerTask = nil
+        isRecordingVoice = false
+        microphone.discard()
+        stopLocalSpeech()
         activeRequest?.cancel()
         activeRequest = nil
         activeRequestID = nil
@@ -240,8 +341,34 @@ private struct BetaChatView: View {
                         }
                         ForEach(Array(model.messages.enumerated()), id: \.offset) { index, message in
                             HStack(alignment: .top) {
-                                if message.role == "assistant" { responseBubble(message.content) }
-                                else { Spacer(minLength: 80); userBubble(message.content) }
+                                if message.role == "assistant" {
+                                    responseBubble(message.content)
+                                    if index == model.messages.count - 1,
+                                       model.latestAssistantText == message.content {
+                                        VStack(spacing: 6) {
+                                            Button {
+                                                model.speakLocally(message.content)
+                                            } label: {
+                                                Image(systemName: "speaker.wave.2")
+                                            }
+                                            .accessibilityLabel("本机朗读回复")
+                                            .accessibilityIdentifier("local-speech-play-button")
+                                            .help("在本机朗读最新回复")
+                                            Button {
+                                                model.stopLocalSpeech()
+                                            } label: {
+                                                Image(systemName: "stop.fill")
+                                            }
+                                            .accessibilityLabel("停止本机朗读")
+                                            .accessibilityIdentifier("local-speech-stop-button")
+                                            .help("停止本机朗读")
+                                        }
+                                        .buttonStyle(.borderless)
+                                    }
+                                } else {
+                                    Spacer(minLength: 80)
+                                    userBubble(message.content)
+                                }
                             }
                             .id(index)
                         }
@@ -259,13 +386,44 @@ private struct BetaChatView: View {
                     .lineLimit(1...5)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(requestSend)
+                if model.isRecordingVoice {
+                    VStack(spacing: 4) {
+                        Text("本机录音 \(model.voiceSeconds)/30 秒")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack {
+                            Button("取消并丢弃") { model.cancelVoiceCapture() }
+                                .accessibilityIdentifier("voice-cancel-button")
+                            Button("停止并识别") {
+                                Task { await model.finishVoiceCapture() }
+                            }
+                            .accessibilityIdentifier("voice-stop-transcribe-button")
+                        }
+                    }
+                } else if model.isTranscribingVoice {
+                    ProgressView("本机识别…")
+                        .controlSize(.small)
+                } else {
+                    Button {
+                        Task { await model.startVoiceCapture() }
+                    } label: {
+                        Label("语音输入", systemImage: "mic")
+                    }
+                    .accessibilityIdentifier("voice-input-button")
+                    .disabled(!model.canStartVoiceCapture)
+                    .help("点击后才开始麦克风采集；音频最多保留在内存 30 秒")
+                }
                 if model.isStreaming {
                     Button("停止", action: model.stop)
                         .keyboardShortcut(.cancelAction)
                 } else {
                     Button("发送", action: requestSend)
                         .keyboardShortcut(.return, modifiers: .command)
-                        .disabled(model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(
+                            model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                || model.isRecordingVoice
+                                || model.isTranscribingVoice
+                        )
                 }
             }
             .padding()
