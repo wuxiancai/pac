@@ -549,3 +549,4 @@
 - 用户已确认当前 MacBook Air M1/16 GiB 为主力设备，最低系统 macOS 14.0；据此将 D-001/D-002 标为 Accepted，并记录与 Beta `LSMinimumSystemVersion` 一致。
 - POC-01 实时 streaming 代码增加 seam 注入 `BetaVoiceTranscriber`，自动覆盖 WebSocket token、协议、PCM frame sequence、partial/final/ended 顺序、坏序号拒绝和清理；ASR `finish()` 覆盖 endpoint flush 及 endpoint 缺失时 partial 晋升 final。窄回归 `tests/test_beta_api.py tests/test_local_streaming_asr.py` 当前 13 项通过（Starlette TestClient 有 deprecation warning），随后应跑全量回归。
 - 上述实时语音改动后 Python 全量回归 174 passed（1 条 Starlette TestClient/httpx deprecation warning），Swift `swift test --package-path poc/macos-audio` 31 tests passed。依赖 SBOM 已按最新 `backend/uv.lock` 重生成，55 个非根依赖的 name/version 与 CycloneDX 1.5 BOM 完全匹配；新 SHA 见 `phase0-python-sbom.md`。
+- 用户已确认 D-003：不保存对话、安全日志保留 30 天、临时会话/音频缓存退出或中断时清理、不备份对话。决策记录与 Beta 范围说明已更新；当前没有持久安全日志，启用写盘前需落实 30 天清理和排除正文/凭据/音频的 metadata-only 约束。
