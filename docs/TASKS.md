@@ -20,7 +20,7 @@
 
 | 顺序 | 工作包 | 状态 | 完成条件 / 说明 |
 |---:|---|---|---|
-| B0 | 应用可运行骨架 | IN PROGRESS | SwiftUI 测试版 `.app` 构建/启动入口已实现；启动失败时显示按错误类型区分的中文提示并提供“重试连接”。supervisor 启动/停止/状态读取现由生命周期锁串行化，新增握手未完成时停止的回归。2026-11-09 GUI 已实测：故意返回无效握手时显示中文提示和重试按钮，替换为本机 health fixture 后点击重试连接成功；Cmd-Q 退出后无 app/backend 残留。点窗口关闭时自动出现新的 WindowGroup 窗口并重新连接，无法据此区分 onDisappear 清理与新窗口重启，最后窗口关闭的清理语义仍待确定/复核。 |
+| B0 | 应用可运行骨架 | DONE | SwiftUI `.app` 可由仓库脚本构建启动；本机服务启动失败时按错误类型显示中文提示并可重试；supervisor 对启动/停止/状态读取串行化并覆盖启动中停止。GUI 故意返回无效握手后，替换为本机 health fixture 并点击重试成功；真实本机服务启动连接成功；单窗口关闭后 app 与 backend 均退出且无残留。 |
 | B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或千问应用 API、DeepSeek、OpenRouter 固定路由；本地模型 ID 可配置。选择云端即持续授权后续消息发往该服务商，设置有告知且无逐条弹窗；Keychain、固定目标、L3 拦截、错误脱敏和无自动 fallback 保留。每次发送快照当前 Provider/模型；切换时取消旧客户端流并屏蔽迟到回调，状态栏显示当前及本轮实际路由；用户已实机确认模型间可自由切换，切换后当前聊天使用新选择。用户反馈千问现可正常聊天，旧的一次合成探测失败不再代表当前状态。2026-11-09 已在当前 GUI 本机 Ollama 流式生成中点击停止，状态正确变为“已停止本轮生成”，没有云出站；Provider 侧停止/费用语义另行按供应商实测。D-005 已定自然月 100 元预算/80 元提醒/100 元硬拦截，Beta 尚无费用归一或限额实现，不能作为当前保护承诺；D-010 已确认 V1 Provider 范围为默认千问应用 API、另支持 DeepSeek（中国）与 OpenRouter（Global）；Token Plan `sk-sp-` 个人版不直连自建应用。详见 `beta/macOS-beta-chat.md`。 |
 | B2 | 本地语音闭环 | IN PROGRESS | 已扩展为受认证 loopback WebSocket 本机实时 ASR：200 ms PCM 帧、有界队列、临时 partial、停止后 final 入草稿；用户曾验证 final、取消、文字生成时打断、录音中 Cmd-Q 清理。GUI 曾在停止时断开 socket、随后的第二次录音报 ASR 忙（partial n=2、停止→final n=0）。根因已查明：`LocalVoiceTranscriber.end_stream()`/`abort_stream()` 调用不存在的 `LocalStreamingASR.reset()`，清理再次异常使 WebSocket finally 跳过锁释放。现改为重置底层 recognizer，并在清理异常时仍释放会话锁。真实 Uvicorn + 项目本机 ASR 模型连续 3 轮 PCM 流式识别均收到 partial/final/ended；Python 全量 183 项通过（1 条既有 Starlette/httpx 弃用警告）；Apple URLSessionWebSocketTask + 真实 Uvicorn + 本机 sherpa-onnx 模型 + 固定 PCM WAV 连续 3 轮均收到 partial/final/ended。用户已确认 GUI 实时语音故障修复。启动面板单位错误已定位并修复：秒值遗漏乘以 1,000。用户提供的 20 个启动值换算为 500–700 ms，nearest-rank P95=700 ms，低于 5 秒门槛，启动采样计划已完成；partial 更新 216 次、22 个窗口 P95 摘要最高 41.5 ms；停止→final 21 次 pooled P95 97.9 ms、最大 99.9 ms。三项性能均已满足门槛；D-013 启动 20 个样本计划已完成。模型报告已通过本机 SHA-256 将双语 Zipformer 与 Qwen ONNX 权重精确对应到公开模型 revision；模型训练数据、Qwen 转换代码/工件和随包音频许可仍开放。详见 `beta/macOS-beta-voice.md` 与 `poc/phase0-model-license-review.md`。 |
 | B3 | 会话保存与恢复 | DEFERRED | D-003 已决定不保存对话，D-006 确认 V1 不提供备份/恢复，D-007 确认 V1 不设 app 数据库，D-008 确认不支持外接盘活动数据目录；持久化仍不在当前范围。若未来恢复会话保存，须先重开 ADR-019、完成加密/migration/备份及介质决策和验证。 |
@@ -35,7 +35,7 @@
 
 0. **阶段 1 工程底座（DONE，当前决策范围）**：Loopback API trace、统一错误、依赖注入、最小 health、集中配置和可注入进程启动设置均完成；云凭据保存/删除需 Touch ID 或设备密码 gate。Ruff、mypy、secret scan、锁文件、Python/Swift 测试进入 CI。数据库/迁移/会话持久化/静态加密和 metadata-only 30 天审计日志明确未实现，按 D-003/D-007 触发条件延期；因此这不是规格书完整 V1 持久化底座验收。
 
-1. **B0 应用可运行骨架**：基于现有 SwiftUI lifecycle demo，形成开发者可重复启动的单用户 app 入口；本机后端启动、健康状态、错误提示和退出清理纳入该闭环。
+1. **B0 应用可运行骨架（DONE）**：SwiftUI 单实例窗口的本机 Beta 入口已完成；本机后端启动、健康状态、错误恢复和关窗退出清理均已验证。
 2. **B1 本机文字对话和模型设置**：本机 Ollama/固定云端配置选择；选中云端 Provider 后持续授权，聊天时不弹逐条确认；Keychain 凭据和无自动 fallback；完成设置 UI 手动复核及 API Key/错误路径验证。
 3. **B2 本地语音**：接入本机实时 Streaming ASR、明确点击才采集、有限内存/队列、partial/final 草稿边界和按键打断；识别失败不得转云。完整双向语音、AEC、自动插话和系统生命周期仍需阶段 3 决策与验证。
 4. 后续再按用户实际使用反馈决定会话持久化；D-014 确认 V1 不提供长期记忆/Embedding，D-015 确认 V1 不提供 app 数据导出。文件导入已由 D-012 纳入 V1 范围（TXT/Markdown/PDF，10 MB），需先通过安全 POC 再启用。备份/恢复按 D-006 不在 V1。B4 千问 Token Plan 文本/实时语音仍须符合个人版条款及 Consent/Policy，不接入自建应用路径。

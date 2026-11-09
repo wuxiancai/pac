@@ -57,7 +57,7 @@ struct PersonalAssistantBetaApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("个人 AI 助理测试版") {
+        Window("个人 AI 助理测试版", id: "main") {
             if let model {
                 BetaChatView(model: model)
                     .frame(minWidth: 700, minHeight: 540)
