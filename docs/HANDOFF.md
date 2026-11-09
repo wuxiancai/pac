@@ -1,5 +1,11 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 2 B1 Swift SSE 错误事件解码回归（2026-11-09）
+
+- Swift 客户端新增 URLProtocol 流 fixture，返回 HTTP 200 的 SSE `error` 事件；确认 `streamChat` 转成 `LocalAPIStreamError`，localizedDescription 保留服务端已经脱敏的 Ollama 提示，便于 UI 展示。
+- 验证：`swift test --package-path poc/macos-audio` → 38 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；`git diff --check` 通过。未触碰当前运行 GUI 会话。
+- 客户端错误解码链路已自动覆盖；状态文字在 Beta 界面里的实机可见性仍需在不打扰现有云端会话的测试窗口确认。
+
 ## 阶段 2 B1 本机模型错误映射 API 回归（2026-11-09）
 
 - 新增 fake local adapter 错误回归：本机 stream 抛出模拟内部异常时，SSE 返回 Ollama 操作提示且不回显内部异常；UsageLedger 将 run 记为 failed，token 和费用保持 unknown；adapter 调用一次，不切云端。

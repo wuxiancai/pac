@@ -21,6 +21,28 @@ private final class ErrorResponseURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class SSEErrorURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "text/event-stream"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        let event = Data(
+            "data: {\"error\":\"本机模型请求失败，请确认 Ollama 正在运行且模型已安装\"}\n\n".utf8
+        )
+        client?.urlProtocol(self, didLoad: event)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 @available(macOS 12.0, *)
 @Test func localAPIClientBuildsAuthenticatedLoopbackRequest() throws {
     let client = try LocalAPIClient(
@@ -63,6 +85,27 @@ private final class ErrorResponseURLProtocol: URLProtocol {
     } catch let error as LocalAPIClientError {
         #expect(error == .requestFailed(statusCode: 503))
         #expect(!error.localizedDescription.contains("secret-response-body"))
+    }
+}
+
+@available(macOS 12.0, *)
+@Test func chatStreamPreservesSanitizedServerSSEError() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [SSEErrorURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43127")!,
+        token: "test-token",
+        sessionConfiguration: configuration
+    )
+
+    do {
+        for try await _ in client.streamChat(
+            messages: [LocalChatMessage(role: "user", content: "test")]
+        ) {}
+        Issue.record("Expected the SSE error event")
+    } catch let error as LocalAPIStreamError {
+        #expect(error.message == "本机模型请求失败，请确认 Ollama 正在运行且模型已安装")
+        #expect(error.localizedDescription == error.message)
     }
 }
 

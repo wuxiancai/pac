@@ -25,6 +25,8 @@
 
 ## 验证记录
 
+- 2026-11-09 Swift SSE error 事件回归：fake URLProtocol 返回 HTTP 200 加本机安全错误 SSE event，`LocalAPIClient.streamChat` 抛出 `LocalAPIStreamError`，错误说明与事件一致。Swift 全量 38 passed；Beta target build 通过。此为客户端流解码测试，不代表 GUI 上状态文字已实机呈现。
+
 - 2026-11-09 云端错误映射服务端回归：fake DeepSeek adapter 参数化注入 HTTP 401/402/403/429/503，检查 SSE 只含分类提示、不回显 adapter 错误内容，run 最终状态为 FAILED，adapter 只调用一次且无 fallback。`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --group dev pytest -q tests/test_beta_api.py -k cloud_provider_errors_are_sanitized_and_never_fallback` → 5 passed；后端全量 238 passed。没有真实云请求或 Keychain 访问。该测试只覆盖 API/SSE；GUI 文案仍需实机确认。
 - 2026-11-09 本机 Provider 错误映射服务端回归：fake Ollama adapter 抛出模拟内部异常，SSE 显示检查 Ollama/模型的提示，不回显异常细节；run 记录为 failed，usage/cost 仍为 unknown，无云 fallback。与云错误合并的定向回归 6 passed；后端全量 239 passed。仅在运行中的 GUI 观察到云端会话和后端已连接；没有切换设置、发消息或修改会话，GUI 错误消息实机验收待后续。
 
