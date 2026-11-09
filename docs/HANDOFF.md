@@ -1,3 +1,10 @@
+# 2026-11-09：将 PDF POC 自动回归纳入 CI
+
+- 检查发现 GitHub Actions 安装 `phase0-security` 和 `phase0-embedding`，但没有安装 `phase4-pdf-poc`；因此 `tests/test_pdf_import_poc.py` 会因 `pytest.importorskip("pypdf")` 整个跳过，CI 未覆盖已存在的 PDF 隔离解析回归。
+- `.github/workflows/ci.yml` 现显式安装 `phase4-pdf-poc`。`docs/beta/file-import.md` 和 `docs/TASKS.md` 已记录：CI 会执行 POC 测试，但 PDF 仍禁用，硬内存隔离、恶意 PDF 语料及真实压力/超时测试缺口不变。
+- 验证：在 `backend/` 执行 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra phase4-pdf-poc --group dev pytest -q tests/test_pdf_import_poc.py` → 5 passed；`UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 239 passed，1 条既有 Starlette/httpx 弃用警告。远端 GitHub Actions 尚未运行当前提交。
+- 下一步继续处理阶段 2 可本地闭环工作；B1 的 UI 错误呈现仍需干净 Beta 会话手动验收，B5 的 GUI 文件选择/移除/聊天引用也待手动冒烟。PDF 不能因这些自动测试通过而启用。
+
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
 ## 阶段 4 B5 Swift 文件导入请求契约回归（2026-11-09）
