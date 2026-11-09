@@ -9,7 +9,7 @@ from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic, time
-from typing import Literal, Protocol
+from typing import Any, Callable, Literal, Protocol
 from uuid import UUID
 
 import httpx
@@ -194,6 +194,19 @@ async def _stream_with_keepalives(
             await close()
 
 
+async def _run_voice_worker(function: Callable[..., Any], *args: Any) -> Any:
+    """Wait for a blocking ASR call to finish before cancellation cleanup proceeds."""
+    worker = asyncio.create_task(asyncio.to_thread(function, *args))
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        try:
+            await worker
+        except Exception:
+            pass
+        raise
+
+
 @dataclass(frozen=True)
 class BetaAPIDependencies:
     """Explicit composition inputs for the in-memory beta application factory."""
@@ -320,8 +333,8 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 await websocket.send_json({"type": "error", "message": "不支持的本机语音格式"})
                 await websocket.close(code=1008)
                 return
-            await asyncio.to_thread(voice_transcriber.begin_stream)
             started = True
+            await _run_voice_worker(voice_transcriber.begin_stream)
             await websocket.send_json({"type": "ready"})
             while True:
                 message = await websocket.receive()
@@ -347,7 +360,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                         })
                         await websocket.close(code=1008)
                         break
-                    event = await asyncio.to_thread(
+                    event = await _run_voice_worker(
                         voice_transcriber.accept_stream_frame, pcm, sequence
                     )
                     sequence += 1
@@ -365,7 +378,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     except json.JSONDecodeError:
                         command = {}
                     if command == {"type": "end"}:
-                        event = await asyncio.to_thread(voice_transcriber.end_stream, sequence)
+                        event = await _run_voice_worker(voice_transcriber.end_stream, sequence)
                         if event is not None:
                             await websocket.send_json({
                                 "type": "final",
@@ -374,7 +387,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                                 "revision_id": event.revision_id,
                             })
                         if started:
-                            await asyncio.to_thread(voice_transcriber.abort_stream)
+                            await _run_voice_worker(voice_transcriber.abort_stream)
                             started = False
                         voice_stream_lock.release()
                         lock_acquired = False
@@ -382,7 +395,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                         break
                     if command == {"type": "abort"}:
                         if started:
-                            await asyncio.to_thread(voice_transcriber.abort_stream)
+                            await _run_voice_worker(voice_transcriber.abort_stream)
                             started = False
                         if lock_acquired:
                             voice_stream_lock.release()
@@ -415,7 +428,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         finally:
             try:
                 if started:
-                    await asyncio.to_thread(voice_transcriber.abort_stream)
+                    await _run_voice_worker(voice_transcriber.abort_stream)
             finally:
                 if lock_acquired:
                     voice_stream_lock.release()

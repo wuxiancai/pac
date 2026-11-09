@@ -6,7 +6,7 @@
 
 - 录音只由聊天页的“语音输入”按钮启动。点击后才请求 macOS 麦克风权限；应用启动时不请求、不采集。
 - Swift `AVAudioEngine` 在内存中采集并转换为 16 kHz 单声道 PCM16LE。最多缓存 30 秒（960,000 字节）；“取消并丢弃”清空缓冲，应用关闭时停止并丢弃正在录制的缓冲。
-- 麦克风回调把转换后的 PCM 按 200 毫秒帧经带随机 Bearer token 的 loopback WebSocket `/voice/stream` 送到同机 FastAPI。协议固定 16 kHz、单声道、PCM16LE，并带单调帧序号；帧串行发送、队列有界、服务端限制单帧与 30 秒总量，同一时刻只允许一个识别会话。识别器使用本机 sherpa-onnx 双语 Streaming Zipformer；音频只在内存和 loopback 传输，不写文件、不出云。
+- 麦克风回调把转换后的 PCM 按 200 毫秒帧经带随机 Bearer token 的 loopback WebSocket `/voice/stream` 送到同机 FastAPI。协议固定 16 kHz、单声道、PCM16LE，并带单调帧序号；帧串行发送、队列有界、服务端限制单帧与 30 秒总量，同一时刻只允许一个识别会话；WebSocket 断连/取消若发生在阻塞式 ASR 调用期间，会等待该线程调用结束后再执行 abort 和释放会话锁，避免并行清理或新会话与旧识别器竞争。识别器使用本机 sherpa-onnx 双语 Streaming Zipformer；音频只在内存和 loopback 传输，不写文件、不出云。
 - 录音时 ASR partial 只临时显示在输入区旁，不进入消息或草稿；端点 final 暂存在当前语音会话，用户点“停止并识别”后才合并到草稿。不会自动发送，发送仍由用户单独操作，并遵循当时模型设置的 Provider。识别错误/队列溢出会丢弃未完成转写，不尝试云 ASR。
 - 文字模型正在生成时，点“打断并语音输入”先取消当前文字流，再开始本机采集和实时识别。该交互式按键打断不等于全双工声学插话。
 - 被打断的 assistant 部分回复保留在界面供查看，但会从下一次模型请求上下文排除，也不能作为“完整回复”启动本机朗读。
@@ -14,6 +14,8 @@
 - Beta `.app` Info.plist 已设置 `NSMicrophoneUsageDescription`，说明采集触发方式、30 秒上限、本机处理和不上传边界。
 
 ## 当前验证
+
+- **2026-11-09 取消期间 ASR 线程清理**：请求协程被取消时，`asyncio.to_thread` 内的同步 ASR 调用不能被强制中止；现在先等待该调用结束，再执行 abort 与锁释放。新增线程阻塞期间取消的回归，验证清理不会越过仍在运行的 worker。后端全量 250 项通过，1 条既有 Starlette/httpx 弃用警告；此自动化测试不替代真实麦克风驱动故障注入。
 
 - **2026-11-09 快速重连根因及修复**：用户 GUI 报第一次停止后 socket 断开，第二次服务端 busy（partial n=2、停止→final n=0）。在真实 Uvicorn WebSocket + 项目本机 ASR 模型上复现停止路径 `AttributeError: LocalStreamingASR has no attribute reset`：`LocalVoiceTranscriber.end_stream()` 和 `abort_stream()` 都错误地调用包装器上不存在的 `reset()`，且 WebSocket `finally` 在 abort 抛错时跳过锁释放，造成该会话永久占锁。现改为调用底层 recognizer 的 `reset()` 并保证清除 stream 引用；服务端 finally 无论清理是否异常都释放 asyncio 锁。修复后同一真实 Uvicorn + 本机 ASR 模型、真实音频文件 PCM 分帧、连续 3 轮均收到 partial/final/ended。Apple `URLSessionWebSocketTask` + 真实 Uvicorn + 项目 sherpa-onnx ASR + 仓库 PCM WAV 整链连续 3 轮通过（partial/final/ended 均收到）；用户随后确认 GUI 实时语音故障已修复；尚未收到可复核的 D-013 P95 面板数值。
 - D-013 本机测量诊断已加入可选模式：从仓库根目录运行 `PAC_BETA_PERF_DIAGNOSTICS=1 poc/macos-audio/scripts/run_beta_app.sh`，聊天窗口底部会显示三项数值。诊断仅在当前进程内保存时间样本，不保存音频或转写：Beta App 初始化至本机服务就绪；PCM 帧组装就绪至对应 partial 更新 SwiftUI 状态；点击“停止并识别”至 final 草稿更新。partial 指标不含 200 ms 帧组装之前的采集时间，也不测屏幕实际绘制完成；须保留定义，不把它直接外推成完整用户感知延迟。诊断关闭时不显示或累计这些分布。

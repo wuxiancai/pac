@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from threading import Event
 from time import sleep
 
 import httpx
@@ -17,6 +18,7 @@ from pac_poc.beta_api import (
     CLOUD_PROVIDERS,
     create_beta_api,
     create_beta_app,
+    _run_voice_worker,
     _stream_with_keepalives,
 )
 from pac_poc.model_gateway import (
@@ -472,6 +474,27 @@ def test_chat_stream_disconnect_cancels_pending_upstream_delta() -> None:
         assert await anext(stream) is None
         await stream.aclose()
         assert upstream_closed.is_set()
+
+    asyncio.run(run())
+
+
+def test_voice_worker_cancellation_waits_for_blocking_call_to_finish() -> None:
+    async def run() -> None:
+        worker_started = Event()
+        release_worker = Event()
+
+        def blocking_call() -> None:
+            worker_started.set()
+            release_worker.wait(timeout=2)
+
+        task = asyncio.create_task(_run_voice_worker(blocking_call))
+        assert await asyncio.to_thread(worker_started.wait, 1)
+        task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        release_worker.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
 
     asyncio.run(run())
 

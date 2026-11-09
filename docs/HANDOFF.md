@@ -1,3 +1,10 @@
+## 2026-11-09：阶段 3 语音 WebSocket 取消等待 ASR worker
+
+- 语音识别通过 `asyncio.to_thread` 调用同步 ASR。协程取消并不会中止已运行的线程，旧逻辑可能在该线程还在使用 recognizer 时执行 abort 并释放会话锁。现在 `_run_voice_worker` 对线程工作做 shield；捕获取消后等待 worker 结束，再传播取消，由 finally 执行 abort/释放锁。begin、frame、end 和 abort 调用均走此边界。
+- 新增回归：阻塞 worker 运行中取消请求任务，确认任务在释放线程前仍未完成，释放后再以 CancelledError 结束。
+- 验证：`UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q tests/test_beta_api.py` → 28 passed；Ruff、mypy 通过；后端全量 → 250 passed，1 条既有 Starlette/httpx 弃用警告。
+- 更新 `docs/beta/macOS-beta-voice.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。没有启动麦克风或操作 GUI，未读 Keychain、未发云请求。
+
 ## 2026-11-09：阶段 2 UsageLedger 数值边界校验
 
 - Ledger 写入现拒绝 NaN/无穷时间戳、布尔/非整数/负毫秒延迟，以及布尔、负数或非有限 `audio_seconds`，保持 Usage API 的时间和时长字段为有效 JSON 数值或 `null`。不改变 token/cost 语义、进程内保留或预算状态。
