@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 1 最终复核（2026-11-09）
+
+- 当前 `HEAD` 为 `5f6fe24 feat(stage1): complete stateless engineering foundation`，工作区进入时干净。阶段 1 当前决策允许的无持久化工程底座已完成；数据库/schema/migration/会话持久化/静态加密与 metadata-only 30 天审计仍按 D-003/D-007 未实现并延期，不作为阶段 1 通过项。
+- 当前提交验证：`cd backend && uv run --locked --all-extras --all-groups ruff check pac_poc tests` 通过；同环境 `mypy` 无错误；`pytest -q` → 192 passed、1 条既有 Starlette/httpx 弃用警告；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功；`swift test --package-path poc/macos-audio` → 33 passed；`python3 -m compileall -q pac_poc scripts tests`、`uv lock --check` 和 `git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 均通过。
+- 首次使用 `UV_OFFLINE=1` 跑 Ruff 时因缓存缺少 `onnxruntime==1.31.1` wheel 未启动；改为正常锁定依赖执行后通过。此为环境依赖缓存限制，不是代码失败。
+- 阶段 1 收尾后，下一步按 `docs/TASKS.md` 的 B0/B1/B2 队列继续；本次未运行远端 CI。提交本轮文档更正后，交接点为阶段 1 DONE（当前决策范围），阶段 0 完整 V1/正式发布仍有延期证据。
+
 ### 阶段 1 更新：Keychain 写入/删除认证 gate
 
 - Beta 模型设置改用 `CredentialManagementService` 保存/删除云 Provider Key；两种修改均要求系统设备认证（Touch ID 或设备密码），取消/失败时不改 Keychain。只读 configured 状态仍不回显密钥。
