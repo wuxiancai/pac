@@ -1,3 +1,10 @@
+# 2026-11-09：阶段 6 当前 Beta 本机门禁复核
+
+- 在源码提交 `bf48e30`（B5 文件导入单飞保护）上重跑本机 CI 等价门禁：`uv lock --check`、`ruff check pac_poc tests`、`mypy`、`python -m compileall -q pac_poc scripts tests`、tracked-file `detect-secrets-hook` 均通过。
+- 全量回归：backend `uv run --locked --all-extras --all-groups pytest -q` → 263 passed，1 条既有 Starlette/httpx 弃用警告；`swift test` → 40 passed；`swift build --product personal-assistant-beta` 成功。Swift 测试目标 arm64e/macOS 14.0。
+- 首次从仓库根目录启动全量 pytest 时，3 个旧测试模块因工作目录不同而无法导入 `scripts`；按 CI 的 `backend/` 工作目录重跑后通过。此为验证命令工作目录不匹配，非产品回归。
+- 没有操作 GUI、发起 Provider 请求、读取 Keychain 或采集麦克风。远端 GitHub Actions 未运行。此段只记录验证结果。
+
 # 2026-11-09：B5 文件导入并发保护
 
 - 检查发现文件导入期间仍可再次打开文件选择器；并发任务可能同时通过 4 个附件客户端上限检查，导致重复读取/上传或请求随后超出聊天 ID 限制。
