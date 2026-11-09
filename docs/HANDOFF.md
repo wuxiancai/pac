@@ -5,7 +5,8 @@
 - 启动失败后新增“重试连接”按钮，并按 runtime 缺失、进程启动失败、握手超时/无效等情况显示中文恢复提示；重复点击期间禁用按钮。用户仍可从脚本重新启动来修复虚拟环境/仓库配置问题。
 - 检查窗口消失时的异步 shutdown 与 supervisor.start 并发：若启动任务尚未完成，原先 shutdown 可能先看到空 process 而返回。现 `LocalBackendSupervisor` 对 start/stop/isRunning 加生命周期锁，串行化进程状态访问。新增真实子进程回归：服务进程在启动握手前延迟时触发 stop，stop 等待启动登记后再关闭，最后确认无存活子进程。
 - 验证：`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功；`swift test --package-path poc/macos-audio` → 34 passed。一次初始并发测试未通过是因为锁修改未应用，随后修正锁并以进程 marker 确定测试时序，最终回归通过。
-- 本轮没有关闭/替换用户可能仍打开的 Beta 窗口。GUI 窗口关闭清理及模拟后端失败后的重试尚未实机复核，B0 保持 IN PROGRESS。下一步可先让用户保存未提交聊天并退出当前 Beta，再用启动脚本复核重试与关窗后的 backend 进程清理；随后继续 B1/B2。
+- 后续 GUI 复核已完成：本轮通过一次性 loopback fixture 故意返回无效握手，界面出现“本机服务握手失败，未建立连接。请重试。”和“重试连接”；替换 fixture 为只提供认证 `/health` 的本机 HTTP server 后点击重试，状态变为“本机服务已连接”。未发送聊天、访问 Keychain、启动麦克风或连接云 Provider。随后点击窗口关闭，UI 自动显示一个新 WindowGroup 窗口且服务仍在；因此不能把该观察记为“关窗后服务已停止”，可能是新窗口生命周期触发重启。按 Cmd-Q 退出后再检查，Beta 和 `pac_poc.local_service` 均无残留。
+- B0 仍 IN PROGRESS：失败重试 GUI 已验证，Cmd-Q 清理有证据；最后窗口关闭究竟应退出应用还是保留空应用进程并停止服务，需要在确定窗口行为后补验。测试实例退出后已清理临时 fixture；工作区没有残留 app/backend 进程，fixture 也已删除。随后继续 B1/B2。
 
 ## 阶段 1 最终复核（2026-11-09）
 
