@@ -23,6 +23,8 @@
 
 ## 验证记录
 
+- 2026-11-09 本机模型流式保活：Ollama 模型在 thinking 阶段可能暂时不发可见 `message.content`，后端原先因此没有 SSE bytes，Swift URLSession 在空闲期超时。`/chat/stream` 现在每 15 秒发 SSE 注释 keep-alive，不转发 thinking 或提示词；客户端断开时会取消并关闭上游迭代器。设置拒绝非有限/非正值和 bool。验证：`uv run --locked --all-extras --all-groups pytest -q tests/test_beta_api.py tests/test_local_model_gateway.py` → 22 passed；`ruff check pac_poc tests`、`mypy`（相关 3 个文件）、`uv lock --check`、`python3 -m compileall -q pac_poc scripts tests` 均通过。完整 Python `pytest -q` → 193 passed、1 failed：`test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup[APFS-128]` 在磁盘耗尽脚本返回 `OSError`，与流式保活无关；另有 1 条既有 Starlette/httpx 弃用警告。实机在 thinking 期间取消并立即重发后观察 50 秒，未再出现 UI 超时，但始终没有可见文本，随后停止；这只验证连接仍存活，不代表该轮生成完成或响应及时。测试后将模型选择恢复为 OpenRouter（只恢复本机偏好，没有云请求）。
+
 - 2026-11-09 修复模型切换反馈：SwiftUI 模型选择变更会取消在途客户端请求、清除其 request ID 并更新当前 Provider/模型状态；发送时仍以当前设置建立不可变请求快照，完成状态显示本轮实际 Provider/模型。`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；本轮未运行测试、未启动 GUI、未发起云请求。
 
 - `swift build --package-path . --product personal-assistant-beta`：通过。

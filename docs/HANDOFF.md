@@ -1,5 +1,13 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## B1 本机流式保活继续开发（2026-11-09）
+
+- 发现本机 Ollama 默认 thinking 阶段暂时没有可见 `message.content`，Gateway 不发 SSE 数据，Swift URLSession 因空闲超时；`/chat/stream` 现在每 15 秒输出 SSE 注释 keep-alive，不暴露 thinking 或提示词。断开时会取消待取的上游 delta 并关闭 iterator。
+- 回归：`tests/test_beta_api.py tests/test_local_model_gateway.py` 22 passed；Ruff、mypy（相关 3 文件）、`uv lock --check`、compileall 通过。Python 全量 193 passed，1 failed：`test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup[APFS-128]` 受磁盘耗尽脚本 OSError 失败，与本次代码无关；1 条 Starlette/httpx deprecation warning。
+- GUI 观察：thinking 中取消后立即发送新提示，等待 50 秒 UI 未再报超时，但没有出现可见文本，之后停止。保活修复解决空闲断流，不代表模型响应延迟已解决；下一步应评估向用户显示思考/等待状态及重试策略，不擅自改变模型 thinking 默认或产品决策。测试后已恢复 OpenRouter 模型选择；未发云请求。
+- B0 最终完成：SwiftUI 主窗口从 `WindowGroup` 改为单实例 `Window`，使最后/唯一窗口关闭即退出，符合单会话 Beta 生命周期；启动错误及 GUI 重试已以本机 fixture 实测，fixture 已删除；真实后端连接后关闭唯一窗口，确认 app/backend 均无进程残留。Swift Beta build 成功，`swift test --package-path poc/macos-audio` 34 passed。
+- 当前代码改动待提交：`backend/pac_poc/beta_api.py`、`backend/tests/test_beta_api.py`，以及本次进度文档。继续 B1；B0 已关闭。交接前检查 diff 并提交。
+
 ## B0 继续开发（2026-11-09）
 
 - 启动失败后新增“重试连接”按钮，并按 runtime 缺失、进程启动失败、握手超时/无效等情况显示中文恢复提示；重复点击期间禁用按钮。用户仍可从脚本重新启动来修复虚拟环境/仓库配置问题。

@@ -15,6 +15,7 @@ from pac_poc.beta_api import (
     BetaAPISettings,
     create_beta_api,
     create_beta_app,
+    _stream_with_keepalives,
 )
 from pac_poc.model_gateway import LocalModelRequest, ModelGateway, LocalOnlyPolicy
 from pac_poc.security_poc import LocalAPISession
@@ -58,6 +59,8 @@ def test_beta_api_settings_only_allow_restrictive_valid_limits() -> None:
         BetaAPISettings(max_voice_pcm_bytes=320_001)
     with pytest.raises(ValueError):
         BetaAPISettings(voice_stream_lock_wait_seconds=float("inf"))
+    with pytest.raises(ValueError):
+        BetaAPISettings(chat_stream_keepalive_seconds=True)
 
 
 class StubLocalAdapter:
@@ -77,6 +80,13 @@ class StubLocalAdapter:
         self.request = request
         yield "本机"
         yield "回答"
+
+
+class DelayedLocalAdapter(StubLocalAdapter):
+    async def stream(self, request: LocalModelRequest):
+        self.request = request
+        await asyncio.sleep(0.04)
+        yield "可见回复"
 
 
 class StubCloudAdapter:
@@ -176,6 +186,49 @@ def test_beta_chat_stream_is_authenticated_local_and_non_persistent() -> None:
         assert adapter.request.model == BETA_MODEL
         assert adapter.request.provider == "ollama"
         assert adapter.request.messages == [{"role": "user", "content": "你好"}]
+
+    asyncio.run(run())
+
+
+def test_beta_chat_stream_sends_keepalives_without_exposing_thinking() -> None:
+    async def run() -> None:
+        adapter = DelayedLocalAdapter()
+        app = create_beta_api(
+            session=LocalAPISession(token="test-token"),
+            gateway=ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy()),
+            settings=BetaAPISettings(chat_stream_keepalive_seconds=0.01),
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            response = await client.post(
+                "/chat/stream",
+                headers={"authorization": "Bearer test-token"},
+                json={"messages": [{"role": "user", "content": "synthetic local prompt"}]},
+            )
+        assert response.status_code == 200
+        assert ": keep-alive\n\n" in response.text
+        assert '"delta": "可见回复"' in response.text
+        assert '"thinking"' not in response.text
+
+    asyncio.run(run())
+
+
+def test_chat_stream_disconnect_cancels_pending_upstream_delta() -> None:
+    async def run() -> None:
+        upstream_closed = asyncio.Event()
+
+        async def upstream():
+            try:
+                await asyncio.Event().wait()
+                yield "unreachable"
+            finally:
+                upstream_closed.set()
+
+        stream = _stream_with_keepalives(upstream(), interval_seconds=0.01)
+        assert await anext(stream) is None
+        await stream.aclose()
+        assert upstream_closed.is_set()
 
     asyncio.run(run())
 

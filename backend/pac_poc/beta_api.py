@@ -58,6 +58,7 @@ MAX_MESSAGE_CHARS = 16_000
 MAX_CONTEXT_CHARS = 40_000
 MAX_VOICE_PCM_BYTES = 960_000  # 30 seconds of 16 kHz mono PCM16
 VOICE_STREAM_LOCK_WAIT_SECONDS = 2.0
+CHAT_STREAM_KEEPALIVE_SECONDS = 15.0
 VOICE_MODEL_DIR = (
     Path(__file__).resolve().parent.parent
     / ".poc-data"
@@ -73,6 +74,7 @@ class BetaAPISettings:
     max_context_chars: int = MAX_CONTEXT_CHARS
     max_voice_pcm_bytes: int = MAX_VOICE_PCM_BYTES
     voice_stream_lock_wait_seconds: float = VOICE_STREAM_LOCK_WAIT_SECONDS
+    chat_stream_keepalive_seconds: float = CHAT_STREAM_KEEPALIVE_SECONDS
     voice_model_dir: Path = VOICE_MODEL_DIR
 
     def __post_init__(self) -> None:
@@ -98,6 +100,14 @@ class BetaAPISettings:
             or timeout <= 0
         ):
             raise ValueError("voice stream lock timeout must be finite and positive")
+        keepalive = self.chat_stream_keepalive_seconds
+        if (
+            isinstance(keepalive, bool)
+            or not isinstance(keepalive, (int, float))
+            or not math.isfinite(keepalive)
+            or keepalive <= 0
+        ):
+            raise ValueError("chat stream keepalive must be finite and positive")
         if not isinstance(self.voice_model_dir, Path) or not self.voice_model_dir.is_absolute():
             raise ValueError("voice model directory must be absolute")
 
@@ -135,6 +145,37 @@ class BetaVoiceTranscriber(Protocol):
     def abort_stream(self) -> None: ...
 
     def transcribe_pcm16le(self, pcm: bytes) -> str: ...
+
+
+async def _stream_with_keepalives(
+    source: AsyncIterator[str], interval_seconds: float
+) -> AsyncIterator[str | None]:
+    """Keep an SSE response active without exposing upstream thinking content."""
+    iterator = source.__aiter__()
+
+    async def next_value() -> str:
+        return await iterator.__anext__()
+
+    next_delta: asyncio.Task[str] = asyncio.create_task(next_value())
+    try:
+        while True:
+            completed, _ = await asyncio.wait({next_delta}, timeout=interval_seconds)
+            if not completed:
+                yield None
+                continue
+            try:
+                delta = next_delta.result()
+            except StopAsyncIteration:
+                break
+            yield delta
+            next_delta = asyncio.create_task(next_value())
+    finally:
+        if not next_delta.done():
+            next_delta.cancel()
+        await asyncio.gather(next_delta, return_exceptions=True)
+        close = getattr(iterator, "aclose", None)
+        if close is not None:
+            await close()
 
 
 @dataclass(frozen=True)
@@ -464,7 +505,12 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
 
         async def events() -> AsyncIterator[str]:
             try:
-                async for delta in selected_gateway.stream(request):
+                async for delta in _stream_with_keepalives(
+                    selected_gateway.stream(request), settings.chat_stream_keepalive_seconds
+                ):
+                    if delta is None:
+                        yield ": keep-alive\n\n"
+                        continue
                     yield "data: " + json.dumps({"delta": delta}, ensure_ascii=False) + "\n\n"
                 yield "data: {\"done\":true}\n\n"
             except RemoteProviderError as exc:
