@@ -161,6 +161,24 @@ class FailingLocalAdapter:
         raise RuntimeError("private-local-runtime-detail")
 
 
+class FailingLocalTransportAdapter:
+    is_local = True
+
+    def __init__(self, error: httpx.RequestError) -> None:
+        self.error = error
+
+    async def generate(self, request: LocalModelRequest) -> str:
+        raise AssertionError("chat endpoint must use streaming")
+
+    async def call_with_tools(self, request: LocalModelRequest):
+        raise AssertionError("chat endpoint must not invoke tools")
+
+    async def stream(self, request: LocalModelRequest):
+        if False:
+            yield "unreachable"
+        raise self.error
+
+
 class SpyCredentials:
     def __init__(self) -> None:
         self.reads = 0
@@ -868,6 +886,39 @@ def test_local_model_error_is_sanitized_and_recorded_as_unknown_usage() -> None:
     assert record["status"] == "failed"
     assert record["usage_state"] == "unknown"
     assert record["cost_state"] == "unknown"
+
+
+@pytest.mark.parametrize(
+    ("error_type", "expected_message"),
+    [
+        (httpx.ConnectError, "无法连接本机 Ollama"),
+        (httpx.ReadTimeout, "等待本机 Ollama 响应超时"),
+    ],
+)
+def test_local_transport_errors_use_local_recovery_guidance(
+    error_type: type[httpx.RequestError], expected_message: str
+) -> None:
+    request = httpx.Request("POST", "http://127.0.0.1:11434/api/chat")
+    adapter = FailingLocalTransportAdapter(error_type("synthetic transport marker", request=request))
+    app = create_beta_api(
+        session=LocalAPISession(token="test-token"),
+        gateway=ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy()),
+    )
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/stream",
+            headers={"authorization": "Bearer test-token", "host": "127.0.0.1"},
+            json={
+                "provider": "ollama",
+                "model": BETA_MODEL,
+                "messages": [{"role": "user", "content": "synthetic transport error test"}],
+            },
+        )
+
+    assert response.status_code == 200
+    assert expected_message in response.text
+    assert "云端" not in response.text
+    assert "synthetic transport marker" not in response.text
 
 
 def test_qwen_application_route_is_available_with_exact_region_and_model() -> None:

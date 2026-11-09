@@ -1116,3 +1116,11 @@
 - 导入 API 现串行接收：存在在途导入时，第二个请求立即返回 409，不读取其 body；首个请求成功后释放门禁。未改变云端拒绝、格式验证、文件数/总量上限和进程内存储语义。
 - 新增并发 ASGI 回归，以异步请求体暂停证明第二请求生成器未消费。定向导入测试 3 passed；Ruff 和 mypy 通过；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：274 passed，1 条既有 Starlette/httpx 弃用警告。
 - 更新 `docs/beta/file-import.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。GUI 聊天引用仍待桌面验收；PDF 继续禁用。
+
+
+### 2026-11-10：B1 Ollama 传输错误提示分流
+
+- 发现统一处理 `httpx.RequestError` 时，即使 Provider 是 `ollama`，SSE 也会显示云端服务失败和计费未知文案，给本机故障提供错误恢复指导。
+- 现在 Ollama 连接错误提示检查本机服务与 loopback 地址；读/连接超时提示 Ollama 可能仍在本机生成并建议先检查状态。底层异常不回显。云 Provider 原来的“是否已收到请求/用量记录”提示不变。
+- 新增合成 `ConnectError` / `ReadTimeout` 回归，确保输出为本机措辞且不包含异常标记或“云端”；同组本机/云端错误回归 8 passed。Ruff 与 mypy 通过；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：276 passed、1 条既有 Starlette/httpx 弃用警告。
+- 没有真实 Provider 请求或 GUI 错误展示验收；GUI 仍待可用桌面操作。已更新 `docs/beta/macOS-beta-chat.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。

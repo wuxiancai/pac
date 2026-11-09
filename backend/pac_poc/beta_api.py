@@ -753,12 +753,25 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 run_registry.transition(run.run_id, RunStatus.FAILED)
                 message = "本机无法从 Keychain 读取已保存的云端凭据；未能发起云端请求。"
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
-            except httpx.RequestError:
+            except httpx.RequestError as exc:
                 run_registry.transition(run.run_id, RunStatus.FAILED)
-                message = (
-                    "连接云端服务失败或超时；服务端是否收到请求无法确认，"
-                    "请先检查服务商用量记录再重试。"
-                )
+                if payload.provider == "ollama":
+                    if isinstance(
+                        exc, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
+                    ):
+                        message = "无法连接本机 Ollama；请确认 Ollama 正在运行且本机地址可访问。"
+                    elif isinstance(exc, httpx.TimeoutException):
+                        message = (
+                            "等待本机 Ollama 响应超时；它可能仍在本机生成，"
+                            "请检查 Ollama 状态后再重试。"
+                        )
+                    else:
+                        message = "与本机 Ollama 通信失败；本机生成状态可能未知，请检查服务状态后再重试。"
+                else:
+                    message = (
+                        "连接云端服务失败或超时；服务端是否收到请求无法确认，"
+                        "请先检查服务商用量记录再重试。"
+                    )
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except Exception:
                 run_registry.transition(run.run_id, RunStatus.FAILED)

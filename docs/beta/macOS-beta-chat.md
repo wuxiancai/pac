@@ -75,3 +75,8 @@
 - B2 初始 SwiftUI 录音/本机 ASR/手动 TTS 接入见 [`macOS-beta-voice.md`](macOS-beta-voice.md)。录音只由用户点击按钮启动，音频不落盘，识别失败不切云；真实设备链路仍待手动冒烟。
 - 千问 Token Plan Realtime 虽是服务端支持能力，个人版 Key 的官方范围不允许用于本项目自建应用；此处不开放云语音入口。应用云语音需使用适用的 API 计费凭据，详情见 `qwen-token-plan-integration.md`。
 - 当前启动脚本依赖仓库虚拟环境；所选本地模型须已安装于 Ollama。属于开发测试版，不是独立分发安装器。
+
+
+### 2026-11-10 本机传输错误提示
+
+`httpx.RequestError` 现在按 Provider 分流提示：Ollama 连接失败时引导检查本机服务；本机响应超时时提示生成状态可能未知、先检查 Ollama 后再重试。错误内容不回显底层异常，也不出现云端服务/计费措辞。合成 adapter 回归覆盖 `ConnectError` 和 `ReadTimeout`；连同原有本机错误及云端状态码脱敏回归共 8 passed。后端全量 276 passed，1 条既有 Starlette/httpx 弃用警告；Ruff/mypy 通过。GUI 错误文案呈现仍待手动验收；没有真实 Provider 请求。

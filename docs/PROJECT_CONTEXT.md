@@ -14,7 +14,7 @@
 - 2026-11-10 当前复核更新：`swift test --package-path poc/macos-audio` 43 项通过；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）→ 273 passed、1 条既有 Starlette/httpx 弃用警告。之前该日一轮全量在 APFS-128 `backup-copy` 临时映像用例失败；单独复跑该用例 1 passed，随后当前全量亦通过，偶发原因未判定，保留非阻塞观察。Beta build 已在当前开发检查点成功。
 - 2026-11-10 UsageLedger 一致性校验更新：UNKNOWN 不得含 token 数，ACTUAL/ESTIMATED 必须至少含一项 token 数；定向 `tests/test_usage.py tests/test_beta_api.py` 46 passed，后端全量 267 passed（1 条既有弃用警告），相关 Ruff 与 mypy 通过。D-005 费用归一/预算硬拦截仍未实现；此改动不改变费用语义。
 - 2026-11-10 本机 TTS 点播行为更新：开始朗读另一条回复时先停止当前播放；如果系统不能立即停止，就不排入新文本并显示明确状态。Swift 全量 43 项通过，Beta target 构建通过；仅用 fake SpeechEngine 自动验证，真实设备可听性仍待用户手动验收。
-- 2026-11-10 Provider 重试契约更新：远端 Adapter 最多两次尝试，仅对 HTTP 429 与建连前失败重试；读/写超时不重试，避免结果未知时重复发送。Consent 撤销会取消退避任务。最新后端全量 274 passed（1 条既有弃用警告）；无真实云请求。
+- 2026-11-10 Provider 重试契约更新：远端 Adapter 最多两次尝试，仅对 HTTP 429 与建连前失败重试；读/写超时不重试，避免结果未知时重复发送。Consent 撤销会取消退避任务。最新后端全量 276 passed（1 条既有弃用警告）；无真实云请求。
 
 - 2026-11-08 模型设置更新：SwiftUI 聊天页增加本地/云端选择，默认本机 Ollama；云端默认千问按量计费应用 API（`qwen3.8-flash`、`sk-ws-`、Keychain account `qwen-app`），另有 DeepSeek/OpenRouter 路由。选择云 Provider 即持续授权后续聊天发送到该服务商，不再逐条弹窗；设置文案披露此行为，Key 存 login Keychain，L3 凭据在后端出站前拒绝。千问 Token Plan 个人版 `sk-sp-` 官方条款明确排除自建应用后端，未接入直连 Provider；本会话一次千问合成请求返回通用错误且未重试，用户随后反馈已可正常聊天；未在本地记录该次成功响应/usage。详见 `docs/beta/macOS-beta-chat.md` 和 `docs/beta/qwen-token-plan-integration.md`。
 - 当前目标：单用户 macOS 本机优先测试版；POC 证据仍标为 POC，阶段 0 完整 V1/正式发布验收未完成。SwiftUI Beta、受认证的本机 `/chat/stream`、Ollama 增量对话和 Provider/模型切换已实现；GUI 发消息/显示回复、模型切换与语音冒烟已由用户实机复核，详情见 `docs/beta/macOS-beta-chat.md`、`docs/beta/macOS-beta-voice.md`。生成请求使用 request ID 隔离回调；对话不持久化。B2 现为显式点击采集、本机实时 ASR、partial/final 草稿和手动 AVSpeechSynthesizer 朗读；用户实机验证 final、取消、点击打断和录音中 Cmd-Q 退出清理。延期能力保持清晰扩展边界，不宣称已通过验证。
@@ -58,3 +58,5 @@
 | [`DECISIONS.md`](DECISIONS.md) | 已确认的项目决策、待决产品事项和 ADR 状态入口 |
 | [`HANDOFF.md`](HANDOFF.md) | 最新工作摘要和下一位执行者的起点 |
 | [`poc/phase0-traceability.md`](poc/phase0-traceability.md) | 阶段 0 要求、证据、缺口及门禁的权威追踪矩阵 |
+
+- 2026-11-10 本机 Provider 传输错误映射：修正 `httpx.RequestError` 在 Ollama 请求时错误套用云端失败/计费提示的问题；连接错误提示检查 Ollama，响应超时提示本机生成可能仍在继续。窄回归 8 passed，Ruff/mypy 通过；后端全量 276 passed（1 条既有弃用警告）。
