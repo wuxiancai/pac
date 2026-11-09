@@ -631,7 +631,7 @@ final class BetaChatModel {
     func speakLocally(_ text: String) {
         switch speechPlayback.speak(text) {
         case .started:
-            status = "正在本机朗读回复。"
+            status = "已开始本机朗读回复。"
         case .emptyText:
             status = "没有可朗读的回复。"
         case .existingSpeechCouldNotBeStopped:

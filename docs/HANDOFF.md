@@ -1088,7 +1088,7 @@
 
 ### 2026-11-10：本机 TTS 连续点播控制
 
-- SpeechPlaybackController 改为返回明确启动结果。用户点播新回复时，若当前仍在朗读，先尝试立即停止；停止失败时不将新文本排入系统队列，并向状态栏显示原因。空文本仍不影响当前朗读。同步更新 `TTSInterruptPOC` 和 Beta UI 调用点。
+- SpeechPlaybackController 改为返回明确启动结果。用户点播新回复时，若当前仍在朗读，先尝试立即停止；停止失败时不将新文本排入系统队列，并向状态栏显示原因。空文本仍不影响当前朗读。状态文案改为“已开始”以避免自然播放结束后仍显示“正在”。同步更新 `TTSInterruptPOC` 和 Beta UI 调用点。
 - 自动回归新增：新点播停止旧朗读、系统拒绝停止时新文本不入队、空文本不打断当前内容。一次全量编译捕获到 `TTSInterruptPOC` 的旧 Bool 调用后已修正。
 - 验证：`swift test --package-path poc/macos-audio` → 43 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。没有启动真实语音输出；手动可听性验收仍待用户桌面操作。
 - 更新 `docs/beta/macOS-beta-voice.md`、`TASKS.md`、`PROJECT_CONTEXT.md`。下一段继续处理阶段 2/3 中可独立自动验证的事项；GUI、真机 TTS、费用归一仍保持未验收或待决状态。
