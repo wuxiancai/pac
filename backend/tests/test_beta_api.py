@@ -135,9 +135,9 @@ class FailingCloudAdapter:
         self.calls += 1
         if False:
             yield "unreachable"
-        secret_marker = "provider-body-secret-marker"
+        response_marker = "synthetic-provider-body-sentinel"
         raise RemoteProviderError(
-            f"Provider returned {secret_marker}", status_code=self.status_code
+            f"Provider returned {response_marker}", status_code=self.status_code
         )
 
 
@@ -701,7 +701,7 @@ def test_cloud_provider_errors_are_sanitized_and_never_fallback(
 
     assert response.status_code == 200
     assert expected_message in response.text
-    assert "provider-body-secret-marker" not in response.text
+    assert "synthetic-provider-body-sentinel" not in response.text
     assert adapter.calls == 1
     assert run_status.json()["status"] == "failed"
 

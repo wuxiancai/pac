@@ -1,3 +1,9 @@
+## 2026-11-09：阶段 6 本机 CI 门禁复核
+
+- 重跑与 `.github/workflows/ci.yml` 对应的本机门禁：`uv lock --check`、`ruff check pac_poc tests`、`mypy`、`python -m compileall -q pac_poc scripts tests`、tracked-file `detect-secrets-hook`、后端 all-extras/all-groups pytest（253 passed，1 条既有 Starlette/httpx 弃用警告）；Swift 40 项及 Beta target build 已在前一提交复核通过。
+- secret scan 首次命中 `tests/test_beta_api.py` 中名为 `secret_marker` 的纯合成响应 fixture；将变量与断言字面量改为 `response_marker` / `synthetic-provider-body-sentinel` 后扫描通过。没有绕过 baseline 或加入 allowlist。
+- 当前 commit 仍未运行远端 GitHub Actions；本机 CI 门禁通过不替代远端 PR 事件证据。
+
 ## 2026-11-09：阶段 3 批量语音并发锁超时
 
 - `/voice/transcribe` 的“先看 `locked()` 再 `async with`”存在检查与获取之间的竞态，并发批量 ASR 也可能无限排队。现直接以 `asyncio.wait_for(lock.acquire(), voice_stream_lock_wait_seconds)` 原子获取单会话锁；超时返回 409，工作完成或取消后在 finally 释放。
