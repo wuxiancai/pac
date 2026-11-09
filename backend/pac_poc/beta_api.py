@@ -7,7 +7,7 @@ import re
 from collections.abc import AsyncIterator, Mapping
 from pathlib import Path
 from time import monotonic, time
-from typing import Literal
+from typing import Literal, Protocol
 
 import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -45,6 +45,7 @@ from .security_poc import (
     create_local_api,
     _is_loopback_host,
 )
+from .asr import ASREvent
 from .voice_transcription import LocalVoiceTranscriber
 
 
@@ -78,6 +79,18 @@ class StreamChatRequest(BaseModel):
     confirmed_for_this_request: bool = False
 
 
+class BetaVoiceTranscriber(Protocol):
+    def begin_stream(self) -> None: ...
+
+    def accept_stream_frame(self, pcm: bytes, sequence: int) -> ASREvent | None: ...
+
+    def end_stream(self, sequence: int) -> ASREvent | None: ...
+
+    def abort_stream(self) -> None: ...
+
+    def transcribe_pcm16le(self, pcm: bytes) -> str: ...
+
+
 CLOUD_PROVIDERS: dict[str, RemoteProviderConfig] = {
     "deepseek": DEEPSEEK_PROBE_CONFIG,
     "openrouter": OPENROUTER_PROBE_CONFIG,
@@ -102,6 +115,7 @@ def create_beta_api(
     gateway: ModelGateway | None = None,
     credentials: CredentialProvider | None = None,
     remote_adapters_override: Mapping[str, LocalProviderAdapter] | None = None,
+    voice_transcriber_override: BetaVoiceTranscriber | None = None,
 ) -> FastAPI:
     """Build the beta's authenticated loopback API; chat data remains in memory."""
     app = create_local_api(session=session)
@@ -115,7 +129,9 @@ def create_beta_api(
         )
         for provider, config in CLOUD_PROVIDERS.items()
     }
-    voice_transcriber = LocalVoiceTranscriber(VOICE_MODEL_DIR)
+    voice_transcriber: BetaVoiceTranscriber = voice_transcriber_override or LocalVoiceTranscriber(
+        VOICE_MODEL_DIR
+    )
     voice_stream_lock = asyncio.Lock()
     router = APIRouter()
 

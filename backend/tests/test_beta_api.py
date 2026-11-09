@@ -3,7 +3,11 @@ from __future__ import annotations
 import asyncio
 
 import httpx
+import pytest
+from starlette.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
+from pac_poc.asr import ASREvent
 from pac_poc.beta_api import BETA_MODEL, create_beta_api
 from pac_poc.model_gateway import LocalModelRequest, ModelGateway, LocalOnlyPolicy
 from pac_poc.security_poc import LocalAPISession
@@ -54,6 +58,31 @@ class SpyCredentials:
     def get(self, account: str) -> str:
         self.reads += 1
         return "synthetic-test-credential"
+
+
+class StubVoiceTranscriber:
+    def __init__(self) -> None:
+        self.frames: list[tuple[bytes, int]] = []
+        self.started = 0
+        self.ended = 0
+        self.aborted = 0
+
+    def begin_stream(self) -> None:
+        self.started += 1
+
+    def accept_stream_frame(self, pcm: bytes, sequence: int) -> ASREvent:
+        self.frames.append((pcm, sequence))
+        return ASREvent("partial", "你好", sequence, "rev_partial")
+
+    def end_stream(self, sequence: int) -> ASREvent:
+        self.ended += 1
+        return ASREvent("final", "你好", sequence, "rev_final")
+
+    def abort_stream(self) -> None:
+        self.aborted += 1
+
+    def transcribe_pcm16le(self, pcm: bytes) -> str:
+        raise AssertionError("streaming voice route must not use batch transcription")
 
 
 def test_beta_chat_stream_is_authenticated_local_and_non_persistent() -> None:
@@ -189,3 +218,78 @@ def test_qwen_application_route_is_available_with_exact_region_and_model() -> No
         assert adapter.request.data_level.value == "L2"
 
     asyncio.run(run())
+
+
+def test_authenticated_voice_websocket_streams_partial_then_final() -> None:
+    transcriber = StubVoiceTranscriber()
+    app = create_beta_api(
+        session=LocalAPISession(token="voice-token"),
+        voice_transcriber_override=transcriber,
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect(
+            "/voice/stream",
+            headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+        ) as websocket:
+            websocket.send_json({
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            })
+            assert websocket.receive_json() == {"type": "ready"}
+            pcm = b"\x01\x00" * 3_200
+            websocket.send_bytes((0).to_bytes(4, "big") + pcm)
+            partial = websocket.receive_json()
+            assert partial == {
+                "type": "partial",
+                "text": "你好",
+                "sequence": 0,
+                "revision_id": "rev_partial",
+            }
+            websocket.send_json({"type": "end"})
+            final = websocket.receive_json()
+            assert final["type"] == "final"
+            assert final["text"] == "你好"
+            assert websocket.receive_json() == {"type": "ended"}
+
+    assert transcriber.started == 1
+    assert transcriber.frames == [(pcm, 0)]
+    assert transcriber.ended == 1
+    assert transcriber.aborted == 1
+
+
+def test_voice_websocket_rejects_bad_token_and_out_of_order_frames() -> None:
+    transcriber = StubVoiceTranscriber()
+    app = create_beta_api(
+        session=LocalAPISession(token="voice-token"),
+        voice_transcriber_override=transcriber,
+    )
+    with TestClient(app) as client:
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect(
+                "/voice/stream",
+                headers={"authorization": "Bearer wrong-token", "host": "127.0.0.1"},
+            ):
+                pass
+
+        with client.websocket_connect(
+            "/voice/stream",
+            headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+        ) as websocket:
+            websocket.send_json({
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            })
+            assert websocket.receive_json() == {"type": "ready"}
+            websocket.send_bytes((1).to_bytes(4, "big") + b"\x00\x00" * 3_200)
+            error = websocket.receive_json()
+            assert error == {"type": "error", "message": "音频帧格式或序号无效"}
+
+    assert transcriber.started == 1
+    assert transcriber.frames == []
+    assert transcriber.aborted == 1

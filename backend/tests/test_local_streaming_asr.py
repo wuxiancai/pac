@@ -89,6 +89,33 @@ def test_suppresses_duplicate_partial_text() -> None:
     assert second is None
 
 
+def test_finish_flushes_endpoint_and_emits_final() -> None:
+    recognizer = FakeRecognizer([Snapshot("你好"), Snapshot("你好。", endpoint=True)])
+    asr = LocalStreamingASR(recognizer, sample_rate_hz=16_000)
+    partial = asr.accept(AudioFrame(sequence=0, sample_rate_hz=16_000, samples=(0.0,)))
+
+    final = asr.finish(sequence=1)
+
+    assert partial is not None and partial.kind == "partial"
+    assert final is not None
+    assert (final.kind, final.text, final.sequence) == ("final", "你好。", 1)
+    assert len(recognizer.accepted) == 2
+    assert recognizer.accepted[-1][0] == (0.0,) * 3_200
+    assert recognizer.reset_count == 1
+
+
+def test_finish_promotes_last_partial_when_endpoint_is_not_detected() -> None:
+    recognizer = FakeRecognizer([Snapshot("你好"), *[Snapshot("你好") for _ in range(3)]])
+    asr = LocalStreamingASR(recognizer, sample_rate_hz=16_000)
+    asr.accept(AudioFrame(sequence=0, sample_rate_hz=16_000, samples=(0.0,)))
+
+    final = asr.finish(sequence=1)
+
+    assert final is not None
+    assert (final.kind, final.text, final.sequence) == ("final", "你好", 4)
+    assert len(recognizer.accepted) == 4
+
+
 def test_resolves_sherpa_onnx_epoch_named_bilingual_model_files(tmp_path) -> None:
     for name in (
         "encoder-epoch-99-avg-1.int8.onnx",

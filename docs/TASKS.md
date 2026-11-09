@@ -20,14 +20,14 @@
 |---:|---|---|---|
 | B0 | 应用可运行骨架 | IN PROGRESS | 新增 SwiftUI 测试版 `.app` 构建/启动入口；本轮经启动脚本实机显示本机服务已连接，Cmd-Q 后进程检查未见 app/backend 残留。窗口关闭路径及启动失败恢复体验仍需复核。 |
 | B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或千问应用 API、DeepSeek、OpenRouter 固定路由；本地模型 ID 可配置。选择云端即持续授权后续消息发往该服务商，设置有告知且无逐条弹窗；Keychain、固定目标、L3 拦截、错误脱敏和无自动 fallback 保留。每次发送快照当前 Provider/模型；切换时取消旧客户端流并屏蔽迟到回调，状态栏显示当前及本轮实际路由（已构建，GUI 手动切换/请求冒烟待复核）。此前本机一次千问合成请求结果不明；用户随后反馈千问已可正常聊天（本轮未独立复测）。D-010 仍待决；Token Plan `sk-sp-` 个人版不直连自建应用。详见 `beta/macOS-beta-chat.md`。 |
-| B2 | 本地语音闭环 | IN PROGRESS | 已扩展为受认证 loopback WebSocket 本机实时 ASR：200 ms PCM 帧、有界队列、临时 partial、停止后 final 入草稿；文字生成中可点击打断并开始语音输入。补齐 `websockets` 依赖；用户确认录音时 partial 可见。停止后的 final/草稿、取消和打断路径仍需实机复核。云 Realtime、AEC/自动声学插话和睡眠/锁屏等仍按阶段 3/ADR-021 处理。手动本机朗读仍保留。详见 `beta/macOS-beta-voice.md`。 |
+| B2 | 本地语音闭环 | IN PROGRESS | 已扩展为受认证 loopback WebSocket 本机实时 ASR：200 ms PCM 帧、有界队列、临时 partial、停止后 final 入草稿；文字生成中可点击打断并开始语音输入。补齐 `websockets` 依赖；用户确认录音时 partial 可见。新增 WebSocket/ASR finish 自动回归；停止后的 final/草稿、取消和打断路径仍需实机复核。云 Realtime、AEC/自动声学插话和睡眠/锁屏等仍按阶段 3/ADR-021 处理。手动本机朗读仍保留。详见 `beta/macOS-beta-voice.md`。 |
 | B3 | 会话保存与恢复 | DEFERRED | 等待最小数据保留和静态加密决策；在决定前不持久化敏感对话。 |
 | B4 | 千问 Token Plan 扩展接入 | DEFERRED | 个人版条款仅允许经官方支持的编程/智能体工具扩展交互使用，排除本项目自建应用后端。只有取得允许自建应用的官方授权/套餐，或实现受支持工具扩展集成后，才能纳入应用选项。协议、地址和状态见 `beta/qwen-token-plan-integration.md`。 |
 | B5 | 正式发布与扩展功能 | DEFERRED | 文件导入、Embedding 记忆、云语音、备份/恢复、自动恢复、完整许可通知、正式签名分发在对应功能实现前再补决策和测试。 |
 
 ## 阶段 0 证据状态（保留追踪，不作为测试版总门禁）
 
-0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 170 项、Swift 31 项通过，`uv lock --check`、`compileall` 通过；历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前 `main` 本地 ahead `origin/main` 13 commits，PR 触发路径尚未实际运行；`uv.lock` 新增 WebSocket 依赖后需更新 Python SBOM。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
+0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 174 项、Swift 31 项通过，`uv lock --check`、`compileall` 通过；历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地分支尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 55/55 非根依赖。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
 
 ## 当前执行顺序
 

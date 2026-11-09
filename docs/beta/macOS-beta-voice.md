@@ -17,6 +17,7 @@
 
 - 2026-11-09 首次实时语音无响应的根因：Beta 后端仅安装 Uvicorn，没有任何 WebSocket 协议依赖；HTTP 聊天正常，但实时语音握手失败。`backend/pyproject.toml` 与 `uv.lock` 已锁定增加 `websockets==17.4`。本机 Python 3.12 环境检查 `uv run --locked python -c 'from fastapi import FastAPI; from uvicorn.config import Config; config = Config(FastAPI()); config.load(); print(config.ws_protocol_class.__name__)'` 输出 `WebSocketsSansIOProtocol`。已重启 Beta，GUI 确认新实时语音控件显示且本机服务已连接；尚未重试麦克风/语音 WebSocket。
 - 用户随后报告再次点击语音输入后，录音时已能在控件右侧看到所说内容的转写。这是用户实机观察；本仓库没有对应捕获/转写数据，停止后的 final 草稿和打断链路仍未验证。
+- 新增后端自动回归：认证 WebSocket 握手、协议格式、200 ms PCM 帧序号、partial→final→ended 顺序、坏 token 拒绝、帧序号错误拒绝和连接清理；另覆盖 ASR `finish()` 对 endpoint final 与 endpoint 缺失时的 partial→final 收尾。
 - 2026-11-09 继续开发：中断中的 assistant 部分回复仍显示，但不再进入下一次发送上下文，也不允许被当作完整回复朗读。`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；未运行测试。该上下文处理改动在刚构建的二进制中，需重启应用后生效。
 - `swift build --package-path poc/macos-audio --product personal-assistant-beta`：实时语音客户端与 Beta target 构建通过。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python -m compileall -q pac_poc`（工作目录 `backend/`）：通过。

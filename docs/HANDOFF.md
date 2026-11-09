@@ -158,7 +158,7 @@
 ### 2026-11-08：0G Python 依赖许可证线索复核
 
 - 核实 `tokenizers==0.23.3` 的本机 Trove classifier 与固定版本 PyPI 页均声明 Apache，发布对应的上游 tag 有 LICENSE 文件。更新 SBOM 报告以明确 metadata 分类来源。
-- 54/54 锁定包目前各有初步来源线索；许可证适用范围、通知义务、原生依赖与最终打包闭包仍未审查，不是法律批准。依据：[固定版本 PyPI 页面](https://pypi.org/project/tokenizers/0.23.3/)、[上游 tag LICENSE](https://github.com/huggingface/tokenizers/blob/v0.23.3/LICENSE)。
+- 此处为历史记录：54/54 锁定包当时各有初步来源线索。最新为 55 个非根包，含 `websockets==17.4` 的精确 PyPI BSD-3-Clause 线索；许可证适用范围、通知义务、原生依赖与最终打包闭包仍未审查，不是法律批准。
 
 ### 2026-11-08：0B 模拟设备故障注入
 
@@ -368,8 +368,8 @@
 
 ### 2026-11-08：0G Python 依赖 SBOM
 
-- 从锁文件导出 CycloneDX 1.5 SBOM，覆盖所有 54 个 Python 锁定依赖（包括所有 extras 与 dev 组），并核对 BOM 的 `(name, version)` 集合与 `uv.lock` 完全一致。复现步骤、SHA-256 和范围限制见 `poc/phase0-python-sbom.md`。
-- uv 导出的组件未包含许可证字段；54 个锁定 Python 包现均有 metadata、随包 LICENSE 或对应 PyPI 精确版本页的初步许可证线索。完整许可证范围/通知审查、模型权重许可、真实标注记忆检索集和 D-014 模型决定仍未完成。
+- 从锁文件导出 CycloneDX 1.5 SBOM，覆盖当时所有 54 个 Python 锁定依赖（包括所有 extras 与 dev 组），并核对 BOM 的 `(name, version)` 集合与 `uv.lock` 完全一致。此后加入实时语音依赖；最新 55 个非根依赖的报告和 SHA-256 见 `poc/phase0-python-sbom.md`。
+- uv 导出的组件未包含许可证字段；当时 54 个锁定 Python 包均有初步许可证线索。最新 55 个非根包也已补充 `websockets==17.4` 的精确 PyPI BSD-3-Clause 来源；完整许可证范围/通知审查、模型权重许可、真实标注记忆检索集和 D-014 模型决定仍未完成。
 
 ### 2026-11-08：两家 Provider 实测与本地语音功能复测
 
@@ -544,5 +544,8 @@
 
 - 用户要求逐项完成全部阶段 0。先从工程基线复核：Python 全量首次暴露 2 个云路由 `NameError: time`（`beta_api.py` 改用 monotonic 后遗漏了 `time()`）；已补回导入。窄回归 `tests/test_beta_api.py -k 'cloud_chat_requires_one_time_consent_before_adapter_access or qwen_application_route_is_available_with_exact_region_and_model'` 2 passed；全量 `pytest -q` 170 passed。Swift `swift test --package-path poc/macos-audio` 31 passed；`uv lock --check` 与 Python `compileall` 通过。
 - 阶段 0 矩阵工程基线仍为 PARTIAL：workflow 声明 `push`/`pull_request`/`workflow_dispatch`，但没有实际 PR 运行；当前本机 `main` commit `d5ed799` 比 `origin/main` `51b9ab9` ahead 13 commits，尚未推送。`uv.lock` 新增 `websockets==17.4` 后，既有 SBOM SHA 锚点过期，需要更新。当前不通过推送/PR提前发布 13 个未核准提交；待阶段 0改动收敛再安排实际 PR CI。
-- 更新 `PROJECT_CONTEXT.md`、`TASKS.md` 和追踪矩阵。本次 `beta_api.py` 修复和最新回归记录仍待提交；接下来按追踪矩阵处理下一项，D-001 设备快照可独立刷新，但主力设备/最低系统版本仍需用户确认。
-- D-001 已刷新本机证据：MacBook Air `MacBookAir10,1` / M1 / 16 GiB、macOS 26.5.1、数据卷余量约 21 GiB、默认内建麦克风单声道及系统音频 48 kHz，见 `docs/poc/phase0-local-asr.md`。已向用户请求确认是否为主力设备及 V1 最低 macOS；等待回复前不冻结兼容性承诺。
+- 更新 `PROJECT_CONTEXT.md`、`TASKS.md` 和追踪矩阵。本次 `beta_api.py` 修复和最新回归记录仍待提交；接下来按追踪矩阵处理下一项。D-001 设备快照及 D-001/D-002 用户确认已补入决策记录。
+- D-001/D-002 已刷新并获用户确认：MacBook Air `MacBookAir10,1` / M1 / 16 GiB 为主力设备，最低 macOS 为 14；本机快照见 `docs/poc/phase0-local-asr.md`。
+- 用户已确认当前 MacBook Air M1/16 GiB 为主力设备，最低系统 macOS 14.0；据此将 D-001/D-002 标为 Accepted，并记录与 Beta `LSMinimumSystemVersion` 一致。
+- POC-01 实时 streaming 代码增加 seam 注入 `BetaVoiceTranscriber`，自动覆盖 WebSocket token、协议、PCM frame sequence、partial/final/ended 顺序、坏序号拒绝和清理；ASR `finish()` 覆盖 endpoint flush 及 endpoint 缺失时 partial 晋升 final。窄回归 `tests/test_beta_api.py tests/test_local_streaming_asr.py` 当前 13 项通过（Starlette TestClient 有 deprecation warning），随后应跑全量回归。
+- 上述实时语音改动后 Python 全量回归 174 passed（1 条 Starlette TestClient/httpx deprecation warning），Swift `swift test --package-path poc/macos-audio` 31 tests passed。依赖 SBOM 已按最新 `backend/uv.lock` 重生成，55 个非根依赖的 name/version 与 CycloneDX 1.5 BOM 完全匹配；新 SHA 见 `phase0-python-sbom.md`。

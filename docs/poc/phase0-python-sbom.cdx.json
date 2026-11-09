@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:faf4ef71-6efe-48d0-999f-6ed7b18a9a01",
+  "serialNumber": "urn:uuid:384477ef-288c-404e-9ea3-a4c559ad3d56",
   "metadata": {
-    "timestamp": "2026-11-08T04:46:57.543563000Z",
+    "timestamp": "2026-11-09T02:17:50.431353000Z",
     "tools": [
       {
         "vendor": "Astral Software Inc.",
@@ -429,7 +429,14 @@
     },
     {
       "type": "library",
-      "bom-ref": "win32-setctime-55@1.2.1",
+      "bom-ref": "websockets-55@17.4",
+      "name": "websockets",
+      "version": "17.4",
+      "purl": "pkg:pypi/websockets@17.4"
+    },
+    {
+      "type": "library",
+      "bom-ref": "win32-setctime-56@1.2.1",
       "name": "win32-setctime",
       "version": "1.2.1",
       "purl": "pkg:pypi/win32-setctime@1.2.1",
@@ -563,7 +570,7 @@
       "ref": "loguru-23@0.7.3",
       "dependsOn": [
         "colorama-10@0.4.6",
-        "win32-setctime-55@1.2.1"
+        "win32-setctime-56@1.2.1"
       ]
     },
     {
@@ -615,7 +622,8 @@
         "sounddevice-45@0.5.6",
         "sqlalchemy-46@2.1.8",
         "sqlcipher3-47@0.6.3",
-        "uvicorn-54@0.54.0"
+        "uvicorn-54@0.54.0",
+        "websockets-55@17.4"
       ]
     },
     {
@@ -736,7 +744,10 @@
       ]
     },
     {
-      "ref": "win32-setctime-55@1.2.1"
+      "ref": "websockets-55@17.4"
+    },
+    {
+      "ref": "win32-setctime-56@1.2.1"
     }
   ]
 }

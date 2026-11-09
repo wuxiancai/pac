@@ -24,8 +24,8 @@
 
 | 编号 | 待决事项 | 当前记录 |
 |---|---|---|
-| D-001 | 主力 Mac 型号、内存、磁盘 | **DEFERRED（2026-11-08，用户要求延期未决事项）**。观测快照仍为 MacBook Air `MacBookAir10,1`、M1/16 GB；尚未确认是产品主力设备。 |
-| D-002 | 最低 macOS | **DEFERRED（2026-11-08）**；发布目标确认时再定。 |
+| D-001 | 主力 Mac 型号、内存、磁盘 | **Accepted（2026-11-09）**。用户确认当前 MacBook Air `MacBookAir10,1` / Apple M1 / 16 GiB 为主力开发/运行设备；数据卷剩余约 21 GiB，当前快照见 `poc/phase0-local-asr.md`。 |
+| D-002 | 最低 macOS | **Accepted（2026-11-09）：macOS 14.0**。与 Beta Info.plist 当前 `LSMinimumSystemVersion` 相符；仍需 CI 目标和安装包验证覆盖该最低版本。 |
 | D-003 | 对话、日志、缓存和备份保留期限 | **DEFERRED（2026-11-08）**。 |
 | D-004 | 音频缓冲上限及异常清理 | **DEFERRED（2026-11-08）**。 |
 | D-005 | 月 API 预算、币种、软/硬阈值 | **DEFERRED（2026-11-08）**。 |
@@ -42,4 +42,4 @@
 
 ## ADR 状态
 
-ADR-001–ADR-022 的原始定义见 [开发规格 v1.2 §16](../个人AI助理可执行开发规格书%20v1.2.md#16-adr-清单延续-v11)。**按用户 2026-11-08 指示，未决事项先延期：ADR-019（静态加密）、ADR-020（Gateway 运行依赖）、ADR-021（音频协议/AEC/插话）、ADR-022（主力 Mac/最低 macOS）均记录为 DEFERRED，等待后续恢复决策。** 2026-11-09 用户授权在单用户 Beta 提前实现本机实时 ASR partial/final 与点击打断文字生成的窄切片；这不决定完整音频协议、AEC、自动声学插话、云 Realtime 或睡眠/锁屏策略，ADR-021 仍 Deferred。其他 ADR 状态按基线记录，不因该指示自动变更。延期是产品决策状态，不豁免阶段 0 明确要求的 POC/验收证据。
+ADR-001–ADR-022 的原始定义见 [开发规格 v1.2 §16](../个人AI助理可执行开发规格书%20v1.2.md#16-adr-清单延续-v11)。ADR-022 已随用户确认主力设备和最低 macOS 改为 Accepted；ADR-019（静态加密）、ADR-020（Gateway 运行依赖）仍 Deferred；ADR-021（音频协议/AEC/插话）仍 POC Required，窄 Beta 切片不决定完整音频协议、AEC、自动声学插话、云 Realtime 或睡眠/锁屏策略。其他 ADR 状态按基线记录，不因该指示自动变更。延期是产品决策状态，不豁免阶段 0 明确要求的 POC/验收证据。
