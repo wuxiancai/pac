@@ -1,3 +1,9 @@
+## 2026-11-09：阶段 3 批量语音并发锁超时
+
+- `/voice/transcribe` 的“先看 `locked()` 再 `async with`”存在检查与获取之间的竞态，并发批量 ASR 也可能无限排队。现直接以 `asyncio.wait_for(lock.acquire(), voice_stream_lock_wait_seconds)` 原子获取单会话锁；超时返回 409，工作完成或取消后在 finally 释放。
+- 新增并发 ASR 回归：阻塞第一条识别请求，第二条在 20 ms 配置等待上限后得到 409，随后第一条完成。窄测 1 passed；Ruff/mypy 通过；后端全量 253 passed，1 条既有 Starlette/httpx 弃用警告。
+- 更新 `docs/beta/macOS-beta-voice.md`、`docs/poc/phase0-traceability.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。未启动麦克风、未操作 GUI/Keychain、未发云请求。
+
 ## 2026-11-09：B5 当前运行窗口文件导入控件只读检查
 
 - 通过 CUA 读取正在运行的 Beta accessibility 控件树：服务已连接，当前路由为 OpenRouter；树中未显示“添加资料”控件。源码 `MacBetaApp/main.swift` 仍有 `import-text-file-button` 和 `.fileImporter` 实现，故不能据此认定代码缺失，运行窗口可能为旧构建或控件树未暴露。

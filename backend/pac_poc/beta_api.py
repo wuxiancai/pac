@@ -467,10 +467,19 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 detail=f"audio exceeds {settings.max_voice_seconds} seconds",
             )
         try:
-            if voice_stream_lock.locked():
-                raise HTTPException(status_code=409, detail="local voice recognition is busy")
-            async with voice_stream_lock:
+            try:
+                await asyncio.wait_for(
+                    voice_stream_lock.acquire(),
+                    timeout=settings.voice_stream_lock_wait_seconds,
+                )
+            except TimeoutError:
+                raise HTTPException(
+                    status_code=409, detail="local voice recognition is busy"
+                ) from None
+            try:
                 text = await _run_voice_worker(voice_transcriber.transcribe_pcm16le, pcm)
+            finally:
+                voice_stream_lock.release()
         except HTTPException:
             raise
         except FileNotFoundError:

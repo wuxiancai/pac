@@ -870,6 +870,55 @@ def test_voice_transcribe_bounds_chunked_body_before_batch_asr() -> None:
     asyncio.run(run())
 
 
+def test_concurrent_batch_voice_request_fails_when_asr_session_is_busy() -> None:
+    class BlockingBatchVoiceTranscriber(StubVoiceTranscriber):
+        def __init__(self) -> None:
+            super().__init__()
+            self.started = Event()
+            self.release = Event()
+
+        def transcribe_pcm16le(self, pcm: bytes) -> str:
+            self.started.set()
+            self.release.wait(timeout=2)
+            return "recognized"
+
+    async def run() -> None:
+        transcriber = BlockingBatchVoiceTranscriber()
+        app = create_beta_api(
+            session=LocalAPISession(token="voice-token"),
+            voice_transcriber_override=transcriber,
+            settings=BetaAPISettings(
+                max_voice_pcm_bytes=32_000,
+                voice_stream_lock_wait_seconds=0.02,
+            ),
+        )
+        headers = {
+            "authorization": "Bearer voice-token",
+            "content-type": "application/octet-stream",
+        }
+
+        async def audio_chunks():
+            yield b"\x00" * 32_000
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            first_task = asyncio.create_task(
+                client.post("/voice/transcribe", headers=headers, content=audio_chunks())
+            )
+            assert await asyncio.to_thread(transcriber.started.wait, 1)
+            second = await client.post(
+                "/voice/transcribe", headers=headers, content=audio_chunks()
+            )
+            transcriber.release.set()
+            first = await first_task
+
+        assert first.status_code == 200
+        assert second.status_code == 409
+
+    asyncio.run(run())
+
+
 def test_voice_websocket_reports_busy_after_authenticated_handshake() -> None:
     transcriber = StubVoiceTranscriber()
     app = create_beta_api(
