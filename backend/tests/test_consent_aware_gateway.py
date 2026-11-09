@@ -39,6 +39,46 @@ class RemoteProbeAdapter:
         yield "stubbed response"
 
 
+class WaitingGenerateAdapter(RemoteProbeAdapter):
+    def __init__(self, started: asyncio.Event, pending: asyncio.Event) -> None:
+        super().__init__()
+        self.started = started
+        self.pending = pending
+        self.cancelled = False
+
+    async def generate(self, request: LocalModelRequest) -> str:
+        self.calls += 1
+        self.started.set()
+        try:
+            await self.pending.wait()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+        return "late response"
+
+
+class WaitingStreamAdapter(RemoteProbeAdapter):
+    def __init__(
+        self,
+        started: asyncio.Event,
+        pending: asyncio.Event,
+        closed: asyncio.Event,
+    ) -> None:
+        super().__init__()
+        self.started = started
+        self.pending = pending
+        self.closed = closed
+
+    async def stream(self, request: LocalModelRequest):
+        self.calls += 1
+        try:
+            self.started.set()
+            yield "first chunk"
+            await self.pending.wait()
+        finally:
+            self.closed.set()
+
+
 def remote_request(**overrides: object) -> LocalModelRequest:
     fields: dict[str, object] = {
         "provider": "provider-test",
@@ -227,3 +267,58 @@ def test_revocation_blocks_next_remote_gateway_request() -> None:
         asyncio.run(gateway.generate(remote_request()))
 
     assert adapter.calls == 1
+
+
+def test_revocation_cancels_in_flight_generate() -> None:
+    async def run() -> None:
+        consent = ConsentManager()
+        grant_consent(consent)
+        started = asyncio.Event()
+        pending = asyncio.Event()
+        adapter = WaitingGenerateAdapter(started, pending)
+        gateway = make_gateway(consent, adapter)
+        task = asyncio.create_task(gateway.generate(remote_request()))
+
+        await started.wait()
+        assert consent.revoke(
+            "provider-test", "model-test", "region-test", "assistant-response"
+        )
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert adapter.calls == 1
+        assert adapter.cancelled
+        grant = consent.exact_grant(
+            "provider-test", "model-test", "region-test", "assistant-response"
+        )
+        assert grant is not None
+        assert grant.status.value == "revoked"
+
+    asyncio.run(run())
+
+
+def test_revocation_cancels_in_flight_stream_and_closes_adapter() -> None:
+    async def run() -> None:
+        consent = ConsentManager()
+        grant_consent(consent, actions=frozenset({ModelAction.STREAM}))
+        started = asyncio.Event()
+        pending = asyncio.Event()
+        closed = asyncio.Event()
+        adapter = WaitingStreamAdapter(started, pending, closed)
+        gateway = make_gateway(consent, adapter)
+
+        async def consume() -> list[str]:
+            return [chunk async for chunk in gateway.stream(remote_request())]
+
+        task = asyncio.create_task(consume())
+        await started.wait()
+        assert consent.revoke(
+            "provider-test", "model-test", "region-test", "assistant-response"
+        )
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert adapter.calls == 1
+        assert closed.is_set()
+
+    asyncio.run(run())

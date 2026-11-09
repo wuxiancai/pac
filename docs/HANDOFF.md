@@ -1,3 +1,10 @@
+### 2026-11-09：实现 Consent 撤销时的在途请求最佳努力取消
+
+- 按规格书 FR-SEC-003，实现 Consent 撤销时先将精确授权标记为 REVOKED、在锁内拒绝后续注册，然后向该授权登记的 asyncio task 发出线程安全取消；所有 Gateway 请求结束路径解除登记，流式请求 cancellation/finally 会关闭 adapter async iterator。
+- 新增 fake adapter 回归：挂起的 generate 被取消；挂起的 stream 被取消且 iterator cleanup 被调用；撤销后的新请求继续在 adapter 前拒绝。未发送真实 Provider 请求。最佳努力取消不能撤回已发送的数据，也不证明 Provider 端停止生成或停止计费。
+- 验证：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra phase0-security pytest -q tests/test_consent_aware_gateway.py tests/test_remote_providers_poc.py tests/test_security_poc.py` → 49 passed；全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 182 passed，1 条既有 Starlette/httpx deprecation warning。
+- POC-05 的在途取消子项已由本机 fake adapter 覆盖；持久审计、Consent UI、实际远端拒绝/取消证据和 Provider 侧费用语义仍开放。阶段 0 未完成。
+
 ### 2026-11-09：扩充本机 ASR+LLM 并发性能样本
 
 - 在既有 7 轮的基础上，固定 `bilingual-mandarin-16k.wav` + `qwen3.5:0.8b` 新增 13 轮本机同步屏障 probe；13/13 产生 final、10 partial，模型响应非空且确认 ASR/LLM 实际重叠。

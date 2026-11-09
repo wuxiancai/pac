@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import hmac
 import ipaddress
+import threading
 import time
 from dataclasses import dataclass, field, replace
 from collections.abc import Callable
@@ -150,14 +152,48 @@ class OutboundRequest:
     source: str
 
 
+@dataclass(frozen=True)
+class _InFlightRequest:
+    loop: asyncio.AbstractEventLoop
+    task: asyncio.Task[object]
+
+
+class ConsentOperationLease:
+    """Unregister one authorized outbound operation when its Gateway call ends."""
+
+    def __init__(
+        self,
+        manager: ConsentManager,
+        key: tuple[str, str, str, str],
+        operation_id: int,
+    ) -> None:
+        self._manager: ConsentManager | None = manager
+        self._key = key
+        self._operation_id = operation_id
+
+    def close(self) -> None:
+        manager = self._manager
+        if manager is None:
+            return
+        self._manager = None
+        manager._unregister_in_flight(self._key, self._operation_id)
+
+
 class ConsentManager:
     """In-memory exact-match consent registry; no grant exists by default."""
 
     def __init__(self) -> None:
         self._grants: dict[tuple[str, str, str, str], ConsentGrant] = {}
+        self._in_flight: dict[
+            tuple[str, str, str, str], dict[int, _InFlightRequest]
+        ] = {}
+        self._next_operation_id = 1
+        self._lock = threading.RLock()
 
     def grant(self, grant: ConsentGrant) -> None:
-        self._grants[(grant.provider, grant.model, grant.region, grant.purpose)] = grant
+        key = (grant.provider, grant.model, grant.region, grant.purpose)
+        with self._lock:
+            self._grants[key] = grant
 
     def revoke(self, provider: str, model: str, region: str, purpose: str) -> bool:
         """Mark a grant REVOKED instead of dropping it, so the state is observable.
@@ -166,16 +202,74 @@ class ConsentManager:
         record makes that transition explicit rather than an absent key.
         """
         key = (provider, model, region, purpose)
-        existing = self._grants.get(key)
-        if existing is None or existing.status is ConsentStatus.REVOKED:
-            return False
-        self._grants[key] = replace(existing, status=ConsentStatus.REVOKED)
+        with self._lock:
+            existing = self._grants.get(key)
+            if existing is None or existing.status is ConsentStatus.REVOKED:
+                return False
+            self._grants[key] = replace(existing, status=ConsentStatus.REVOKED)
+            in_flight = tuple(self._in_flight.get(key, {}).values())
+        for operation in in_flight:
+            if operation.loop.is_closed():
+                continue
+            try:
+                operation.loop.call_soon_threadsafe(
+                    operation.task.cancel, "consent revoked"
+                )
+            except RuntimeError:
+                # The owning event loop may close between the check and scheduling.
+                continue
         return True
 
     def exact_grant(
         self, provider: str, model: str, region: str, purpose: str
     ) -> ConsentGrant | None:
-        return self._grants.get((provider, model, region, purpose))
+        with self._lock:
+            return self._grants.get((provider, model, region, purpose))
+
+    def begin_authorized_request(
+        self, request: OutboundRequest
+    ) -> ConsentOperationLease | None:
+        """Atomically recheck exact consent and register the current asyncio task."""
+        loop = asyncio.get_running_loop()
+        task = asyncio.current_task()
+        if task is None:
+            return None
+        key = (request.provider, request.model, request.region, request.purpose)
+        with self._lock:
+            grant = self._grants.get(key)
+            if not self._grant_authorizes(grant, request):
+                return None
+            operation_id = self._next_operation_id
+            self._next_operation_id += 1
+            self._in_flight.setdefault(key, {})[operation_id] = _InFlightRequest(
+                loop=loop,
+                task=task,
+            )
+        return ConsentOperationLease(self, key, operation_id)
+
+    def _unregister_in_flight(
+        self, key: tuple[str, str, str, str], operation_id: int
+    ) -> None:
+        with self._lock:
+            operations = self._in_flight.get(key)
+            if operations is None:
+                return
+            operations.pop(operation_id, None)
+            if not operations:
+                self._in_flight.pop(key, None)
+
+    @staticmethod
+    def _grant_authorizes(
+        grant: ConsentGrant | None, request: OutboundRequest
+    ) -> bool:
+        return bool(
+            request.data_level is not DataLevel.L3
+            and grant
+            and grant.is_live(time.time())
+            and request.data_level in grant.data_levels
+            and request.action in grant.action_scopes
+            and request.source in grant.source_scopes
+        )
 
 
 class OutboundPolicy:
@@ -183,15 +277,12 @@ class OutboundPolicy:
         self._consent = consent
 
     def authorize(self, request: OutboundRequest) -> bool:
-        if request.data_level is DataLevel.L3:
-            return False
         grant = self._consent.exact_grant(
             request.provider, request.model, request.region, request.purpose
         )
-        return bool(
-            grant
-            and grant.is_live(time.time())
-            and request.data_level in grant.data_levels
-            and request.action in grant.action_scopes
-            and request.source in grant.source_scopes
-        )
+        return self._consent._grant_authorizes(grant, request)
+
+    def begin_authorized_request(
+        self, request: OutboundRequest
+    ) -> ConsentOperationLease | None:
+        return self._consent.begin_authorized_request(request)

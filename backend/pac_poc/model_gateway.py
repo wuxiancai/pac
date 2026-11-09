@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 import httpx
 
 from pac_poc.security_poc import (
+    ConsentOperationLease,
     DataLevel,
     ModelAction,
     OutboundPolicy,
@@ -109,19 +110,42 @@ class ConsentAwarePolicy:
             raise PolicyDenied("remote request requires an explicit region and purpose")
         if not request.source.strip():
             raise PolicyDenied("remote request requires an explicit source scope")
-        authorized = self._outbound_policy.authorize(
-            OutboundRequest(
-                provider=request.provider,
-                model=request.model,
-                region=request.region,
-                purpose=request.purpose,
-                data_level=request.data_level,
-                action=action,
-                source=request.source,
-            )
-        )
+        authorized = self._outbound_policy.authorize(self._outbound_request(request, action))
         if not authorized:
             raise PolicyDenied("remote request lacks matching active Consent and Policy")
+
+    def begin_operation(
+        self,
+        adapter: LocalProviderAdapter,
+        request: LocalModelRequest,
+        action: ModelAction,
+    ) -> ConsentOperationLease | None:
+        if adapter.is_local:
+            return None
+        if not request.region.strip() or not request.purpose.strip():
+            raise PolicyDenied("remote request requires an explicit region and purpose")
+        if not request.source.strip():
+            raise PolicyDenied("remote request requires an explicit source scope")
+        lease = self._outbound_policy.begin_authorized_request(
+            self._outbound_request(request, action)
+        )
+        if lease is None:
+            raise PolicyDenied("remote request lacks matching active Consent and Policy")
+        return lease
+
+    @staticmethod
+    def _outbound_request(
+        request: LocalModelRequest, action: ModelAction
+    ) -> OutboundRequest:
+        return OutboundRequest(
+            provider=request.provider,
+            model=request.model,
+            region=request.region,
+            purpose=request.purpose,
+            data_level=request.data_level,
+            action=action,
+            source=request.source,
+        )
 
 
 class ModelGateway:
@@ -138,7 +162,11 @@ class ModelGateway:
 
     async def generate(self, request: LocalModelRequest) -> str:
         adapter = self._get_authorized_adapter(request, ModelAction.GENERATE)
-        return await adapter.generate(request)
+        lease = self._begin_operation(adapter, request, ModelAction.GENERATE)
+        try:
+            return await adapter.generate(request)
+        finally:
+            self._close_operation(lease)
 
     async def generate_with_metadata(self, request: LocalModelRequest) -> Any:
         adapter = self._get_authorized_adapter(request, ModelAction.GENERATE)
@@ -147,18 +175,26 @@ class ModelGateway:
             raise ProviderCapabilityUnsupported(
                 f"provider {request.provider} does not expose response metadata"
             )
-        return await generate_with_metadata(request)
+        lease = self._begin_operation(adapter, request, ModelAction.GENERATE)
+        try:
+            return await generate_with_metadata(request)
+        finally:
+            self._close_operation(lease)
 
     async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
         adapter = self._get_authorized_adapter(request, ModelAction.STREAM)
-        stream = adapter.stream(request)
+        lease = self._begin_operation(adapter, request, ModelAction.STREAM)
         try:
-            async for chunk in stream:
-                yield chunk
+            stream = adapter.stream(request)
+            try:
+                async for chunk in stream:
+                    yield chunk
+            finally:
+                close = getattr(stream, "aclose", None)
+                if close is not None:
+                    await close()
         finally:
-            close = getattr(stream, "aclose", None)
-            if close is not None:
-                await close()
+            self._close_operation(lease)
 
     async def call_with_tools(self, request: LocalModelRequest) -> ToolCallResult:
         adapter = self._get_authorized_adapter(request, ModelAction.TOOL_PROPOSAL)
@@ -167,7 +203,27 @@ class ModelGateway:
             raise ProviderCapabilityUnsupported(
                 f"provider {request.provider} does not support tool calls"
             )
-        return await call(request)
+        lease = self._begin_operation(adapter, request, ModelAction.TOOL_PROPOSAL)
+        try:
+            return await call(request)
+        finally:
+            self._close_operation(lease)
+
+    def _begin_operation(
+        self,
+        adapter: LocalProviderAdapter,
+        request: LocalModelRequest,
+        action: ModelAction,
+    ) -> ConsentOperationLease | None:
+        begin = getattr(self._policy, "begin_operation", None)
+        if callable(begin):
+            return begin(adapter, request, action)
+        return None
+
+    @staticmethod
+    def _close_operation(lease: ConsentOperationLease | None) -> None:
+        if lease is not None:
+            lease.close()
 
     def _get_authorized_adapter(
         self, request: LocalModelRequest, action: ModelAction
