@@ -4,6 +4,22 @@ public enum LocalAPIClientError: Error, Equatable {
     case invalidEndpoint
     case invalidResponse
     case requestFailed(statusCode: Int)
+    case voiceStreamUnavailable
+}
+
+extension LocalAPIClientError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .invalidEndpoint:
+            return "本机服务地址无效。"
+        case .invalidResponse:
+            return "本机服务返回了无效响应。"
+        case .requestFailed(let statusCode):
+            return "本机服务请求失败（HTTP \(statusCode)）。"
+        case .voiceStreamUnavailable:
+            return "本机语音服务仍在完成上一段识别，请稍后重试；音频未发送到云端。"
+        }
+    }
 }
 
 public struct LocalChatMessage: Codable, Equatable, Sendable {

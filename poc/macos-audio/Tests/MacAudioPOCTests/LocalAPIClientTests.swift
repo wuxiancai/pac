@@ -25,3 +25,10 @@ import Testing
         try LocalAPIClient(baseURL: URL(string: "https://127.0.0.1")!, token: "token")
     }
 }
+
+@Test func voiceStreamUnavailableHasActionableLocalOnlyMessage() {
+    let message = LocalAPIClientError.voiceStreamUnavailable.localizedDescription
+
+    #expect(message.contains("稍后重试"))
+    #expect(message.contains("音频未发送到云端"))
+}

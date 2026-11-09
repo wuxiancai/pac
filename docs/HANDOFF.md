@@ -590,3 +590,4 @@
 - 下一步：用户 Cmd-Q 退出旧 Beta，运行 `PAC_BETA_PERF_DIAGNOSTICS=1 ./poc/macos-audio/scripts/run_beta_app.sh` 构建并重开；先验证停止后立即再次语音可用，再继续累计 20 个 partial 与 20 个停止→final 样本。避免重复做云端请求。
 - 修复提交：`46bca45`（语音锁在 `ended` 前释放）。用户报告的 20 次启动值均低于 5 秒，因此启动门槛有用户观测支持；原范围文本仍需更正精确上下界。partial/final 性能尚无有效 GUI 分布，阶段 0 不能据此验收。
 - 用户回报重构建后第二次语音仍无响应；随后 CUA 查看当前窗口显示“测试版尚未配置”，进程快照只有 App、没有 backend。该运行没有加载启动脚本注入的 `PAC_POC_PYTHON`/`PAC_POC_BACKEND`，因此尚不能判断 `46bca45` 的 GUI 复测结果。用户已收到先 Cmd-Q，再从仓库根目录运行诊断启动命令，并确认新窗口显示“本机服务已连接”后再测的步骤。
+- 后续用户反馈仍出现英文 “There was a bad response from the server”。本次进程快照确认 Beta App 和其管理的 `pac_poc.local_service` 均运行；GUI Accessibility 显示本机已连接、partial 样本 n=5、stop→final n=0。WebSocket 握手时服务端的忙碌拒绝是该英文错误的一个可能原因，但根因尚未证实。客户端现对本机语音 WebSocket 做最多 5 次、间隔 200 ms 的握手重试；耗尽后显示中文提示并明确音频未发往云端。验证：Beta Swift build 通过，`swift test --package-path poc/macos-audio` 32 项通过。下一步需用户 Cmd-Q 后重建启动，确认立即连续两次“语音→停止并识别”均能开始且 final 入草稿；若仍失败，请提供最新状态栏全文与诊断面板 n/P95。性能采样只有在这条路径通过后继续。

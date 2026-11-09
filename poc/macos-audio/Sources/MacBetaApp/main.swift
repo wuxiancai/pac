@@ -266,12 +266,7 @@ final class BetaChatModel {
         stopLocalSpeech()
         status = "正在连接本机实时识别…"
         do {
-            let stream = try client.openVoiceStream()
-            try await stream.start()
-            let ready = try await stream.receive()
-            guard ready.type == "ready" else {
-                throw LocalAPIClientError.invalidResponse
-            }
+            let stream = try await connectVoiceStream(client)
             voiceStream = stream
             voiceFinalSegments = []
             partialTranscript = ""
@@ -347,6 +342,29 @@ final class BetaChatModel {
             cancelVoiceStream()
             status = error.localizedDescription
         }
+    }
+
+    private func connectVoiceStream(_ client: LocalAPIClient) async throws -> LocalVoiceStream {
+        let attempts = 5
+        for attempt in 0..<attempts {
+            let stream = try client.openVoiceStream()
+            do {
+                try await stream.start()
+                let ready = try await stream.receive()
+                guard ready.type == "ready" else {
+                    throw LocalAPIClientError.invalidResponse
+                }
+                return stream
+            } catch {
+                stream.cancel()
+                guard attempt + 1 < attempts else {
+                    throw LocalAPIClientError.voiceStreamUnavailable
+                }
+                status = "正在重试连接本机语音服务…（\(attempt + 2)/\(attempts)）"
+                try await Task.sleep(nanoseconds: 200_000_000)
+            }
+        }
+        throw LocalAPIClientError.voiceStreamUnavailable
     }
 
     func finishVoiceCapture(stopTappedAtUptime: TimeInterval? = nil) async {
