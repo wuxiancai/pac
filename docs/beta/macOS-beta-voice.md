@@ -15,7 +15,7 @@
 
 ## 当前验证
 
-- **2026-11-09 快速重连复测状态**：用户运行重建后的 Beta 后仍报告第二次点语音无反应及 “There was a bad response from the server”。本机进程快照确认 App 与受管 `pac_poc.local_service` 均在运行；GUI Accessibility 显示本机服务已连接、partial `n=5`、停止→final `n=0`。服务忙碌拒绝可能造成 WebSocket 握手 bad response，但尚未证实根因。后端锁释放顺序已调整；客户端现增加最多 5 次、每次间隔 200 ms 的本机握手重试，耗尽后显示中文提示并说明音频未发送到云端。新客户端代码已 `swift build --package-path poc/macos-audio --product personal-assistant-beta` 构建，`swift test --package-path poc/macos-audio` 32 项通过；尚未在 GUI 重建复测。下一步先验证连续两次语音均可启动且停止后 final 入草稿，再采集 D-013 语音样本。
+- **2026-11-09 快速重连复测状态**：用户运行重建后的 Beta 后仍报告第二次点语音无反应及 “There was a bad response from the server”。本机进程快照确认 App 与受管 `pac_poc.local_service` 均在运行；GUI Accessibility 显示本机服务已连接、partial `n=5`、停止→final `n=0`。具体根因尚未证实。服务端已调整锁释放顺序；客户端现增加最多 5 次、每次间隔 200 ms 的本机握手重试；服务端在已认证握手后以 `error` 事件明确返回“本机语音识别正忙”，再以 1013 关闭连接，使客户端可读错误并重试，而非收到 HTTP 握手错误。相关 API/ASR 窄回归 16 项、全量 Python 回归 177 项通过（1 条既有 Starlette/httpx 弃用警告）；compileall、`uv lock --check` 和阶段 0 文档回归 9 项通过。重试后的 Beta 尚未在 GUI 重建复测。下一步先验证连续两次语音均可启动且停止后 final 入草稿，再采集 D-013 语音样本。
 - D-013 本机测量诊断已加入可选模式：从仓库根目录运行 `PAC_BETA_PERF_DIAGNOSTICS=1 poc/macos-audio/scripts/run_beta_app.sh`，聊天窗口底部会显示三项数值。诊断仅在当前进程内保存时间样本，不保存音频或转写：Beta App 初始化至本机服务就绪；PCM 帧组装就绪至对应 partial 更新 SwiftUI 状态；点击“停止并识别”至 final 草稿更新。partial 指标不含 200 ms 帧组装之前的采集时间，也不测屏幕实际绘制完成；须保留定义，不把它直接外推成完整用户感知延迟。诊断关闭时不显示或累计这些分布。
 - 用户随后手动确认 20 次启动计时均约在 0.9–0.11 秒范围内；原文范围端点顺序/小数位存在歧义，因此先只记录全部低于 5 秒门槛的用户报告，待确认最小/最大值后补精确分布。用户尚未能完成语音延迟分布：第一次录音/停止正常，紧接着再次点语音时出现服务端响应错误。
 - 复核发现后端在 WebSocket `/voice/stream` 发送 `ended` 后才释放单例 ASR 锁，存在客户端收到完成事件后立即重连撞上旧锁的竞态。现已改为先结束/清理 ASR 流、释放锁，再发送 `ended`；新增同一客户端会话结束后立即再次连接的回归。后端 15 项窄回归及 Python 全量 176 项通过；GUI 上仍需用户用新构建复测快速再次录音。

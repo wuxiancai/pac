@@ -295,6 +295,52 @@ def test_authenticated_voice_websocket_streams_partial_then_final() -> None:
     assert transcriber.aborted == 2
 
 
+def test_voice_websocket_reports_busy_after_authenticated_handshake() -> None:
+    transcriber = StubVoiceTranscriber()
+    app = create_beta_api(
+        session=LocalAPISession(token="voice-token"),
+        voice_transcriber_override=transcriber,
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect(
+            "/voice/stream",
+            headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+        ) as active:
+            active.send_json({
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            })
+            assert active.receive_json() == {"type": "ready"}
+
+            with client.websocket_connect(
+                "/voice/stream",
+                headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+            ) as busy:
+                busy.send_json({
+                    "type": "start",
+                    "sample_rate_hz": 16_000,
+                    "channels": 1,
+                    "encoding": "pcm_s16le",
+                    "frame_duration_ms": 200,
+                })
+                error = busy.receive_json()
+                assert error == {
+                    "type": "error",
+                    "message": "本机语音识别正忙，请稍后重试；音频未发送到云端",
+                }
+
+            active.send_json({"type": "end"})
+            assert active.receive_json()["type"] == "final"
+            assert active.receive_json() == {"type": "ended"}
+
+    assert transcriber.started == 1
+    assert transcriber.ended == 1
+    assert transcriber.aborted == 1
+
+
 def test_voice_websocket_rejects_bad_token_and_out_of_order_frames() -> None:
     transcriber = StubVoiceTranscriber()
     app = create_beta_api(

@@ -148,7 +148,12 @@ def create_beta_api(
         if not valid:
             await websocket.close(code=1008)
             return
+        await websocket.accept()
         if voice_stream_lock.locked():
+            await websocket.send_json({
+                "type": "error",
+                "message": "本机语音识别正忙，请稍后重试；音频未发送到云端",
+            })
             await websocket.close(code=1013)
             return
         await voice_stream_lock.acquire()
@@ -157,7 +162,6 @@ def create_beta_api(
         total_bytes = 0
         sequence = 0
         try:
-            await websocket.accept()
             start = await websocket.receive_json()
             if start != {
                 "type": "start",
