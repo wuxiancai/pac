@@ -38,7 +38,7 @@ Beta 运行时现从随包的 `pac_poc/beta_model_capabilities.json` 装配默�
 
 ## 进程内 Usage 首段
 
-聊天 run 结束时，`UsageLedger` 保存最近最多 512 条请求 metadata，认证 `GET /usage?limit=50` 可读取（limit 最大 100）。记录仅含 run/provider/model/region/purpose/data level、生命周期状态和 wall latency，不含消息、回复、密钥或音频；进程退出即清空。Beta 流式 Provider 当前不向统一流接口暴露 token/费用 metadata，因此 `usage_state` 与 `cost_state` 返回 `unknown`，token、费用和币种返回 `null`。这不是费用账单或预算保护；D-005 费用来源与缺失 usage 的 fail-closed 方案尚未完成前，不执行额度拦截。
+聊天 run 结束时，`UsageLedger` 保存最近最多 512 条请求 metadata，认证 `GET /usage?limit=50` 可读取（limit 最大 100）。记录仅含 run/provider/model/region/purpose/data level、生命周期状态和 wall latency，不含消息、回复、密钥或音频；进程退出即清空。Gateway 已把 Ollama 与 OpenAI-compatible 流最终帧中实际返回的 token 计数交给 ledger；OpenRouter 若返回经校验的 `usage.cost`，则记录其实际 USD 金额。未返回或不完整的 usage/cost 仍为 `unknown`/`null`。这不是完整费用账单或预算保护：精确 Beta 型号真实 usage/cost E2E、其他 Provider 费用来源及人民币归一尚未完成；D-005 月额度拦截当前未实现。
 
 macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的 Provider/model、region、状态、耗时，以及实际/估算/未知 token 和费用。当前没有真实 token/费用时明确显示为未知，不作推算。面板查询只访问认证 loopback API，不发起模型请求；数据显示依赖当前进程内 ledger，退出后消失。
 
@@ -66,6 +66,6 @@ swift test --package-path poc/macos-audio
 
 - 客户端断连后的服务端取消、run 终态和 usage 记录已有 ASGI 自动回归；仍需在干净 Beta 会话做 GUI 手动冒烟；不提供退出后后台续跑。
 - 在正常启动 Beta 时手动检查“用量”面板的空记录、UNKNOWN/null 呈现和加载失败提示。
-- 将真实 Provider 可获得的 usage metadata 安全透传到 UsageLedger；逐 Provider 明确 usage 来源和 actual/estimated/unknown 语义后，再实现预算检查。当前无真实云 usage 验证，不做云调用。
+- 精确 Beta 云型号仍需按功能触发条件验证真实 usage/cost E2E；目前已实现的协议透传只由 mock 回归证明。之后再明确各 Provider 的费用来源、汇率与缺失值 fail-closed 规则，并实现 D-005 预算门；当前不做云调用，也不把 mock 当作供应商端到端证据。
 - 在正常启动 Beta 时检查精确型号 capability 查询、用量面板、空记录和认证失败状态。
 - 精确云型号的 usage 兼容性尚需依产品功能触发条件验证；工具、多模态和持久化仍须各自完成决策、实现与验证后再启用。

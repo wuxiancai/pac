@@ -1,3 +1,9 @@
+# 2026-11-09：校正用量报告中的过期说明
+
+- 审阅阶段 2 编排报告时发现 Usage 首段仍称流式 Provider 不透传 token，与下方已记录的 Ollama/OpenAI-compatible 最终帧 token 透传及 OpenRouter 实际 USD 处理相矛盾。
+- 已把首段更正为当前代码状态：仅实际返回的 token 计数和 OpenRouter 合法 `usage.cost` 可进入 ledger；缺失值仍 unknown/null；真实 Beta 型号 E2E、跨 Provider 人民币费用归一和 D-005 硬拦截仍未完成。下一步描述也区分 mock 协议回归与供应商真实证据。
+- 本段仅修正文档，未运行测试；依据为当前实现及既有测试证据。没有云请求、Keychain 读取或 GUI 会话改动。
+
 # 2026-11-09：补齐聊天 HTTP 断连生命周期回归
 
 - 新增 ASGI 层聊天断连回归，真实调用 `/chat/stream`，在上游 adapter 阻塞期间模拟 `http.disconnect`。验证上游异步流被关闭、run 查询终态为 `cancelled`，UsageLedger 对应记录也为 `cancelled`。
