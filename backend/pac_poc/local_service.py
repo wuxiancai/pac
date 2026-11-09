@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+import math
 import secrets
 import socket
 import sys
 import threading
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
+
+from fastapi import FastAPI
 
 from .beta_api import create_beta_api
 from .security_poc import LOCAL_API_BIND_HOST, LocalAPISession, create_local_server
@@ -14,8 +19,29 @@ from .security_poc import LOCAL_API_BIND_HOST, LocalAPISession, create_local_ser
 STARTUP_TIMEOUT_SECONDS = 5.0
 
 
+@dataclass(frozen=True)
+class LocalServiceSettings:
+    startup_timeout_seconds: float = STARTUP_TIMEOUT_SECONDS
+    shutdown_timeout_seconds: float = STARTUP_TIMEOUT_SECONDS
+
+    def __post_init__(self) -> None:
+        if any(
+            not math.isfinite(value) or value <= 0
+            for value in (self.startup_timeout_seconds, self.shutdown_timeout_seconds)
+        ):
+            raise ValueError("service timeouts must be finite positive values")
+
+
 def main() -> int:
-    """Run the fixed POC API process and exchange readiness over standard pipes."""
+    return run_local_service()
+
+
+def run_local_service(
+    *,
+    settings: LocalServiceSettings = LocalServiceSettings(),
+    app_factory: Callable[..., FastAPI] = create_beta_api,
+) -> int:
+    """Compose and run the loopback API; settings and app construction are injectable."""
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server = None
     server_thread: threading.Thread | None = None
@@ -30,7 +56,7 @@ def main() -> int:
         server = create_local_server(
             session=LocalAPISession(token=token, expires_at=float("inf")),
             port=port,
-            app_factory=create_beta_api,
+            app_factory=app_factory,
         )
         server_thread = threading.Thread(
             target=server.run,
@@ -40,12 +66,12 @@ def main() -> int:
         )
         server_thread.start()
 
-        deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
+        deadline = time.monotonic() + settings.startup_timeout_seconds
         while not server.started and server_thread.is_alive() and time.monotonic() < deadline:
             time.sleep(0.01)
         if not server.started:
             server.should_exit = True
-            server_thread.join(timeout=STARTUP_TIMEOUT_SECONDS)
+            server_thread.join(timeout=settings.shutdown_timeout_seconds)
             return 1
 
         # stdout is a private owner pipe: exactly one credential-bearing handshake.
@@ -57,7 +83,7 @@ def main() -> int:
 
         command = sys.stdin.readline().strip()
         server.should_exit = True
-        server_thread.join(timeout=STARTUP_TIMEOUT_SECONDS)
+        server_thread.join(timeout=settings.shutdown_timeout_seconds)
         if server_thread.is_alive():
             return 1
         return 0 if command in {"stop", ""} else 2
@@ -65,7 +91,7 @@ def main() -> int:
         if server is not None:
             server.should_exit = True
         if server_thread is not None:
-            server_thread.join(timeout=STARTUP_TIMEOUT_SECONDS)
+            server_thread.join(timeout=settings.shutdown_timeout_seconds)
         return 1
     finally:
         listener.close()

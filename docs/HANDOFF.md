@@ -12,6 +12,12 @@
 - `/health` 仍需本机认证，只返回 `status`、应用版本和进程 uptime；不读取 Keychain/Provider、不检查或创建数据库，也不采集音频。Swift 客户端只解码 `status`，额外字段保持兼容。
 - 更新既有 health 断言；本轮仅做静态编译和差异检查，未运行测试。
 
+### 阶段 1 更新：进程启动配置注入
+
+- 将服务入口拆为 `main()` 与可注入的 `run_local_service(settings, app_factory)`；新增不可变 `LocalServiceSettings`，集中控制启动 ready 和优雅关闭 join 超时，非有限或非正值拒绝。
+- 默认仍使用 5 秒超时、随机 loopback 端口、短期进程令牌和原 Beta API factory；不读取新增环境变量，不改变网络暴露范围或 Keychain 来源。
+- 更新子进程 health 断言以兼容新增版本与 uptime 字段；本轮仅做静态编译与差异检查，未运行测试。
+
 - 用户确认：剩余小功能可以后续补齐，当前文档应明确标为未实现；阶段 0 若已结束则开始阶段 1。
 - 阶段 0 Beta 范围收尾标记为已结束，并保留原始 §13 的 `PARTIAL/OPEN` 与每项触发条件；不宣称完整 V1/发布 POC 全部通过。
 - 阶段 1 按 D-007 从无持久化工程基础开始。数据库、schema/migration、会话保存、静态加密、预算硬拦截、持久审计和文件导入均未实现。

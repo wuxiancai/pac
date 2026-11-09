@@ -42,7 +42,9 @@ def test_managed_local_service_emits_authenticated_loopback_handshake_and_stops(
                 headers={"authorization": f"Bearer {handshake['token']}"},
             )
         assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+        assert response.json()["status"] == "ok"
+        assert response.json()["version"]
+        assert response.json()["uptime_seconds"] >= 0
 
         assert process.stdin is not None
         process.stdin.write("stop\n")
