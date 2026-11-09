@@ -1,3 +1,8 @@
+## 2026-11-09：验证聊天请求字节上限容纳有效最大上下文
+
+- 对前一段 512 KiB JSON 请求体上限补充边界证据：使用默认 ASCII 转义 JSON 编码 39,000 个 supplementary Unicode 字符（约 468 KiB）发往本机模型 mock，返回 200 并到达 adapter；无 Content-Length 的超限分块请求仍返回 413。
+- 定向 2 passed；Ruff/mypy 通过；后端全量 262 passed，1 条既有 Starlette/httpx 弃用警告。更新 `docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md` 的当前回归数。
+
 ## 2026-11-09：阶段 2 聊天 JSON 请求体分块限长
 
 - `/chat/stream` 原由 FastAPI 在执行上下文长度限制前完整解析请求 JSON，带大量转义或填充的请求会先占用内存。现改为从 ASGI 流分块累计，超过 512 KiB 返回 413；之后使用 `StreamChatRequest.model_validate_json`，验证失败仍走不回显输入的统一 422 错误契约。

@@ -639,6 +639,36 @@ def test_chat_request_body_limit_applies_to_chunked_requests_without_length() ->
     asyncio.run(run())
 
 
+def test_chat_body_limit_allows_large_valid_unicode_context() -> None:
+    async def run() -> None:
+        adapter = StubLocalAdapter()
+        app = create_beta_api(
+            session=LocalAPISession(token="test-token"),
+            gateway=ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy()),
+        )
+        body = json.dumps(
+            {"messages": [{"role": "user", "content": "🙂" * 13_000} for _ in range(3)]}
+        ).encode()
+        assert len(body) <= MAX_CHAT_REQUEST_BYTES
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            response = await client.post(
+                "/chat/stream",
+                headers={
+                    "authorization": "Bearer test-token",
+                    "content-type": "application/json",
+                },
+                content=body,
+            )
+
+        assert response.status_code == 200
+        assert adapter.request is not None
+
+    asyncio.run(run())
+
+
 def test_cloud_chat_requires_one_time_consent_before_adapter_access() -> None:
     async def run() -> None:
         adapter = StubCloudAdapter()
