@@ -27,7 +27,7 @@
 
 ## 阶段 0 证据状态（保留追踪，不作为测试版总门禁）
 
-0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 174 项、Swift 31 项通过，`uv lock --check`、`compileall` 通过；历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地分支尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 55/55 非根依赖。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
+0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 176 项、Swift 31 项通过，`uv lock --check`、`compileall` 通过；历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地分支尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 55/55 非根依赖。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
 
 ## 当前执行顺序
 

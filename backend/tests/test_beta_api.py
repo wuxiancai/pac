@@ -85,6 +85,16 @@ class StubVoiceTranscriber:
         raise AssertionError("streaming voice route must not use batch transcription")
 
 
+class QuietVoiceTranscriber(StubVoiceTranscriber):
+    def __init__(self) -> None:
+        super().__init__()
+        self.accepted_sequences: list[int] = []
+
+    def accept_stream_frame(self, pcm: bytes, sequence: int) -> ASREvent | None:
+        self.accepted_sequences.append(sequence)
+        return None
+
+
 def test_beta_chat_stream_is_authenticated_local_and_non_persistent() -> None:
     async def run() -> None:
         adapter = StubLocalAdapter()
@@ -292,4 +302,63 @@ def test_voice_websocket_rejects_bad_token_and_out_of_order_frames() -> None:
 
     assert transcriber.started == 1
     assert transcriber.frames == []
+    assert transcriber.aborted == 1
+
+
+def test_voice_websocket_caps_stream_at_thirty_seconds() -> None:
+    transcriber = QuietVoiceTranscriber()
+    app = create_beta_api(
+        session=LocalAPISession(token="voice-token"),
+        voice_transcriber_override=transcriber,
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect(
+            "/voice/stream",
+            headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+        ) as websocket:
+            websocket.send_json({
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            })
+            assert websocket.receive_json() == {"type": "ready"}
+            pcm_200ms = b"\x00\x00" * 3_200
+            for sequence in range(150):
+                websocket.send_bytes(sequence.to_bytes(4, "big") + pcm_200ms)
+            websocket.send_bytes((150).to_bytes(4, "big") + b"\x00\x00")
+            assert websocket.receive_json() == {
+                "type": "error",
+                "message": "录音超过 30 秒上限",
+            }
+
+    assert transcriber.accepted_sequences == list(range(150))
+    assert transcriber.aborted == 1
+
+
+def test_voice_websocket_disconnect_aborts_and_clears_stream() -> None:
+    transcriber = StubVoiceTranscriber()
+    app = create_beta_api(
+        session=LocalAPISession(token="voice-token"),
+        voice_transcriber_override=transcriber,
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect(
+            "/voice/stream",
+            headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+        ) as websocket:
+            websocket.send_json({
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            })
+            assert websocket.receive_json() == {"type": "ready"}
+            websocket.send_bytes((0).to_bytes(4, "big") + b"\x00\x00" * 3_200)
+            assert websocket.receive_json()["type"] == "partial"
+            websocket.close()
+
+    assert transcriber.ended == 0
     assert transcriber.aborted == 1
