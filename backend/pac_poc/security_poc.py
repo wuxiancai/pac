@@ -12,7 +12,9 @@ from enum import StrEnum
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import uvicorn
 
 
@@ -32,38 +34,79 @@ def create_local_api(*, session: LocalAPISession) -> FastAPI:
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
+    @app.exception_handler(StarletteHTTPException)
+    async def handle_http_error(request: Request, error: StarletteHTTPException) -> JSONResponse:
+        code = {
+            400: "bad_request",
+            401: "unauthorized",
+            403: "forbidden",
+            404: "not_found",
+            409: "conflict",
+            413: "payload_too_large",
+            415: "unsupported_media_type",
+            422: "request_rejected",
+            503: "service_unavailable",
+        }.get(error.status_code, "http_error")
+        message = error.detail if isinstance(error.detail, str) else "request failed"
+        return _error_response(request, error.status_code, code, message, headers=error.headers)
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_validation_error(
+        request: Request, _error: RequestValidationError
+    ) -> JSONResponse:
+        # Do not echo rejected values: request bodies can contain prompts or secrets.
+        return _error_response(request, 422, "validation_error", "request validation failed")
+
     @app.middleware("http")
-    async def attach_trace_id(request: Request, call_next):
+    async def protect_local_api(request: Request, call_next):
         supplied = request.headers.get("x-trace-id", "")
         try:
             trace_id = str(uuid.UUID(supplied))
         except (ValueError, AttributeError):
             trace_id = str(uuid.uuid4())
         request.state.trace_id = trace_id
-        response = await call_next(request)
+        if not _is_loopback_host(request.headers.get("host", "")):
+            response = _error_response(request, 400, "invalid_host", "invalid host")
+        elif request.headers.get("origin") is not None:
+            response = _error_response(
+                request, 403, "browser_origin_denied", "browser origins are not allowed"
+            )
+        elif time.monotonic() >= session.expires_at:
+            response = _error_response(request, 401, "session_expired", "local session expired")
+        else:
+            authorization = request.headers.get("authorization", "")
+            prefix = "Bearer "
+            candidate = authorization[len(prefix) :] if authorization.startswith(prefix) else ""
+            if not hmac.compare_digest(candidate.encode("utf-8"), session.token.encode("utf-8")):
+                response = _error_response(request, 401, "unauthorized", "unauthorized")
+            else:
+                response = await call_next(request)
         response.headers["X-Trace-ID"] = trace_id
         return response
-
-    @app.middleware("http")
-    async def protect_local_api(request: Request, call_next):
-        if not _is_loopback_host(request.headers.get("host", "")):
-            return JSONResponse({"detail": "invalid host"}, status_code=400)
-        if request.headers.get("origin") is not None:
-            return JSONResponse({"detail": "browser origins are not allowed"}, status_code=403)
-        if time.monotonic() >= session.expires_at:
-            return JSONResponse({"detail": "local session expired"}, status_code=401)
-        authorization = request.headers.get("authorization", "")
-        prefix = "Bearer "
-        candidate = authorization[len(prefix) :] if authorization.startswith(prefix) else ""
-        if not hmac.compare_digest(candidate.encode("utf-8"), session.token.encode("utf-8")):
-            return JSONResponse({"detail": "unauthorized"}, status_code=401)
-        return await call_next(request)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
     return app
+
+
+def _error_response(
+    request: Request,
+    status_code: int,
+    code: str,
+    message: str,
+    *,
+    headers: dict[str, str] | None = None,
+) -> JSONResponse:
+    return JSONResponse(
+        {
+            "detail": message,
+            "error": {"code": code, "trace_id": getattr(request.state, "trace_id", None)},
+        },
+        status_code=status_code,
+        headers=headers,
+    )
 
 
 def create_local_server(
