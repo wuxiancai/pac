@@ -81,7 +81,7 @@ flowchart TD
 ### 阶段 0（当前阶段，未验收）
 
 1. 0A 仓库审计与基线记录：完成，不改动原功能/章节/schema/API。
-2. 0B 本地语音链路：旧模型有中文 Streaming ASR；官方双语 Streaming Zipformer 对合成中英音频产生 partial/final；Qwen3-ASR ONNX 另有随包离线评估。用户已有三次真实设备麦克风 CLI partial/final 观察和一次 Beta 录音 partial 可见反馈；当前以功能冒烟为准，模型质量留待后续选择。V1 已接受本机点击触发的实时 ASR/点击打断文字生成，不做 AEC/自动声学插话/云 Realtime；final 草稿、取消/清理和打断仍待 GUI 实机验收。ASR-final→TTS 合成链路在 5 条中文/英文/混说 WAV 上共 7/7 完成并有报告；独立真人语料、长时/多负载资源证据、真实驱动异常仍缺。D-011 现优先采用千问 Token Plan/北京；应用内云语音仍需合规凭据、Consent 和对应接口实测。
+2. 0B 本地语音链路：旧模型有中文 Streaming ASR；官方双语 Streaming Zipformer 对合成中英音频产生 partial/final；Qwen3-ASR ONNX 另有随包离线评估。用户已有三次真实设备麦克风 CLI partial/final 观察；Beta 用户已实机验证 partial、停止后 final 入草稿、取消清理、文字生成中点击打断及录音中 Cmd-Q 退出后无残留。最新快速重复录音复测仍报 WebSocket 服务 bad response；后端已先清理并释放 ASR 锁再发 `ended`，客户端增加有限握手重试，新构建效果待用户复验。模型质量留待后续选择。V1 已接受本机点击触发的实时 ASR/点击打断文字生成，不做 AEC/自动声学插话/云 Realtime。ASR-final→TTS 合成链路在 5 条中文/英文/混说 WAV 上共 7/7 完成并有报告；独立真人语料、长时/多负载资源证据、真实驱动异常仍缺。D-011 现优先采用千问 Token Plan/北京；应用内云语音仍需合规凭据、Consent 和对应接口实测。
 3. 0C 本地 Gateway/能力注册/Agent 模拟：可测试骨架完成；DeepSeek 与 OpenRouter 有用户逐次确认的合成文本实测，同一 ModelGateway 顺序跨 Provider 路由一次通过，两家 SSE、工具提案、JSON 和 4xx 错误路径均有真实探测；另已加入 Qwen Token Plan 固定北京文本 adapter 和 `sk-sp-` 类型保护，并有一次用户逐次确认、精确匹配的真实文本请求（usage 73/50/123）；服务未返回 Provider/区域/费用。服务端取消语义、完整稳定性矩阵及 Qwen 逐项能力仍待补证。
 4. 0D 记忆 POC：SQLite/FTS/来源/纠错/删除/恢复已测；本地 Embedding 候选以 opt-in provider 接入内存仓库并完成 4 条合成查询；产品模型、持久化 schema 与真实检索质量仍 OPEN。
 5. 0E Swift/Loopback/Keychain/Consent：部分完成；策略支持 Touch ID 或设备密码，fake evaluator 路径已测；POC SwiftUI demo 启停/退出清理及两轮 GUI 启停已实机验证；真实系统认证成功两次、用户取消一次，测试代码不访问钥匙串；异常自动恢复/退避、锁屏行为及正式分发配置仍 OPEN。
@@ -103,7 +103,7 @@ flowchart TD
 | 5 | Tool Gateway 加固、加密备份、健康与恢复 | 授权与恢复设计确认 |
 | 6 | V1 E2E、真实设备、发布候选 | AC-001–AC-020 有实际证据，所有阻断项关闭 |
 
-2026-11-09 注：按用户要求，单用户 Beta 的 B2 已提前加入本机实时 ASR/WebSocket、临时 partial/final 草稿边界及点击打断文字生成；用户已确认录音 partial 可见，并实机验证停止 final 入草稿、取消清空 partial、语音按钮打断文字生成并开始采集、录音中 Cmd-Q 退出后 app/backend 清理。20 次离线合成帧耗时观察已记录，但端到端 P95 和 Beta App 启动分布仍待验证；真实设备驱动故障路径未作硬件注入。AEC/自动声学插话/云 Realtime 不在 V1 ADR-021 范围。阶段 3 完整语音体验仍未验收。
+2026-11-09 注：按用户要求，单用户 Beta 的 B2 已提前加入本机实时 ASR/WebSocket、临时 partial/final 草稿边界及点击打断文字生成；用户已确认录音 partial 可见，并实机验证停止 final 入草稿、取消清空 partial、语音按钮打断文字生成并开始采集、录音中 Cmd-Q 退出后 app/backend 清理。20 次离线合成帧耗时观察已记录；用户报告 20 次 App 启动均低于 5 秒，但原始范围存在歧义；partial 与停止→final 的 GUI 端到端 P95 仍无有效样本。快速重复录音 GUI 尚未复验通过，客户端现有有限握手重试。真实设备驱动故障路径未作硬件注入。AEC/自动声学插话/云 Realtime 不在 V1 ADR-021 范围。阶段 3 完整语音体验仍未验收。
 
 V1.1 及 V2–V5 仅按规格书规划；当前不实施后台任务、专业 Agent 团队、外部连接器/写操作、跨设备或多用户能力。
 
