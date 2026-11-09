@@ -1,6 +1,7 @@
 import MacAudioPOC
 import Observation
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum ModelSource: String, CaseIterable, Identifiable {
     case local
@@ -84,6 +85,7 @@ final class BetaChatModel {
     private var activeRequestID: UUID?
     private(set) var latestRunID: String?
     private(set) var latestRunStatus: LocalChatRunStatus?
+    private(set) var importedTextFiles: [LocalImportedTextFile] = []
     private var lastAssistantResponseInterrupted = false
     private let microphone = LocalMicrophoneCapture()
     private let speechPlayback = SpeechPlaybackController(engine: AVSpeechEngine())
@@ -211,6 +213,10 @@ final class BetaChatModel {
 
     func send() {
         guard activeRequest == nil, !isRecordingVoice, !isTranscribingVoice, let client else { return }
+        if usesCloud && !importedTextFiles.isEmpty {
+            status = "已选资料目前只允许发送到本机模型；切回本地模型后再提问。"
+            return
+        }
         guard !selectedModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             status = "请先在模型设置中选择模型。"
             return
@@ -229,6 +235,7 @@ final class BetaChatModel {
         let provider = selectedProvider
         let modelID = selectedModel
         let confirmedForThisRequest = usesCloud
+        let importedDocumentIDs = importedTextFiles.map(\.importID)
         let requestID = UUID()
         activeRequestID = requestID
         latestRunID = nil
@@ -241,7 +248,8 @@ final class BetaChatModel {
                     messages: context,
                     provider: provider,
                     model: modelID,
-                    confirmedForThisRequest: confirmedForThisRequest
+                    confirmedForThisRequest: confirmedForThisRequest,
+                    importedDocumentIDs: importedDocumentIDs
                 ) {
                     guard let self else { return }
                     guard self.activeRequestID == requestID else { return }
@@ -325,6 +333,70 @@ final class BetaChatModel {
                 if runStatus != .running && runStatus != .created { return }
             }
         }
+    }
+
+    func importSelectedFiles(_ urls: [URL]) async {
+        guard let client else { return }
+        guard !urls.isEmpty else { return }
+        if importedTextFiles.count + urls.count > 4 {
+            status = "一次最多附加 4 个文本文件；请分批选择。"
+            return
+        }
+        for url in urls {
+            let suffix = url.pathExtension.lowercased()
+            guard ["txt", "md", "markdown"].contains(suffix) else {
+                status = "目前支持 TXT 和 Markdown 文件；PDF 导入待安全验证。"
+                return
+            }
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+                guard values.isRegularFile == true,
+                      let fileSize = values.fileSize,
+                      fileSize > 0,
+                      fileSize <= 10 * 1024 * 1024
+                else {
+                    status = "文件必须是非空普通文件且不超过 10 MB。"
+                    return
+                }
+                let handle = try FileHandle(forReadingFrom: url)
+                defer { try? handle.close() }
+                let data = try handle.read(upToCount: 10 * 1024 * 1024 + 1) ?? Data()
+                guard data.count <= 10 * 1024 * 1024 else {
+                    status = "文件超过 10 MB 上限。"
+                    return
+                }
+                let imported = try await client.importSelectedText(
+                    data: data,
+                    fileName: url.lastPathComponent
+                )
+                importedTextFiles.append(imported)
+                status = "已添加本机资料：\(imported.displayName)（\(imported.characterCount) 字符）"
+            } catch {
+                status = "无法添加文件：\(error.localizedDescription)"
+                return
+            }
+        }
+    }
+
+    func removeImportedFile(_ file: LocalImportedTextFile) async {
+        guard activeRequest == nil else {
+            status = "请先停止当前生成，再移除资料。"
+            return
+        }
+        guard let client else { return }
+        do {
+            try await client.removeImportedText(importID: file.importID)
+            importedTextFiles.removeAll { $0.id == file.id }
+            status = "已从本机临时资料中移除：\(file.displayName)"
+        } catch {
+            status = "无法从本机服务移除资料：\(error.localizedDescription)"
+        }
+    }
+
+    func reportFileImportError(_ error: Error) {
+        status = "无法打开所选文件：\(error.localizedDescription)"
     }
 
     private func modelSelectionDidChange() {
@@ -590,6 +662,7 @@ final class BetaChatModel {
 private struct BetaChatView: View {
     @Bindable var model: BetaChatModel
     @State private var showingSettings = false
+    @State private var showingFileImporter = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -681,6 +754,31 @@ private struct BetaChatView: View {
                 }
             }
             Divider()
+            if !model.importedTextFiles.isEmpty {
+                ScrollView(.horizontal) {
+                    HStack {
+                        ForEach(model.importedTextFiles) { file in
+                            HStack(spacing: 5) {
+                                Label(file.displayName, systemImage: "doc.text")
+                                Button {
+                                    Task { await model.removeImportedFile(file) }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(model.isStreaming)
+                                .accessibilityLabel("移除资料 \(file.displayName)")
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(.quaternary, in: Capsule())
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .padding(.top, 8)
+            }
             HStack(alignment: .bottom, spacing: 10) {
                 TextField("输入消息…", text: $model.draft, axis: .vertical)
                     .lineLimit(1...5)
@@ -705,6 +803,14 @@ private struct BetaChatView: View {
                     ProgressView("本机识别…")
                         .controlSize(.small)
                 } else {
+                    Button {
+                        showingFileImporter = true
+                    } label: {
+                        Label("添加资料", systemImage: "paperclip")
+                    }
+                    .disabled(model.isRecordingVoice || model.isTranscribingVoice)
+                    .help("选择 TXT 或 Markdown 文件；资料只用于本机模型，PDF 导入尚未启用")
+                    .accessibilityIdentifier("import-text-file-button")
                     Button {
                         Task { await model.startVoiceCapture() }
                     } label: {
@@ -747,6 +853,22 @@ private struct BetaChatView: View {
         }
         .sheet(isPresented: $showingSettings) {
             BetaModelSettingsView(model: model)
+        }
+        .fileImporter(
+            isPresented: $showingFileImporter,
+            allowedContentTypes: [
+                .plainText,
+                UTType(filenameExtension: "md") ?? .plainText,
+                UTType(filenameExtension: "markdown") ?? .plainText,
+            ],
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                Task { await model.importSelectedFiles(urls) }
+            case .failure(let error):
+                model.reportFileImportError(error)
+            }
         }
     }
 

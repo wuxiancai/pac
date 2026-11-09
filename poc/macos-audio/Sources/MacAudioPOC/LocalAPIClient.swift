@@ -59,6 +59,22 @@ public enum LocalChatStreamItem: Sendable {
     case delta(String)
 }
 
+public struct LocalImportedTextFile: Decodable, Identifiable, Sendable {
+    public let importID: String
+    public let displayName: String
+    public let byteCount: Int
+    public let characterCount: Int
+
+    public var id: String { importID }
+
+    enum CodingKeys: String, CodingKey {
+        case importID = "import_id"
+        case displayName = "display_name"
+        case byteCount = "byte_count"
+        case characterCount = "character_count"
+    }
+}
+
 /// Minimal native client for the authenticated, loopback-only POC health endpoint.
 @available(macOS 12.0, *)
 public final class LocalAPIClient: @unchecked Sendable {
@@ -159,6 +175,57 @@ public final class LocalAPIClient: @unchecked Sendable {
         return value.status
     }
 
+    public func importSelectedText(data: Data, fileName: String) async throws -> LocalImportedTextFile {
+        let suffix = URL(fileURLWithPath: fileName).pathExtension.lowercased()
+        guard !data.isEmpty, data.count <= 10 * 1024 * 1024,
+              !fileName.contains("/"), !fileName.contains("\\"),
+              ["txt", "md", "markdown"].contains(suffix),
+              let endpoint = URL(string: "/imports/text", relativeTo: baseURL),
+              var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: true)
+        else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        components.queryItems = [URLQueryItem(name: "filename", value: fileName)]
+        guard let url = components.url else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        request.httpBody = data
+        let (responseData, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard httpResponse.statusCode == 201 else {
+            throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+        guard let imported = try? JSONDecoder().decode(LocalImportedTextFile.self, from: responseData) else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        return imported
+    }
+
+    public func removeImportedText(importID: String) async throws {
+        guard let identifier = UUID(uuidString: importID),
+              let url = URL(
+                string: "/imports/\(identifier.uuidString.lowercased())",
+                relativeTo: baseURL
+              )?.absoluteURL
+        else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard httpResponse.statusCode == 200 else {
+            throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+    }
+
     public func openVoiceStream() throws -> LocalVoiceStream {
         guard let httpURL = URL(string: "/voice/stream", relativeTo: baseURL)?.absoluteURL,
               var components = URLComponents(url: httpURL, resolvingAgainstBaseURL: false)
@@ -176,7 +243,8 @@ public final class LocalAPIClient: @unchecked Sendable {
         messages: [LocalChatMessage],
         provider: String = "ollama",
         model: String = "qwen3.5:0.8b",
-        confirmedForThisRequest: Bool = false
+        confirmedForThisRequest: Bool = false,
+        importedDocumentIDs: [String] = []
     ) -> AsyncThrowingStream<LocalChatStreamItem, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -193,7 +261,8 @@ public final class LocalAPIClient: @unchecked Sendable {
                         messages: messages,
                         provider: provider,
                         model: model,
-                        confirmedForThisRequest: confirmedForThisRequest
+                        confirmedForThisRequest: confirmedForThisRequest,
+                        importIDs: importedDocumentIDs
                     ))
                     let (bytes, response) = try await session.bytes(for: request)
                     guard let httpResponse = response as? HTTPURLResponse else {
@@ -252,12 +321,14 @@ private struct ChatRequest: Encodable {
     let provider: String
     let model: String
     let confirmedForThisRequest: Bool
+    let importIDs: [String]
 
     enum CodingKeys: String, CodingKey {
         case messages
         case provider
         case model
         case confirmedForThisRequest = "confirmed_for_this_request"
+        case importIDs = "import_ids"
     }
 }
 

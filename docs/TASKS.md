@@ -29,7 +29,7 @@
 | B2 | 本地语音闭环 | IN PROGRESS | 已扩展为受认证 loopback WebSocket 本机实时 ASR：200 ms PCM 帧、有界队列、临时 partial、停止后 final 入草稿；用户曾验证 final、取消、文字生成时打断、录音中 Cmd-Q 清理。GUI 曾在停止时断开 socket、随后的第二次录音报 ASR 忙（partial n=2、停止→final n=0）。根因已查明：`LocalVoiceTranscriber.end_stream()`/`abort_stream()` 调用不存在的 `LocalStreamingASR.reset()`，清理再次异常使 WebSocket finally 跳过锁释放。现改为重置底层 recognizer，并在清理异常时仍释放会话锁。真实 Uvicorn + 项目本机 ASR 模型连续 3 轮 PCM 流式识别均收到 partial/final/ended；Python 全量 183 项通过（1 条既有 Starlette/httpx 弃用警告）；Apple URLSessionWebSocketTask + 真实 Uvicorn + 本机 sherpa-onnx 模型 + 固定 PCM WAV 连续 3 轮均收到 partial/final/ended。用户已确认 GUI 实时语音故障修复。启动面板单位错误已定位并修复：秒值遗漏乘以 1,000。用户提供的 20 个启动值换算为 500–700 ms，nearest-rank P95=700 ms，低于 5 秒门槛，启动采样计划已完成；partial 更新 216 次、22 个窗口 P95 摘要最高 41.5 ms；停止→final 21 次 pooled P95 97.9 ms、最大 99.9 ms。三项性能均已满足门槛；D-013 启动 20 个样本计划已完成。模型报告已通过本机 SHA-256 将双语 Zipformer 与 Qwen ONNX 权重精确对应到公开模型 revision；模型训练数据、Qwen 转换代码/工件和随包音频许可仍开放。详见 `beta/macOS-beta-voice.md` 与 `poc/phase0-model-license-review.md`。 |
 | B3 | 会话保存与恢复 | DEFERRED | D-003 已决定不保存对话，D-006 确认 V1 不提供备份/恢复，D-007 确认 V1 不设 app 数据库，D-008 确认不支持外接盘活动数据目录；持久化仍不在当前范围。若未来恢复会话保存，须先重开 ADR-019、完成加密/migration/备份及介质决策和验证。 |
 | B4 | 千问 Token Plan 扩展接入 | DEFERRED | 个人版条款仅允许经官方支持的编程/智能体工具扩展交互使用，排除本项目自建应用后端。只有取得允许自建应用的官方授权/套餐，或实现受支持工具扩展集成后，才能纳入应用选项。协议、地址和状态见 `beta/qwen-token-plan-integration.md`。 |
-| B5 | V1 文件导入及正式发布扩展 | OPEN | D-012 已确定用户主动只读导入 TXT/Markdown/PDF，每个文件最多 10 MB；尚未实现。启用前须完成 PDF 解析资源限制、文件类型/路径安全 POC。D-014 确认 V1 不提供长期记忆/Embedding，D-015 确认 V1 不提供 app 数据导出；云语音、备份/恢复、自动恢复、完整许可通知和正式签名分发仍延后至对应功能开发/发布前。 |
+| B5 | V1 文件导入及正式发布扩展 | IN PROGRESS | 已实现用户主动选择 TXT/Markdown、本机临时导入、显式移除及仅本机模型上下文；10 MB/UTF-8/普通文件名验证，有界进程内内存，无路径持久化。PDF 仍禁用，待独立验证解析器资源限制后再启用。详见 `docs/beta/file-import.md`。D-014 确认 V1 不提供长期记忆/Embedding，D-015 确认 V1 不提供 app 数据导出；云语音、备份/恢复、自动恢复、完整许可通知和正式签名分发仍延后至对应功能开发/发布前。 |
 
 ## 阶段 0 证据状态（已结束；延期项保留原状态）
 
@@ -42,10 +42,10 @@
 1. **B0 应用可运行骨架（DONE）**：SwiftUI 单实例窗口的本机 Beta 入口已完成；本机后端启动、健康状态、错误恢复和关窗退出清理均已验证。
 2. **B1 本机文字对话和模型设置（IN PROGRESS）**：本机 Ollama/固定云端配置选择；选中云端 Provider 后持续授权，聊天时不弹逐条确认；Keychain 凭据和无自动 fallback。用户与本轮 GUI 均确认 Ollama 正常运行时本机聊天可回复。模型设置云端披露已实机复核，本机提示新文案待下次启动确认。长流取消后 Ollama 短请求明显变慢，疑似上游 runner 槽释放问题；停止提示已如实区分客户端取消与上游状态。需确认可用 Ollama 版本/恢复策略，并完成可本地验证的错误路径和云 API 错误 UI 验收。
 3. **B2 本地语音**：接入本机实时 Streaming ASR、明确点击才采集、有限内存/队列、partial/final 草稿边界和按键打断；识别失败不得转云。完整双向语音、AEC、自动插话和系统生命周期仍需阶段 3 决策与验证。
-4. **单助理编排框架（IN PROGRESS）**：已把总助理请求、上下文构建和 Model Gateway 流式调用抽为独立 `MainAssistantOrchestrator`；目前仅启用 `main_assistant`，上下文只使用用户本轮显式提供的消息，不读写持久存储。API 路由保留认证、云授权和 SSE 错误映射。每次流式请求有有界进程内运行状态，可按 run ID 经认证 API 查询；macOS UI 显示短 ID 和状态，并在停止/切换模型后查询终态。编排层接入精确型号能力注册表；声明工具/多模态等额外能力前须有证据，未知时在调用 Gateway 前拒绝，不改变现有文本流路径。Python 窄回归 31 项、Swift 35 项通过，Ruff/mypy 通过；GUI run 状态手动冒烟待下次启动确认；详见 `docs/beta/orchestrator-framework.md`。
-5. 后续再按用户实际使用反馈决定会话持久化；D-014 确认 V1 不提供长期记忆/Embedding，D-015 确认 V1 不提供 app 数据导出。文件导入已由 D-012 纳入 V1 范围（TXT/Markdown/PDF，10 MB），需先通过安全 POC 再启用。备份/恢复按 D-006 不在 V1。B4 千问 Token Plan 文本/实时语音仍须符合个人版条款及 Consent/Policy，不接入自建应用路径。
+4. **单助理编排框架（IN PROGRESS）**：已把总助理请求、上下文构建和 Model Gateway 流式调用抽为独立 `MainAssistantOrchestrator`；目前仅启用 `main_assistant`，上下文只使用本轮明确消息和用户主动导入的文本资料，不读写持久存储。API 路由保留认证、云授权和 SSE 错误映射。每次流式请求有有界进程内运行状态，可按 run ID 经认证 API 查询；macOS UI 显示短 ID 和状态，并在停止/切换模型后查询终态。编排层接入精确型号能力注册表；声明工具/多模态等额外能力前须有证据，未知时在调用 Gateway 前拒绝，不改变现有文本流路径。相关 Python 窄回归 34 项、Swift 35 项通过，Ruff/mypy 通过；run 状态和文件选择 GUI 手动冒烟待下次启动确认；详见 `docs/beta/orchestrator-framework.md` 与 `docs/beta/file-import.md`。
+5. 后续再按用户实际使用反馈决定会话持久化；D-014 确认 V1 不提供长期记忆/Embedding，D-015 确认 V1 不提供 app 数据导出。D-012 文件导入按格式分步启用：TXT/Markdown 本机闭环已实现并待 GUI 冒烟；PDF 在解析器资源限制安全 POC 前保持禁用。备份/恢复按 D-006 不在 V1。B4 千问 Token Plan 文本/实时语音仍须符合个人版条款及 Consent/Policy，不接入自建应用路径。
 
-阶段 1 当前决策允许的无持久化工程底座已完成并有 CI 门禁；预算硬拦截、持久审计、文件导入、Embedding、数据库迁移等均明确未实现，按追踪矩阵触发点排期。完整阶段状态以追踪矩阵 §6 为准。
+阶段 1 当前决策允许的无持久化工程底座已完成并有 CI 门禁；预算硬拦截、持久审计、PDF 导入、Embedding、数据库迁移等均明确未实现，按追踪矩阵触发点排期。TXT/Markdown 导入在 B5 增量实现中，不代表完整文件导入验收。完整阶段状态以追踪矩阵 §6 为准。
 
 ### 非阻塞问题回修清单
 

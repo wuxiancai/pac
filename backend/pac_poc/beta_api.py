@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic, time
 from typing import Literal, Protocol
+from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -27,6 +28,11 @@ from .model_gateway import (
     LocalOnlyPolicy,
     ModelGateway,
     OllamaAdapter,
+)
+from .imported_text import (
+    MAX_IMPORTED_FILE_BYTES,
+    ImportRejected,
+    ImportedTextRegistry,
 )
 from .orchestrator import (
     ConversationTurn,
@@ -138,6 +144,7 @@ class StreamChatRequest(BaseModel):
     provider: Literal["ollama", "deepseek", "openrouter", "qwen-app"] = "ollama"
     model: str = Field(default=BETA_MODEL, min_length=1, max_length=128)
     confirmed_for_this_request: bool = False
+    import_ids: list[UUID] = Field(default_factory=list, max_length=4)
 
 
 class BetaVoiceTranscriber(Protocol):
@@ -256,6 +263,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         settings.voice_model_dir
     )
     run_registry = RunRegistry()
+    imported_text = ImportedTextRegistry()
     voice_stream_lock = asyncio.Lock()
     router = APIRouter()
 
@@ -487,6 +495,43 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             "updated_at": run.updated_at,
         }
 
+    @router.post("/imports/text", status_code=201)
+    async def import_selected_text(request: Request) -> dict[str, str | int]:
+        display_name = request.query_params.get("filename", "")
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                if int(content_length) > MAX_IMPORTED_FILE_BYTES:
+                    raise HTTPException(status_code=413, detail="file exceeds the 10 MB limit")
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="invalid content length") from exc
+        if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() not in {
+            "application/octet-stream",
+            "text/plain",
+        }:
+            raise HTTPException(status_code=415, detail="unsupported file content type")
+        data = bytearray()
+        async for chunk in request.stream():
+            if len(data) + len(chunk) > MAX_IMPORTED_FILE_BYTES:
+                raise HTTPException(status_code=413, detail="file exceeds the 10 MB limit")
+            data.extend(chunk)
+        try:
+            document = imported_text.add(display_name, bytes(data))
+        except ImportRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "import_id": document.import_id,
+            "display_name": document.display_name,
+            "byte_count": document.byte_count,
+            "character_count": document.character_count,
+        }
+
+    @router.delete("/imports/{import_id}")
+    async def remove_imported_text(import_id: str) -> dict[str, bool]:
+        if not imported_text.remove(import_id):
+            raise HTTPException(status_code=404, detail="import not found")
+        return {"removed": True}
+
     @router.post("/chat/stream")
     async def stream_chat(payload: StreamChatRequest) -> StreamingResponse:
         total_chars = sum(len(message.content) for message in payload.messages)
@@ -499,6 +544,19 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 status_code=403,
                 detail="sensitive credentials are blocked from cloud requests",
             )
+        if payload.provider in CLOUD_PROVIDERS and payload.import_ids:
+            raise HTTPException(
+                status_code=403,
+                detail="selected documents are available to local models only",
+            )
+        try:
+            imported_documents = imported_text.get_many(
+                tuple(str(item) for item in payload.import_ids)
+            )
+        except ImportRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="selected file is no longer available") from exc
         messages = [{"role": item.role, "content": item.content} for item in payload.messages]
         selected_gateway = gateway_for(payload)
         if payload.provider in CLOUD_PROVIDERS:
@@ -520,18 +578,23 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             purpose=purpose,
             data_level=data_level,
             source=source,
+            documents=imported_documents,
         )
+        orchestrator = MainAssistantOrchestrator(selected_gateway)
+        model_request = orchestrator.prepare_request(turn)
+        actual_context_chars = sum(len(item["content"]) for item in model_request.messages)
+        if actual_context_chars > settings.max_context_chars:
+            raise HTTPException(status_code=413, detail="conversation context is too long")
         try:
             run = run_registry.create(turn.assistant_key)
             run_registry.transition(run.run_id, RunStatus.RUNNING)
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail="too many active chat runs") from exc
-        orchestrator = MainAssistantOrchestrator(selected_gateway)
 
         async def events() -> AsyncIterator[str]:
             try:
                 async for delta in _stream_with_keepalives(
-                    orchestrator.stream(turn),
+                    orchestrator.stream_request(model_request),
                     settings.chat_stream_keepalive_seconds,
                 ):
                     if delta is None:

@@ -8,11 +8,11 @@
 
 ## 当前状态
 
-- 阶段状态（2026-11-09）：阶段 0 的 Beta 范围已结束，附带明确的未实现/延期清单；原始 §13 全量 POC 仍有 `PARTIAL/OPEN`，不宣称全量验收。阶段 1 当前决策允许的无持久化工程底座已完成并接入 CI lint/type/test/secret-scan 门禁。Loopback API 已有 trace、统一错误、依赖注入、最小 health、可注入启动设置和集中校验配置；云凭据写入/删除需通过 Touch ID 或设备密码。数据库、schema/migration、会话持久化、静态加密、预算硬拦截、文件导入及 30 天持久安全审计明确未实现；触发条件见 `docs/poc/phase0-traceability.md` 和 `docs/TASKS.md`。
+- 阶段状态（2026-11-09）：阶段 0 的 Beta 范围已结束，附带明确的未实现/延期清单；原始 §13 全量 POC 仍有 `PARTIAL/OPEN`，不宣称全量验收。阶段 1 当前决策允许的无持久化工程底座已完成并接入 CI lint/type/test/secret-scan 门禁。Loopback API 已有 trace、统一错误、依赖注入、最小 health、可注入启动设置和集中校验配置；云凭据写入/删除需通过 Touch ID 或设备密码。数据库、schema/migration、会话持久化、静态加密、预算硬拦截、PDF 导入及 30 天持久安全审计明确未实现；TXT/Markdown 导入由 B5 增量实现，完整文件导入未完成。触发条件见 `docs/poc/phase0-traceability.md` 和 `docs/TASKS.md`。
 
 - 2026-11-08 模型设置更新：SwiftUI 聊天页增加本地/云端选择，默认本机 Ollama；云端默认千问按量计费应用 API（`qwen3.8-flash`、`sk-ws-`、Keychain account `qwen-app`），另有 DeepSeek/OpenRouter 路由。选择云 Provider 即持续授权后续聊天发送到该服务商，不再逐条弹窗；设置文案披露此行为，Key 存 login Keychain，L3 凭据在后端出站前拒绝。千问 Token Plan 个人版 `sk-sp-` 官方条款明确排除自建应用后端，未接入直连 Provider；本会话一次千问合成请求返回通用错误且未重试，用户随后反馈已可正常聊天；未在本地记录该次成功响应/usage。详见 `docs/beta/macOS-beta-chat.md` 和 `docs/beta/qwen-token-plan-integration.md`。
 - 当前目标：单用户 macOS 本机优先测试版；POC 证据仍标为 POC，阶段 0 完整 V1/正式发布验收未完成。SwiftUI Beta、受认证的本机 `/chat/stream`、Ollama 增量对话和 Provider/模型切换已实现；GUI 发消息/显示回复、模型切换与语音冒烟已由用户实机复核，详情见 `docs/beta/macOS-beta-chat.md`、`docs/beta/macOS-beta-voice.md`。生成请求使用 request ID 隔离回调；对话不持久化。B2 现为显式点击采集、本机实时 ASR、partial/final 草稿和手动 AVSpeechSynthesizer 朗读；用户实机验证 final、取消、点击打断和录音中 Cmd-Q 退出清理。延期能力保持清晰扩展边界，不宣称已通过验证。
-- 对话主干已增加独立 `MainAssistantOrchestrator` / `ContextBuilder`、有界进程内 `RunRegistry` 和可选的精确型号能力门。当前只路由 `main_assistant`，run 状态可经认证 API 查询，macOS UI 显示短 ID 和状态，记录不含对话正文且不跨进程保存；现有文本流保持原路由，未来额外能力必须先有精确型号证据。后续能力以框架主线连续推进；不影响闭环的小问题先记录回修，不让偶发模型/网络状况占住主线，具体规则见根目录 `AGENTS.md` 与 `docs/TASKS.md`。
+- 对话主干已增加独立 `MainAssistantOrchestrator` / `ContextBuilder`、有界进程内 `RunRegistry`、可选的精确型号能力门，以及用户主动 TXT/Markdown 文件导入。导入内容只留本机进程内存，可移除，只用于本机模型并按不可信资料加入上下文；PDF 保持禁用直至解析资源限制验证完成。当前只路由 `main_assistant`，run 状态可经认证 API 查询，macOS UI 显示短 ID 和状态，记录不含对话正文且不跨进程保存；后续主线优先推进，不影响闭环的小问题先登记回修，具体规则见根目录 `AGENTS.md` 与 `docs/TASKS.md`。
 - B0 已完成（2026-11-09）：主界面采用 SwiftUI 单实例 `Window`，关闭窗口即退出应用；启动失败分类提示/GUI 重试、真实本机服务启动和关窗后 app/backend 无残留均已复核。supervisor 的 start/stop/isRunning 由生命周期锁串行化，启动期间停止的回归通过。
 - B1 本机依赖（2026-11-09）：PAC 本地聊天通过 Ollama 提供模型服务，Ollama 需在本机运行且选择的模型已安装；用户及本轮 GUI 均确认短句可正常返回。Ollama 0.40.15 本机直连接受控取消长流后，下一短请求延迟 46.72 秒；与 Ollama 上游断连占用 runner 槽报告相符，因果尚未完全确认。PAC 停止提示已说明 Ollama 可能仍在结束旧生成；新设置帮助会明确 PAC 后端与 Ollama 分开运行。详见 `docs/beta/macOS-beta-chat.md`。
 - 实现形态：macOS SwiftUI 客户端 + 本机 Python/FastAPI 服务；仓库内各工作包的当前状态和证据见 [阶段 0 追踪矩阵](poc/phase0-traceability.md)。

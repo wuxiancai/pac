@@ -7,7 +7,7 @@
 `backend/pac_poc/orchestrator.py` 提供一条最小、可替换的对话编排路径：
 
 1. `ConversationTurn` 承载一次请求的消息、Provider、模型和授权元数据；对象只在请求生命周期内存在。
-2. `PassThroughContextBuilder` 只复制调用方明确提交的消息，不读取文件、数据库或记忆。
+2. `PassThroughContextBuilder` 只使用调用方明确提交的消息和用户主动导入的文本资料，不读取任意路径、数据库或记忆。
 3. `MainAssistantOrchestrator` 只接受 `main_assistant`，构造 `LocalModelRequest` 并把流交给项目自有 `ModelGateway`。
 4. FastAPI `/chat/stream` 仍负责本机认证、输入大小/L3 检查、云端 Consent/Policy 组合、SSE keep-alive 和面向 UI 的错误映射。
 5. `RunRegistry` 为每次对话创建 UUID 和 `CREATED → RUNNING → COMPLETED/FAILED/CANCELLED` 状态；仅保留有界进程内元数据，不记录消息、生成内容或凭据。SSE 响应头 `X-PAC-Run-ID` 和完成事件提供 ID，认证的 `GET /chat/runs/{run_id}` 查询状态。macOS 客户端读取 run ID、正常结束/失败时查询终态，并在用户停止或切换模型后短暂轮询。
@@ -26,10 +26,10 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked mypy pac_poc/orchestrator.py pac
 swift test --package-path poc/macos-audio
 ```
 
-结果：Python 31 passed；Swift 35 passed（Beta target 在测试构建中完成编译）；Ruff 全部通过；mypy 无问题。pytest 有一条既有 Starlette/httpx 弃用警告。本轮未重启 GUI 做手动 run 状态冒烟；未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
+结果：Python 34 passed；Swift 35 passed（Beta target 在测试构建中完成编译）；Ruff 全部通过；mypy 无问题。pytest 有一条既有 Starlette/httpx 弃用警告。本轮未重启 GUI 做手动 run 状态冒烟；未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
 
 ## 下一步
 
 - 补齐客户端断连与取消路径的生命周期 GUI 手动冒烟；不提供退出后后台续跑。
 - 建立有证据锚点的能力报告装配入口；按已验证的 Provider/model/能力逐步启用，未知项继续默认拒绝。
-- 只有在产品明确启用相应功能后，再增加工具、文件上下文或持久化实现。
+- 下一步将已证实能力逐项装配进运行时；工具、多模态和持久化仍须各自完成决策、实现与验证后再启用。

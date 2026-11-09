@@ -13,6 +13,7 @@ from pac_poc.beta_api import (
     BETA_MODEL,
     BetaAPIDependencies,
     BetaAPISettings,
+    CLOUD_PROVIDERS,
     create_beta_api,
     create_beta_app,
     _stream_with_keepalives,
@@ -190,6 +191,116 @@ def test_beta_chat_stream_is_authenticated_local_and_non_persistent() -> None:
         assert adapter.request.model == BETA_MODEL
         assert adapter.request.provider == "ollama"
         assert adapter.request.messages == [{"role": "user", "content": "你好"}]
+
+    asyncio.run(run())
+
+
+def test_user_selected_text_import_is_bounded_ephemeral_and_local_only() -> None:
+    async def run() -> None:
+        adapter = StubLocalAdapter()
+        app = create_beta_api(
+            session=LocalAPISession(token="test-token"),
+            gateway=ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy()),
+        )
+        headers = {"authorization": "Bearer test-token"}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            imported = await client.post(
+                "/imports/text?filename=notes.md",
+                headers={**headers, "content-type": "application/octet-stream"},
+                content="项目计划：先完成本机测试版。".encode(),
+            )
+            import_id = imported.json()["import_id"]
+            cloud_blocked = await client.post(
+                "/chat/stream",
+                headers=headers,
+                json={
+                    "provider": "deepseek",
+                    "model": CLOUD_PROVIDERS["deepseek"].model,
+                    "confirmed_for_this_request": True,
+                    "import_ids": [import_id],
+                    "messages": [{"role": "user", "content": "总结文件"}],
+                },
+            )
+            local = await client.post(
+                "/chat/stream",
+                headers=headers,
+                json={
+                    "import_ids": [import_id],
+                    "messages": [{"role": "user", "content": "总结文件"}],
+                },
+            )
+            removed = await client.delete(f"/imports/{import_id}", headers=headers)
+            missing = await client.post(
+                "/chat/stream",
+                headers=headers,
+                json={
+                    "import_ids": [import_id],
+                    "messages": [{"role": "user", "content": "再总结"}],
+                },
+            )
+
+        assert imported.status_code == 201
+        assert cloud_blocked.status_code == 403
+        assert local.status_code == 200
+        assert adapter.request is not None
+        assert adapter.request.messages[0]["role"] == "system"
+        assert "不可信数据" in adapter.request.messages[0]["content"]
+        assert "项目计划：先完成本机测试版。" in adapter.request.messages[-1]["content"]
+        assert removed.status_code == 200
+        assert missing.status_code == 404
+
+    asyncio.run(run())
+
+
+def test_user_selected_text_import_rejects_unsupported_or_invalid_files() -> None:
+    async def run() -> None:
+        app = create_beta_api(session=LocalAPISession(token="test-token"))
+        headers = {"authorization": "Bearer test-token", "content-type": "application/octet-stream"}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            pdf = await client.post("/imports/text?filename=doc.pdf", headers=headers, content=b"%PDF")
+            binary = await client.post("/imports/text?filename=doc.txt", headers=headers, content=b"\xff\x00")
+            path = await client.post("/imports/text?filename=../secret.txt", headers=headers, content=b"text")
+
+        assert pdf.status_code == 422
+        assert binary.status_code == 422
+        assert path.status_code == 422
+
+    asyncio.run(run())
+
+
+def test_untrusted_document_framing_counts_against_the_context_limit() -> None:
+    async def run() -> None:
+        adapter = StubLocalAdapter()
+        app = create_beta_api(
+            session=LocalAPISession(token="test-token"),
+            gateway=ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy()),
+            settings=BetaAPISettings(max_context_chars=800),
+        )
+        headers = {"authorization": "Bearer test-token", "content-type": "application/octet-stream"}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            imported = await client.post(
+                "/imports/text?filename=quotes.txt",
+                headers=headers,
+                content=("\"" * 500).encode(),
+            )
+            response = await client.post(
+                "/chat/stream",
+                headers={"authorization": "Bearer test-token"},
+                json={
+                    "import_ids": [imported.json()["import_id"]],
+                    "messages": [{"role": "user", "content": "Summarize"}],
+                },
+            )
+
+        assert imported.status_code == 201
+        assert response.status_code == 413
+        assert adapter.request is None
 
     asyncio.run(run())
 

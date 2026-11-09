@@ -1,5 +1,13 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 本机文本文件导入首段（2026-11-09）
+
+- 完成 TXT/Markdown 首个可用导入闭环：macOS 用户文件选择、security-scoped read、限定 10 MiB 有界读取；后端检查扩展名/无路径文件名/严格 UTF-8/NUL/大小，内容只放进容量受限的进程内 Registry，提供用户删除接口。
+- 聊天引用只传进程内 import UUID；上下文 builder 将资料作为不可信 JSON 参考内容并添加固定 system 指引。导入资料只用于本机模型，API 在 Gateway 前拒绝所有带资料的云请求。支持最多 4 个文件、累计暂存最多 20 MiB，按编排后所有消息的 `content` 字符总数计算 40,000 字符上限，不自动截断。
+- PDF 仍禁用，继续完成解析器资源限制 POC 后再启用；GUI 文件选择/移除手动冒烟待下次启动。没有持久化、目录扫描或原文件路径传输。详见 `docs/beta/file-import.md`。
+- 验证：导入相关 Python 窄回归 45 passed，编排相关 Python 窄回归 34 passed，Ruff/mypy 通过；`swift test --package-path poc/macos-audio` 35 passed 且 Beta target 编译通过。仅一条既有 Starlette/httpx 弃用警告。未读 Keychain、无云请求、无麦克风采集。
+- 下一步继续核心功能框架；GUI 冒烟待应用下次常规启动时顺带确认，PDF 安全解析独立推进，已知 Ollama 偶发现象继续留在回修清单。
+
 ## macOS run 状态反馈（2026-11-09）
 
 - Swift 客户端现在读取 `X-PAC-Run-ID`，将 run ID/状态作为独立流事件交给 Beta UI；聊天页显示 run 短 ID 和本机生命周期状态。正常结束/失败后调用认证的 `GET /chat/runs/{run_id}`；用户停止或切换模型后短暂轮询后端终态。

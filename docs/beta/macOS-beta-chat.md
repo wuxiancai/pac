@@ -8,8 +8,9 @@
 - 本机服务只绑定 `127.0.0.1`，使用随机 Bearer token、Host/Origin 检查和健康检查；token 与 supervisor 管理的后端进程同寿命，关窗停止服务后销毁。
 - `POST /chat/stream` 默认路由到 Ollama 的 `qwen3.5:0.8b`，并接受 GUI 选择的本地模型或固定云 Provider；只接受 `user`/`assistant` 消息，单条消息上限 16,000 字符、上下文总量 40,000 字符、最多 20 条。未知字段拒绝。
 - SwiftUI 页面支持发消息、增量显示回复和停止当前流。对话只保留在当前 app 进程内存中，关闭后不恢复；UI 明示“不保存对话”。
+- 文件选择器支持用户主动选择 TXT/Markdown；文件经受限 loopback API 导入进程内存，最多 10 MB/文件，可从附件条目移除。所选文件只可用于本机模型；切换到云端时后端在 Gateway 前拒绝带文件的聊天。PDF 尚未开放。安全边界和测试见 [`file-import.md`](file-import.md)。
 - 聊天流响应的 `X-PAC-Run-ID` 会传入 UI；页面显示本轮 run 短 ID 与状态。正常结束/失败后向认证的 `/chat/runs/{run_id}` 查询后端状态；用户停止或切换模型时短暂轮询终态。该状态仅供本机进程内观测，不保存对话，也不表示 Provider 一定停止生成。
-- 模型请求失败时显示经过脱敏的提示，不自动回退到其他 Provider。记忆和文件导入仍未接入；B2 语音首个代码切片见 [`macOS-beta-voice.md`](macOS-beta-voice.md)，尚待用户实机录音/识别/朗读。
+- 模型请求失败时显示经过脱敏的提示，不自动回退到其他 Provider。长期记忆仍未接入；B2 语音首个代码切片见 [`macOS-beta-voice.md`](macOS-beta-voice.md)，尚待用户实机录音/识别/朗读。
 
 ## 模型设置与云端请求
 
