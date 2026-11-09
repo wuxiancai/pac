@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from time import sleep
 
 import httpx
@@ -469,6 +470,92 @@ def test_chat_stream_disconnect_cancels_pending_upstream_delta() -> None:
         stream = _stream_with_keepalives(upstream(), interval_seconds=0.01)
         assert await anext(stream) is None
         await stream.aclose()
+        assert upstream_closed.is_set()
+
+    asyncio.run(run())
+
+
+def test_chat_http_disconnect_marks_run_cancelled_and_closes_upstream() -> None:
+    async def run() -> None:
+        upstream_started = asyncio.Event()
+        upstream_closed = asyncio.Event()
+        disconnect = asyncio.Queue()
+        response_started = asyncio.Event()
+        response_headers: list[tuple[bytes, bytes]] = []
+
+        class BlockingLocalAdapter(StubLocalAdapter):
+            async def stream(self, request: LocalModelRequest):
+                self.request = request
+                upstream_started.set()
+                try:
+                    await asyncio.Event().wait()
+                    yield "unreachable"
+                finally:
+                    upstream_closed.set()
+
+        app = create_beta_api(
+            session=LocalAPISession(token="test-token"),
+            gateway=ModelGateway(
+                adapters={"ollama": BlockingLocalAdapter()}, policy=LocalOnlyPolicy()
+            ),
+        )
+        body = json.dumps({
+            "messages": [{"role": "user", "content": "synthetic disconnect test"}]
+        }).encode()
+        request_delivered = False
+
+        async def receive():
+            nonlocal request_delivered
+            if not request_delivered:
+                request_delivered = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await disconnect.get()
+
+        async def send(message):
+            if message["type"] == "http.response.start":
+                response_headers.extend(message["headers"])
+                response_started.set()
+
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": "/chat/stream",
+            "raw_path": b"/chat/stream",
+            "query_string": b"",
+            "root_path": "",
+            "headers": [
+                (b"host", b"127.0.0.1"),
+                (b"authorization", b"Bearer test-token"),
+                (b"content-type", b"application/json"),
+            ],
+            "client": ("127.0.0.1", 12345),
+            "server": ("127.0.0.1", 80),
+        }
+
+        request_task = asyncio.create_task(app(scope, receive, send))
+        await response_started.wait()
+        await upstream_started.wait()
+        disconnect.put_nowait({"type": "http.disconnect"})
+        await request_task
+
+        headers = dict(response_headers)
+        run_id = headers[b"x-pac-run-id"].decode()
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            auth = {"authorization": "Bearer test-token"}
+            run_response = await client.get(f"/chat/runs/{run_id}", headers=auth)
+            usage_response = await client.get("/usage?limit=1", headers=auth)
+
+        assert run_response.status_code == 200
+        assert run_response.json()["status"] == "cancelled"
+        assert usage_response.status_code == 200
+        record = usage_response.json()["records"][0]
+        assert record["run_id"] == run_id
+        assert record["status"] == "cancelled"
         assert upstream_closed.is_set()
 
     asyncio.run(run())

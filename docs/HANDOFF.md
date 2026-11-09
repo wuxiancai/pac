@@ -1,3 +1,10 @@
+# 2026-11-09：补齐聊天 HTTP 断连生命周期回归
+
+- 新增 ASGI 层聊天断连回归，真实调用 `/chat/stream`，在上游 adapter 阻塞期间模拟 `http.disconnect`。验证上游异步流被关闭、run 查询终态为 `cancelled`，UsageLedger 对应记录也为 `cancelled`。
+- 验证：在 `backend/` 执行定向用例 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_beta_api.py::test_chat_http_disconnect_marks_run_cancelled_and_closes_upstream` → 1 passed；后端全量 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 240 passed，1 条既有 Starlette/httpx 弃用警告；`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked ruff check tests/test_beta_api.py` 通过。
+- GUI 手动取消/断连仍待干净 Beta 会话复核；本回归未访问云 Provider、Keychain、麦克风，也未增加持久化。
+- 下一步继续 B1 可自动验证项和 B5/TASKS 中可本地闭环工作；云 API usage/cost E2E 与 UI 呈现仍保留对应门槛。
+
 # 2026-11-09：将 PDF POC 自动回归纳入 CI
 
 - 检查发现 GitHub Actions 安装 `phase0-security` 和 `phase0-embedding`，但没有安装 `phase4-pdf-poc`；因此 `tests/test_pdf_import_poc.py` 会因 `pytest.importorskip("pypdf")` 整个跳过，CI 未覆盖已存在的 PDF 隔离解析回归。

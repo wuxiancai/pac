@@ -60,11 +60,11 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked mypy pac_poc/usage.py pac_poc/be
 swift test --package-path poc/macos-audio
 ```
 
-结果：本轮能力清单/API 窄回归 39 passed；Ruff 与相关模块 mypy 通过；wheel 检查确认 manifest 随包。Python 全量 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 228 passed，1 条既有 Starlette/httpx 弃用警告。上一段用量面板接入后 Swift 36 项与 Beta target build 通过。GUI 手动冒烟尚未做；未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
+结果（2026-11-09）：新增 ASGI 层 HTTP 断连回归，验证请求断开会关闭上游异步流、run 状态变为 `CANCELLED`，认证 run 查询与 UsageLedger 均返回该终态。定向回归 1 passed；Ruff 通过；后端全量 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 240 passed，1 条既有 Starlette/httpx 弃用警告。此前能力清单/API 窄回归 39 passed、相关模块 mypy 通过，wheel 检查确认 manifest 随包；Swift 用量面板此前 36 项与 Beta target build 通过。GUI 手动冒烟尚未做；未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
 
 ## 下一步
 
-- 补齐客户端断连与取消路径的生命周期 GUI 手动冒烟；不提供退出后后台续跑。
+- 客户端断连后的服务端取消、run 终态和 usage 记录已有 ASGI 自动回归；仍需在干净 Beta 会话做 GUI 手动冒烟；不提供退出后后台续跑。
 - 在正常启动 Beta 时手动检查“用量”面板的空记录、UNKNOWN/null 呈现和加载失败提示。
 - 将真实 Provider 可获得的 usage metadata 安全透传到 UsageLedger；逐 Provider 明确 usage 来源和 actual/estimated/unknown 语义后，再实现预算检查。当前无真实云 usage 验证，不做云调用。
 - 在正常启动 Beta 时检查精确型号 capability 查询、用量面板、空记录和认证失败状态。
