@@ -1,3 +1,9 @@
+### 2026-11-09：补充 Consent 并发请求撤销回归
+
+- 新增同一精确 Consent 下两个并发挂起 generate 的 fake adapter 场景；撤销后两个请求均收到取消。未发起真实 Provider 请求。
+- 验证：Consent/Provider/Security 窄回归 50 passed；Python 全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 183 passed，1 条既有 Starlette/httpx deprecation warning。
+- 阶段 0 仍未验收；真实 Provider 侧取消/费用、审计持久化/UI、macOS 14 runtime、远端 CI 和许可/发行闭环仍开放。
+
 ### 2026-11-09：实现 Consent 撤销时的在途请求最佳努力取消
 
 - 按规格书 FR-SEC-003，实现 Consent 撤销时先将精确授权标记为 REVOKED、在锁内拒绝后续注册，然后向该授权登记的 asyncio task 发出线程安全取消；所有 Gateway 请求结束路径解除登记，流式请求 cancellation/finally 会关闭 adapter async iterator。

@@ -17,7 +17,7 @@
 - 缺少 region/purpose/source、provider/model/region/purpose/data level/source 任一不匹配、action 不匹配、L3、过期和撤销后的请求均拒绝。
 - generate grant 不授权 stream/tool proposal，stream grant 不授权 generate；显式 stream grant 才允许流式请求进入 fake adapter。
 - 精确匹配且有效的 L1 Consent 才允许对应操作进入 fake adapter；撤销状态保留并可检查。
-- 在 fake adapter 的 generate 与 stream 挂起期间撤销 Consent，会取消当前 asyncio task；stream 路径同时关闭 adapter async iterator。后续新请求仍被拒绝。
+- 在 fake adapter 的 generate 与 stream 挂起期间撤销 Consent，会取消当前 asyncio task；同一精确 Consent 下多个并发 generate 也都会被取消；stream 路径同时关闭 adapter async iterator。后续新请求仍被拒绝。
 
 命令：
 
@@ -26,7 +26,7 @@ cd backend
 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra phase0-security pytest -q tests/test_consent_aware_gateway.py
 ```
 
-窄回归：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra phase0-security pytest -q tests/test_consent_aware_gateway.py tests/test_remote_providers_poc.py tests/test_security_poc.py` → 49 passed。2026-11-09 全量：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 182 passed，1 条既有 Starlette/httpx 弃用警告。并发撤销仅由 fake adapter 验证；已发出的请求数据无法撤回，Provider 侧停止生成/计费语义也未被证明。审计持久化、Consent UI、真实 Provider 出站门禁和费用/区域核验仍未闭环；契约测试不构成 Provider E2E 证据。
+窄回归：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --extra phase0-security pytest -q tests/test_consent_aware_gateway.py tests/test_remote_providers_poc.py tests/test_security_poc.py` → 50 passed。新增同一精确 Consent 下两个并发挂起 generate 同时被撤销取消。2026-11-09 全量：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 183 passed，1 条既有 Starlette/httpx 弃用警告。并发撤销仅由 fake adapter 验证；已发出的请求数据无法撤回，Provider 侧停止生成/计费语义也未被证明。审计持久化、Consent UI、真实 Provider 出站门禁和费用/区域核验仍未闭环；契约测试不构成 Provider E2E 证据。
 
 ## 安全边界
 

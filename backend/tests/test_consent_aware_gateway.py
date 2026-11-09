@@ -40,19 +40,28 @@ class RemoteProbeAdapter:
 
 
 class WaitingGenerateAdapter(RemoteProbeAdapter):
-    def __init__(self, started: asyncio.Event, pending: asyncio.Event) -> None:
+    def __init__(
+        self,
+        started: asyncio.Event,
+        pending: asyncio.Event,
+        expected_calls: int = 1,
+    ) -> None:
         super().__init__()
         self.started = started
         self.pending = pending
+        self.expected_calls = expected_calls
         self.cancelled = False
+        self.cancelled_calls = 0
 
     async def generate(self, request: LocalModelRequest) -> str:
         self.calls += 1
-        self.started.set()
+        if self.calls >= self.expected_calls:
+            self.started.set()
         try:
             await self.pending.wait()
         except asyncio.CancelledError:
             self.cancelled = True
+            self.cancelled_calls += 1
             raise
         return "late response"
 
@@ -320,5 +329,31 @@ def test_revocation_cancels_in_flight_stream_and_closes_adapter() -> None:
 
         assert adapter.calls == 1
         assert closed.is_set()
+
+    asyncio.run(run())
+
+
+def test_revocation_cancels_all_concurrent_requests_for_the_consent_scope() -> None:
+    async def run() -> None:
+        consent = ConsentManager()
+        grant_consent(consent)
+        started = asyncio.Event()
+        pending = asyncio.Event()
+        adapter = WaitingGenerateAdapter(started, pending, expected_calls=2)
+        gateway = make_gateway(consent, adapter)
+        tasks = [
+            asyncio.create_task(gateway.generate(remote_request()))
+            for _ in range(2)
+        ]
+
+        await started.wait()
+        assert adapter.calls == 2
+        assert consent.revoke(
+            "provider-test", "model-test", "region-test", "assistant-response"
+        )
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        assert all(isinstance(result, asyncio.CancelledError) for result in results)
+        assert adapter.cancelled_calls == 2
 
     asyncio.run(run())
