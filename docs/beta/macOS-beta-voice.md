@@ -14,6 +14,7 @@
 
 ## 当前验证
 
+- 2026-11-09 首次实时语音无响应的根因：Beta 后端仅安装 Uvicorn，没有任何 WebSocket 协议依赖；HTTP 聊天正常，但实时语音握手失败。`backend/pyproject.toml` 与 `uv.lock` 已锁定增加 `websockets==17.4`。本机 Python 3.12 环境检查 `uv run --locked python -c 'from fastapi import FastAPI; from uvicorn.config import Config; config = Config(FastAPI()); config.load(); print(config.ws_protocol_class.__name__)'` 输出 `WebSocketsSansIOProtocol`。已重启 Beta，GUI 确认新实时语音控件显示且本机服务已连接；尚未重试麦克风/语音 WebSocket。
 - `swift build --package-path poc/macos-audio --product personal-assistant-beta`：实时语音客户端与 Beta target 构建通过。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python -m compileall -q pac_poc`（工作目录 `backend/`）：通过。
 - 本轮没有启动麦克风、运行测试、启动 GUI 或播放语音；新 WebSocket 与设备采集/partial/final、文字生成打断尚未实机验证。
