@@ -23,6 +23,8 @@ CI 现显式安装 `phase4-pdf-poc` extra，因此通用 Python 回归会实际�
 
 此 POC 尚未完成 D-012 启用门：本机尝试对 `RLIMIT_AS`、`RLIMIT_DATA`、`RLIMIT_RSS` 设 512 MiB 有限限额均失败，Python 报 `ValueError: current limit exceeds maximum limit`；随后又在 worker 启动前用 `/bin/sh` 的 `ulimit -v` 试设 768 MiB、1 GiB、1.5 GiB，三次均被 macOS 返回 `cannot modify limit: Invalid argument`。因此当前目标系统上没有验证通过的硬内存上限。仍缺代表性恶意 PDF 语料、CPU 压力/真实墙钟超时实测、对象数专项测试和 Beta GUI 端到端验证。合成 FlateDecode 上限回归只覆盖一种受控输入，不代表完整恶意样本集。因此 PDF 仍禁用，以上 POC 结果不视为产品保证。文件相关内容仍仅本机临时处理，无云端处理或长期保存。
 
+2026-11-10 macOS 资源隔离资料核对：Apple 将 App Sandbox 描述为限制应用访问文件、网络连接和硬件等系统资源的边界；官方 `os_proc_available_memory()` 说明明确将结果限定为当前 app 可用内存的建议值，数值会随生命周期变化，且调用者不是 app 时返回 0。它不能给当前 Python helper worker 提供可配置、可验证的硬内存上限。此轮没有找到可替代已失败 `setrlimit`/`ulimit` 尝试且在目标 macOS 上验证通过的公共机制；这不证明不存在其他机制。PDF 继续禁用，直到候选隔离能以超限样本证明限制和拒绝行为。[App Sandbox 文档](https://developer.apple.com/documentation/security/app-sandbox)；[`os_proc_available_memory()` 文档](https://developer.apple.com/documentation/os/os_proc_available_memory)。
+
 ## 自动验证
 
 Swift 客户端请求契约回归（2026-11-09）：`swift test --package-path poc/macos-audio` → 40 passed，Beta target build 通过。新增 URLProtocol fixture 验证导入请求只携带 basename、文件内容和 loopback Bearer token；不包含原始路径；PDF 与大于 10 MiB 文件在网络调用前拒绝。GUI 文件选择、暂存和移除已另行实测通过；自动契约测试不代替尚未完成的聊天引用 GUI 验收。较早一次只读检查旧运行实例时，accessibility 控件树未呈现“添加资料”；当时窗口有未持久化对话，因此未重启。之后确认 Beta 实例已退出，从仓库根目录运行 `poc/macos-audio/scripts/run_beta_app.sh` 启动当前构建，状态栏显示本机服务已连接，accessibility 树可见 `import-text-file-button`。随后进行本机 GUI 冒烟：仓库内 141-byte 合成 TXT 由文件选择器选中，Beta 显示 `gui-import-fixture.txt` 和 65 字符计数；点击移除后附件 chip 消失，状态提示“已从本机临时资料中移除”。当时应用选择 Ollama 本地模型，未发送聊天消息或触发 Provider，因此只确认文件选择、暂存和移除；资料实际进入聊天上下文的 GUI 引用仍待验证。
