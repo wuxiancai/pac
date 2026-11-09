@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import math
 import re
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
@@ -65,6 +66,35 @@ VOICE_MODEL_DIR = (
 )
 
 
+@dataclass(frozen=True)
+class BetaAPISettings:
+    """Non-secret, process-local runtime limits and resource locations."""
+
+    max_context_chars: int = MAX_CONTEXT_CHARS
+    max_voice_pcm_bytes: int = MAX_VOICE_PCM_BYTES
+    voice_stream_lock_wait_seconds: float = VOICE_STREAM_LOCK_WAIT_SECONDS
+    voice_model_dir: Path = VOICE_MODEL_DIR
+
+    def __post_init__(self) -> None:
+        if not 0 < self.max_context_chars <= MAX_CONTEXT_CHARS:
+            raise ValueError("context limit must be positive and cannot exceed the Beta limit")
+        if not 0 < self.max_voice_pcm_bytes <= MAX_VOICE_PCM_BYTES:
+            raise ValueError("PCM byte limit must be positive and cannot exceed 30 seconds")
+        if self.max_voice_pcm_bytes % 32_000:
+            raise ValueError("PCM byte limit must represent a whole second of 16 kHz mono PCM16")
+        if not math.isfinite(self.voice_stream_lock_wait_seconds) or self.voice_stream_lock_wait_seconds <= 0:
+            raise ValueError("voice stream lock timeout must be finite and positive")
+        if not isinstance(self.voice_model_dir, Path) or not self.voice_model_dir.is_absolute():
+            raise ValueError("voice model directory must be absolute")
+
+    @property
+    def max_voice_seconds(self) -> int:
+        return self.max_voice_pcm_bytes // 32_000
+
+
+DEFAULT_BETA_API_SETTINGS = BetaAPISettings()
+
+
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -102,6 +132,7 @@ class BetaAPIDependencies:
     credentials: CredentialProvider | None = None
     remote_adapters: Mapping[str, LocalProviderAdapter] | None = None
     voice_transcriber: BetaVoiceTranscriber | None = None
+    settings: BetaAPISettings = DEFAULT_BETA_API_SETTINGS
 
 
 CLOUD_PROVIDERS: dict[str, RemoteProviderConfig] = {
@@ -129,6 +160,7 @@ def create_beta_api(
     credentials: CredentialProvider | None = None,
     remote_adapters_override: Mapping[str, LocalProviderAdapter] | None = None,
     voice_transcriber_override: BetaVoiceTranscriber | None = None,
+    settings: BetaAPISettings = DEFAULT_BETA_API_SETTINGS,
 ) -> FastAPI:
     """Compatibility composition root for the injected beta app factory."""
     return create_beta_app(dependencies=BetaAPIDependencies(
@@ -137,6 +169,7 @@ def create_beta_api(
         credentials=credentials,
         remote_adapters=remote_adapters_override,
         voice_transcriber=voice_transcriber_override,
+        settings=settings,
     ))
 
 
@@ -147,6 +180,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
     credentials = dependencies.credentials
     remote_adapters_override = dependencies.remote_adapters
     voice_transcriber_override = dependencies.voice_transcriber
+    settings = dependencies.settings
     app = create_local_api(session=session)
     ollama = OllamaAdapter()
     credential_provider = credentials or MacOSKeychainCredentialProvider()
@@ -159,7 +193,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         for provider, config in CLOUD_PROVIDERS.items()
     }
     voice_transcriber: BetaVoiceTranscriber = voice_transcriber_override or LocalVoiceTranscriber(
-        VOICE_MODEL_DIR
+        settings.voice_model_dir
     )
     voice_stream_lock = asyncio.Lock()
     router = APIRouter()
@@ -181,7 +215,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         try:
             await asyncio.wait_for(
                 voice_stream_lock.acquire(),
-                timeout=VOICE_STREAM_LOCK_WAIT_SECONDS,
+                timeout=settings.voice_stream_lock_wait_seconds,
             )
         except TimeoutError:
             await websocket.send_json({
@@ -226,8 +260,11 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                         await websocket.close(code=1008)
                         break
                     total_bytes += len(pcm)
-                    if total_bytes > MAX_VOICE_PCM_BYTES:
-                        await websocket.send_json({"type": "error", "message": "录音超过 30 秒上限"})
+                    if total_bytes > settings.max_voice_pcm_bytes:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"录音超过 {settings.max_voice_seconds} 秒上限",
+                        })
                         await websocket.close(code=1008)
                         break
                     event = await asyncio.to_thread(
@@ -310,15 +347,21 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         content_length = request.headers.get("content-length")
         if content_length is not None:
             try:
-                if int(content_length) > MAX_VOICE_PCM_BYTES:
-                    raise HTTPException(status_code=413, detail="audio exceeds 30 seconds")
+                if int(content_length) > settings.max_voice_pcm_bytes:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"audio exceeds {settings.max_voice_seconds} seconds",
+                    )
             except ValueError:
                 raise HTTPException(status_code=400, detail="invalid content length") from None
         pcm = await request.body()
         if not pcm or len(pcm) % 2:
             raise HTTPException(status_code=422, detail="audio must be non-empty PCM16LE")
-        if len(pcm) > MAX_VOICE_PCM_BYTES:
-            raise HTTPException(status_code=413, detail="audio exceeds 30 seconds")
+        if len(pcm) > settings.max_voice_pcm_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"audio exceeds {settings.max_voice_seconds} seconds",
+            )
         try:
             if voice_stream_lock.locked():
                 raise HTTPException(status_code=409, detail="local voice recognition is busy")
@@ -373,7 +416,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
     @router.post("/chat/stream")
     async def stream_chat(payload: StreamChatRequest) -> StreamingResponse:
         total_chars = sum(len(message.content) for message in payload.messages)
-        if total_chars > MAX_CONTEXT_CHARS:
+        if total_chars > settings.max_context_chars:
             raise HTTPException(status_code=413, detail="conversation context is too long")
         if payload.provider in CLOUD_PROVIDERS and any(
             _L3_SECRET_PATTERN.search(item.content) for item in payload.messages
