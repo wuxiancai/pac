@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import errno
-import os
 import sqlite3
 from pathlib import Path
 

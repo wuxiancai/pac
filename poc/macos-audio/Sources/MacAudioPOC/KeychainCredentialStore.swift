@@ -3,13 +3,13 @@ import Security
 
 public enum KeychainCredentialError: Error, Equatable, LocalizedError {
     case emptyIdentity
-    case emptySecret
+    case emptyCredential
     case keychain(operation: String, status: OSStatus)
 
     public var errorDescription: String? {
         switch self {
         case .emptyIdentity: "密钥账户信息无效。"
-        case .emptySecret: "API Key 不能为空。"
+        case .emptyCredential: "API Key 不能为空。"
         case .keychain(let operation, let status): "Keychain 操作失败（\(operation), \(status)）。"
         }
     }
@@ -25,7 +25,7 @@ public final class KeychainCredentialStore {
 
     public func save(_ secret: String, account: String) throws {
         try validate(account: account)
-        guard !secret.isEmpty else { throw KeychainCredentialError.emptySecret }
+        guard !secret.isEmpty else { throw KeychainCredentialError.emptyCredential }
         let key = baseQuery(account: account)
         let attributes = [kSecValueData as String: Data(secret.utf8)] as CFDictionary
 

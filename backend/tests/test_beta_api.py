@@ -9,9 +9,55 @@ from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from pac_poc.asr import ASREvent
-from pac_poc.beta_api import BETA_MODEL, create_beta_api
+from pac_poc.beta_api import (
+    BETA_MODEL,
+    BetaAPIDependencies,
+    BetaAPISettings,
+    create_beta_api,
+    create_beta_app,
+)
 from pac_poc.model_gateway import LocalModelRequest, ModelGateway, LocalOnlyPolicy
 from pac_poc.security_poc import LocalAPISession
+
+
+def test_beta_app_factory_and_error_envelope_do_not_echo_invalid_request_values() -> None:
+    async def run() -> None:
+        app = create_beta_app(
+            dependencies=BetaAPIDependencies(session=LocalAPISession(token="factory-token"))
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            denied = await client.post("/chat/stream", json={})
+            sentinel = "sk-" + ("x" * 32)
+            invalid = await client.post(
+                "/chat/stream",
+                headers={"authorization": "Bearer factory-token"},
+                json={"messages": [], "unexpected_secret": sentinel},
+            )
+        assert denied.status_code == 401
+        assert denied.json()["error"]["code"] == "unauthorized"
+        assert denied.json()["error"]["trace_id"] == denied.headers["x-trace-id"]
+        assert invalid.status_code == 422
+        assert invalid.json()["error"]["code"] == "validation_error"
+        assert invalid.json()["error"]["trace_id"] == invalid.headers["x-trace-id"]
+        assert sentinel not in invalid.text
+
+    asyncio.run(run())
+
+
+def test_beta_api_settings_only_allow_restrictive_valid_limits() -> None:
+    settings = BetaAPISettings(max_context_chars=12_000, max_voice_pcm_bytes=320_000)
+    assert settings.max_voice_seconds == 10
+
+    with pytest.raises(ValueError):
+        BetaAPISettings(max_context_chars=True)
+    with pytest.raises(ValueError):
+        BetaAPISettings(max_voice_pcm_bytes=960_001)
+    with pytest.raises(ValueError):
+        BetaAPISettings(max_voice_pcm_bytes=320_001)
+    with pytest.raises(ValueError):
+        BetaAPISettings(voice_stream_lock_wait_seconds=float("inf"))
 
 
 class StubLocalAdapter:
@@ -185,7 +231,7 @@ def test_cloud_chat_requires_one_time_consent_before_adapter_access() -> None:
                 headers=headers,
                 json={
                     **body,
-                    "messages": [{"role": "user", "content": "sk-1234567890abcdefghijklmnop"}],
+                    "messages": [{"role": "user", "content": "sk-" + ("x" * 24)}],
                     "confirmed_for_this_request": True,
                 },
             )

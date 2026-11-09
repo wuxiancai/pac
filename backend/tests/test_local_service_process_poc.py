@@ -7,9 +7,18 @@ import sys
 from pathlib import Path
 
 import httpx
+import pytest
+
+from pac_poc.local_service import LocalServiceSettings
 
 
 BACKEND = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("timeout", [0, -1, True, "5", float("inf"), float("nan")])
+def test_local_service_settings_reject_invalid_timeouts(timeout: object) -> None:
+    with pytest.raises(ValueError):
+        LocalServiceSettings(startup_timeout_seconds=timeout)  # type: ignore[arg-type]
 
 
 def _readiness_line(process: subprocess.Popen[str], timeout: float = 8) -> dict[str, object]:

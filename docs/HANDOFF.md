@@ -1,9 +1,22 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+### 阶段 1 更新：Keychain 写入/删除认证 gate
+
+- Beta 模型设置改用 `CredentialManagementService` 保存/删除云 Provider Key；两种修改均要求系统设备认证（Touch ID 或设备密码），取消/失败时不改 Keychain。只读 configured 状态仍不回显密钥。
+- 设置页新增“删除已保存的 Key”入口；输入中的密钥在保存成功后清空，写入和删除使用统一进行中状态防止重复点击。
+- Swift 单测覆盖 auth gate 的授权前置和拒绝时不落钥匙串；完成本机 Swift build/test 后记录结果。真人 GUI 设备认证路径还需手动冒烟。
+
 ### 阶段 1 更新：严格配置类型
 
 - `BetaAPISettings` 现拒绝 bool/字符串/非整数容量、超过 Beta 上限的值、非整秒 PCM 容量、错误模型目录类型和无效超时；`LocalServiceSettings` 对超时也执行数值类型、有限性和正值检查。
 - 这避免 Python 将 `True` 隐式当作整数容量/超时，或让小数容量悄然参与协议限制。仅做静态编译与差异检查，未运行测试。
+
+### 阶段 1 收尾：质量门禁与当前范围完成
+
+- 锁定开发工具 `ruff`、`mypy`、`detect-secrets`；CI 新增 Python lint、应用底座类型检查、全仓 tracked file secret-hook 和 `uv lock --check`。
+- secret scan 当前 baseline 经审查后为 0 项；测试中的假 Key 使用低熵占位符，Keychain 错误枚举改为 `emptyCredential`，避免被误识别为泄漏。
+- Ruff（`pac_poc tests`）、mypy、compileall、`uv lock --check`、secret hook 均通过。最终 Python 全量（D-007 security extra + dev）192 passed，1 条既有 Starlette/httpx deprecation warning；Swift Beta build 成功、33 tests passed。
+- 一次与 Swift 构建并行的 Python 测试中，Swift↔FastAPI 子进程测试偶发退出码 1；独立重跑该测试通过，随后串行 Python 全量 192 passed。当前决策范围内阶段 1 无持久化底座标记完成；DB/migration/encryption、持久审计及其他功能按 D-003/D-007 和矩阵触发点延期，未标成通过。
 
 ### 阶段 1 更新：统一 HTTP 错误契约
 

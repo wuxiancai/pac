@@ -48,7 +48,7 @@ private enum TestAuthorizationError: Error {
     let store = KeychainCredentialStore(service: service)
     defer { try? store.delete(account: "provider") }
 
-    #expect(throws: KeychainCredentialError.emptySecret) {
+    #expect(throws: KeychainCredentialError.emptyCredential) {
         try store.save("", account: "provider")
     }
     try store.save("old-dummy-secret", account: "provider")

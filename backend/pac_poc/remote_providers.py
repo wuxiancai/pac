@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
@@ -165,13 +165,12 @@ class OpenAICompatibleRemoteAdapter:
             and cost >= 0
             else None
         )
+        response_model = payload.get("model")
+        if not isinstance(response_model, str):
+            response_model = self._config.model
         return RemoteCompletion(
             text=content,
-            model=(
-                payload.get("model")
-                if isinstance(payload.get("model"), str)
-                else self._config.model
-            ),
+            model=response_model,
             provider=provider,
             region=region,
             prompt_tokens=self._optional_nonnegative_int(usage.get("prompt_tokens")),

@@ -681,8 +681,14 @@ private struct BetaModelSettingsView: View {
     @State private var apiKey = ""
     @State private var keyStatus = ""
     @State private var saveMessage = ""
+    @State private var hasConfiguredCredential = false
+    @State private var isUpdatingCredential = false
     private let keychain = KeychainCredentialStore(
         service: "com.personal-ai-assistant.phase0.provider"
+    )
+    private let credentialManager = CredentialManagementService(
+        service: "com.personal-ai-assistant.phase0.provider",
+        authorizer: TouchIDAuthorizer()
     )
 
     var body: some View {
@@ -718,7 +724,11 @@ private struct BetaModelSettingsView: View {
                     .textFieldStyle(.roundedBorder)
                 HStack {
                     Button("保存 API Key") { saveCredential() }
-                        .disabled(apiKey.isEmpty)
+                        .disabled(apiKey.isEmpty || isUpdatingCredential)
+                    if hasConfiguredCredential {
+                        Button("删除已保存的 Key", role: .destructive) { deleteCredential() }
+                            .disabled(isUpdatingCredential)
+                    }
                     if !saveMessage.isEmpty {
                         Text(saveMessage).font(.caption).foregroundStyle(.secondary)
                     }
@@ -741,10 +751,12 @@ private struct BetaModelSettingsView: View {
 
     private func refreshKeyStatus() {
         do {
-            keyStatus = try keychain.contains(account: model.cloudProvider.account)
+            hasConfiguredCredential = try keychain.contains(account: model.cloudProvider.account)
+            keyStatus = hasConfiguredCredential
                 ? "已保存（\(model.cloudProvider.account)）"
                 : "未配置（\(model.cloudProvider.account)）"
         } catch {
+            hasConfiguredCredential = false
             keyStatus = "无法读取 Keychain 状态"
         }
     }
@@ -754,13 +766,34 @@ private struct BetaModelSettingsView: View {
             saveMessage = "千问应用 API Key 应以 sk-ws- 开头；sk-sp- Token Plan Key 不用于本应用。"
             return
         }
-        do {
-            try keychain.save(apiKey, account: model.cloudProvider.account)
-            apiKey = ""
-            saveMessage = "已安全保存。"
+        let secret = apiKey
+        let account = model.cloudProvider.account
+        isUpdatingCredential = true
+        Task {
+            do {
+                try await credentialManager.save(secret, account: account)
+                apiKey = ""
+                saveMessage = "已通过设备认证并安全保存。"
+            } catch {
+                saveMessage = "未更改 Keychain：\(error.localizedDescription)"
+            }
+            isUpdatingCredential = false
             refreshKeyStatus()
-        } catch {
-            saveMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteCredential() {
+        let account = model.cloudProvider.account
+        isUpdatingCredential = true
+        Task {
+            do {
+                try await credentialManager.delete(account: account)
+                saveMessage = "已通过设备认证并删除 Key。"
+            } catch {
+                saveMessage = "未更改 Keychain：\(error.localizedDescription)"
+            }
+            isUpdatingCredential = false
+            refreshKeyStatus()
         }
     }
 }

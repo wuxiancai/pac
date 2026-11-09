@@ -33,6 +33,21 @@ jobs:
         working-directory: backend
         run: uv sync --locked --extra phase0-security --extra phase0-embedding --group dev
 
+      - name: Lint Python sources
+        working-directory: backend
+        run: uv run --locked ruff check pac_poc tests
+
+      - name: Type-check application foundations
+        working-directory: backend
+        run: uv run --locked mypy
+
+      - name: Scan tracked files for new secrets
+        run: git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline
+
+      - name: Check dependency lock
+        working-directory: backend
+        run: uv lock --check
+
       - name: Run Python tests
         working-directory: backend
         run: uv run --locked pytest -q

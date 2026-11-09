@@ -7,7 +7,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field, replace
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from enum import StrEnum
 from urllib.parse import urlsplit
 
@@ -104,7 +104,7 @@ def _error_response(
     code: str,
     message: str,
     *,
-    headers: dict[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     return JSONResponse(
         {
