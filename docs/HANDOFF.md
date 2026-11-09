@@ -1,5 +1,11 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 2 B1 本机模型错误映射 API 回归（2026-11-09）
+
+- 新增 fake local adapter 错误回归：本机 stream 抛出模拟内部异常时，SSE 返回 Ollama 操作提示且不回显内部异常；UsageLedger 将 run 记为 failed，token 和费用保持 unknown；adapter 调用一次，不切云端。
+- 验证：本机错误 + 云 Provider 错误映射定向 6 passed；Ruff 和 mypy 通过；后端全量 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 239 passed，1 条既有 Starlette/httpx 弃用警告。
+- GUI 目前是用户正在使用的 OpenRouter 会话；仅检查到服务连接正常，未切换设置、发送消息或改动会话。应用层错误提示的 GUI 实机验收仍待之后合适的干净测试会话。
+
 ## 阶段 2 B1 云 Provider 错误映射 API 回归（2026-11-09）
 
 - `backend/tests/test_beta_api.py` 新增 fake adapter 参数化回归，覆盖 HTTP 401/402/403/429/503；每种响应均检查 SSE 使用经分类的安全提示、不回显 adapter 错误正文、run 状态最终为 FAILED，且所选 adapter 只调用一次（没有 fallback）。

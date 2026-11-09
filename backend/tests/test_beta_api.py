@@ -138,6 +138,25 @@ class FailingCloudAdapter:
         )
 
 
+class FailingLocalAdapter:
+    is_local = True
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def generate(self, request: LocalModelRequest) -> str:
+        raise AssertionError("chat endpoint must use streaming")
+
+    async def call_with_tools(self, request: LocalModelRequest):
+        raise AssertionError("chat endpoint must not invoke tools")
+
+    async def stream(self, request: LocalModelRequest):
+        self.calls += 1
+        if False:
+            yield "unreachable"
+        raise RuntimeError("private-local-runtime-detail")
+
+
 class SpyCredentials:
     def __init__(self) -> None:
         self.reads = 0
@@ -574,6 +593,36 @@ def test_cloud_provider_errors_are_sanitized_and_never_fallback(
     assert "provider-body-secret-marker" not in response.text
     assert adapter.calls == 1
     assert run_status.json()["status"] == "failed"
+
+
+def test_local_model_error_is_sanitized_and_recorded_as_unknown_usage() -> None:
+    adapter = FailingLocalAdapter()
+    gateway = ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy())
+    app = create_beta_api(
+        session=LocalAPISession(token="test-token"),
+        gateway=gateway,
+    )
+    headers = {"authorization": "Bearer test-token", "host": "127.0.0.1"}
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/stream",
+            headers=headers,
+            json={
+                "provider": "ollama",
+                "model": BETA_MODEL,
+                "messages": [{"role": "user", "content": "synthetic local error test"}],
+            },
+        )
+        usage_response = client.get("/usage", headers=headers)
+
+    assert response.status_code == 200
+    assert "本机模型请求失败，请确认 Ollama 正在运行且模型已安装" in response.text
+    assert "private-local-runtime-detail" not in response.text
+    assert adapter.calls == 1
+    record = usage_response.json()["records"][0]
+    assert record["status"] == "failed"
+    assert record["usage_state"] == "unknown"
+    assert record["cost_state"] == "unknown"
 
 
 def test_qwen_application_route_is_available_with_exact_region_and_model() -> None:

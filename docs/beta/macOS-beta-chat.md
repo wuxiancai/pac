@@ -26,6 +26,7 @@
 ## 验证记录
 
 - 2026-11-09 云端错误映射服务端回归：fake DeepSeek adapter 参数化注入 HTTP 401/402/403/429/503，检查 SSE 只含分类提示、不回显 adapter 错误内容，run 最终状态为 FAILED，adapter 只调用一次且无 fallback。`UV_CACHE_DIR=.poc-data/uv-cache uv run --locked --group dev pytest -q tests/test_beta_api.py -k cloud_provider_errors_are_sanitized_and_never_fallback` → 5 passed；后端全量 238 passed。没有真实云请求或 Keychain 访问。该测试只覆盖 API/SSE；GUI 文案仍需实机确认。
+- 2026-11-09 本机 Provider 错误映射服务端回归：fake Ollama adapter 抛出模拟内部异常，SSE 显示检查 Ollama/模型的提示，不回显异常细节；run 记录为 failed，usage/cost 仍为 unknown，无云 fallback。与云错误合并的定向回归 6 passed；后端全量 239 passed。仅在运行中的 GUI 观察到云端会话和后端已连接；没有切换设置、发消息或修改会话，GUI 错误消息实机验收待后续。
 
 - 2026-11-09 本机 API HTTP 错误客户端回归：注入仅供测试的 ephemeral URLSession 配置，以 URLProtocol 返回 HTTP 503 和带敏感标记的错误正文；`streamChat` 只抛出 `.requestFailed(statusCode: 503)`，正文不进入 localizedDescription。生产 initializer 仍创建 ephemeral session，保留 loopback delegate 与禁重定向。`swift test --package-path poc/macos-audio` → 37 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。本次未对运行中 GUI 做手动错误冒烟，也未发起云请求；HTTP 错误的 UI 呈现仍待实机确认。
 
