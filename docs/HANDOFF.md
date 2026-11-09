@@ -1,3 +1,9 @@
+## 2026-11-09：B5 当前运行窗口文件导入控件只读检查
+
+- 通过 CUA 读取正在运行的 Beta accessibility 控件树：服务已连接，当前路由为 OpenRouter；树中未显示“添加资料”控件。源码 `MacBetaApp/main.swift` 仍有 `import-text-file-button` 和 `.fileImporter` 实现，故不能据此认定代码缺失，运行窗口可能为旧构建或控件树未暴露。
+- 当前窗口已有未持久化对话；为保留用户会话没有关闭/重启 App，也未改变 Provider、草稿或消息。GUI 文件选择/移除/聊天引用验收继续保持未完成，触发条件为下一次用户可接受的干净启动后复核。
+- 已把观察及不确定原因记录到 `docs/beta/file-import.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。本段只读检查，无文件选择、网络请求或 Keychain 读取。
+
 ## 2026-11-09：跨端回归复核
 
 - 当前 `main` 提交 `06c077e` 后复跑 Swift 全量：`swift test --package-path poc/macos-audio` → 40 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。测试目标为 arm64e/macOS 14.0。

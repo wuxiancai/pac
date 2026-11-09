@@ -21,7 +21,7 @@ CI 现显式安装 `phase4-pdf-poc` extra，因此通用 Python 回归会实际�
 
 ## 自动验证
 
-Swift 客户端请求契约回归（2026-11-09）：`swift test --package-path poc/macos-audio` → 40 passed，Beta target build 通过。新增 URLProtocol fixture 验证导入请求只携带 basename、文件内容和 loopback Bearer token；不包含原始路径；PDF 与大于 10 MiB 文件在网络调用前拒绝。此项不代替 GUI 文件选择、移除和聊天引用实机冒烟。
+Swift 客户端请求契约回归（2026-11-09）：`swift test --package-path poc/macos-audio` → 40 passed，Beta target build 通过。新增 URLProtocol fixture 验证导入请求只携带 basename、文件内容和 loopback Bearer token；不包含原始路径；PDF 与大于 10 MiB 文件在网络调用前拒绝。此项不代替 GUI 文件选择、移除和聊天引用实机冒烟。2026-11-09 只读检查当前已运行 Beta 的 accessibility 控件树，未看到“添加资料”按钮；当前运行窗口显示已有未持久化对话，未重启应用以免清除该会话。仓库源代码仍包含 `import-text-file-button` 与文件选择器，原因可能是运行中的旧构建或控件树遗漏，尚未判定。需在下次用户可接受的干净启动后确认实际控件及导入闭环。
 
 在 `backend/` 目录：
 
