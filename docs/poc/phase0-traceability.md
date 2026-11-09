@@ -22,6 +22,7 @@
 | D-010 V1 Provider 范围 | 确认 V1 首批云 Provider 与路由区域 | PASS（决策） | 2026-11-09 用户确认默认千问应用 API，另支持 DeepSeek（中国）和 OpenRouter（Global） | 实际能力、取消行为、费用/区域 metadata、许可/条款及全量能力矩阵仍由 POC-02 单独追踪；未完成项不得从本范围决策推定通过 |
 | D-012 文件导入 | 明确 V1 文件类型白名单及容量上限 | PASS（范围决策） | 2026-11-09 用户确认只读导入 TXT、Markdown、PDF，单文件最多 10 MB，须由用户主动选择 | 功能尚未实现；启用前须验证真实文件类型与大小校验、PDF 解析资源上限、无目录扫描/执行、路径边界和清理策略；决策不替代安全 POC |
 | D-013 性能目标 | 明确本机启动、partial 和停止后 final 的 P95 目标 | PASS（决策） | 2026-11-09 用户确认主力 M1/16 GiB 上：启动 P95 ≤5 秒；ASR partial P95 ≤500 毫秒；停止录音至 final 草稿可用 P95 ≤2 秒 | 既有指标多为合成 WAV、CLI 或单帧推理；需新增 Beta 端到端采样并按该目标判断，不能从旧数据推定通过 |
+| D-014 长期记忆/Embedding | 确认 V1 是否交付长期记忆，以及其 Embedding 方案 | PASS（范围决策） | 2026-11-09 用户确认 V1 不提供长期记忆/Embedding；产品模型/格式等持久化功能启动前再选 | POC 候选和 4 条合成 query 评估保留为研究证据，不构成产品 schema 或型号批准；未来启用前须有真实标注检索集和 migration/删除验证 |
 | POC-01 / FR-VOICE-002/004 | 本地流式 partial/final、语句端点 | PARTIAL | 旧中文 Streaming 模型：8 条本机合成句均产生 final、59 partial、weighted CER 0.0；官方双语 Streaming Zipformer：合成中英 WAV 10/10 final、82 partial、weighted CER 0.0254；用户主动完成三次真实 CLI 麦克风采集并观察到流式 partial/final；2026-11-09 用户又确认 Beta 实时录音时能看见 partial。新增 WebSocket 认证/200 ms 帧/序号/partial→final 自动回归；ASR `finish()` flush endpoint 与无 endpoint partial→final 有回归。最新 CLI 样本输出含中英 final，识别质量按用户决定留待后续模型优化 | 用户尚未反馈 SwiftUI 停止后的 final 是否进入草稿；真实设备驱动异常仍未测；Qwen ONNX 转换包及随包音频许可待核；双语模型仓库声明 Apache-2.0，但包 README 与官方索引的上游标识不一致、内部训练数据权利链未核验。真人语音质量留待模型选择，不以合成集结果代替 |
 | POC-01 / FR-VOICE-005/008 | 本机 TTS 可打断；ASR/TTS 独立 | PARTIAL | AVSpeechSynthesizer CLI 实测立即打断；新增显式合成样本 ASR-final→AVSpeechSynthesizer 链路，5 条中文/英文/混说 manifest WAV 共 7/7 产生 final 并正常完成播放；拒绝路径无 TTS；详见 `phase0-local-asr.md` | 均为系统合成语音，不代表真人语料或长时稳定性；SwiftUI 集成属阶段 3，ASR/TTS 并发与产品性能阈值未验证 |
 | POC-01 / FR-VOICE-006/007/010 | 本地默认；本地失败显式失败；不落盘、不静默云切换 | PARTIAL | ASR adapter 无云 fallback；麦克风仅内存队列；测试覆盖拒绝/溢出；新增 mock PortAudio 启动失败与 callback status 故障注入，验证缓冲清空和采集停止。D-011 现优先选千问 Token Plan/北京；文本 chat adapter 已有本地 mock，但云语音各接口仍未实现 | 实际设备驱动异常与系统级出站监测未完整执行；Token Plan 官方支持的实时语音 WebSocket、非实时云 ASR 和云 TTS 尚未接入；Consent/本机音频生命周期适配和实测待完成，接口记录见 `beta/qwen-token-plan-integration.md`；麦克风未打开时的一次 Ctrl-C 停止正常返回 |
@@ -64,7 +65,7 @@ flowchart TD
 
 以下事项已按用户 2026-11-08 指示延期；延期不视为阶段 0 中明确要求的 POC/验收通过：
 
-- 规格书 D-001–D-015 中 D-001–D-010、D-012 和 D-013 已由用户确认并记录（D-003–D-008 含 V1 范围决策）；D-011 已确认阶段 0 候选方向；D-014/D-015 仍待逐项处理。决策通过不等于对应实现和 POC 证据通过；按各矩阵行分别追踪。
+- 规格书 D-001–D-015 中 D-001–D-010、D-012–D-014 已由用户确认并记录（D-003–D-008、D-014 含 V1 范围决策）；D-011 已确认阶段 0 候选方向；D-015 仍待处理。决策通过不等于对应实现和 POC 证据通过；按各矩阵行分别追踪。
 - 多语言 ASR：用户提供的 Qwen3-ASR 候选完成随包 WAV 离线测试；另有官方 sherpa-onnx 双语 streaming 模型在现有适配器上通过中英合成 WAV 分帧测试。后者证明文件回放路径产生 partial/final，不代表真人麦克风、独立语料或 SwiftUI 端到端通过；Qwen ONNX 转换包许可仍待核。
 - 多 Provider 实测与开源 Gateway 对照：D-010 已确认 V1 默认千问应用 API，并支持 DeepSeek（中国）与 OpenRouter（Global）。DeepSeek/OpenRouter 各有一次用户逐次确认的合成文本请求成功；千问应用 API 的 Beta 用户报告可正常聊天。真实 Provider 请求仍须对应的精确 Consent + Policy，能力证据见 `phase0-remote-provider.md`，各供应商完整 E2E/费用和取消证据仍不足。
 - 同一 ModelGateway 双 adapter 路由已有本地 MockTransport 与一次真实顺序调用证据；DeepSeek 和 OpenRouter SSE 各一次真实成功；两家 tool proposal 各一次成功且未执行（OpenRouter 前两次为空，第三次 Relace/HKG 成功）；OpenRouter JSON 成功，DeepSeek JSON 三次一空两成功；两家错误路径分别返回 HTTP 422/400。OpenRouter metadata 两次均 Relace/HKG；DeepSeek 两次均无服务端 Provider/区域/费用。deny-check tripwire 与真实 HTTPX 默认拒绝 harness 均通过；PID 级 lsof 无活动 socket，但全局 tcpdump 流量无法归因。脚本及实测结果见 `phase0-remote-provider.md`；LiteLLM、Bifrost、Portkey 第一方桌面资料对照已记录，但不代表运行集成。

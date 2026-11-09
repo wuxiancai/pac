@@ -559,3 +559,4 @@
 - 用户确认 D-010：V1 默认千问应用 API，并支持 DeepSeek（中国）及 OpenRouter（Global）。此为 Provider 范围决策，不替代 POC-02 尚缺的完整能力、费用、区域、错误和取消验证；每个真实远端请求仍受 Consent/Policy 控制。
 - 用户确认 D-012：V1 支持用户主动只读导入 TXT、Markdown、PDF，单文件最多 10 MB。产品导入流程尚未实现；启用前须完成文件类型/路径和 PDF 解析资源安全 POC。
 - 用户确认 D-013：主力 M1/16 GiB 上 App 启动 P95≤5 秒、ASR partial P95≤500 毫秒、停止录音到 final 草稿可用 P95≤2 秒。现有合成/CLI 测量不是端到端验收，须补真实 GUI 会话分布。
+- 用户确认 D-014：V1 不提供长期记忆/Embedding；开始持久化记忆功能前再定模型和格式。FastEmbed/MiniLM 的小型合成集 POC 不作为产品型号或 schema 选择。
