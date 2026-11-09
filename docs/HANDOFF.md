@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 2 macOS 用量面板（2026-11-09）
+
+- macOS Beta 新增“用量”面板，调用认证 loopback `GET /usage` 显示本进程最近的 Provider/model、区域、状态、耗时、token 和费用状态。只有服务端实际/估算记录才显示数值；未知继续显示为空/未知，不估算。
+- 用量 ledger 仍限进程内，应用退出清空；面板只读，不发模型请求、不访问 Keychain。没有增加持久化或预算逻辑。
+- 验证：`swift test --package-path poc/macos-audio` → 36 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。新增 decoder regression 覆盖 UNKNOWN/null 响应。GUI 面板手动冒烟待下次正常启动确认。
+- 下一段：结合正常 Beta 启动检查空记录、未知值呈现和认证失败状态；之后继续阶段 2 的真实 usage 语义工作，但须逐 Provider 核实来源并在未授权时不发云请求。阶段状态和延期条件见 `docs/TASKS.md`、`docs/beta/orchestrator-framework.md`。
+
 ## 阶段 2 Usage 首段（2026-11-09）
 
 - 新增进程内 `UsageLedger` 与认证 `GET /usage?limit=50`，每个 chat run 完成/失败/取消时记录路由、region/purpose/data level、run 状态和耗时；记录最多 512 条，退出清空，不保留对话、回复、Key 或音频。额度 1–100 可选。

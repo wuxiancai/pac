@@ -40,6 +40,19 @@ import Testing
     #expect(cancelled.displayName == "已取消")
 }
 
+@Test func localUsageSnapshotDecodesUnknownProviderUsageWithoutInventingValues() throws {
+    let body = """
+    {"summary":{"record_count":1},"records":[{"run_id":"run-1","provider":"ollama","model":"fixture","region":"local","purpose":"chat","data_level":"L0","status":"completed","started_at":1,"completed_at":2,"latency_ms":1000,"prompt_tokens":null,"completion_tokens":null,"cost_amount":null,"cost_currency":null,"usage_state":"unknown","cost_state":"unknown"}]}
+    """
+    let snapshot = try JSONDecoder().decode(LocalUsageSnapshot.self, from: Data(body.utf8))
+
+    #expect(snapshot.records.count == 1)
+    #expect(snapshot.records[0].usageState == "unknown")
+    #expect(snapshot.records[0].costState == "unknown")
+    #expect(snapshot.records[0].promptTokens == nil)
+    #expect(snapshot.records[0].costAmount == nil)
+}
+
 @Test func voiceStreamUnavailableHasActionableLocalOnlyMessage() {
     let message = LocalAPIClientError.voiceStreamUnavailable(
         reason: "服务端测试错误"

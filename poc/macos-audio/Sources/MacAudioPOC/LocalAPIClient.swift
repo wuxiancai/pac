@@ -75,6 +75,46 @@ public struct LocalImportedTextFile: Decodable, Identifiable, Sendable {
     }
 }
 
+public struct LocalUsageRecord: Decodable, Identifiable, Sendable {
+    public let runID: String
+    public let provider: String
+    public let model: String
+    public let region: String
+    public let purpose: String
+    public let dataLevel: String
+    public let status: LocalChatRunStatus
+    public let startedAt: Double
+    public let completedAt: Double
+    public let latencyMS: Int
+    public let promptTokens: Int?
+    public let completionTokens: Int?
+    public let costAmount: Double?
+    public let costCurrency: String?
+    public let usageState: String
+    public let costState: String
+
+    public var id: String { runID }
+
+    enum CodingKeys: String, CodingKey {
+        case runID = "run_id"
+        case provider, model, region, purpose, status
+        case dataLevel = "data_level"
+        case startedAt = "started_at"
+        case completedAt = "completed_at"
+        case latencyMS = "latency_ms"
+        case promptTokens = "prompt_tokens"
+        case completionTokens = "completion_tokens"
+        case costAmount = "cost_amount"
+        case costCurrency = "cost_currency"
+        case usageState = "usage_state"
+        case costState = "cost_state"
+    }
+}
+
+public struct LocalUsageSnapshot: Decodable, Sendable {
+    public let records: [LocalUsageRecord]
+}
+
 /// Minimal native client for the authenticated, loopback-only POC health endpoint.
 @available(macOS 12.0, *)
 public final class LocalAPIClient: @unchecked Sendable {
@@ -173,6 +213,30 @@ public final class LocalAPIClient: @unchecked Sendable {
             throw LocalAPIClientError.invalidResponse
         }
         return value.status
+    }
+
+    public func recentUsage(limit: Int = 50) async throws -> LocalUsageSnapshot {
+        guard (1...100).contains(limit),
+              let endpoint = URL(string: "/usage", relativeTo: baseURL),
+              var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: true)
+        else { throw LocalAPIClientError.invalidEndpoint }
+        components.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+        guard let url = components.url else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard httpResponse.statusCode == 200 else {
+            throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+        guard let value = try? JSONDecoder().decode(UsageResponse.self, from: data) else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        return LocalUsageSnapshot(records: value.records)
     }
 
     public func importSelectedText(data: Data, fileName: String) async throws -> LocalImportedTextFile {
@@ -348,6 +412,10 @@ private struct ChatStreamEvent: Decodable {
 
 private struct ChatRunStatusResponse: Decodable {
     let status: LocalChatRunStatus
+}
+
+private struct UsageResponse: Decodable {
+    let records: [LocalUsageRecord]
 }
 
 public struct LocalAPIStreamError: Error, LocalizedError {

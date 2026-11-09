@@ -86,6 +86,9 @@ final class BetaChatModel {
     private(set) var latestRunID: String?
     private(set) var latestRunStatus: LocalChatRunStatus?
     private(set) var importedTextFiles: [LocalImportedTextFile] = []
+    private(set) var usageRecords: [LocalUsageRecord] = []
+    private(set) var usageStatus = "尚未读取本机用量。"
+    private(set) var isLoadingUsage = false
     private var lastAssistantResponseInterrupted = false
     private let microphone = LocalMicrophoneCapture()
     private let speechPlayback = SpeechPlaybackController(engine: AVSpeechEngine())
@@ -399,6 +402,21 @@ final class BetaChatModel {
         status = "无法打开所选文件：\(error.localizedDescription)"
     }
 
+    func refreshUsage() async {
+        guard let client, !isLoadingUsage else { return }
+        isLoadingUsage = true
+        defer { isLoadingUsage = false }
+        do {
+            let snapshot = try await client.recentUsage()
+            usageRecords = snapshot.records
+            usageStatus = snapshot.records.isEmpty
+                ? "此进程尚无聊天用量记录。记录仅保存在本机内存，退出后清空。"
+                : "显示最近 \(snapshot.records.count) 条记录；退出应用后记录清空。"
+        } catch {
+            usageStatus = "无法读取本机用量：\(error.localizedDescription)"
+        }
+    }
+
     private func modelSelectionDidChange() {
         if activeRequest != nil {
             let stoppedRunID = latestRunID
@@ -663,6 +681,7 @@ private struct BetaChatView: View {
     @Bindable var model: BetaChatModel
     @State private var showingSettings = false
     @State private var showingFileImporter = false
+    @State private var showingUsage = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -693,6 +712,13 @@ private struct BetaChatView: View {
                     Label("模型设置", systemImage: "gearshape")
                 }
                 .accessibilityIdentifier("model-settings-button")
+                Button {
+                    showingUsage = true
+                    Task { await model.refreshUsage() }
+                } label: {
+                    Label("用量", systemImage: "chart.bar")
+                }
+                .accessibilityIdentifier("usage-button")
                 Text("对话不保存")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -854,6 +880,10 @@ private struct BetaChatView: View {
         .sheet(isPresented: $showingSettings) {
             BetaModelSettingsView(model: model)
         }
+        .sheet(isPresented: $showingUsage) {
+            UsageHistoryView(model: model)
+                .frame(minWidth: 520, minHeight: 420)
+        }
         .fileImporter(
             isPresented: $showingFileImporter,
             allowedContentTypes: [
@@ -888,6 +918,62 @@ private struct BetaChatView: View {
                 .frame(maxWidth: 560, alignment: .leading)
             Spacer(minLength: 80)
         }
+    }
+}
+
+@available(macOS 14.0, *)
+private struct UsageHistoryView: View {
+    @Bindable var model: BetaChatModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("本机用量").font(.title2.bold())
+                Spacer()
+                Button("刷新") { Task { await model.refreshUsage() } }
+                    .disabled(model.isLoadingUsage)
+            }
+            Text(model.usageStatus).font(.caption).foregroundStyle(.secondary)
+            Text("token 与费用只显示服务端实际返回值；未知时保留为空，不进行估算。")
+                .font(.caption).foregroundStyle(.secondary)
+            Divider()
+            if model.usageRecords.isEmpty {
+                ContentUnavailableView("暂无记录", systemImage: "chart.bar", description: Text(model.usageStatus))
+            } else {
+                List(model.usageRecords) { record in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text("\(record.provider) / \(record.model)").font(.headline)
+                            Spacer()
+                            Text("\(record.latencyMS) ms").monospacedDigit()
+                        }
+                        HStack {
+                            Text("\(record.status.displayName) · \(record.region.isEmpty ? "区域未知" : record.region)")
+                            Spacer()
+                            Text("\(record.usageState == "actual" ? "实际 token" : record.usageState == "estimated" ? "估算 token" : "token 未知")")
+                        }
+                        HStack {
+                            Text("输入 \(record.promptTokens.map { String($0) } ?? "—") / 输出 \(record.completionTokens.map { String($0) } ?? "—")")
+                            Spacer()
+                            Text(costDescription(record))
+                        }
+                    }
+                    .font(.caption)
+                    .padding(.vertical, 3)
+                }
+                .listStyle(.plain)
+            }
+        }
+        .padding()
+        .task { await model.refreshUsage() }
+    }
+
+    private func costDescription(_ record: LocalUsageRecord) -> String {
+        guard let amount = record.costAmount, let currency = record.costCurrency else {
+            return "费用未知"
+        }
+        let kind = record.costState == "actual" ? "实扣" : "估算"
+        return "\(kind) \(amount.formatted()) \(currency)"
     }
 }
 
