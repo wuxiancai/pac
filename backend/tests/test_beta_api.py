@@ -824,6 +824,52 @@ def test_authenticated_voice_websocket_streams_partial_then_final() -> None:
     assert transcriber.aborted == 2
 
 
+def test_voice_transcribe_bounds_chunked_body_before_batch_asr() -> None:
+    class BatchVoiceTranscriber(StubVoiceTranscriber):
+        def __init__(self) -> None:
+            super().__init__()
+            self.transcribed: list[bytes] = []
+
+        def transcribe_pcm16le(self, pcm: bytes) -> str:
+            self.transcribed.append(pcm)
+            return "recognized"
+
+    async def run() -> None:
+        transcriber = BatchVoiceTranscriber()
+        app = create_beta_api(
+            session=LocalAPISession(token="voice-token"),
+            voice_transcriber_override=transcriber,
+            settings=BetaAPISettings(max_voice_pcm_bytes=32_000),
+        )
+
+        async def valid_chunks():
+            yield b"\x00" * 16_000
+            yield b"\x00" * 16_000
+
+        async def oversized_chunks():
+            yield b"\x00" * 32_000
+            yield b"\x00\x00"
+
+        headers = {
+            "authorization": "Bearer voice-token",
+            "content-type": "application/octet-stream",
+        }
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            valid = await client.post("/voice/transcribe", headers=headers, content=valid_chunks())
+            oversized = await client.post(
+                "/voice/transcribe", headers=headers, content=oversized_chunks()
+            )
+
+        assert valid.status_code == 200
+        assert valid.json() == {"text": "recognized"}
+        assert oversized.status_code == 413
+        assert transcriber.transcribed == [b"\x00" * 32_000]
+
+    asyncio.run(run())
+
+
 def test_voice_websocket_reports_busy_after_authenticated_handshake() -> None:
     transcriber = StubVoiceTranscriber()
     app = create_beta_api(

@@ -6,7 +6,7 @@
 
 - 录音只由聊天页的“语音输入”按钮启动。点击后才请求 macOS 麦克风权限；应用启动时不请求、不采集。
 - Swift `AVAudioEngine` 在内存中采集并转换为 16 kHz 单声道 PCM16LE。最多缓存 30 秒（960,000 字节）；“取消并丢弃”清空缓冲，应用关闭时停止并丢弃正在录制的缓冲。
-- 麦克风回调把转换后的 PCM 按 200 毫秒帧经带随机 Bearer token 的 loopback WebSocket `/voice/stream` 送到同机 FastAPI。协议固定 16 kHz、单声道、PCM16LE，并带单调帧序号；帧串行发送、队列有界、服务端限制单帧与 30 秒总量，同一时刻只允许一个识别会话；WebSocket 断连/取消若发生在阻塞式 ASR 调用期间，会等待该线程调用结束后再执行 abort 和释放会话锁，避免并行清理或新会话与旧识别器竞争。识别器使用本机 sherpa-onnx 双语 Streaming Zipformer；音频只在内存和 loopback 传输，不写文件、不出云。
+- 麦克风回调把转换后的 PCM 按 200 毫秒帧经带随机 Bearer token 的 loopback WebSocket `/voice/stream` 送到同机 FastAPI。一次性 `/voice/transcribe` 兼容入口也按请求流逐块累计，超过配置 PCM 上限即拒绝，不依赖 Content-Length 才能限长。协议固定 16 kHz、单声道、PCM16LE，并带单调帧序号；帧串行发送、队列有界、服务端限制单帧与 30 秒总量，同一时刻只允许一个识别会话；WebSocket 断连/取消若发生在阻塞式 ASR 调用期间，会等待该线程调用结束后再执行 abort 和释放会话锁，避免并行清理或新会话与旧识别器竞争。识别器使用本机 sherpa-onnx 双语 Streaming Zipformer；音频只在内存和 loopback 传输，不写文件、不出云。
 - 录音时 ASR partial 只临时显示在输入区旁，不进入消息或草稿；端点 final 暂存在当前语音会话，用户点“停止并识别”后才合并到草稿。不会自动发送，发送仍由用户单独操作，并遵循当时模型设置的 Provider。识别错误/队列溢出会丢弃未完成转写，不尝试云 ASR。
 - 文字模型正在生成时，点“打断并语音输入”先取消当前文字流，再开始本机采集和实时识别。该交互式按键打断不等于全双工声学插话。
 - 被打断的 assistant 部分回复保留在界面供查看，但会从下一次模型请求上下文排除，也不能作为“完整回复”启动本机朗读。
@@ -14,6 +14,8 @@
 - Beta `.app` Info.plist 已设置 `NSMicrophoneUsageDescription`，说明采集触发方式、30 秒上限、本机处理和不上传边界。
 
 ## 当前验证
+
+- **2026-11-09 一次性语音请求限长与取消清理**：`/voice/transcribe` 现通过 ASGI 请求流分块读取，测试无 Content-Length 的 chunked 请求在超过 30 秒字节上限时返回 413，且不调用识别器；批量同步 ASR 同样经取消安全 worker 执行，取消期间会持有单会话锁直至识别线程结束。后端全量 251 项通过，1 条既有 Starlette/httpx 弃用警告。
 
 - **2026-11-09 取消期间 ASR 线程清理**：请求协程被取消时，`asyncio.to_thread` 内的同步 ASR 调用不能被强制中止；现在先等待该调用结束，再执行 abort 与锁释放。新增线程阻塞期间取消的回归，验证清理不会越过仍在运行的 worker。后端全量 250 项通过，1 条既有 Starlette/httpx 弃用警告；此自动化测试不替代真实麦克风驱动故障注入。
 

@@ -440,14 +440,25 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         content_length = request.headers.get("content-length")
         if content_length is not None:
             try:
-                if int(content_length) > settings.max_voice_pcm_bytes:
+                declared_length = int(content_length)
+                if declared_length < 0:
+                    raise HTTPException(status_code=400, detail="invalid content length")
+                if declared_length > settings.max_voice_pcm_bytes:
                     raise HTTPException(
                         status_code=413,
                         detail=f"audio exceeds {settings.max_voice_seconds} seconds",
                     )
             except ValueError:
                 raise HTTPException(status_code=400, detail="invalid content length") from None
-        pcm = await request.body()
+        pcm_data = bytearray()
+        async for chunk in request.stream():
+            if len(pcm_data) + len(chunk) > settings.max_voice_pcm_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"audio exceeds {settings.max_voice_seconds} seconds",
+                )
+            pcm_data.extend(chunk)
+        pcm = bytes(pcm_data)
         if not pcm or len(pcm) % 2:
             raise HTTPException(status_code=422, detail="audio must be non-empty PCM16LE")
         if len(pcm) > settings.max_voice_pcm_bytes:
@@ -459,7 +470,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             if voice_stream_lock.locked():
                 raise HTTPException(status_code=409, detail="local voice recognition is busy")
             async with voice_stream_lock:
-                text = await asyncio.to_thread(voice_transcriber.transcribe_pcm16le, pcm)
+                text = await _run_voice_worker(voice_transcriber.transcribe_pcm16le, pcm)
         except HTTPException:
             raise
         except FileNotFoundError:

@@ -1,3 +1,10 @@
+## 2026-11-09：阶段 3 一次性语音 API 有界读取
+
+- `/voice/transcribe` 先前用 `request.body()` 完整缓存后再检查最大 30 秒，未提供 Content-Length 的请求可在检查前占用无界内存。现改为遍历 ASGI request stream，累计字节超限立即返回 413；拒绝负 Content-Length。
+- 批量 `transcribe_pcm16le` 也改用取消安全 worker，保证调用线程结束前异步会话锁不会释放。
+- 回归以无 Content-Length 的 HTTPX 异步分块请求验证 32,000 字节合法数据可识别、超出 2 字节时 413 且识别器只收到合法请求。定向 2 passed；Ruff/mypy 通过；后端全量 251 passed，1 条既有 Starlette/httpx 弃用警告。
+- 更新 `docs/beta/macOS-beta-voice.md`、`docs/poc/phase0-traceability.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。未启动麦克风、未操作 GUI/Keychain、未发云请求。
+
 ## 2026-11-09：阶段 3 语音 WebSocket 取消等待 ASR worker
 
 - 语音识别通过 `asyncio.to_thread` 调用同步 ASR。协程取消并不会中止已运行的线程，旧逻辑可能在该线程还在使用 recognizer 时执行 abort 并释放会话锁。现在 `_run_voice_worker` 对线程工作做 shield；捕获取消后等待 worker 结束，再传播取消，由 finally 执行 abort/释放锁。begin、frame、end 和 abort 调用均走此边界。
