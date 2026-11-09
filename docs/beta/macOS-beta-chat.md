@@ -29,6 +29,10 @@
 
 - GUI 停流/重发复核：在 Ollama 正常运行下启动约 300 字故事请求，点击停止后 UI 立即显示“已停止本轮生成”；随后立即发出“只回复 PAC-RESEND-OK”，等待 30 秒仍显示生成中且无文本，手动停止。对话当时包含长请求/未完成上下文，因此原因未定，不能判为取消实现故障，也不能判通过。关闭合成测试会话并用仓库脚本重启，现在 app/backend 已连接且对话为空；所有请求均留在本机。
 
+- Ollama 取消/队列对照（本机，2026-11-09）：安装版本 `0.40.15`。通过 httpx 启动一个长 `/api/chat` stream，约 2 秒后关闭 client stream，随后马上发送短句。取消后的短请求完成耗时 46.72 秒；未取消流时默认参数短句基线约 2.42 秒，显式 `think:false` 约 0.88 秒。未记录返回正文。Ollama v0.40.15 官方代码的流式路径使用无缓冲 channel，官方 issue [#17131](https://github.com/ollama/ollama/issues/17131) 描述客户端断开时可能泄漏 handler goroutine 并占住 runner semaphore；现象与本机延迟相符，但版本代码/issue 不能单独证明此次延迟由该缺陷造成。见 [v0.40.15 `server/routes.go`](https://github.com/ollama/ollama/blob/v0.40.15/server/routes.go)。这表明 PAC 发起 URLSession 取消后，即使前端立即复位，也不能保证本机 Ollama 立即可服务下一轮；客户端 keep-alive 只防止等待期间 UI 连接超时。
+
+- 2026-11-09 停止状态提示：本机停止显示“已停止接收回复；Ollama 可能仍在结束本机生成。”，云端停止显示“已停止接收回复；云端服务是否停止生成未知。”这描述客户端观测，不承诺上游已结束。`swift test --package-path poc/macos-audio` → 34 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。仓库脚本启动新 app 后，以本机合成长请求点击停止，GUI 显示上述本机提示。云 Provider 未调用，云文案未做 GUI 出站冒烟。
+
 - 2026-11-09 修复模型切换反馈：SwiftUI 模型选择变更会取消在途客户端请求、清除其 request ID 并更新当前 Provider/模型状态；发送时仍以当前设置建立不可变请求快照，完成状态显示本轮实际 Provider/模型。`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；本轮未运行测试、未启动 GUI、未发起云请求。
 
 - `swift build --package-path . --product personal-assistant-beta`：通过。

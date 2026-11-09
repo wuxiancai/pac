@@ -7,7 +7,9 @@
 - 回归：`tests/test_beta_api.py tests/test_local_model_gateway.py` 22 passed；Ruff、mypy（相关 3 文件）、`uv lock --check`、compileall 通过。Python 全量 193 passed，1 failed：`test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup[APFS-128]` 受磁盘耗尽脚本 OSError 失败，与本次代码无关；1 条 Starlette/httpx deprecation warning。
 - 实机复核：从 `poc/macos-audio/scripts/run_beta_app.sh` 启动后，GUI 显示本机服务已连接、模型 `ollama / qwen3.5:0.8b`。干净会话中的短句得到精确回复；同时本机 Ollama 默认参数 `/api/chat` 合成短句返回完成，耗时约 2.51 秒；显式 `think:false` 对照约 0.88 秒，未记录回复正文。用户也确认打开 Ollama 后 PAC 本地模型可以聊天。
 - 停流/重发：长故事请求开始生成后点停止，UI 立即显示“已停止本轮生成”；随后立即发短句，30 秒内仍显示生成中、没有文本，手动停止。该对话含长请求及未完成上下文，尚不能区分 Ollama 旧生成清理、上下文思考或模型延迟。请求停止期间 UI 未超时；这不能证明供应商/模型进程已经停止计算。
-- 测试对话清理后，已再次从仓库脚本启动 Beta，当前为空白本地会话且服务进程在运行；未发云请求。下一步是确认停止请求后的上游实际关闭/队列行为，或用隔离的新会话重试简短提示；B1 暂不关闭。
+- Ollama 直连接受控取消对照：通过 httpx 取消一个长 `/api/chat` 流（约 2 秒后断开），立即提交新的短请求；后者耗时 46.72 秒才完成。此前同机默认参数的短请求约 2.42 秒，显式 `think:false` 短请求约 0.88 秒。`ollama --version` 为 0.40.15。检查该版本官方 `server/routes.go`，流式生产 goroutine 通过无缓冲 channel 向响应 handler 发送；Ollama 官方 issue #17131 描述 client disconnect 可能使 Chat 流式 handler goroutine/runner semaphore slot 被占用，与观察到的取消后排队延迟相符，但不能证明本机该次请求由这个缺陷导致。见 [v0.40.15 routes.go](https://github.com/ollama/ollama/blob/v0.40.15/server/routes.go) 和 [Ollama issue #17131](https://github.com/ollama/ollama/issues/17131)。
+- PAC 停止状态文案已更新：本机选择显示“已停止接收回复；Ollama 可能仍在结束本机生成。”；云端选择显示“已停止接收回复；云端服务是否停止生成未知。”该文案避免把客户端取消误报成上游已停止。Swift `swift test --package-path poc/macos-audio` → 34 项通过；Beta target build 通过；仓库脚本重启后以长请求实际点停止，GUI Accessibility 显示本机提示文案。没有发云请求，云端文案仅由构建代码覆盖，尚未在云 Provider GUI 路径实测。
+- 测试对话清理后，已再次从仓库脚本启动 Beta，当前为空白本地会话且服务进程在运行；未发云请求。下一步是按 Ollama 版本/上游修复状态确定可用运行要求或恢复策略，再完成设置 UI 和云 API 错误路径验收；B1 暂不关闭。
 - 一次桌面自动化重绑定短暂显示“无法找到本机运行环境”，原因是启动了没有 `PAC_POC_PYTHON`/`PAC_POC_BACKEND` 的 app 实例；已将其关闭并用仓库脚本正常重启，现无启动错误。
 - B0 最终完成：SwiftUI 主窗口从 `WindowGroup` 改为单实例 `Window`，使最后/唯一窗口关闭即退出，符合单会话 Beta 生命周期；启动错误及 GUI 重试已以本机 fixture 实测，fixture 已删除；真实后端连接后关闭唯一窗口，确认 app/backend 均无进程残留。Swift Beta build 成功，`swift test --package-path poc/macos-audio` 34 passed。
 - 上述 keep-alive 实现已在提交 `fa721e1`；本次仅更正实机根因判断与验证记录。继续 B1；B0 已关闭。交接前检查 diff 并提交。

@@ -269,7 +269,11 @@ final class BetaChatModel {
         if interrupted, messages.last?.role == "assistant" {
             lastAssistantResponseInterrupted = true
         }
-        status = "已停止本轮生成"
+        if usesCloud {
+            status = "已停止接收回复；云端服务是否停止生成未知。"
+        } else {
+            status = "已停止接收回复；Ollama 可能仍在结束本机生成。"
+        }
     }
 
     private func modelSelectionDidChange() {
