@@ -578,3 +578,9 @@
 - 验证：`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；`swift test --package-path poc/macos-audio` 通过（31 项）；`sh -n poc/macos-audio/scripts/run_beta_app.sh` 与 `git diff --check` 通过。采样值尚未收集。
 - 下一步需要用户运行 `PAC_BETA_PERF_DIAGNOSTICS=1 poc/macos-audio/scripts/run_beta_app.sh`，收集 20 次 app 启动值、20 次 partial 和 20 次停止→final 草稿值。此操作会开启用户主动点击才开始的本机麦克风采集；建议只说不含敏感信息的固定短句。完成后将当前面板显示的每类样本数/P95 与 20 个启动值发回，之后继续处理矩阵其他缺口。
 - 完成本次提交后本地 `main` 预计领先 `origin/main` 36 个提交；勿推送。阶段 0 仍未验收。
+
+# 2026-11-09 Beta 模型切换实机确认
+
+- 用户确认模型之间可自由切换，切换后的当前聊天使用新选择；用户也反馈新千问 API 可以正常聊天。B1 文档与任务清单已据此更正；旧的单次合成失败保留为历史样本，无法追溯是否到达 Provider/计费。停止/取消生成的 GUI 专门复核仍待做。
+- 阶段 0 性能采样已准备好 opt-in GUI 面板。按上一节的步骤由用户采集 D-013 数据；这是当前需要手动参与的一项。
+- 最近提交 `403b42e`（B1 文档）、`b3e0b19`（性能诊断）和 `d62ff5a`（语音退出及离线指标证据）均在本机 `main`，当前领先 `origin/main` 37 个提交；没有推送。工作区应保持干净。
