@@ -72,6 +72,24 @@ def test_usage_record_preserves_explicit_actual_usage_without_content_fields() -
     assert "content" not in UsageRecord.__dataclass_fields__
 
 
+def test_usage_ledger_rejects_token_counts_marked_unknown() -> None:
+    record = UsageRecord(
+        **{**_record("unknown-with-counts").__dict__, "prompt_tokens": 12}
+    )
+
+    with pytest.raises(ValueError, match="unknown usage"):
+        UsageLedger().record(record)
+
+
+def test_usage_ledger_rejects_estimated_state_without_token_counts() -> None:
+    record = UsageRecord(
+        **{**_record("estimated-without-counts").__dict__, "usage_state": UsageState.ESTIMATED}
+    )
+
+    with pytest.raises(ValueError, match="known usage"):
+        UsageLedger().record(record)
+
+
 def test_usage_ledger_rejects_cached_prompt_tokens_above_prompt_total() -> None:
     record = UsageRecord(
         **{

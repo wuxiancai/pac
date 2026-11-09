@@ -94,10 +94,13 @@ class UsageLedger:
             raise ValueError("audio duration must be finite and non-negative or unknown")
         if (record.cost_amount is None) != (record.cost_currency is None):
             raise ValueError("cost amount and currency must be provided together")
-        if record.usage_state is UsageState.ACTUAL and (
-            record.prompt_tokens is None and record.completion_tokens is None
-        ):
-            raise ValueError("actual usage requires at least one token count")
+        has_token_counts = (
+            record.prompt_tokens is not None or record.completion_tokens is not None
+        )
+        if record.usage_state is UsageState.UNKNOWN and has_token_counts:
+            raise ValueError("unknown usage must not include token counts")
+        if record.usage_state is not UsageState.UNKNOWN and not has_token_counts:
+            raise ValueError("known usage requires at least one token count")
         if record.cost_state is not UsageState.UNKNOWN and record.cost_amount is None:
             raise ValueError("known cost state requires an amount and currency")
         if record.cost_amount is not None and record.cost_state is UsageState.UNKNOWN:

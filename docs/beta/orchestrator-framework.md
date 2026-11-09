@@ -1,6 +1,6 @@
 # 单助理编排框架
 
-更新日期：2026-11-09
+更新日期：2026-11-10
 
 ## 当前结构
 
@@ -64,6 +64,8 @@ macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的
 - 上述公开价目会变化，且缓存/时段/活动/下游路由和充值费用口径不同。它们能支持后续设计估算或上界规则，但不足以当前实现“实扣费用”人民币累加。D-005 仍需确定价目版本/更新、USD→CNY 口径、未知字段拦截、额度跨进程保存及并发/月界事务策略，再进入预算 enforcement；未完成前保持 unknown，不拦截或宣称预算保护。
 
 ## 验证
+
+2026-11-10 UsageLedger token 状态校验补强：`unknown` 记录必须不含 token 数；`actual`/`estimated` 记录必须至少含输入或输出 token 数，防止 `/usage` 返回互相矛盾的状态和数值。定向回归 `tests/test_usage.py tests/test_beta_api.py` → 46 passed；完整后端回归 → 267 passed、1 条既有 Starlette/httpx 弃用警告；`ruff check pac_poc/usage.py tests/test_usage.py` 与 `mypy pac_poc/usage.py` 均通过。该校验只约束内存用量记录一致性，不估算费用、不持久化、不改变预算策略。
 
 2026-11-10 用量面板元数据显示：每条记录展示用途、数据等级、开始时间和正确区域标签，便于分辨本机处理和带授权的云端交互；空值/未知 token 与费用语义保持不变。`swift test --package-path poc/macos-audio` → 40 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。Swift Codable 回归覆盖本机 L0、空区域→本机、Unix 时间戳，以及交互聊天 L2/DeepSeek China 区域映射。GUI 用量面板手动验收和真实 Provider usage/cost E2E 仍待完成。
 

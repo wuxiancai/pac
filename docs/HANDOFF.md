@@ -1078,3 +1078,10 @@
 - 同步 `TASKS.md`、`PROJECT_CONTEXT.md`，明确最近全量结果已通过并保留偶发失败为非阻塞观察；B1/编排框架记录从过时的“265 项通过”基线更新到当前实际结果。未更改产品代码。
 - 当前 GUI 手动验收仍无法由本代理完成：此前 CUA 请求已被自动审核拒绝。依赖用户桌面操作的 B1 错误 UI、Usage 面板和 B5 聊天引用仍标未验收；不尝试绕过桌面授权。
 - 下一步继续阶段 2 可自动验证的主干，优先检查 Usage/预算决策边界和 API 错误契约；D-005 的费用来源及缺失 usage fail-closed 规则未闭合前不启用预算拦截。
+
+### 2026-11-10：UsageLedger token 状态一致性
+
+- `UsageLedger.record()` 现在拒绝 `usage_state=unknown` 但带有 token 数的记录，并要求 `actual`/`estimated` 状态至少有输入或输出 token 数。新增两项回归覆盖这类矛盾输入。
+- 验证：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_usage.py tests/test_beta_api.py` → 46 passed；全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 267 passed、1 条既有 Starlette/httpx 弃用警告；`ruff check pac_poc/usage.py tests/test_usage.py`、`mypy pac_poc/usage.py` 通过。
+- 更新 `docs/beta/orchestrator-framework.md`、`TASKS.md` 和 `PROJECT_CONTEXT.md`。不做费用估算/预算拦截，不读 Keychain，不发云请求；真实云 usage/cost E2E 与 GUI Usage 验收仍待完成。
+- 继续处理不依赖桌面的阶段 2 自动验收；桌面手动验收保持未通过状态，因 CUA 对 PAC 测试版的授权审核拒绝仍有效。
