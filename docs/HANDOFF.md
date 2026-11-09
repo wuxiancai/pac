@@ -1,3 +1,9 @@
+# 2026-11-09：B5 当前 Beta 文件入口只读复核
+
+- 确认旧 Beta 进程已退出后，从仓库根目录运行 `poc/macos-audio/scripts/run_beta_app.sh`。新窗口显示“本机服务已连接”，Accessibility 树出现“添加资料”（`import-text-file-button`）；此前旧实例未暴露按钮的问题在当前构建中未复现。
+- 未选择/上传文件、未发送消息、未操作麦克风，也未发云请求；当前模型选中 OpenRouter。完整文件导入、移除和本机聊天引用 GUI 冒烟仍未完成。
+- 已更新 `docs/beta/file-import.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`；清理本轮创建但未使用的临时 TXT 夹具。应用保持运行。
+
 # 2026-11-09：阶段 4 PDF POC 文本长度上限回归
 
 - 再新增实际提取文本边界测试：合成 PDF 页面含 200,001 个字符，worker 在 200,000 字符限制处安全拒绝。PDF POC 自动回归现为 7 项，包含有效/无效输入、输入大小、页数、FlateDecode 解压、提取文本上限和父进程超时转换（超时转换为模拟）。
