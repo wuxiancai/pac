@@ -50,7 +50,18 @@ class UsageLedger:
         self._lock = Lock()
 
     def record(self, record: UsageRecord) -> None:
-        if record.latency_ms < 0 or record.completed_at < record.started_at:
+        if (
+            isinstance(record.latency_ms, bool)
+            or not isinstance(record.latency_ms, int)
+            or record.latency_ms < 0
+            or isinstance(record.started_at, bool)
+            or not isinstance(record.started_at, (int, float))
+            or not isfinite(record.started_at)
+            or isinstance(record.completed_at, bool)
+            or not isinstance(record.completed_at, (int, float))
+            or not isfinite(record.completed_at)
+            or record.completed_at < record.started_at
+        ):
             raise ValueError("usage record timestamps are invalid")
         for value in (
             record.prompt_tokens,
@@ -74,6 +85,13 @@ class UsageLedger:
             or record.cost_amount < 0
         ):
             raise ValueError("cost amount must be non-negative or unknown")
+        if record.audio_seconds is not None and (
+            isinstance(record.audio_seconds, bool)
+            or not isinstance(record.audio_seconds, (int, float))
+            or not isfinite(record.audio_seconds)
+            or record.audio_seconds < 0
+        ):
+            raise ValueError("audio duration must be finite and non-negative or unknown")
         if (record.cost_amount is None) != (record.cost_currency is None):
             raise ValueError("cost amount and currency must be provided together")
         if record.usage_state is UsageState.ACTUAL and (

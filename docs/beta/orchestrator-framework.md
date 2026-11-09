@@ -40,6 +40,8 @@ Beta 运行时现从随包的 `pac_poc/beta_model_capabilities.json` 装配默�
 
 聊天 run 结束时，`UsageLedger` 保存最近最多 512 条请求 metadata，认证 `GET /usage?limit=50` 可读取（limit 最大 100）。记录含 run/provider/model/region/purpose/data level、生命周期状态、wall latency，以及 Provider 明确报告的 token/cache/cost metadata；不含消息、回复、密钥或音频，进程退出即清空。Gateway 已把 Ollama 与 OpenAI-compatible 流最终帧中实际返回的 token 计数交给 ledger；OpenRouter 若返回经校验的 `usage.cost`，则记录其实际 USD 金额。未返回或不完整的 usage/cost 仍为 `unknown`/`null`。这不是完整费用账单或预算保护：精确 Beta 型号真实 usage/cost E2E、其他 Provider 费用来源及人民币归一尚未完成；D-005 月额度拦截当前未实现。
 
+Ledger 在写入时拒绝非有限时间戳、布尔/非整数毫秒延迟，以及负数、布尔或非有限音频时长，避免无效数值进入 `/usage` JSON 响应；未知音频时长仍以 `null` 表示。
+
 macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的 Provider/model、region、状态、耗时，以及实际/估算/未知 token 和费用。当前没有真实 token/费用时明确显示为未知，不作推算。面板查询只访问认证 loopback API，不发起模型请求；数据显示依赖当前进程内 ledger，退出后消失。
 
 ### 流式 token 与 OpenRouter 费用透传（2026-11-09）

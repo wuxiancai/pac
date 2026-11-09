@@ -1,3 +1,10 @@
+## 2026-11-09：阶段 2 UsageLedger 数值边界校验
+
+- Ledger 写入现拒绝 NaN/无穷时间戳、布尔/非整数/负毫秒延迟，以及布尔、负数或非有限 `audio_seconds`，保持 Usage API 的时间和时长字段为有效 JSON 数值或 `null`。不改变 token/cost 语义、进程内保留或预算状态。
+- 回归覆盖时间戳 NaN/Infinity、布尔延迟，以及音频时长 NaN/Infinity/负值/布尔值。
+- 验证：`UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q tests/test_usage.py` → 11 passed；Ruff、mypy 通过；后端全量 → 249 passed，1 条既有 Starlette/httpx 弃用警告。
+- 更新 `docs/beta/orchestrator-framework.md`、`docs/PROJECT_CONTEXT.md` 和 `docs/TASKS.md`。未操作 GUI、未访问 Keychain、未发起云请求。
+
 ## 2026-11-09：验证 macOS PDF worker 启动前虚拟内存限额
 
 - 针对 Python 进程启动后设置 rlimit 失败，额外使用 `/bin/sh` 在 `exec` worker 前执行 `ulimit -v`，分别测试 768 MiB、1 GiB、1.5 GiB。当前 macOS 均返回 `cannot modify limit: Invalid argument`，未启动 worker。

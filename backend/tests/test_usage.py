@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from math import inf, nan
+
 import pytest
 
 from pac_poc.orchestrator import RunStatus
@@ -79,4 +81,22 @@ def test_usage_ledger_rejects_cached_prompt_tokens_above_prompt_total() -> None:
         }
     )
     with pytest.raises(ValueError, match="cached prompt tokens"):
+        UsageLedger().record(record)
+
+
+@pytest.mark.parametrize(
+    "field,value", [("started_at", nan), ("completed_at", inf), ("latency_ms", True)]
+)
+def test_usage_ledger_rejects_invalid_time_values(field: str, value: object) -> None:
+    record = UsageRecord(**{**_record("bad-time").__dict__, field: value})
+
+    with pytest.raises(ValueError, match="timestamps"):
+        UsageLedger().record(record)
+
+
+@pytest.mark.parametrize("value", [nan, inf, -1.0, True])
+def test_usage_ledger_rejects_invalid_audio_duration(value: object) -> None:
+    record = UsageRecord(**{**_record("bad-audio").__dict__, "audio_seconds": value})
+
+    with pytest.raises(ValueError, match="audio duration"):
         UsageLedger().record(record)
