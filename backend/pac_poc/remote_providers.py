@@ -158,15 +158,7 @@ class OpenAICompatibleRemoteAdapter:
         provider, region = self._openrouter_route(payload)
         choice = payload["choices"][0]
         finish_reason = choice.get("finish_reason")
-        cost = usage.get("cost")
-        cost_usd = (
-            float(cost)
-            if isinstance(cost, (int, float))
-            and not isinstance(cost, bool)
-            and math.isfinite(float(cost))
-            and cost >= 0
-            else None
-        )
+        cost_usd = self._optional_nonnegative_number(usage.get("cost"))
         response_model = payload.get("model")
         if not isinstance(response_model, str):
             response_model = self._config.model
@@ -453,7 +445,10 @@ class OpenAICompatibleRemoteAdapter:
     @staticmethod
     def _optional_nonnegative_number(value: object) -> float | None:
         if isinstance(value, (int, float)) and not isinstance(value, bool):
-            number = float(value)
+            try:
+                number = float(value)
+            except (OverflowError, ValueError):
+                return None
             if math.isfinite(number) and number >= 0:
                 return number
         return None

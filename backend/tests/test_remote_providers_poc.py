@@ -390,6 +390,15 @@ def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:
     assert b'"stream_options":{"include_usage":true}' in seen[0].read()
 
 
+@pytest.mark.parametrize("value", [10**400, float("inf"), float("nan"), -1.0, True])
+def test_provider_cost_parser_rejects_unrepresentable_or_invalid_values(value: object) -> None:
+    assert OpenAICompatibleRemoteAdapter._optional_nonnegative_number(value) is None
+
+
+def test_provider_cost_parser_accepts_finite_nonnegative_values() -> None:
+    assert OpenAICompatibleRemoteAdapter._optional_nonnegative_number(0.125) == 0.125
+
+
 def test_closing_remote_sse_after_first_chunk_closes_response_stream() -> None:
     class PendingSSE(httpx.AsyncByteStream):
         def __init__(self) -> None:

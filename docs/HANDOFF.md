@@ -1,3 +1,9 @@
+## 2026-11-09：阶段 2 Provider 用量浮点转换边界
+
+- 远端 `usage.cost` 若为极大 JSON 整数，原解析器将其转成 `float` 时会抛 `OverflowError`，使本来可安全降为 unknown 的用量元数据中断请求处理。现在统一使用有限、非负且可表示的数值解析器；超大整数、NaN/Infinity、负值和 bool 均视为 unknown。
+- 增加数值边界回归 6 项，保留合法有限费用值；窄回归连同现有 OpenRouter SSE 用例 7 passed，Ruff/mypy 通过；后端全量 259 passed，1 条既有 Starlette/httpx 弃用警告。未发云请求、未读 Keychain。
+- 更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。
+
 ## 2026-11-09：阶段 6 本机 CI 门禁复核
 
 - 重跑与 `.github/workflows/ci.yml` 对应的本机门禁：`uv lock --check`、`ruff check pac_poc tests`、`mypy`、`python -m compileall -q pac_poc scripts tests`、tracked-file `detect-secrets-hook`、后端 all-extras/all-groups pytest（253 passed，1 条既有 Starlette/httpx 弃用警告）；Swift 40 项及 Beta target build 已在前一提交复核通过。
