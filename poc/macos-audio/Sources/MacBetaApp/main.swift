@@ -92,6 +92,7 @@ final class BetaChatModel {
     private var voiceStream: LocalVoiceStream?
     private var voiceFinalSegments: [String] = []
     private var voiceStreamFailed = false
+    private var voiceStreamFailureMessage: String?
     private var voiceFrameReadyAt: [UInt32: TimeInterval] = [:]
     private var partialLatencySamples: [TimeInterval] = []
     private var stopToDraftSamples: [TimeInterval] = []
@@ -271,6 +272,7 @@ final class BetaChatModel {
             voiceFinalSegments = []
             partialTranscript = ""
             voiceStreamFailed = false
+            voiceStreamFailureMessage = nil
             voiceFrameReadyAt.removeAll(keepingCapacity: true)
             voiceNextSequence = 0
             let (frames, continuation) = AsyncStream<CapturedVoiceFrame>.makeStream(bufferingPolicy: .bufferingOldest(6))
@@ -291,6 +293,7 @@ final class BetaChatModel {
                     }
                 } catch {
                     self?.voiceStreamFailed = true
+                    self?.voiceStreamFailureMessage = error.localizedDescription
                 }
             }
             voiceReceiverTask = Task { [weak self] in
@@ -307,12 +310,14 @@ final class BetaChatModel {
                                 self.partialTranscript = ""
                             } else if event.type == "error" {
                                 self.voiceStreamFailed = true
+                                self.voiceStreamFailureMessage = event.message
                             }
                         }
                         if event.type == "ended" || event.type == "error" { break }
                     }
                 } catch {
                     self?.voiceStreamFailed = true
+                    self?.voiceStreamFailureMessage = error.localizedDescription
                 }
             }
             try await microphone.start(onFrame: { frame in
@@ -404,7 +409,9 @@ final class BetaChatModel {
                 : "本机识别完成；转写已放入输入框，请检查后发送。"
         } catch {
             microphone.discard()
-            status = "本机实时识别中断；未完成的转写已丢弃，没有切换到云端。"
+            try? await voiceStream?.abort()
+            let reason = voiceStreamFailureMessage ?? error.localizedDescription
+            status = "本机实时识别中断：\(reason)；未完成的转写已丢弃，没有切换到云端。"
         }
         cancelVoiceStream()
         isTranscribingVoice = false
@@ -416,19 +423,28 @@ final class BetaChatModel {
         voiceTimerTask = nil
         isRecordingVoice = false
         microphone.discard()
-        cancelVoiceStream()
+        cancelVoiceStream(sendAbort: true)
         partialTranscript = ""
         status = "录音已取消并丢弃。"
     }
 
-    private func cancelVoiceStream() {
+    private func cancelVoiceStream(sendAbort: Bool = false) {
         voiceFrameContinuation?.finish()
         voiceFrameContinuation = nil
         voiceSenderTask?.cancel()
         voiceSenderTask = nil
         voiceReceiverTask?.cancel()
         voiceReceiverTask = nil
-        voiceStream?.cancel()
+        if let stream = voiceStream {
+            if sendAbort {
+                Task {
+                    try? await stream.abort()
+                    stream.cancel()
+                }
+            } else {
+                stream.cancel()
+            }
+        }
         voiceStream = nil
     }
 

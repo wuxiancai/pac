@@ -41,6 +41,10 @@ public final class LocalVoiceStream: @unchecked Sendable {
         try await sendJSON(["type": "end"])
     }
 
+    public func abort() async throws {
+        try await sendJSON(["type": "abort"])
+    }
+
     public func receive() async throws -> VoiceRecognitionEvent {
         let message = try await task.receive()
         let data: Data

@@ -235,6 +235,15 @@ def create_beta_api(
                         lock_acquired = False
                         await websocket.send_json({"type": "ended"})
                         break
+                    if command == {"type": "abort"}:
+                        if started:
+                            await asyncio.to_thread(voice_transcriber.abort_stream)
+                            started = False
+                        if lock_acquired:
+                            voice_stream_lock.release()
+                            lock_acquired = False
+                        await websocket.send_json({"type": "ended"})
+                        break
                     await websocket.send_json({"type": "error", "message": "未知语音控制命令"})
                     await websocket.close(code=1008)
                     break

@@ -341,6 +341,49 @@ def test_voice_websocket_reports_busy_after_authenticated_handshake() -> None:
     assert transcriber.aborted == 1
 
 
+def test_voice_websocket_abort_clears_session_and_allows_immediate_restart() -> None:
+    transcriber = StubVoiceTranscriber()
+    app = create_beta_api(
+        session=LocalAPISession(token="voice-token"),
+        voice_transcriber_override=transcriber,
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect(
+            "/voice/stream",
+            headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+        ) as websocket:
+            websocket.send_json({
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            })
+            assert websocket.receive_json() == {"type": "ready"}
+            websocket.send_json({"type": "abort"})
+            assert websocket.receive_json() == {"type": "ended"}
+
+        with client.websocket_connect(
+            "/voice/stream",
+            headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+        ) as websocket:
+            websocket.send_json({
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            })
+            assert websocket.receive_json() == {"type": "ready"}
+            websocket.send_json({"type": "end"})
+            assert websocket.receive_json()["type"] == "final"
+            assert websocket.receive_json() == {"type": "ended"}
+
+    assert transcriber.started == 2
+    assert transcriber.ended == 1
+    assert transcriber.aborted == 2
+
+
 def test_voice_websocket_rejects_bad_token_and_out_of_order_frames() -> None:
     transcriber = StubVoiceTranscriber()
     app = create_beta_api(
