@@ -1053,3 +1053,11 @@
 - 已统一状态：选择、暂存和移除已通过本机 Ollama 模式 GUI 冒烟；资料进入聊天上下文的 GUI 引用仍待验证；PDF 继续关闭，直至内存限制、恶意样本及 CPU/墙钟压力门槛有证据。未扩大 Beta 功能范围。
 - 本次仅改文档；未运行测试或 GUI，也未触发麦克风、Keychain 或云端请求。待执行 `git diff --check`、复核差异并提交。
 - 下一段优先完成 B5 聊天引用的 GUI 验收；随后处理 B1 错误呈现和阶段 2 用量面板的 GUI 验收。真实云 usage/cost、PDF 启用及预算 enforcement 仍须各自满足触发条件与产品决策，不能以本地 mock 代替。
+
+### 2026-11-10：继续阶段工作与 B5 GUI 验收状态
+
+- 当前基线提交为 `5567968`，工作区初始干净。读取项目上下文、任务、决策、交接和阶段 0 矩阵后，继续处理 B5 聊天引用 GUI 验收。
+- `./poc/macos-audio/scripts/run_beta_app.sh` 已成功构建 Beta target 并启动仓库当前 `.poc-data/personal-assistant-beta.app`。Ollama 正在运行，`ollama list` 显示已安装 `qwen3.5:0.8b`。
+- CUA 对该测试版窗口请求返回“Computer Use was not approved to use 个人 AI 助理测试版”。因此没有执行桌面点击、没有导入或发送测试资料，也没有尝试绕过该拦截。B5 的聊天引用 GUI 验收仍待可用的授权桌面操作；自动化 API 回归已覆盖本机资料上下文注入与云端拒绝。
+- 同步 `docs/beta/file-import.md`，澄清文件选择/暂存/移除的 GUI 冒烟已经通过，唯独资料进入聊天上下文仍未验证；PDF 保持禁用。仅文档变更，未运行测试；随后执行 `git diff --check`、暂存差异复核并提交。
+- 下一步：桌面操作可用时，明确选中 Ollama，用合成无敏感内容 TXT 验证附件引用后模型可读到唯一测试短语；继续前检查新 Beta 窗口未承载用户未保存聊天。若桌面仍被自动审核拦截，转向不依赖 GUI 的阶段 2 工作，勿把手动验收标为通过。
