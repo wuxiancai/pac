@@ -2,6 +2,8 @@
 
 ## B1 本机流式保活继续开发（2026-11-09）
 
+- 本轮只读复核模型设置：云端说明完整显示 Provider、模型、区域及持续发送行为；OpenRouter 状态显示“已保存”，未读取 Key 内容。检查后恢复本机来源，未发云请求，也未覆盖当前聊天。
+- 本机设置帮助现明确说明 PAC 后端与 Ollama 是两个独立进程；须启动 Ollama 并安装所选模型，“PAC 服务已连接”不代表 Ollama 已运行。`swift test --package-path poc/macos-audio` → 34 passed；Beta build 成功。当前运行 GUI 保留用户本地对话，未为显示新帮助文字而关闭；新文案将在下次从仓库脚本启动后生效，尚未 GUI 验收。
 - 之前一次 GUI 等待 50 秒无回复时没有记录 Ollama 服务状态，因此不能判定是服务未启动还是模型延迟；SSE keep-alive 的自动回归有效，真实 thinking 原因尚未单独确认。Ollama 服务须在本机运行且所选模型已安装；后台本机错误提示会指引检查这两项。用户本轮已打开 Ollama 并确认 PAC 本地模型可以聊天。
 - 本机 `/chat/stream` 每 15 秒输出 SSE 注释 keep-alive，不暴露 thinking 或提示词；断开时会取消待取的上游 delta 并关闭 iterator。
 - 回归：`tests/test_beta_api.py tests/test_local_model_gateway.py` 22 passed；Ruff、mypy（相关 3 文件）、`uv lock --check`、compileall 通过。Python 全量 193 passed，1 failed：`test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup[APFS-128]` 受磁盘耗尽脚本 OSError 失败，与本次代码无关；1 条 Starlette/httpx deprecation warning。
@@ -9,7 +11,7 @@
 - 停流/重发：长故事请求开始生成后点停止，UI 立即显示“已停止本轮生成”；随后立即发短句，30 秒内仍显示生成中、没有文本，手动停止。该对话含长请求及未完成上下文，尚不能区分 Ollama 旧生成清理、上下文思考或模型延迟。请求停止期间 UI 未超时；这不能证明供应商/模型进程已经停止计算。
 - Ollama 直连接受控取消对照：通过 httpx 取消一个长 `/api/chat` 流（约 2 秒后断开），立即提交新的短请求；后者耗时 46.72 秒才完成。此前同机默认参数的短请求约 2.42 秒，显式 `think:false` 短请求约 0.88 秒。`ollama --version` 为 0.40.15。检查该版本官方 `server/routes.go`，流式生产 goroutine 通过无缓冲 channel 向响应 handler 发送；Ollama 官方 issue #17131 描述 client disconnect 可能使 Chat 流式 handler goroutine/runner semaphore slot 被占用，与观察到的取消后排队延迟相符，但不能证明本机该次请求由这个缺陷导致。见 [v0.40.15 routes.go](https://github.com/ollama/ollama/blob/v0.40.15/server/routes.go) 和 [Ollama issue #17131](https://github.com/ollama/ollama/issues/17131)。
 - PAC 停止状态文案已更新：本机选择显示“已停止接收回复；Ollama 可能仍在结束本机生成。”；云端选择显示“已停止接收回复；云端服务是否停止生成未知。”该文案避免把客户端取消误报成上游已停止。Swift `swift test --package-path poc/macos-audio` → 34 项通过；Beta target build 通过；仓库脚本重启后以长请求实际点停止，GUI Accessibility 显示本机提示文案。没有发云请求，云端文案仅由构建代码覆盖，尚未在云 Provider GUI 路径实测。
-- 测试对话清理后，已再次从仓库脚本启动 Beta，当前为空白本地会话且服务进程在运行；未发云请求。下一步是按 Ollama 版本/上游修复状态确定可用运行要求或恢复策略，再完成设置 UI 和云 API 错误路径验收；B1 暂不关闭。
+- 上一轮合成测试结束后，从仓库脚本重新启动 Beta；本轮打开时用户已有本地对话，未关闭或覆盖。下一步是按 Ollama 版本/上游修复状态确定可用运行要求或恢复策略；再完成可本地验证的错误路径与云 API 错误 UI 的授权内验收。新 Ollama 依赖说明已构建，待下次启动后 GUI 确认；B1 暂不关闭。
 - 一次桌面自动化重绑定短暂显示“无法找到本机运行环境”，原因是启动了没有 `PAC_POC_PYTHON`/`PAC_POC_BACKEND` 的 app 实例；已将其关闭并用仓库脚本正常重启，现无启动错误。
 - B0 最终完成：SwiftUI 主窗口从 `WindowGroup` 改为单实例 `Window`，使最后/唯一窗口关闭即退出，符合单会话 Beta 生命周期；启动错误及 GUI 重试已以本机 fixture 实测，fixture 已删除；真实后端连接后关闭唯一窗口，确认 app/backend 均无进程残留。Swift Beta build 成功，`swift test --package-path poc/macos-audio` 34 passed。
 - 上述 keep-alive 实现已在提交 `fa721e1`；本次仅更正实机根因判断与验证记录。继续 B1；B0 已关闭。交接前检查 diff 并提交。

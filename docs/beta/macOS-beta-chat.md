@@ -33,6 +33,8 @@
 
 - 2026-11-09 停止状态提示：本机停止显示“已停止接收回复；Ollama 可能仍在结束本机生成。”，云端停止显示“已停止接收回复；云端服务是否停止生成未知。”这描述客户端观测，不承诺上游已结束。`swift test --package-path poc/macos-audio` → 34 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。仓库脚本启动新 app 后，以本机合成长请求点击停止，GUI 显示上述本机提示。云 Provider 未调用，云文案未做 GUI 出站冒烟。
 
+- 2026-11-09 模型设置 GUI 只读复核：设置 sheet 显示本地/云端来源；检查云端时显示 OpenRouter 固定模型与区域、Keychain 状态“已保存（openrouter）”、删除入口和持续发送披露。未读取/编辑 SecureField，未点击保存或删除，未发送云请求；检查后恢复本机来源。新构建在本地设置下说明 PAC 后端与 Ollama 分开运行，要求启动 Ollama 并安装所选模型，且 PAC 后端已连接不代表 Ollama 已运行。Swift 34 项与 Beta build 通过；当前运行的 app 保留用户对话，未关闭重启来手动验收新提示，文案待下次仓库脚本启动后确认。
+
 - 2026-11-09 修复模型切换反馈：SwiftUI 模型选择变更会取消在途客户端请求、清除其 request ID 并更新当前 Provider/模型状态；发送时仍以当前设置建立不可变请求快照，完成状态显示本轮实际 Provider/模型。`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；本轮未运行测试、未启动 GUI、未发起云请求。
 
 - `swift build --package-path . --product personal-assistant-beta`：通过。

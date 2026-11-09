@@ -743,7 +743,7 @@ private struct BetaModelSettingsView: View {
             if model.source == .local {
                 TextField("Ollama 模型名称", text: $model.localModel)
                     .textFieldStyle(.roundedBorder)
-                Text("例如 qwen3.5:0.8b。模型由本机 Ollama 提供；请填写已安装的模型名称。")
+                Text("PAC 本机服务和 Ollama 是两个独立进程。请先启动 Ollama，并确认已安装此模型；PAC 服务已连接不代表 Ollama 已运行。")
                     .font(.callout).foregroundStyle(.secondary)
             } else {
                 Picker("云端服务商", selection: $model.cloudProvider) {
