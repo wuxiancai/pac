@@ -26,6 +26,7 @@
 - `swift build --package-path poc/macos-audio --product personal-assistant-beta`：通过。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python -m compileall -q pac_poc`（工作目录 `backend/`）：通过。
 - `poc/macos-audio/scripts/run_beta_app.sh`：构建并启动成功；GUI Accessibility 树显示“语音输入”按钮和提示“点击后才开始麦克风采集；音频最多保留在内存 30 秒”。Info.plist 的 `NSMicrophoneUsageDescription` 已读回确认。
+- 2026-11-09 用户确认 ADR-021 的 V1 边界：本机点击触发实时 ASR，语音按钮可打断文字生成，final 放入草稿；不做 AEC、自动声学插话或云 Realtime。决策已记录，但 GUI 的停止后 final/草稿、取消和打断路径仍需实机验证。
 - 本轮没有点击“语音输入”，没有申请权限、打开麦克风或采集音频；没有对录音/ASR endpoint/TTS 播放做运行时验证。没有运行测试。
 
 ## 用户手动冒烟步骤

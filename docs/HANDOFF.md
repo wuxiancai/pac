@@ -562,3 +562,4 @@
 - 用户确认 D-014：V1 不提供长期记忆/Embedding；开始持久化记忆功能前再定模型和格式。FastEmbed/MiniLM 的小型合成集 POC 不作为产品型号或 schema 选择。
 - 用户确认 D-015：V1 不提供 app 数据导出；未来加入持久数据时再定格式和默认加密，当前不生成 app 导出文件。
 - 用户确认 ADR-020：V1 继续使用项目自有轻量 ModelGateway，不引入开源 Gateway 运行依赖；LiteLLM/Bifrost/Portkey 研究留作后续评估参考。
+- 用户确认 ADR-021：V1 本机点击触发实时 ASR，语音按钮可打断文字生成，final 入草稿；不做 AEC、自动声学插话或云 Realtime。GUI 停止后 final、取消清理和打断仍待用户实机验证。
