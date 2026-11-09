@@ -13,7 +13,7 @@
 
 ## Beta 客户端并发边界
 
-2026-11-09：macOS Beta 将文件导入限制为单个在途任务。导入期间禁用重复文件选择、发送和语音入口；模型层也拒绝重入。这样避免用户连续打开选择器时并发读取/上传多个 10 MiB 文件，并确保前端最多 4 个附件的限制不会因并发检查竞态而被绕过。后端 8 文件/20 MiB 和每次聊天最多 4 个 ID 限制仍是独立保护。Swift 全量 40 项通过，`personal-assistant-beta` 构建通过。之后 GUI 文件选择、导入暂存和移除已用 141-byte 合成 TXT 在本机 Ollama 模式验证通过；附件进入聊天上下文的 GUI 闭环仍待人工验证。
+2026-11-09：macOS Beta 将文件导入限制为单个在途任务。导入期间禁用重复文件选择、发送和语音入口；模型层也拒绝重入。这样避免用户连续打开选择器时并发读取/上传多个 10 MiB 文件，并确保前端最多 4 个附件的限制不会因并发检查竞态而被绕过。后端 8 文件/20 MiB 和每次聊天最多 4 个 ID 限制仍是独立保护。2026-11-10 后端 API 也增加单飞接收锁：已有上传尚未完成时，第二个上传立即收到 409，且不消费其请求体；因此请求流暂存不会按并发上传数倍增，单请求仍受 10 MiB 流上限约束。Swift 全量 40 项通过，`personal-assistant-beta` 构建通过。之后 GUI 文件选择、导入暂存和移除已用 141-byte 合成 TXT 在本机 Ollama 模式验证通过；附件进入聊天上下文的 GUI 闭环仍待人工验证。
 
 ## 尚未启用
 
@@ -42,3 +42,6 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked mypy pac_poc/imported_text.py pa
 结果：45 passed；Ruff 全部通过；mypy 无问题；pytest 有一条既有 Starlette/httpx 弃用警告。覆盖有效 TXT/Markdown、路径/类型/二进制拒绝、字符/字节上限、进程内删除、云端拒绝、上下文不可信标注、准确上下文长度门和移除后失效。
 
 `swift test --package-path poc/macos-audio` → 35 passed，Beta app target 编译通过。未重启 GUI 做手动文件选择/移除冒烟；本机聊天联调待下一次启动确认。未读取 Keychain、未发起云请求、未采集麦克风。
+
+
+2026-11-10 后端并发接收回归：上传 A 暂停在第一段请求体后，上传 B 返回 409 且其异步 body generator 未运行；释放 A 后其完成导入。定向导入测试 3 passed；`ruff check pac_poc/beta_api.py tests/test_beta_api.py` 与 `mypy pac_poc/beta_api.py` 通过；后端全量 274 passed，1 条既有 Starlette/httpx 弃用警告。

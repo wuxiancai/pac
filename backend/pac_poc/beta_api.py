@@ -290,6 +290,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
     run_registry = RunRegistry()
     usage_ledger = UsageLedger()
     imported_text = ImportedTextRegistry()
+    import_request_lock = asyncio.Lock()
     voice_stream_lock = asyncio.Lock()
     router = APIRouter()
 
@@ -574,6 +575,19 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
 
     @router.post("/imports/text", status_code=201)
     async def import_selected_text(request: Request) -> dict[str, str | int]:
+        # Do not let concurrent authenticated uploads each allocate a 10 MiB body
+        # before the registry's aggregate in-memory limit is checked.
+        if import_request_lock.locked():
+            raise HTTPException(status_code=409, detail="another file import is in progress")
+        await import_request_lock.acquire()
+        try:
+            return await _receive_imported_text(request, imported_text)
+        finally:
+            import_request_lock.release()
+
+    async def _receive_imported_text(
+        request: Request, registry: ImportedTextRegistry
+    ) -> dict[str, str | int]:
         display_name = request.query_params.get("filename", "")
         content_length = request.headers.get("content-length")
         if content_length is not None:
@@ -593,7 +607,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 raise HTTPException(status_code=413, detail="file exceeds the 10 MB limit")
             data.extend(chunk)
         try:
-            document = imported_text.add(display_name, bytes(data))
+            document = registry.add(display_name, bytes(data))
         except ImportRejected as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {

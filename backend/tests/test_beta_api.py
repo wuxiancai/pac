@@ -385,6 +385,51 @@ def test_user_selected_text_import_is_bounded_ephemeral_and_local_only() -> None
     asyncio.run(run())
 
 
+def test_text_import_rejects_a_concurrent_upload_before_reading_its_body() -> None:
+    async def run() -> None:
+        app = create_beta_api(session=LocalAPISession(token="test-token"))
+        headers = {
+            "authorization": "Bearer test-token",
+            "content-type": "application/octet-stream",
+        }
+        first_chunk_sent = asyncio.Event()
+        release_first = asyncio.Event()
+        second_body_read = False
+
+        async def first_body():
+            yield b"first"
+            first_chunk_sent.set()
+            await release_first.wait()
+            yield b" continued"
+
+        async def second_body():
+            nonlocal second_body_read
+            second_body_read = True
+            yield b"second"
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            first_request = asyncio.create_task(client.post(
+                "/imports/text?filename=first.txt", headers=headers, content=first_body()
+            ))
+            await asyncio.wait_for(first_chunk_sent.wait(), timeout=1)
+            try:
+                second = await client.post(
+                    "/imports/text?filename=second.txt", headers=headers, content=second_body()
+                )
+            finally:
+                release_first.set()
+            first = await first_request
+
+        assert second.status_code == 409
+        assert not second_body_read
+        assert first.status_code == 201
+        assert first.json()["byte_count"] == len(b"first continued")
+
+    asyncio.run(run())
+
+
 def test_user_selected_text_import_rejects_unsupported_or_invalid_files() -> None:
     async def run() -> None:
         app = create_beta_api(session=LocalAPISession(token="test-token"))

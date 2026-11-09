@@ -1108,3 +1108,11 @@
 - 定向 `tests/test_orchestrator.py tests/test_beta_api.py -k 'imported_prompt_injection or user_selected_text_import or untrusted_document_framing'`：4 passed；Ruff 通过。后端全量：273 passed、1 条既有 Starlette/httpx 弃用警告。
 - 已同步 `docs/beta/file-import.md`、`docs/TASKS.md` 与 `docs/PROJECT_CONTEXT.md`。
 - 下一步继续阶段 2/4 可本机闭环项；GUI 手动验收需可用桌面操作，PDF 保持禁用。
+
+
+### 2026-11-10：B5 后端文件导入并发接收上限
+
+- 发现注册表虽有 8 文件/20 MiB 总量上限，但 API 原先先完整读取最多 10 MiB 请求体，再检查注册表容量；并发请求会在容量检查前同时分配 body buffer。
+- 导入 API 现串行接收：存在在途导入时，第二个请求立即返回 409，不读取其 body；首个请求成功后释放门禁。未改变云端拒绝、格式验证、文件数/总量上限和进程内存储语义。
+- 新增并发 ASGI 回归，以异步请求体暂停证明第二请求生成器未消费。定向导入测试 3 passed；Ruff 和 mypy 通过；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：274 passed，1 条既有 Starlette/httpx 弃用警告。
+- 更新 `docs/beta/file-import.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。GUI 聊天引用仍待桌面验收；PDF 继续禁用。
