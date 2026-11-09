@@ -25,7 +25,7 @@ CI 现显式安装 `phase4-pdf-poc` extra，因此通用 Python 回归会实际�
 
 ## 自动验证
 
-Swift 客户端请求契约回归（2026-11-09）：`swift test --package-path poc/macos-audio` → 40 passed，Beta target build 通过。新增 URLProtocol fixture 验证导入请求只携带 basename、文件内容和 loopback Bearer token；不包含原始路径；PDF 与大于 10 MiB 文件在网络调用前拒绝。此项不代替 GUI 文件选择、移除和聊天引用实机冒烟。较早一次只读检查旧运行实例时，accessibility 控件树未呈现“添加资料”；当时窗口有未持久化对话，因此未重启。之后确认 Beta 实例已退出，从仓库根目录运行 `poc/macos-audio/scripts/run_beta_app.sh` 启动当前构建，状态栏显示本机服务已连接，accessibility 树可见 `import-text-file-button`。这解决了入口是否可见的问题；本轮没有选择/上传文件，也没有验证附件移除或聊天引用，完整 GUI 导入闭环仍待验收。
+Swift 客户端请求契约回归（2026-11-09）：`swift test --package-path poc/macos-audio` → 40 passed，Beta target build 通过。新增 URLProtocol fixture 验证导入请求只携带 basename、文件内容和 loopback Bearer token；不包含原始路径；PDF 与大于 10 MiB 文件在网络调用前拒绝。此项不代替 GUI 文件选择、移除和聊天引用实机冒烟。较早一次只读检查旧运行实例时，accessibility 控件树未呈现“添加资料”；当时窗口有未持久化对话，因此未重启。之后确认 Beta 实例已退出，从仓库根目录运行 `poc/macos-audio/scripts/run_beta_app.sh` 启动当前构建，状态栏显示本机服务已连接，accessibility 树可见 `import-text-file-button`。随后进行本机 GUI 冒烟：仓库内 141-byte 合成 TXT 由文件选择器选中，Beta 显示 `gui-import-fixture.txt` 和 65 字符计数；点击移除后附件 chip 消失，状态提示“已从本机临时资料中移除”。当时应用选择 Ollama 本地模型，未发送聊天消息或触发 Provider，因此文件选择、暂存和移除路径已实测通过；资料进入聊天上下文的 GUI 引用路径仍待验证。
 
 在 `backend/` 目录：
 

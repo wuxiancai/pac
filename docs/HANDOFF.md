@@ -1,3 +1,9 @@
+# 2026-11-09：B5 TXT/Markdown GUI 选择与移除实测
+
+- 通过当前仓库构建的 Beta 文件选择器选中仓库 `.poc-data` 下 141-byte 合成 TXT。UI 状态显示文件名与 65 字符计数，附件 chip 显示文件；点击“移除资料”后 chip 消失且状态提示本机临时资料已移除。证明当前 GUI 选择/读取/本机 API 暂存/显式删除链路可用。
+- 当时应用选中 Ollama 本地模型；本轮未发送聊天消息，未验证资料被引用到聊天上下文；未调用任何云 Provider，也未使用麦克风。合成夹具已从仓库 `.poc-data` 清理。
+- 已同步 `docs/beta/file-import.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。B5 GUI 仍 IN PROGRESS，待补资料引用聊天实测；PDF 仍禁用。
+
 # 2026-11-09：阶段 6 CI 增加 Beta 产品构建
 
 - `.github/workflows/ci.yml` 原先运行 `swift test`，但没有显式构建 SwiftPM 的 `personal-assistant-beta` 可执行产品。已添加独立 `swift build --product personal-assistant-beta` 步骤，避免 CI 只编译测试依赖而漏掉应用 target。
