@@ -2,7 +2,7 @@
 
 - D-013 Beta GUI 采样已完成：启动 20 次/P95=700 ms；partial 216 次/各窗口 P95≤41.5 ms；停止→final 21 次/pooled P95=97.9 ms。相应追踪行标为 `PASS（本机 Beta 样本）`，其范围限制已写入矩阵。
 - 验证：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_phase0_traceability_report.py`（`backend/`）→ 9 passed；`git diff --check` 通过。此次为文档/追踪更新，未改代码。
-- 0G 本地核对 `backend/pyproject.toml` 后确认基础 Beta 依赖闭包为 23 个锁定包；FastEmbed/ONNX Runtime/Pillow 和 SQLAlchemy/Alembic/SQLCipher 属于可选 POC extras。`run_beta_app.sh` 使用共享 `.venv`，因此实际环境可包含额外包；当前没有固定的分发 runtime 或完整 NOTICE 清单。已把范围结论补入 `phase0-model-license-review.md` 和追踪矩阵，0G 许可状态维持未闭环。
+- 0G 本地核对 `backend/pyproject.toml` 后确认基础 Beta 依赖闭包为 23 个锁定包；本机对应的 22 个 wheel 含 LICENSE 文件，`sherpa-onnx-core` metadata 声明 Apache-2.0。FastEmbed/ONNX Runtime/Pillow 和 SQLAlchemy/Alembic/SQLCipher 属于可选 POC extras。`run_beta_app.sh` 使用共享 `.venv`，因此实际环境可包含额外包；当前没有固定的分发 runtime 或完整 NOTICE 清单。已把范围结论补入 `phase0-model-license-review.md` 和追踪矩阵，0G 许可状态维持未闭环。
 - 下一步应继续处理可本机复核的阶段 0 项；任何 Provider 出站仍需该次请求精确 Consent/Policy。训练数据权利链、第三方 Qwen 转换工件/测试音频许可、macOS 14 实机与远端 CI 等不能由本机静态检查代替。
 
 ### 2026-11-09：完成 D-013 Beta GUI 性能采样
