@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## B0 继续开发（2026-11-09）
+
+- 启动失败后新增“重试连接”按钮，并按 runtime 缺失、进程启动失败、握手超时/无效等情况显示中文恢复提示；重复点击期间禁用按钮。用户仍可从脚本重新启动来修复虚拟环境/仓库配置问题。
+- 检查窗口消失时的异步 shutdown 与 supervisor.start 并发：若启动任务尚未完成，原先 shutdown 可能先看到空 process 而返回。现 `LocalBackendSupervisor` 对 start/stop/isRunning 加生命周期锁，串行化进程状态访问。新增真实子进程回归：服务进程在启动握手前延迟时触发 stop，stop 等待启动登记后再关闭，最后确认无存活子进程。
+- 验证：`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功；`swift test --package-path poc/macos-audio` → 34 passed。一次初始并发测试未通过是因为锁修改未应用，随后修正锁并以进程 marker 确定测试时序，最终回归通过。
+- 本轮没有关闭/替换用户可能仍打开的 Beta 窗口。GUI 窗口关闭清理及模拟后端失败后的重试尚未实机复核，B0 保持 IN PROGRESS。下一步可先让用户保存未提交聊天并退出当前 Beta，再用启动脚本复核重试与关窗后的 backend 进程清理；随后继续 B1/B2。
+
 ## 阶段 1 最终复核（2026-11-09）
 
 - 当前 `HEAD` 为 `5f6fe24 feat(stage1): complete stateless engineering foundation`，工作区进入时干净。阶段 1 当前决策允许的无持久化工程底座已完成；数据库/schema/migration/会话持久化/静态加密与 metadata-only 30 天审计仍按 D-003/D-007 未实现并延期，不作为阶段 1 通过项。

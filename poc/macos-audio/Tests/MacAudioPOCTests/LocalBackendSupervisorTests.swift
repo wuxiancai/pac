@@ -43,6 +43,30 @@ import Testing
 }
 
 @available(macOS 12.0, *)
+@Test func supervisorStopWaitsForAnInFlightStartup() async throws {
+    let handshake = #"{"base_url":"http://127.0.0.1:49152","token":"01234567890123456789012345678901"}"#
+    let moduleSource = "import sys, time\nopen(__file__ + '.started', 'w').close()\ntime.sleep(0.3)\nprint('''\(handshake)''', flush=True)\nsys.stdin.read()\n"
+    let (python, fixtureDirectory) = try localBackendFixture(moduleSource: moduleSource)
+    defer { try? FileManager.default.removeItem(at: fixtureDirectory) }
+    let supervisor = LocalBackendSupervisor(
+        pythonExecutableURL: python,
+        backendDirectoryURL: fixtureDirectory
+    )
+    let startup = Task.detached { try supervisor.start() }
+
+    let startedMarker = fixtureDirectory.appendingPathComponent("pac_poc/local_service.py.started")
+    let deadline = ProcessInfo.processInfo.systemUptime + 2
+    while !FileManager.default.fileExists(atPath: startedMarker.path),
+          ProcessInfo.processInfo.systemUptime < deadline {
+        usleep(10_000)
+    }
+    #expect(FileManager.default.fileExists(atPath: startedMarker.path))
+    try supervisor.stop()
+    _ = try await startup.value
+    #expect(!supervisor.isRunning)
+}
+
+@available(macOS 12.0, *)
 @Test func supervisorTimesOutAndTerminatesBackendThatNeverHandshakes() throws {
     let (python, fixtureDirectory) = try localBackendFixture(moduleSource: "import time\ntime.sleep(30)\n")
     defer { try? FileManager.default.removeItem(at: fixtureDirectory) }

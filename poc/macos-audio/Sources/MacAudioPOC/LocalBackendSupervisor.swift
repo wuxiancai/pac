@@ -18,6 +18,7 @@ public enum LocalBackendSupervisorError: Error, Equatable {
 /// Owns only the fixed `pac_poc.local_service` module through private standard pipes.
 @available(macOS 12.0, *)
 public final class LocalBackendSupervisor: @unchecked Sendable {
+    private let lifecycleLock = NSLock()
     private let pythonExecutableURL: URL
     private let backendDirectoryURL: URL
     private let startupTimeout: TimeInterval
@@ -42,10 +43,14 @@ public final class LocalBackendSupervisor: @unchecked Sendable {
     }
 
     public var isRunning: Bool {
-        process?.isRunning ?? false
+        lifecycleLock.lock()
+        defer { lifecycleLock.unlock() }
+        return process?.isRunning ?? false
     }
 
     public func start() throws -> LocalBackendHandshake {
+        lifecycleLock.lock()
+        defer { lifecycleLock.unlock() }
         if let process {
             guard !process.isRunning else { throw LocalBackendSupervisorError.alreadyRunning }
             inputPipe?.fileHandleForWriting.closeFile()
@@ -106,6 +111,8 @@ public final class LocalBackendSupervisor: @unchecked Sendable {
     }
 
     public func stop() throws {
+        lifecycleLock.lock()
+        defer { lifecycleLock.unlock() }
         guard let child = process else { return }
         // EOF is the graceful stop signal and cannot raise SIGPIPE if the child exited.
         inputPipe?.fileHandleForWriting.closeFile()

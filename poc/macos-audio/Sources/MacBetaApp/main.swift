@@ -99,6 +99,8 @@ final class BetaChatModel {
     private(set) var startupLatency: TimeInterval?
     private var voiceNextSequence: UInt32 = 0
     private let processStartedAt: TimeInterval
+    private(set) var isStarting = false
+    private(set) var startupFailed = false
     private(set) var performanceDiagnosticsEnabled =
         ProcessInfo.processInfo.environment["PAC_BETA_PERF_DIAGNOSTICS"] == "1"
     private let defaults = UserDefaults.standard
@@ -169,17 +171,39 @@ final class BetaChatModel {
     }
 
     func start() async {
-        guard client == nil else { return }
+        guard client == nil, !isStarting else { return }
+        isStarting = true
+        defer { isStarting = false }
+        let backendSupervisor = supervisor
         do {
-            let backendSupervisor = supervisor
             let handshake = try await Task.detached { try backendSupervisor.start() }.value
             let localClient = try LocalAPIClient(baseURL: handshake.baseURL, token: handshake.token)
             guard try await localClient.health() else { throw LocalAPIClientError.invalidResponse }
             client = localClient
+            startupFailed = false
             startupLatency = max(0, ProcessInfo.processInfo.systemUptime - processStartedAt)
             status = "本机服务已连接；当前模型：\(selectedProvider) / \(selectedModel)"
         } catch {
-            status = "本机服务启动失败：\(error.localizedDescription)"
+            await Task.detached { try? backendSupervisor.stop() }.value
+            startupFailed = true
+            if let supervisorError = error as? LocalBackendSupervisorError {
+                switch supervisorError {
+                case .backendRuntimeUnavailable:
+                    status = "找不到本机 Python 或服务代码。请检查虚拟环境，再重试。"
+                case .launchFailed:
+                    status = "本机服务进程无法启动。请检查 Python 环境，再重试。"
+                case .startupTimedOut:
+                    status = "本机服务启动超时。请检查依赖和端口占用，再重试。"
+                case .invalidHandshake:
+                    status = "本机服务握手失败，未建立连接。请重试。"
+                case .alreadyRunning:
+                    status = "本机服务已在启动或运行。请稍候后重试。"
+                case .shutdownTimedOut:
+                    status = "上一次本机服务未能正常退出。请退出应用后重新启动。"
+                }
+            } else {
+                status = "本机服务启动失败：\(error.localizedDescription)"
+            }
         }
     }
 
@@ -515,6 +539,13 @@ private struct BetaChatView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("个人 AI 助理").font(.title2.bold())
                     Text(model.status).font(.caption).foregroundStyle(.secondary)
+                    if model.startupFailed {
+                        Button(model.isStarting ? "正在重试…" : "重试连接") {
+                            Task { await model.start() }
+                        }
+                        .disabled(model.isStarting)
+                        .accessibilityIdentifier("retry-local-service-button")
+                    }
                     Text(model.usesCloud
                         ? "云端：聊天内容发送至\(model.selectedModelTitle)（\(model.selectedRegion)）"
                         : "本地：聊天内容仅发送到本机模型")
