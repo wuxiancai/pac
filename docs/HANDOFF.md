@@ -1,3 +1,10 @@
+# 2026-11-09：B5 文件导入并发保护
+
+- 检查发现文件导入期间仍可再次打开文件选择器；并发任务可能同时通过 4 个附件客户端上限检查，导致重复读取/上传或请求随后超出聊天 ID 限制。
+- Beta `BetaChatModel` 增加导入中状态和重入保护；导入期间禁用添加资料、发送和语音入口。后端已有的文件数量/字节数限制保持为独立保护。
+- 验证：`swift test --package-path poc/macos-audio` 40 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。没有操作 GUI；文件选择、移除和聊天引用手动验收仍待干净启动，保留现有未持久化对话。
+- 文档同步：`docs/beta/file-import.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。本轮完成后应提交并保持工作区干净；未推送。
+
 ## 2026-11-09：当前 HEAD 阶段 6 本机 CI 门禁复核
 
 - 在当前 HEAD `4b23b86` 重跑工作流对应本机门禁：`uv lock --check`、`ruff check pac_poc tests`、`mypy`、`python -m compileall -q pac_poc scripts tests`、`git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 均通过。

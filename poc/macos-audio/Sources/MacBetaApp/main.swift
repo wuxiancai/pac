@@ -86,6 +86,7 @@ final class BetaChatModel {
     private(set) var latestRunID: String?
     private(set) var latestRunStatus: LocalChatRunStatus?
     private(set) var importedTextFiles: [LocalImportedTextFile] = []
+    private(set) var isImportingFiles = false
     private(set) var usageRecords: [LocalUsageRecord] = []
     private(set) var usageStatus = "尚未读取本机用量。"
     private(set) var isLoadingUsage = false
@@ -149,7 +150,7 @@ final class BetaChatModel {
         ].joined(separator: "\n")
     }
     var canStartVoiceCapture: Bool {
-        client != nil && !isRecordingVoice && !isTranscribingVoice
+        client != nil && !isRecordingVoice && !isTranscribingVoice && !isImportingFiles
     }
     var usesCloud: Bool { source == .cloud }
     var selectedProvider: String { usesCloud ? cloudProvider.rawValue : "ollama" }
@@ -215,7 +216,8 @@ final class BetaChatModel {
     }
 
     func send() {
-        guard activeRequest == nil, !isRecordingVoice, !isTranscribingVoice, let client else { return }
+        guard activeRequest == nil, !isRecordingVoice, !isTranscribingVoice,
+              !isImportingFiles, let client else { return }
         if usesCloud && !importedTextFiles.isEmpty {
             status = "已选资料目前只允许发送到本机模型；切回本地模型后再提问。"
             return
@@ -339,12 +341,18 @@ final class BetaChatModel {
     }
 
     func importSelectedFiles(_ urls: [URL]) async {
+        guard !isImportingFiles else {
+            status = "正在添加本机资料，请稍候。"
+            return
+        }
         guard let client else { return }
         guard !urls.isEmpty else { return }
         if importedTextFiles.count + urls.count > 4 {
             status = "一次最多附加 4 个文本文件；请分批选择。"
             return
         }
+        isImportingFiles = true
+        defer { isImportingFiles = false }
         for url in urls {
             let suffix = url.pathExtension.lowercased()
             guard ["txt", "md", "markdown"].contains(suffix) else {
@@ -834,7 +842,7 @@ private struct BetaChatView: View {
                     } label: {
                         Label("添加资料", systemImage: "paperclip")
                     }
-                    .disabled(model.isRecordingVoice || model.isTranscribingVoice)
+                    .disabled(model.isImportingFiles || model.isRecordingVoice || model.isTranscribingVoice)
                     .help("选择 TXT 或 Markdown 文件；资料只用于本机模型，PDF 导入尚未启用")
                     .accessibilityIdentifier("import-text-file-button")
                     Button {
@@ -863,6 +871,7 @@ private struct BetaChatView: View {
                             model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                 || model.isRecordingVoice
                                 || model.isTranscribingVoice
+                                || model.isImportingFiles
                         )
                 }
             }
