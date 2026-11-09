@@ -23,12 +23,12 @@ from .keychain_credentials import (
 )
 from .model_gateway import (
     ConsentAwarePolicy,
-    LocalModelRequest,
     LocalProviderAdapter,
     LocalOnlyPolicy,
     ModelGateway,
     OllamaAdapter,
 )
+from .orchestrator import ConversationTurn, MainAssistantOrchestrator
 from .remote_providers import (
     DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG,
@@ -493,7 +493,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             purpose = ""
             data_level = DataLevel.L0
             source = ""
-        request = LocalModelRequest(
+        turn = ConversationTurn(
             provider=payload.provider,
             model=payload.model,
             messages=messages,
@@ -506,7 +506,8 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         async def events() -> AsyncIterator[str]:
             try:
                 async for delta in _stream_with_keepalives(
-                    selected_gateway.stream(request), settings.chat_stream_keepalive_seconds
+                    MainAssistantOrchestrator(selected_gateway).stream(turn),
+                    settings.chat_stream_keepalive_seconds,
                 ):
                     if delta is None:
                         yield ": keep-alive\n\n"

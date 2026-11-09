@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 单助理编排框架起步（2026-11-09）
+
+- 用户要求先把框架开发出来。本轮在现有本机 Beta `/chat/stream` 上抽出 `MainAssistantOrchestrator`、`ConversationTurn` 和可替换 `ContextBuilder`；当前只启用 `main_assistant`，默认上下文仅透传本轮明确消息。API 继续承担认证、云 Consent/Policy、SSE 和 UI 错误映射，不改变现有本地/云路由行为。
+- 增加编排框架说明 `docs/beta/orchestrator-framework.md`，并在 `TASKS.md` 增列后续框架工作包。没有加入 Agent 团队、任意工具、长期记忆、后台续跑或持久化。
+- 验证：`backend/` 下窄回归 `tests/test_orchestrator.py tests/test_beta_api.py tests/test_local_model_gateway.py` → 24 passed；Ruff 检查通过；mypy 检查通过。仅有既有 Starlette/httpx 弃用警告。未发云请求、未读 Keychain、未采集麦克风。
+- 下一步继续完善单助理运行边界和模型能力约束，然后逐步扩展框架接缝；暂不回头排查 Ollama 上游取消细节。开始前检查 Git 状态，勿覆盖用户当前运行 GUI 或会话。
+
 ## B1 本机流式保活继续开发（2026-11-09）
 
 - 本轮只读复核模型设置：云端说明完整显示 Provider、模型、区域及持续发送行为；OpenRouter 状态显示“已保存”，未读取 Key 内容。检查后恢复本机来源，未发云请求，也未覆盖当前聊天。
