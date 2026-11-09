@@ -36,6 +36,10 @@ Beta 运行时现从随包的 `pac_poc/beta_model_capabilities.json` 装配默�
 
 认证 `GET /model-capabilities?provider_id=...&model_id=...` 返回报告证据引用及全部能力状态；未收录型号或省略能力都返回 `unknown`。该查询不发模型请求。当前聊天不声明额外工具/多模态能力，因此加载清单没有改变基本文本流行为。静态 JSON 已作为 Python package data，并通过 wheel 内容检查确认随包。
 
+## 聊天请求输入边界
+
+`/chat/stream` 按 ASGI 请求流分块读取 JSON，请求体最多 512 KiB；该上限覆盖 40,000 字符上下文以 UTF-16 surrogate-pair JSON 转义时的字节量及结构开销。未提供 `Content-Length` 的分块请求同样受限，超限在 Pydantic 校验、编排和 Provider 调用前返回 413。语义级上下文仍另受 40,000 字符限制。
+
 ## 进程内 Usage 首段
 
 聊天 run 结束时，`UsageLedger` 保存最近最多 512 条请求 metadata，认证 `GET /usage?limit=50` 可读取（limit 最大 100）。记录含 run/provider/model/region/purpose/data level、生命周期状态、wall latency，以及 Provider 明确报告的 token/cache/cost metadata；不含消息、回复、密钥或音频，进程退出即清空。Gateway 已把 Ollama 与 OpenAI-compatible 流最终帧中实际返回的 token 计数交给 ledger；只有 OpenRouter 的非流式或流式响应中，`usage.cost` 经验证且可由有限浮点数表示时才记录为实际 USD；其他 Provider 即使返回同名字段也保持费用 unknown；超大整数、非有限数和负值视为未知，不让异常数值转换中断流处理。未返回或不完整的 usage/cost 仍为 `unknown`/`null`。这不是完整费用账单或预算保护：精确 Beta 型号真实 usage/cost E2E、其他 Provider 费用来源及人民币归一尚未完成；D-005 月额度拦截当前未实现。

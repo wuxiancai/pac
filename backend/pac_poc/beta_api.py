@@ -14,8 +14,9 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .keychain_credentials import (
     CredentialProvider,
@@ -71,6 +72,7 @@ BETA_SOURCE = "beta-gui-chat"
 MAX_MESSAGES = 20
 MAX_MESSAGE_CHARS = 16_000
 MAX_CONTEXT_CHARS = 40_000
+MAX_CHAT_REQUEST_BYTES = 512 * 1024
 MAX_VOICE_PCM_BYTES = 960_000  # 30 seconds of 16 kHz mono PCM16
 VOICE_STREAM_LOCK_WAIT_SECONDS = 2.0
 CHAT_STREAM_KEEPALIVE_SECONDS = 15.0
@@ -608,7 +610,16 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         return {"removed": True}
 
     @router.post("/chat/stream")
-    async def stream_chat(payload: StreamChatRequest) -> StreamingResponse:
+    async def stream_chat(request: Request) -> StreamingResponse:
+        request_data = bytearray()
+        async for chunk in request.stream():
+            if len(request_data) + len(chunk) > MAX_CHAT_REQUEST_BYTES:
+                raise HTTPException(status_code=413, detail="chat request body is too large")
+            request_data.extend(chunk)
+        try:
+            payload = StreamChatRequest.model_validate_json(bytes(request_data))
+        except ValidationError as exc:
+            raise RequestValidationError(exc.errors(), body=bytes(request_data)) from exc
         total_chars = sum(len(message.content) for message in payload.messages)
         if total_chars > settings.max_context_chars:
             raise HTTPException(status_code=413, detail="conversation context is too long")

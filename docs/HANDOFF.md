@@ -1,3 +1,9 @@
+## 2026-11-09：阶段 2 聊天 JSON 请求体分块限长
+
+- `/chat/stream` 原由 FastAPI 在执行上下文长度限制前完整解析请求 JSON，带大量转义或填充的请求会先占用内存。现改为从 ASGI 流分块累计，超过 512 KiB 返回 413；之后使用 `StreamChatRequest.model_validate_json`，验证失败仍走不回显输入的统一 422 错误契约。
+- 512 KiB 覆盖 40,000 Unicode 字符以 JSON UTF-16 surrogate-pair 形式转义时约 480,000 字节和消息结构开销。新增无 Content-Length 分块超限回归，确认 Provider adapter 未被调用。窄测 3 passed；Ruff/mypy 通过；后端全量 261 passed，1 条既有 Starlette/httpx 弃用警告。
+- 更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。未发云请求或读取 Keychain。
+
 ## 2026-11-09：阶段 2 费用字段仅采信已验证 Provider
 
 - 复核发现流式 usage 只允许 OpenRouter 的 `usage.cost` 以 USD 进入记录，但非流式 `RemoteCompletion.cost_usd` 会把任意 OpenAI-compatible Provider 同名字段都标成 USD。现收敛到同一规则：只有 OpenRouter 接受该费用字段，DeepSeek/Qwen 等其他 Provider 值保持 unknown。

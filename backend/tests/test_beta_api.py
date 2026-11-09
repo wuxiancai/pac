@@ -16,6 +16,7 @@ from pac_poc.beta_api import (
     BetaAPIDependencies,
     BetaAPISettings,
     CLOUD_PROVIDERS,
+    MAX_CHAT_REQUEST_BYTES,
     create_beta_api,
     create_beta_app,
     _run_voice_worker,
@@ -604,6 +605,36 @@ def test_beta_chat_rejects_oversized_context_and_unknown_fields() -> None:
             )
         assert oversized.status_code == 422
         assert extra.status_code == 422
+
+    asyncio.run(run())
+
+
+def test_chat_request_body_limit_applies_to_chunked_requests_without_length() -> None:
+    async def run() -> None:
+        adapter = StubLocalAdapter()
+        app = create_beta_api(
+            session=LocalAPISession(token="test-token"),
+            gateway=ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy()),
+        )
+
+        async def oversized_chunks():
+            yield b" " * MAX_CHAT_REQUEST_BYTES
+            yield b" "
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            response = await client.post(
+                "/chat/stream",
+                headers={
+                    "authorization": "Bearer test-token",
+                    "content-type": "application/json",
+                },
+                content=oversized_chunks(),
+            )
+
+        assert response.status_code == 413
+        assert adapter.request is None
 
     asyncio.run(run())
 
