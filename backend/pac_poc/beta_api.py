@@ -76,13 +76,27 @@ class BetaAPISettings:
     voice_model_dir: Path = VOICE_MODEL_DIR
 
     def __post_init__(self) -> None:
-        if not 0 < self.max_context_chars <= MAX_CONTEXT_CHARS:
+        if (
+            isinstance(self.max_context_chars, bool)
+            or not isinstance(self.max_context_chars, int)
+            or not 0 < self.max_context_chars <= MAX_CONTEXT_CHARS
+        ):
             raise ValueError("context limit must be positive and cannot exceed the Beta limit")
-        if not 0 < self.max_voice_pcm_bytes <= MAX_VOICE_PCM_BYTES:
+        if (
+            isinstance(self.max_voice_pcm_bytes, bool)
+            or not isinstance(self.max_voice_pcm_bytes, int)
+            or not 0 < self.max_voice_pcm_bytes <= MAX_VOICE_PCM_BYTES
+        ):
             raise ValueError("PCM byte limit must be positive and cannot exceed 30 seconds")
         if self.max_voice_pcm_bytes % 32_000:
             raise ValueError("PCM byte limit must represent a whole second of 16 kHz mono PCM16")
-        if not math.isfinite(self.voice_stream_lock_wait_seconds) or self.voice_stream_lock_wait_seconds <= 0:
+        timeout = self.voice_stream_lock_wait_seconds
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout)
+            or timeout <= 0
+        ):
             raise ValueError("voice stream lock timeout must be finite and positive")
         if not isinstance(self.voice_model_dir, Path) or not self.voice_model_dir.is_absolute():
             raise ValueError("voice model directory must be absolute")

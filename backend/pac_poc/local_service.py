@@ -25,11 +25,14 @@ class LocalServiceSettings:
     shutdown_timeout_seconds: float = STARTUP_TIMEOUT_SECONDS
 
     def __post_init__(self) -> None:
-        if any(
-            not math.isfinite(value) or value <= 0
-            for value in (self.startup_timeout_seconds, self.shutdown_timeout_seconds)
-        ):
-            raise ValueError("service timeouts must be finite positive values")
+        for value in (self.startup_timeout_seconds, self.shutdown_timeout_seconds):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value <= 0
+            ):
+                raise ValueError("service timeouts must be finite positive values")
 
 
 def main() -> int:
