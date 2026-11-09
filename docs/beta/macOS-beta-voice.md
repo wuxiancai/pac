@@ -17,8 +17,8 @@
 
 - **2026-11-09 快速重连根因及修复**：用户 GUI 报第一次停止后 socket 断开，第二次服务端 busy（partial n=2、停止→final n=0）。在真实 Uvicorn WebSocket + 项目本机 ASR 模型上复现停止路径 `AttributeError: LocalStreamingASR has no attribute reset`：`LocalVoiceTranscriber.end_stream()` 和 `abort_stream()` 都错误地调用包装器上不存在的 `reset()`，且 WebSocket `finally` 在 abort 抛错时跳过锁释放，造成该会话永久占锁。现改为调用底层 recognizer 的 `reset()` 并保证清除 stream 引用；服务端 finally 无论清理是否异常都释放 asyncio 锁。修复后同一真实 Uvicorn + 本机 ASR 模型、真实音频文件 PCM 分帧、连续 3 轮均收到 partial/final/ended。Apple `URLSessionWebSocketTask` + 真实 Uvicorn + 项目 sherpa-onnx ASR + 仓库 PCM WAV 整链连续 3 轮通过（partial/final/ended 均收到）；用户随后确认 GUI 实时语音故障已修复；尚未收到可复核的 D-013 P95 面板数值。
 - D-013 本机测量诊断已加入可选模式：从仓库根目录运行 `PAC_BETA_PERF_DIAGNOSTICS=1 poc/macos-audio/scripts/run_beta_app.sh`，聊天窗口底部会显示三项数值。诊断仅在当前进程内保存时间样本，不保存音频或转写：Beta App 初始化至本机服务就绪；PCM 帧组装就绪至对应 partial 更新 SwiftUI 状态；点击“停止并识别”至 final 草稿更新。partial 指标不含 200 ms 帧组装之前的采集时间，也不测屏幕实际绘制完成；须保留定义，不把它直接外推成完整用户感知延迟。诊断关闭时不显示或累计这些分布。
-- **2026-11-09 用户提供的 D-013 GUI 样本**：启动值共 17 个，报告范围 0.5–0.7 秒（500–700 ms），nearest-rank P95=700 ms；均低于 5 秒门槛，但原采样计划为 20 次，尚缺 3 次启动值。根因已查明：启动耗时以秒存储，面板遗漏乘以 1,000，却标注为毫秒；已修正显示换算。用户提供的 2 张面板截图中，启动值 0.7 对应新增的第 17 个样本；同一运行另有 partial n=7、P95=32.5 ms 和停止→final n=1、92.0 ms。partial 共 22 组窗口摘要（1 组 n=9、20 组 n=10、1 组 n=7），合计 216 次更新；各组 P95 32.2–41.5 ms。面板使用 nearest-rank `ceil(n×0.95)`，每组样本数均小于 20，因此组内 P95 为该组最大值，所有已采样 partial 更新均不超过 41.5 ms，低于 500 ms 门槛。停止→final 共 21 个单样本；按同一 nearest-rank 算法合并后 P95=97.9 ms，最大 99.9 ms，低于 2 秒门槛。诊断样本仅统计时长，不保存音频或转写。
-- 用户随后手动确认 20 次启动计时均约在 0.9–0.11 秒范围内；原文范围端点顺序/小数位存在歧义，因此先只记录全部低于 5 秒门槛的用户报告，待确认最小/最大值后补精确分布。用户尚未能完成语音延迟分布：第一次录音/停止正常，紧接着再次点语音时出现服务端响应错误。
+- **2026-11-09 用户提供的 D-013 GUI 样本**：启动值共 20 个。此前 17 个范围 500–700 ms；用户补充的三张启动面板截图读数为 678.5、618.4、651.1 ms。20 次启动的 nearest-rank P95=700 ms，低于 5 秒门槛，既定启动样本数已完成。根因已查明：启动耗时以秒存储，面板遗漏乘以 1,000，却标注为毫秒；已修正显示换算。较早两张截图的 0.7 为第 17 个样本，同一运行另有 partial n=7、P95=32.5 ms 和停止→final n=1、92.0 ms。partial 共 22 组窗口摘要（1 组 n=9、20 组 n=10、1 组 n=7），合计 216 次更新；各组 P95 32.2–41.5 ms。面板使用 nearest-rank `ceil(n×0.95)`，每组样本数均小于 20，因此组内 P95 为该组最大值，所有已采样 partial 更新均不超过 41.5 ms，低于 500 ms 门槛。停止→final 共 21 个单样本；按同一 nearest-rank 算法合并后 P95=97.9 ms，最大 99.9 ms，低于 2 秒门槛。诊断样本仅统计时长，不保存音频或转写。
+- 较早一轮“0.9s-0.11s”报告存在端点/小数歧义，不用于精确分布；之后提供了 20 个诊断面板启动值的有效记录并关闭启动采样缺口。
 - 复核发现后端在 WebSocket `/voice/stream` 发送 `ended` 后才释放单例 ASR 锁，存在客户端收到完成事件后立即重连撞上旧锁的竞态。现已改为先结束/清理 ASR 流、释放锁，再发送 `ended`；新增同一客户端会话结束后立即再次连接的回归。后端 15 项窄回归及 Python 全量 176 项通过；GUI 上仍需用户用新构建复测快速再次录音。
 
 - 2026-11-09 首次实时语音无响应的根因：Beta 后端仅安装 Uvicorn，没有任何 WebSocket 协议依赖；HTTP 聊天正常，但实时语音握手失败。`backend/pyproject.toml` 与 `uv.lock` 已锁定增加 `websockets==17.4`。本机 Python 3.12 环境检查 `uv run --locked python -c 'from fastapi import FastAPI; from uvicorn.config import Config; config = Config(FastAPI()); config.load(); print(config.ws_protocol_class.__name__)'` 输出 `WebSocketsSansIOProtocol`。已重启 Beta，GUI 确认新实时语音控件显示且本机服务已连接；尚未重试麦克风/语音 WebSocket。
@@ -32,7 +32,7 @@
 - `swift build --package-path poc/macos-audio --product personal-assistant-beta`：通过。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python -m compileall -q pac_poc`（工作目录 `backend/`）：通过。
 - `poc/macos-audio/scripts/run_beta_app.sh`：构建并启动成功；GUI Accessibility 树显示“语音输入”按钮和提示“点击后才开始麦克风采集；音频最多保留在内存 30 秒”。Info.plist 的 `NSMicrophoneUsageDescription` 已读回确认。
-- 2026-11-09 用户确认 ADR-021 的 V1 边界：本机点击触发实时 ASR，语音按钮可打断文字生成，final 放入草稿；不做 AEC、自动声学插话或云 Realtime。之后用户实机确认停止后 final 入草稿、取消丢弃 partial、语音打断生成并开始采集、录音中 Cmd-Q 退出清理四项均成功。真实驱动异常与 P95 端到端指标仍未验证。
+- 2026-11-09 用户确认 ADR-021 的 V1 边界：本机点击触发实时 ASR，语音按钮可打断文字生成，final 放入草稿；不做 AEC、自动声学插话或云 Realtime。之后用户实机确认停止后 final 入草稿、取消丢弃 partial、语音打断生成并开始采集、录音中 Cmd-Q 退出清理四项均成功。D-013 Beta GUI 样本已低于性能门槛；真实驱动异常仍未验证。
 - 本轮没有点击“语音输入”，没有申请权限、打开麦克风或采集音频；没有对录音/ASR endpoint/TTS 播放做运行时验证。没有运行测试。
 
 ## 用户手动冒烟步骤
@@ -49,7 +49,7 @@
 ## 未完成项
 
 - 用户实机确认系统权限和录音时 partial 可见，并验证 final/草稿、取消清空 partial、语音打断文字生成；录音中 Cmd-Q 后应用和后端退出、重启无残留转写或录音。最新快速二次语音仍失败，有限重试已构建但待 GUI 复测；30 秒上限已有后端自动回归。真实设备驱动异常、TTS 可听见/可中断仍需实机复核。
-- 当前实时识别仅覆盖本机 ASR；没有云端 Realtime、自动 VAD/AEC 声学插话、与 TTS 全双工混音或锁屏/休眠行为。这些不属于用户确认的 V1 ADR-021 边界；D-013 端到端性能验收仍待补证。
+- 当前实时识别仅覆盖本机 ASR；没有云端 Realtime、自动 VAD/AEC 声学插话、与 TTS 全双工混音或锁屏/休眠行为。这些不属于用户确认的 V1 ADR-021 边界；D-013 当前 Beta 路径性能样本已低于目标；真实音频驱动异常注入、其他设备/系统验证仍未覆盖。
 - 测试版依赖仓库内 `.poc-data/models/` 的本地模型文件；没有模型时接口返回本机模型不可用，不会回退到云。
 - POC 中双语 Streaming Zipformer 的来源/训练数据权利链仍未核清，详见 `../poc/phase0-model-license-review.md`；本工作仅作为单机测试版接入，不能据此宣称正式分发许可已解决。
-- D-013 partial/final 延迟已分别有 216 个 partial 更新和 21 个停止→final 样本，均低于门槛。启动计时单位显示错误已修复：秒值现在乘以 1,000 后标为毫秒；已有 17 个启动样本换算为 500–700 ms，P95=700 ms，低于 5 秒门槛；按原采样计划仍需 3 次启动值。每次 Cmd-Q 后重运行脚本并记录，无需再次截图；诊断仅保留进程内时长样本，退出即清空。
+- D-013 GUI 延迟样本均低于门槛。启动计时单位显示错误已修复：秒值现在乘以 1,000 后标为毫秒；20 个启动值范围 500–700 ms，nearest-rank P95=700 ms。partial 共 216 个更新、22 个窗口摘要的 P95 为 32.2–41.5 ms；停止→final 共 21 个样本，pooled P95=97.9 ms、最大 99.9 ms。诊断仅保留进程内时长样本，退出即清空。

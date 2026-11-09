@@ -1,8 +1,22 @@
+### 2026-11-09：阶段 0 性能采样关闭并缩小 Beta 依赖审查范围
+
+- D-013 Beta GUI 采样已完成：启动 20 次/P95=700 ms；partial 216 次/各窗口 P95≤41.5 ms；停止→final 21 次/pooled P95=97.9 ms。相应追踪行标为 `PASS（本机 Beta 样本）`，其范围限制已写入矩阵。
+- 验证：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_phase0_traceability_report.py`（`backend/`）→ 9 passed；`git diff --check` 通过。此次为文档/追踪更新，未改代码。
+- 0G 本地核对 `backend/pyproject.toml` 后确认基础 Beta 依赖闭包为 23 个锁定包；FastEmbed/ONNX Runtime/Pillow 和 SQLAlchemy/Alembic/SQLCipher 属于可选 POC extras。`run_beta_app.sh` 使用共享 `.venv`，因此实际环境可包含额外包；当前没有固定的分发 runtime 或完整 NOTICE 清单。已把范围结论补入 `phase0-model-license-review.md` 和追踪矩阵，0G 许可状态维持未闭环。
+- 下一步应继续处理可本机复核的阶段 0 项；任何 Provider 出站仍需该次请求精确 Consent/Policy。训练数据权利链、第三方 Qwen 转换工件/测试音频许可、macOS 14 实机与远端 CI 等不能由本机静态检查代替。
+
+### 2026-11-09：完成 D-013 Beta GUI 性能采样
+
+- 用户补充三次启动面板截图，读数为 678.5、618.4、651.1 ms。结合此前 17 次记录，启动样本共 20 个，范围 500–700 ms，nearest-rank P95=700 ms（≤5 秒）。
+- GUI partial 共 216 次更新、22 个窗口（各窗口 n=7/9/10），各窗口 P95 为 32.2–41.5 ms；停止→final 共 21 个样本，pooled P95=97.9 ms、最大 99.9 ms。三项均低于 D-013 门槛；诊断不保存音频或转写。追踪矩阵将此特定 Beta 测量行标为 PASS，不外推至并发负载、其他机器或完整用户感知延迟。
+- 已更新 `docs/beta/macOS-beta-voice.md`、`docs/poc/phase0-local-asr.md`、阶段 0 矩阵、任务清单和项目上下文。D-013 采样不再需要用户手动参与。
+- 阶段 0 继续未验收。下一个可推进的本地任务是补强 0G 发行许可审计，尤其核对 Python 原生 wheel notices 与实际 beta 打包清单；云 Provider 真实请求仍严格遵守 Consent/Policy，不做无授权探测。
+
 ### 2026-11-09：核对本机语音模型文件身份
 
 - 0B/0G 许可与来源审计继续推进。使用本机 `shasum -a 256` 对本机两个 ASR 包比对公开权重文件页：双语 Zipformer 的 encoder/decoder/joiner 三个文件与 `csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20` SHA-256 完全一致；Qwen3-ASR 的 conv frontend/encoder/decoder 三个文件与 `csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25` 固定 revision `68818b2313fe77bd06f6a7c5068ff3ef59d02b8a` 完全一致。详见 `docs/poc/phase0-model-license-review.md`。
 - 这证实本机权重对应的公开模型仓库与具体版本，并不等同于权属审批。双语模型训练数据来源/权利链、Qwen 第三方 ONNX 转换代码/工件许可及测试 WAV 许可仍未闭环；对应追踪矩阵保持 PARTIAL。此轮仅更新文档，无代码测试；`git diff --check` 通过，变更已复核并提交为 `4c30476 docs: verify local ASR model provenance`。
-- D-013 另有 17 个启动样本，纠正单位后 P95=700 ms，但采样计划还差 3 次。用户下次使用修复后的诊断构建时记录即可，无需截图或重新录音。
+- （后续状态已于本文件最上方更新）当时尚差 3 个启动样本；用户已补充截图，现共 20 个，D-013 GUI 采样关闭。
 
 ### 2026-11-09：修复 D-013 启动性能面板单位并核对样本
 
