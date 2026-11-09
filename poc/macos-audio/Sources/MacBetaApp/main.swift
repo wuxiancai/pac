@@ -40,13 +40,14 @@ struct PersonalAssistantBetaApp: App {
     @State private var configurationError: String?
 
     init() {
+        let processStartedAt = ProcessInfo.processInfo.systemUptime
         do {
             let configuration = try BackendLifecycleConfiguration.resolve(
                 environment: ProcessInfo.processInfo.environment
             )
             _model = State(initialValue: BetaChatModel(
                 configuration: configuration,
-                processStartedAt: ProcessInfo.processInfo.systemUptime
+                processStartedAt: processStartedAt
             ))
             _configurationError = State(initialValue: nil)
         } catch {
