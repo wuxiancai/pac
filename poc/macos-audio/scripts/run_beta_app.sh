@@ -23,4 +23,5 @@ fi
 "$SCRIPT_DIR/build_beta_app.sh"
 open -n "$APP_DIR" \
   --env "PAC_POC_PYTHON=$PYTHON" \
-  --env "PAC_POC_BACKEND=$BACKEND_DIR"
+  --env "PAC_POC_BACKEND=$BACKEND_DIR" \
+  --env "PAC_BETA_PERF_DIAGNOSTICS=${PAC_BETA_PERF_DIAGNOSTICS:-0}"

@@ -49,6 +49,16 @@ public enum LocalMicrophoneCaptureError: Error, LocalizedError {
     }
 }
 
+public struct CapturedVoiceFrame: Sendable {
+    public let pcm16LE: Data
+    public let readyAtUptime: TimeInterval
+
+    public init(pcm16LE: Data, readyAtUptime: TimeInterval) {
+        self.pcm16LE = pcm16LE
+        self.readyAtUptime = readyAtUptime
+    }
+}
+
 /// Captures only after `start()` is called and keeps at most 30 seconds in memory.
 @available(macOS 14.0, *)
 public final class LocalMicrophoneCapture: @unchecked Sendable {
@@ -67,14 +77,14 @@ public final class LocalMicrophoneCapture: @unchecked Sendable {
     private var converter: AVAudioConverter?
     private var pcm = Data()
     private var pendingFrame = Data()
-    private var frameHandler: (@Sendable (Data) -> Bool)?
+    private var frameHandler: (@Sendable (CapturedVoiceFrame) -> Bool)?
     private var capturedByteCount = 0
     private var conversionFailed = false
     private var reachedLimit = false
 
     public init() {}
 
-    public func start(onFrame: (@Sendable (Data) -> Bool)? = nil) async throws {
+    public func start(onFrame: (@Sendable (CapturedVoiceFrame) -> Bool)? = nil) async throws {
         let permission = AVCaptureDevice.authorizationStatus(for: .audio)
         let granted: Bool
         switch permission {
@@ -131,7 +141,7 @@ public final class LocalMicrophoneCapture: @unchecked Sendable {
     public func finishStreaming() throws {
         stopEngine()
         let pending: Data
-        let handler: (@Sendable (Data) -> Bool)?
+        let handler: (@Sendable (CapturedVoiceFrame) -> Bool)?
         lock.lock()
         pending = pendingFrame
         pendingFrame.removeAll(keepingCapacity: false)
@@ -140,8 +150,12 @@ public final class LocalMicrophoneCapture: @unchecked Sendable {
         let failed = conversionFailed
         capturedByteCount = 0
         lock.unlock()
-        if !pending.isEmpty, handler?(pending) == false {
-            throw LocalMicrophoneCaptureError.streamOverflow
+        if !pending.isEmpty {
+            let frame = CapturedVoiceFrame(
+                pcm16LE: pending,
+                readyAtUptime: ProcessInfo.processInfo.systemUptime
+            )
+            if handler?(frame) == false { throw LocalMicrophoneCaptureError.streamOverflow }
         }
         guard !failed else { throw LocalMicrophoneCaptureError.converterFailed }
     }
@@ -188,8 +202,8 @@ public final class LocalMicrophoneCapture: @unchecked Sendable {
         }
         let incoming = Data(bytes: channel, count: Int(converted.frameLength) * MemoryLayout<Int16>.size)
 
-        var frames: [Data] = []
-        var handler: (@Sendable (Data) -> Bool)?
+        var frames: [CapturedVoiceFrame] = []
+        var handler: (@Sendable (CapturedVoiceFrame) -> Bool)?
         lock.lock()
         let remaining = maximumBytes - capturedByteCount
         guard remaining > 0 else {
@@ -204,7 +218,10 @@ public final class LocalMicrophoneCapture: @unchecked Sendable {
         } else {
             pendingFrame.append(incoming.prefix(acceptedBytes))
             while pendingFrame.count >= 6_400 {
-                frames.append(pendingFrame.prefix(6_400))
+                frames.append(CapturedVoiceFrame(
+                    pcm16LE: pendingFrame.prefix(6_400),
+                    readyAtUptime: ProcessInfo.processInfo.systemUptime
+                ))
                 pendingFrame.removeFirst(6_400)
             }
         }
@@ -222,7 +239,7 @@ public final class LocalMicrophoneCapture: @unchecked Sendable {
         lock.unlock()
     }
 
-    private func resetCaptureBuffer(onFrame: (@Sendable (Data) -> Bool)?) {
+    private func resetCaptureBuffer(onFrame: (@Sendable (CapturedVoiceFrame) -> Bool)?) {
         lock.lock()
         pcm.removeAll(keepingCapacity: false)
         pendingFrame.removeAll(keepingCapacity: false)

@@ -15,6 +15,8 @@
 
 ## 当前验证
 
+- D-013 本机测量诊断已加入可选模式：从仓库根目录运行 `PAC_BETA_PERF_DIAGNOSTICS=1 poc/macos-audio/scripts/run_beta_app.sh`，聊天窗口底部会显示三项数值。诊断仅在当前进程内保存时间样本，不保存音频或转写：App 进程启动至本机服务就绪；PCM 帧组装就绪至对应 partial 更新 SwiftUI 状态；点击“停止并识别”至 final 草稿更新。partial 指标不含 200 ms 帧组装之前的采集时间，也不测屏幕实际绘制完成；须保留定义，不把它直接外推成完整用户感知延迟。诊断关闭时不显示或累计这些分布。
+
 - 2026-11-09 首次实时语音无响应的根因：Beta 后端仅安装 Uvicorn，没有任何 WebSocket 协议依赖；HTTP 聊天正常，但实时语音握手失败。`backend/pyproject.toml` 与 `uv.lock` 已锁定增加 `websockets==17.4`。本机 Python 3.12 环境检查 `uv run --locked python -c 'from fastapi import FastAPI; from uvicorn.config import Config; config = Config(FastAPI()); config.load(); print(config.ws_protocol_class.__name__)'` 输出 `WebSocketsSansIOProtocol`。已重启 Beta，GUI 确认新实时语音控件显示且本机服务已连接；尚未重试麦克风/语音 WebSocket。
 - 用户随后报告再次点击语音输入后，录音时已能在控件右侧看到所说内容的转写。这是用户实机观察；本仓库没有对应捕获/转写数据，停止后的 final 草稿和打断链路仍未验证。
 - 新增后端自动回归：认证 WebSocket 握手、协议格式、200 ms PCM 帧序号、partial→final→ended 顺序、坏 token 拒绝、帧序号错误拒绝和连接清理；另覆盖 ASR `finish()` 对 endpoint final 与 endpoint 缺失时的 partial→final 收尾。
@@ -44,3 +46,4 @@
 - 当前实时识别仅覆盖本机 ASR；没有云端 Realtime、自动 VAD/AEC 声学插话、与 TTS 全双工混音或锁屏/休眠行为。这些不属于用户确认的 V1 ADR-021 边界；D-013 端到端性能验收仍待补证。
 - 测试版依赖仓库内 `.poc-data/models/` 的本地模型文件；没有模型时接口返回本机模型不可用，不会回退到云。
 - POC 中双语 Streaming Zipformer 的来源/训练数据权利链仍未核清，详见 `../poc/phase0-model-license-review.md`；本工作仅作为单机测试版接入，不能据此宣称正式分发许可已解决。
+- D-013 GUI 样本尚未采集。需要用户用上述可选诊断模式收集至少 20 次启动值，以及至少 20 次 partial 更新和 20 次停止→final 草稿样本；当前面板显示本次进程内的 P95 与样本数。启动值需每次 Cmd-Q 后重新运行脚本并手动记下；语音样本使用不含敏感信息的固定短句即可。退出即清空测量样本。

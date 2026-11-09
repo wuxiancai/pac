@@ -44,7 +44,10 @@ struct PersonalAssistantBetaApp: App {
             let configuration = try BackendLifecycleConfiguration.resolve(
                 environment: ProcessInfo.processInfo.environment
             )
-            _model = State(initialValue: BetaChatModel(configuration: configuration))
+            _model = State(initialValue: BetaChatModel(
+                configuration: configuration,
+                processStartedAt: ProcessInfo.processInfo.systemUptime
+            ))
             _configurationError = State(initialValue: nil)
         } catch {
             _model = State(initialValue: nil)
@@ -84,10 +87,18 @@ final class BetaChatModel {
     private var voiceTimerTask: Task<Void, Never>?
     private var voiceSenderTask: Task<Void, Never>?
     private var voiceReceiverTask: Task<Void, Never>?
-    private var voiceFrameContinuation: AsyncStream<Data>.Continuation?
+    private var voiceFrameContinuation: AsyncStream<CapturedVoiceFrame>.Continuation?
     private var voiceStream: LocalVoiceStream?
     private var voiceFinalSegments: [String] = []
     private var voiceStreamFailed = false
+    private var voiceFrameReadyAt: [UInt32: TimeInterval] = [:]
+    private var partialLatencySamples: [TimeInterval] = []
+    private var stopToDraftSamples: [TimeInterval] = []
+    private(set) var startupLatency: TimeInterval?
+    private var voiceNextSequence: UInt32 = 0
+    private let processStartedAt: TimeInterval
+    private(set) var performanceDiagnosticsEnabled =
+        ProcessInfo.processInfo.environment["PAC_BETA_PERF_DIAGNOSTICS"] == "1"
     private let defaults = UserDefaults.standard
     private(set) var status = "正在连接本机服务…"
     private(set) var messages: [LocalChatMessage] = []
@@ -116,6 +127,16 @@ final class BetaChatModel {
     }
 
     var isStreaming: Bool { activeRequest != nil }
+    var performanceSummary: String {
+        guard performanceDiagnosticsEnabled else { return "" }
+        let partial = Self.p95Milliseconds(partialLatencySamples)
+        let final = Self.p95Milliseconds(stopToDraftSamples)
+        return [
+            "启动至本机服务就绪：\(startupLatency.map(Self.formatMilliseconds) ?? "采集中") ms",
+            "partial 帧就绪至 UI 更新：n=\(partialLatencySamples.count)，P95 \(partial.map(Self.formatMilliseconds) ?? "采集中") ms",
+            "停止至 final 入草稿：n=\(stopToDraftSamples.count)，P95 \(final.map(Self.formatMilliseconds) ?? "采集中") ms",
+        ].joined(separator: "\n")
+    }
     var canStartVoiceCapture: Bool {
         client != nil && !isRecordingVoice && !isTranscribingVoice
     }
@@ -132,7 +153,8 @@ final class BetaChatModel {
         else { return nil }
         return message.content
     }
-    init(configuration: BackendLifecycleConfiguration) {
+    init(configuration: BackendLifecycleConfiguration, processStartedAt: TimeInterval) {
+        self.processStartedAt = processStartedAt
         source = ModelSource(rawValue: defaults.string(forKey: "beta.model.source") ?? "local") ?? .local
         localModel = defaults.string(forKey: "beta.model.local") ?? "qwen3.5:0.8b"
         cloudProvider = CloudProvider(
@@ -152,6 +174,7 @@ final class BetaChatModel {
             let localClient = try LocalAPIClient(baseURL: handshake.baseURL, token: handshake.token)
             guard try await localClient.health() else { throw LocalAPIClientError.invalidResponse }
             client = localClient
+            startupLatency = max(0, ProcessInfo.processInfo.systemUptime - processStartedAt)
             status = "本机服务已连接；当前模型：\(selectedProvider) / \(selectedModel)"
         } catch {
             status = "本机服务启动失败：\(error.localizedDescription)"
@@ -252,12 +275,23 @@ final class BetaChatModel {
             voiceFinalSegments = []
             partialTranscript = ""
             voiceStreamFailed = false
-            let (frames, continuation) = AsyncStream<Data>.makeStream(bufferingPolicy: .bufferingOldest(6))
+            voiceFrameReadyAt.removeAll(keepingCapacity: true)
+            voiceNextSequence = 0
+            let (frames, continuation) = AsyncStream<CapturedVoiceFrame>.makeStream(bufferingPolicy: .bufferingOldest(6))
             voiceFrameContinuation = continuation
             voiceSenderTask = Task { [weak self] in
                 do {
                     for await frame in frames {
-                        try await stream.sendFrame(frame)
+                        guard let self else { return }
+                        let expectedSequence = self.voiceNextSequence
+                        if self.performanceDiagnosticsEnabled {
+                            self.voiceFrameReadyAt[expectedSequence] = frame.readyAtUptime
+                        }
+                        let sentSequence = try await stream.sendFrame(frame.pcm16LE)
+                        guard sentSequence == expectedSequence else {
+                            throw LocalAPIClientError.invalidResponse
+                        }
+                        self.voiceNextSequence &+= 1
                     }
                 } catch {
                     self?.voiceStreamFailed = true
@@ -271,6 +305,7 @@ final class BetaChatModel {
                             guard let self else { return }
                             if event.type == "partial" {
                                 self.partialTranscript = event.text ?? ""
+                                self.recordPartialVisible(sequence: event.sequence)
                             } else if event.type == "final", let text = event.text, !text.isEmpty {
                                 self.voiceFinalSegments.append(text)
                                 self.partialTranscript = ""
@@ -284,8 +319,8 @@ final class BetaChatModel {
                     self?.voiceStreamFailed = true
                 }
             }
-            try await microphone.start(onFrame: { data in
-                switch continuation.yield(data) {
+            try await microphone.start(onFrame: { frame in
+                switch continuation.yield(frame) {
                 case .enqueued: true
                 case .dropped, .terminated: false
                 @unknown default: false
@@ -313,7 +348,7 @@ final class BetaChatModel {
         }
     }
 
-    func finishVoiceCapture() async {
+    func finishVoiceCapture(stopTappedAtUptime: TimeInterval? = nil) async {
         guard isRecordingVoice else { return }
         voiceTimerTask?.cancel()
         voiceTimerTask = nil
@@ -331,6 +366,9 @@ final class BetaChatModel {
             let transcript = voiceFinalSegments.joined(separator: "")
             let existing = draft.trimmingCharacters(in: .whitespacesAndNewlines)
             if !transcript.isEmpty { draft = existing.isEmpty ? transcript : existing + "\n" + transcript }
+            if performanceDiagnosticsEnabled, let stopTappedAtUptime, !transcript.isEmpty {
+                stopToDraftSamples.append(max(0, ProcessInfo.processInfo.systemUptime - stopTappedAtUptime))
+            }
             partialTranscript = ""
             status = transcript.isEmpty
                 ? "本次录音未识别到语音；音频已丢弃，请重试。"
@@ -381,6 +419,24 @@ final class BetaChatModel {
 
     private func nonemptyMessages(_ values: [LocalChatMessage]) -> [LocalChatMessage] {
         values.filter { $0.role != "assistant" || !$0.content.isEmpty }
+    }
+
+    func recordPartialVisible(sequence: UInt32?) {
+        guard performanceDiagnosticsEnabled, let sequence,
+              let readyAt = voiceFrameReadyAt.removeValue(forKey: sequence)
+        else { return }
+        partialLatencySamples.append(max(0, ProcessInfo.processInfo.systemUptime - readyAt))
+    }
+
+    private static func p95Milliseconds(_ samples: [TimeInterval]) -> Double? {
+        guard !samples.isEmpty else { return nil }
+        let sorted = samples.sorted()
+        let index = min(sorted.count - 1, Int(ceil(Double(sorted.count) * 0.95)) - 1)
+        return sorted[index] * 1_000
+    }
+
+    private static func formatMilliseconds(_ value: Double) -> String {
+        String(format: "%.1f", value)
     }
 
     func shutdown() async {
@@ -499,7 +555,8 @@ private struct BetaChatView: View {
                             Button("取消并丢弃") { model.cancelVoiceCapture() }
                                 .accessibilityIdentifier("voice-cancel-button")
                             Button("停止并识别") {
-                                Task { await model.finishVoiceCapture() }
+                                let tappedAt = ProcessInfo.processInfo.systemUptime
+                                Task { await model.finishVoiceCapture(stopTappedAtUptime: tappedAt) }
                             }
                             .accessibilityIdentifier("voice-stop-transcribe-button")
                         }
@@ -538,6 +595,15 @@ private struct BetaChatView: View {
                 }
             }
             .padding()
+            if model.performanceDiagnosticsEnabled {
+                Text(model.performanceSummary)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.bottom, 6)
+                    .accessibilityIdentifier("beta-performance-diagnostics")
+            }
         }
         .sheet(isPresented: $showingSettings) {
             BetaModelSettingsView(model: model)

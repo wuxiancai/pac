@@ -4,6 +4,7 @@ public struct VoiceRecognitionEvent: Decodable, Sendable {
     public let type: String
     public let text: String?
     public let message: String?
+    public let sequence: UInt32?
 }
 
 @available(macOS 12.0, *)
@@ -26,12 +27,14 @@ public final class LocalVoiceStream: @unchecked Sendable {
         ])
     }
 
-    public func sendFrame(_ pcm: Data) async throws {
-        var sequence = nextSequence.bigEndian
-        var packet = Data(bytes: &sequence, count: MemoryLayout<UInt32>.size)
+    public func sendFrame(_ pcm: Data) async throws -> UInt32 {
+        let sequence = nextSequence
+        var encodedSequence = sequence.bigEndian
+        var packet = Data(bytes: &encodedSequence, count: MemoryLayout<UInt32>.size)
         packet.append(pcm)
         try await task.send(.data(packet))
         nextSequence &+= 1
+        return sequence
     }
 
     public func finish() async throws {

@@ -571,3 +571,10 @@
 - 对同一 `bilingual-mandarin-16k.wav` 执行 20 次现有离线 ASR 测量：每次 28 帧、10 partial、1 final；运行级帧 P95 为 11.378–14.229 ms，运行级 P95 的 P95 为 13.721 ms；模型加载 0.575–0.752 秒。样本与方法详见 `docs/poc/phase0-local-asr.md`。这是离线帧计算，不是 Beta 麦克风/UI partial 端到端性能证据。
 - 阶段 0 仍未验收。继续按追踪矩阵逐项推进；近期可继续补 D-013 的 App 启动 P95 与停止到 final 草稿 P95。若需真实 GUI 计时或用户朗读配合，会提供具体步骤；不把离线计算结果外推为整链路通过。
 - 工作前 Git 状态干净，分支为 `main`，本地领先 `origin/main` 34 个提交。本轮仅更新文档，待 `git diff --check`、复核变更并提交。
+
+# 2026-11-09 D-013 GUI 性能采样准备
+
+- 新增可选 `PAC_BETA_PERF_DIAGNOSTICS=1` 模式，展示进程启动至本机服务 ready、200 ms PCM 帧就绪至 partial 更新 SwiftUI 状态、点击停止至 final 草稿更新三项耗时。只在当前进程内保留数值，默认关闭，不保存转写或音频；指标边界见 `docs/beta/macOS-beta-voice.md`。
+- 验证：`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；`swift test --package-path poc/macos-audio` 通过（31 项）；`sh -n poc/macos-audio/scripts/run_beta_app.sh` 与 `git diff --check` 通过。采样值尚未收集。
+- 下一步需要用户运行 `PAC_BETA_PERF_DIAGNOSTICS=1 poc/macos-audio/scripts/run_beta_app.sh`，收集 20 次 app 启动值、20 次 partial 和 20 次停止→final 草稿值。此操作会开启用户主动点击才开始的本机麦克风采集；建议只说不含敏感信息的固定短句。完成后将当前面板显示的每类样本数/P95 与 20 个启动值发回，之后继续处理矩阵其他缺口。
+- 完成本次提交后本地 `main` 预计领先 `origin/main` 36 个提交；勿推送。阶段 0 仍未验收。
