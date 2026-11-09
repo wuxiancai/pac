@@ -561,3 +561,4 @@
 - 用户确认 D-013：主力 M1/16 GiB 上 App 启动 P95≤5 秒、ASR partial P95≤500 毫秒、停止录音到 final 草稿可用 P95≤2 秒。现有合成/CLI 测量不是端到端验收，须补真实 GUI 会话分布。
 - 用户确认 D-014：V1 不提供长期记忆/Embedding；开始持久化记忆功能前再定模型和格式。FastEmbed/MiniLM 的小型合成集 POC 不作为产品型号或 schema 选择。
 - 用户确认 D-015：V1 不提供 app 数据导出；未来加入持久数据时再定格式和默认加密，当前不生成 app 导出文件。
+- 用户确认 ADR-020：V1 继续使用项目自有轻量 ModelGateway，不引入开源 Gateway 运行依赖；LiteLLM/Bifrost/Portkey 研究留作后续评估参考。
