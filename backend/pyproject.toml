@@ -21,6 +21,9 @@ phase0-security = [
 phase0-embedding = [
     "fastembed==0.9.1",
 ]
+phase4-pdf-poc = [
+    "pypdf==7.0.0",
+]
 
 [build-system]
 requires = ["setuptools>=80,<81"]

@@ -1,5 +1,13 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 4 PDF 安全解析 POC（2026-11-09）
+
+- 加入仅供 POC 使用的可选依赖 `pypdf==7.0.0`；默认 Beta 依赖和文件导入 UI/API 均未启用 PDF。
+- 新增隔离子进程解析入口，限制输入 10 MiB、墙钟 5 秒、CPU 软/硬限额 4/5 秒、页数 100、提取文本 200,000 字符，并设置 pypdf 对象数量、流解压输出/工作量、页树深度/条目等边界。超时会终止子进程。
+- POC 测试：`UV_CACHE_DIR=.poc-data/uv-cache uv run --extra phase4-pdf-poc --group dev pytest -q tests/test_pdf_import_poc.py` → 4 passed；Ruff 通过。后端全量回归 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 232 passed，1 条既有 Starlette/httpx 弃用警告；mypy 通过；`git diff --check` 通过。
+- 安全证据仍不完整：macOS 硬内存限额未验证，缺少恶意 PDF 样本、CPU/墙钟压力测试及对象数/解压炸弹专项用例。依据 D-012，PDF 继续禁用；本 POC 不构成启用或产品保证。
+- 后续：补齐可在 macOS 验证的内存与恶意样本测试，再评估是否将解析器接入导入路径。其间继续推进不依赖 PDF 的主线。详见 `docs/beta/file-import.md`。
+
 ## 阶段 2 OpenRouter 流式实际费用透传（2026-11-09）
 
 - `ProviderStreamChunk` 扩展可选费用值/币种。只有固定 OpenRouter 适配器从最终 usage 帧收到有限、非负 `usage.cost` 时，账本才保存 actual USD；其他 Provider 不推价。聊天 SSE 客户端仍只接收文本 delta。
