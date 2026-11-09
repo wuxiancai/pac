@@ -10,8 +10,9 @@
 2. `PassThroughContextBuilder` 只复制调用方明确提交的消息，不读取文件、数据库或记忆。
 3. `MainAssistantOrchestrator` 只接受 `main_assistant`，构造 `LocalModelRequest` 并把流交给项目自有 `ModelGateway`。
 4. FastAPI `/chat/stream` 仍负责本机认证、输入大小/L3 检查、云端 Consent/Policy 组合、SSE keep-alive 和面向 UI 的错误映射。
+5. `RunRegistry` 为每次对话创建 UUID 和 `CREATED → RUNNING → COMPLETED/FAILED/CANCELLED` 状态；仅保留有界进程内元数据，不记录消息、生成内容或凭据。SSE 响应头 `X-PAC-Run-ID` 和完成事件提供 ID，认证的 `GET /chat/runs/{run_id}` 查询状态。
 
-这样 Provider、授权和 HTTP 传输不会进入 Orchestrator；后续上下文构造可通过 `ContextBuilder` 替换，编排逻辑也可由 API 之外调用。此骨架不包含真实 Agent Registry、工具执行、会话保存、长期记忆、费用预算或后台运行。
+这样 Provider、授权和 HTTP 传输不会进入 Orchestrator；后续上下文构造可通过 `ContextBuilder` 替换，编排逻辑也可由 API 之外调用。运行状态查询不代表任务可脱离请求后台继续执行；进程退出会清空状态。此骨架不包含真实 Agent Registry、工具执行、会话保存、长期记忆、费用预算或后台运行。
 
 ## 验证
 
@@ -23,7 +24,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked ruff check pac_poc/orchestrator.
 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked mypy pac_poc/orchestrator.py pac_poc/beta_api.py
 ```
 
-结果：24 passed；Ruff 全部通过；mypy 无问题。pytest 有一条既有 Starlette/httpx 弃用警告。未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
+结果：26 passed；Ruff 全部通过；mypy 无问题。pytest 有一条既有 Starlette/httpx 弃用警告。未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
 
 ## 下一步
 

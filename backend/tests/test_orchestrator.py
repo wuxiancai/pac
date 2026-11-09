@@ -8,6 +8,8 @@ from pac_poc.orchestrator import (
     AssistantNotFound,
     ConversationTurn,
     MainAssistantOrchestrator,
+    RunRegistry,
+    RunStatus,
 )
 
 
@@ -58,3 +60,32 @@ def test_orchestrator_does_not_enable_additional_assistants() -> None:
     else:
         raise AssertionError("only main_assistant should be enabled")
     assert gateway.request is None
+
+
+def test_run_registry_enforces_lifecycle_and_keeps_only_bounded_metadata() -> None:
+    runs = RunRegistry(capacity=1)
+    first = runs.create()
+    assert runs.transition(first.run_id, RunStatus.RUNNING).status is RunStatus.RUNNING
+    assert runs.transition(first.run_id, RunStatus.COMPLETED).status is RunStatus.COMPLETED
+
+    second = runs.create()
+    assert runs.get(first.run_id) is None
+    assert runs.get(second.run_id) is not None
+    try:
+        runs.transition(second.run_id, RunStatus.COMPLETED)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("runs must pass through running before a terminal state")
+
+
+def test_run_registry_does_not_evict_active_runs_when_full() -> None:
+    runs = RunRegistry(capacity=1)
+    first = runs.create()
+    runs.transition(first.run_id, RunStatus.RUNNING)
+    try:
+        runs.create()
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("active run metadata must not be evicted")

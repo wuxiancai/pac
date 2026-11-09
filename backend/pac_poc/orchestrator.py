@@ -4,13 +4,85 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
+from threading import Lock
+from time import time
 from typing import Protocol
+from uuid import uuid4
 
 from .model_gateway import LocalModelRequest, ModelGateway
 from .security_poc import DataLevel
 
 
 MAIN_ASSISTANT = "main_assistant"
+
+
+class RunStatus(StrEnum):
+    CREATED = "created"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass(frozen=True)
+class RunSnapshot:
+    run_id: str
+    assistant_key: str
+    status: RunStatus
+    created_at: float
+    updated_at: float
+
+
+class RunRegistry:
+    """Bounded process-local lifecycle metadata; prompts and outputs are never kept."""
+
+    _TERMINAL = frozenset({RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED})
+    _TRANSITIONS = {
+        RunStatus.CREATED: frozenset({RunStatus.RUNNING, RunStatus.CANCELLED, RunStatus.FAILED}),
+        RunStatus.RUNNING: _TERMINAL,
+    }
+
+    def __init__(self, *, capacity: int = 256) -> None:
+        if capacity < 1:
+            raise ValueError("run registry capacity must be positive")
+        self._capacity = capacity
+        self._runs: dict[str, RunSnapshot] = {}
+        self._lock = Lock()
+
+    def create(self, assistant_key: str = MAIN_ASSISTANT) -> RunSnapshot:
+        if assistant_key != MAIN_ASSISTANT:
+            raise AssistantNotFound(f"assistant is not enabled: {assistant_key}")
+        now = time()
+        snapshot = RunSnapshot(str(uuid4()), assistant_key, RunStatus.CREATED, now, now)
+        with self._lock:
+            if len(self._runs) >= self._capacity:
+                oldest_terminal = next(
+                    (key for key, run in self._runs.items() if run.status in self._TERMINAL),
+                    None,
+                )
+                if oldest_terminal is None:
+                    raise RuntimeError("run registry is full with active runs")
+                del self._runs[oldest_terminal]
+            self._runs[snapshot.run_id] = snapshot
+        return snapshot
+
+    def transition(self, run_id: str, status: RunStatus) -> RunSnapshot:
+        with self._lock:
+            current = self._runs.get(run_id)
+            if current is None:
+                raise LookupError("unknown run")
+            if status not in self._TRANSITIONS.get(current.status, frozenset()):
+                raise ValueError(f"invalid run transition: {current.status} -> {status}")
+            updated = RunSnapshot(
+                current.run_id, current.assistant_key, status, current.created_at, time()
+            )
+            self._runs[run_id] = updated
+            return updated
+
+    def get(self, run_id: str) -> RunSnapshot | None:
+        with self._lock:
+            return self._runs.get(run_id)
 
 
 @dataclass(frozen=True)

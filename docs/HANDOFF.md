@@ -1,5 +1,13 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 框架主线与开发节奏（2026-11-09）
+
+- 用户明确要求后续优先完成整体框架和主要功能；对不影响闭环的小问题记入待回修项，主线成形后集中处理。已将规则写入根目录 `AGENTS.md`、`docs/TASKS.md`。核心功能/安全/隐私/授权阻断仍优先处理；偶发现象先记录证据，不臆断代码根因。
+- 本轮实现 `RunRegistry`：每次聊天有 run ID 和 CREATED/RUNNING/COMPLETED/FAILED/CANCELLED 状态；`X-PAC-Run-ID`、SSE done 事件与认证 `GET /chat/runs/{run_id}` 可查询生命周期。状态元数据限于进程内、有界、不含对话正文。
+- 验证：窄回归 26 passed；Ruff 和 mypy 通过；一条既有 Starlette/httpx 弃用警告。无云请求、无 Keychain 读取、无麦克风采集。记录见 `docs/beta/orchestrator-framework.md`。
+- 非阻塞回修：Ollama 取消长流后紧接请求变慢，根因未证实；现有停止文案已如实说明。已登记在 `TASKS.md`，整体主线完成后再决定是否集中排查。
+- 下一步继续补主助理能力/上下文策略和用户可用功能骨架；不要以偶发网络或模型表现中断主线。
+
 ## 单助理编排框架起步（2026-11-09）
 
 - 用户要求先把框架开发出来。本轮在现有本机 Beta `/chat/stream` 上抽出 `MainAssistantOrchestrator`、`ConversationTurn` 和可替换 `ContextBuilder`；当前只启用 `main_assistant`，默认上下文仅透传本轮明确消息。API 继续承担认证、云 Consent/Policy、SSE 和 UI 错误映射，不改变现有本地/云路由行为。

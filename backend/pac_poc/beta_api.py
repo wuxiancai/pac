@@ -28,7 +28,12 @@ from .model_gateway import (
     ModelGateway,
     OllamaAdapter,
 )
-from .orchestrator import ConversationTurn, MainAssistantOrchestrator
+from .orchestrator import (
+    ConversationTurn,
+    MainAssistantOrchestrator,
+    RunRegistry,
+    RunStatus,
+)
 from .remote_providers import (
     DEEPSEEK_PROBE_CONFIG,
     OPENROUTER_PROBE_CONFIG,
@@ -250,6 +255,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
     voice_transcriber: BetaVoiceTranscriber = voice_transcriber_override or LocalVoiceTranscriber(
         settings.voice_model_dir
     )
+    run_registry = RunRegistry()
     voice_stream_lock = asyncio.Lock()
     router = APIRouter()
 
@@ -468,6 +474,19 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             policy=ConsentAwarePolicy(OutboundPolicy(consent)),
         )
 
+    @router.get("/chat/runs/{run_id}")
+    async def get_chat_run(run_id: str) -> dict[str, str | float]:
+        run = run_registry.get(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="run not found")
+        return {
+            "run_id": run.run_id,
+            "assistant": run.assistant_key,
+            "status": run.status.value,
+            "created_at": run.created_at,
+            "updated_at": run.updated_at,
+        }
+
     @router.post("/chat/stream")
     async def stream_chat(payload: StreamChatRequest) -> StreamingResponse:
         total_chars = sum(len(message.content) for message in payload.messages)
@@ -502,19 +521,29 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             data_level=data_level,
             source=source,
         )
+        try:
+            run = run_registry.create(turn.assistant_key)
+            run_registry.transition(run.run_id, RunStatus.RUNNING)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail="too many active chat runs") from exc
+        orchestrator = MainAssistantOrchestrator(selected_gateway)
 
         async def events() -> AsyncIterator[str]:
             try:
                 async for delta in _stream_with_keepalives(
-                    MainAssistantOrchestrator(selected_gateway).stream(turn),
+                    orchestrator.stream(turn),
                     settings.chat_stream_keepalive_seconds,
                 ):
                     if delta is None:
                         yield ": keep-alive\n\n"
                         continue
                     yield "data: " + json.dumps({"delta": delta}, ensure_ascii=False) + "\n\n"
-                yield "data: {\"done\":true}\n\n"
+                run_registry.transition(run.run_id, RunStatus.COMPLETED)
+                yield "data: " + json.dumps(
+                    {"done": True, "run_id": run.run_id}, separators=(",", ":")
+                ) + "\n\n"
             except RemoteProviderError as exc:
+                run_registry.transition(run.run_id, RunStatus.FAILED)
                 if exc.is_authentication_error:
                     message = "云端 API Key 认证失败，请检查 Keychain 中保存的密钥。"
                 elif exc.status_code == 402:
@@ -535,15 +564,18 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     )
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except CredentialUnavailable:
+                run_registry.transition(run.run_id, RunStatus.FAILED)
                 message = "本机无法从 Keychain 读取已保存的云端凭据；未能发起云端请求。"
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except httpx.RequestError:
+                run_registry.transition(run.run_id, RunStatus.FAILED)
                 message = (
                     "连接云端服务失败或超时；服务端是否收到请求无法确认，"
                     "请先检查服务商用量记录再重试。"
                 )
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except Exception:
+                run_registry.transition(run.run_id, RunStatus.FAILED)
                 # Keep local service details and upstream error text out of the UI stream.
                 if payload.provider == "ollama":
                     message = "本机模型请求失败，请确认 Ollama 正在运行且模型已安装。"
@@ -553,8 +585,16 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                         "请先检查服务商用量记录再重试；不会自动切换 Provider。"
                     )
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
+            finally:
+                current = run_registry.get(run.run_id)
+                if current is not None and current.status is RunStatus.RUNNING:
+                    run_registry.transition(run.run_id, RunStatus.CANCELLED)
 
-        return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-PAC-Run-ID": run.run_id},
+        )
 
     app.include_router(router)
     return app

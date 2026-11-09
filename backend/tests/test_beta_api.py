@@ -178,10 +178,14 @@ def test_beta_chat_stream_is_authenticated_local_and_non_persistent() -> None:
                 headers={"authorization": "Bearer test-token"},
                 json={"messages": [{"role": "user", "content": "你好"}]},
             )
+            run_id = response.headers["x-pac-run-id"]
+            run_status = await client.get(f"/chat/runs/{run_id}", headers={"authorization": "Bearer test-token"})
         assert response.status_code == 200
         assert '"delta": "本机"' in response.text
         assert '"delta": "回答"' in response.text
         assert '"done":true' in response.text
+        assert run_id in response.text
+        assert run_status.json()["status"] == "completed"
         assert adapter.request is not None
         assert adapter.request.model == BETA_MODEL
         assert adapter.request.provider == "ollama"
