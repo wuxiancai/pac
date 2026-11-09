@@ -35,7 +35,7 @@
 | D-009 | 固定专业 Agent 属于 V2 还是 V3 | **Accepted（2026-11-09）**：V2 提供少量固定专业 Agent；完整专业 Agent 集放 V3。V1 仍为一个总助理，不实现 Agent 团队或任意 Agent 执行器。 |
 | D-010 | V1 首批 Provider | **Accepted（2026-11-09）**：千问应用 API 为默认云端 Provider，另支持 DeepSeek（中国路由）和 OpenRouter（Global 路由）。这是产品范围选择，不代表各 Provider 的完整能力、取消、费用或区域证据均已验收；POC 证据见 `poc/phase0-remote-provider.md`。 |
 | D-011 | 云 ASR/TTS 供应商与区域 | **阶段 0 交互式 POC 候选已确认（2026-11-08）**：优先千问 Token Plan，北京区域；候选为 `qwen-audio-3.0-asr-flash`、`qwen-audio-3.0-realtime-plus` 和 `qwen-audio-3.0-tts-plus`。服务端能力支持已核实，但个人版 Key 不可用于本项目自建应用；应用内云语音须另选适用于自定义应用的计费凭据，或经官方允许的 Agent 工具扩展路线。接口和用户真实音频尚未验证。范围见[Token Plan 个人版条款](https://platform.qianwenai.com/docs/token-plan/personal/token-plan-personal-overview)、[接入概览](https://platform.qianwenai.com/docs/token-plan/best-practices/integration-overview)、[Token Plan 实时语音接入](https://platform.qianwenai.com/docs/token-plan/best-practices/realtime-voice)、[Realtime API 协议矩阵](https://platform.qianwenai.com/docs/api-reference/realtime-api/overview)。 |
-| D-012 | 文件导入白名单和容量限制 | **DEFERRED（2026-11-08）**。 |
+| D-012 | 文件导入白名单和容量限制 | **Accepted（2026-11-09）**：V1 用户主动选择并只读导入 TXT、Markdown、PDF；每个文件最大 10 MB。不得扫描目录或执行文件内容；解析器/格式校验、PDF 资源限制、路径权限和删除策略需在功能启用前做安全 POC。 |
 | D-013 | 性能目标数值 | **DEFERRED（2026-11-08）**；当前测量仅作为观察值。 |
 | D-014 | Embedding 型号和存储格式 | **DEFERRED（2026-11-08）**。 |
 | D-015 | 导出格式及默认加密 | **DEFERRED（2026-11-08）**。 |
