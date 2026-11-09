@@ -498,6 +498,34 @@ def test_openrouter_metadata_reports_selected_provider_region_usage_and_cost() -
     assert b'"provider":{"allow_fallbacks":false}' in seen[0].read()
 
 
+def test_unverified_non_openrouter_cost_field_is_not_labeled_usd() -> None:
+    credentials = FakeCredentials()
+
+    def handle(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "phase0-probe-ack"}}],
+                "usage": {"cost": 0.0001},
+            },
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent, DEEPSEEK_PROBE_CONFIG)
+    gateway = make_gateway(consent, adapter, "deepseek")
+
+    result = asyncio.run(gateway.generate_with_metadata(request_for(DEEPSEEK_PROBE_CONFIG)))
+
+    assert result.text == "phase0-probe-ack"
+    assert result.cost_usd is None
+    assert credentials.reads == ["deepseek"]
+
+
 def test_one_gateway_routes_sequentially_to_both_providers_with_exact_consents() -> None:
     credentials = FakeCredentials()
     routed: list[str] = []

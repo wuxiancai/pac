@@ -158,7 +158,11 @@ class OpenAICompatibleRemoteAdapter:
         provider, region = self._openrouter_route(payload)
         choice = payload["choices"][0]
         finish_reason = choice.get("finish_reason")
-        cost_usd = self._optional_nonnegative_number(usage.get("cost"))
+        cost_usd = (
+            self._optional_nonnegative_number(usage.get("cost"))
+            if self._config.provider == "openrouter"
+            else None
+        )
         response_model = payload.get("model")
         if not isinstance(response_model, str):
             response_model = self._config.model
