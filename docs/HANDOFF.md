@@ -1064,3 +1064,10 @@
 - 2026-11-10 后续资料核对：Apple App Sandbox 文档将其描述为文件、网络和硬件访问边界；`os_proc_available_memory()` 仅为随 app 生命周期变化的建议值，且非 app 调用返回 0，不能作为当前 Python worker 硬内存上限。没有据此启用 PDF；平台证据及限制写入 `docs/beta/file-import.md`，追踪矩阵同步保持 PDF 未启用。
 - 当前提交 `75306b9` 的回归：`swift test --package-path poc/macos-audio` → 40 passed；`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）→ 264 passed、1 failed、1 条既有 Starlette/httpx 弃用警告。唯一失败为 `test_backup_copy_enospc_preserves_source_and_previous_backup`，临时 APFS image 子进程输出 `{"status":"error","error_type":"OSError"}`。按主干优先作为非阻塞问题记录，不在此暂停主线。Beta target 已由启动脚本成功构建。
 - 下一段可独立推进阶段 2 Usage 面板可见字段/可读性，或 B1 本机配置及错误状态；仍不触发云请求、读取 Keychain 或麦克风。完成后更新本交接、`TASKS.md`，运行适用回归并逐段提交。
+
+### 2026-11-10：阶段 2 用量面板元数据
+
+- `LocalUsageRecord` 增加用途显示名（本机处理/聊天/交互式聊天）与数据级别标签；用量列表现在同时显示用途、数据级别、状态和区域，保留现有 token/cost UNKNOWN 呈现。
+- Swift 回归增加 L0 本机与 L2 交互聊天元数据标签断言。`swift test --package-path poc/macos-audio` → 40 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。两条 SwiftPM 命令并行时出现共享 `.build` 等待，最终均成功。
+- 本轮没有 GUI 用量面板验收、云 Provider 请求、Keychain 读取或麦克风操作。GUI 手动验收仍受本轮 CUA 对 PAC 测试版的自动审核拒绝影响；用量面板与聊天引用路径均不能据此标记通过。
+- 下一步继续检查 B1 本机错误状态/模型设置与阶段 2 能独立自动验收的部分；当前 Python 全量回归另有 APFS-128 临时映像用例 1 项失败，详见本节前述记录，暂列非阻塞问题。

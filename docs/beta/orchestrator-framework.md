@@ -46,7 +46,7 @@ Beta 运行时现从随包的 `pac_poc/beta_model_capabilities.json` 装配默�
 
 Ledger 在写入时拒绝非有限时间戳、布尔/非整数毫秒延迟，以及负数、布尔或非有限音频时长，避免无效数值进入 `/usage` JSON 响应；未知音频时长仍以 `null` 表示。
 
-macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的 Provider/model、region、状态、耗时，以及实际/估算/未知 token 和费用。当前没有真实 token/费用时明确显示为未知，不作推算。面板查询只访问认证 loopback API，不发起模型请求；数据显示依赖当前进程内 ledger，退出后消失。
+macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的 Provider/model、purpose、data level、region、状态、耗时，以及实际/估算/未知 token 和费用。本机与交互式聊天的用途标签分别显示为“本机处理”和“交互式聊天”，并展示服务端记录的数据等级（例如 L0/L2）。当前没有真实 token/费用时明确显示为未知，不作推算。面板查询只访问认证 loopback API，不发起模型请求；数据显示依赖当前进程内 ledger，退出后消失。
 
 ### 流式 token 与 OpenRouter 费用透传（2026-11-09）
 
@@ -64,6 +64,8 @@ macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的
 - 上述公开价目会变化，且缓存/时段/活动/下游路由和充值费用口径不同。它们能支持后续设计估算或上界规则，但不足以当前实现“实扣费用”人民币累加。D-005 仍需确定价目版本/更新、USD→CNY 口径、未知字段拦截、额度跨进程保存及并发/月界事务策略，再进入预算 enforcement；未完成前保持 unknown，不拦截或宣称预算保护。
 
 ## 验证
+
+2026-11-10 用量面板元数据显示：每条记录新增用途与数据等级，便于分辨本机处理和带授权的云端交互；空值/未知 token 与费用语义保持不变。`swift test --package-path poc/macos-audio` → 40 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。Swift Codable 回归覆盖本机 L0 与交互聊天 L2 显示标签。GUI 用量面板手动验收和真实 Provider usage/cost E2E 仍待完成。
 
 在 `backend/` 目录执行：
 

@@ -96,6 +96,17 @@ public struct LocalUsageRecord: Decodable, Identifiable, Sendable {
 
     public var id: String { runID }
 
+    public var purposeDisplayName: String {
+        switch purpose {
+        case "beta-interactive-chat": "交互式聊天"
+        case "chat": "聊天"
+        case "": "本机处理"
+        default: purpose
+        }
+    }
+
+    public var dataLevelDisplayName: String { "数据等级 \(dataLevel)" }
+
     enum CodingKeys: String, CodingKey {
         case runID = "run_id"
         case provider, model, region, purpose, status

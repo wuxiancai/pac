@@ -251,6 +251,18 @@ private final class ImportResponseURLProtocol: URLProtocol {
     #expect(snapshot.records[0].promptTokens == nil)
     #expect(snapshot.records[0].cachedPromptTokens == nil)
     #expect(snapshot.records[0].costAmount == nil)
+    #expect(snapshot.records[0].purposeDisplayName == "聊天")
+    #expect(snapshot.records[0].dataLevelDisplayName == "数据等级 L0")
+
+    let cloudBody = body
+        .replacingOccurrences(of: "\"purpose\":\"chat\"", with: "\"purpose\":\"beta-interactive-chat\"")
+        .replacingOccurrences(of: "\"data_level\":\"L0\"", with: "\"data_level\":\"L2\"")
+    let cloudSnapshot = try JSONDecoder().decode(
+        LocalUsageSnapshot.self,
+        from: Data(cloudBody.utf8)
+    )
+    #expect(cloudSnapshot.records[0].purposeDisplayName == "交互式聊天")
+    #expect(cloudSnapshot.records[0].dataLevelDisplayName == "数据等级 L2")
 }
 
 @Test func voiceStreamUnavailableHasActionableLocalOnlyMessage() {

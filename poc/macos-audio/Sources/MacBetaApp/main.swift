@@ -957,7 +957,12 @@ private struct UsageHistoryView: View {
                             Text("\(record.latencyMS) ms").monospacedDigit()
                         }
                         HStack {
-                            Text("\(record.status.displayName) · \(record.region.isEmpty ? "区域未知" : record.region)")
+                            Text("\(record.purposeDisplayName) · \(record.dataLevelDisplayName)")
+                            Spacer()
+                            Text(record.status.displayName)
+                        }
+                        HStack {
+                            Text(record.region.isEmpty ? "区域未知" : record.region)
                             Spacer()
                             Text("\(record.usageState == "actual" ? "实际 token" : record.usageState == "estimated" ? "估算 token" : "token 未知")")
                         }
