@@ -1,3 +1,10 @@
+## 2026-11-09：验证 macOS PDF worker 启动前虚拟内存限额
+
+- 针对 Python 进程启动后设置 rlimit 失败，额外使用 `/bin/sh` 在 `exec` worker 前执行 `ulimit -v`，分别测试 768 MiB、1 GiB、1.5 GiB。当前 macOS 均返回 `cannot modify limit: Invalid argument`，未启动 worker。
+- 此结果排除了当前设备上简单改为 shell 启动器的方案；不代表所有 macOS 版本都相同，也没有证明其他隔离机制不可行。PDF 仍禁用。
+- 更新 `docs/beta/file-import.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`，保留 D-012 门禁和缺少恶意语料/压力验证的状态。
+- 这是只读系统限额探测；未解析用户 PDF、未访问 Keychain、未发起网络请求。
+
 # 2026-11-09：透传 Provider 缓存命中 token
 
 - 根据阿里云 Model Studio 与 DeepSeek 官方文档补齐原始用量字段：OpenAI-compatible `usage.prompt_tokens_details.cached_tokens`、DeepSeek `usage.prompt_cache_hit_tokens`。Gateway 在数值为非负整数且不超过已知 prompt 总数时才保留；UsageLedger 做一致性校验；认证 `/usage` 返回该字段，Swift client 解码并在用量面板显示。没有按价目表推算费用，也没有启用 D-005 预算门。
