@@ -55,6 +55,7 @@ MAX_MESSAGES = 20
 MAX_MESSAGE_CHARS = 16_000
 MAX_CONTEXT_CHARS = 40_000
 MAX_VOICE_PCM_BYTES = 960_000  # 30 seconds of 16 kHz mono PCM16
+VOICE_STREAM_LOCK_WAIT_SECONDS = 2.0
 VOICE_MODEL_DIR = (
     Path(__file__).resolve().parent.parent
     / ".poc-data"
@@ -149,14 +150,18 @@ def create_beta_api(
             await websocket.close(code=1008)
             return
         await websocket.accept()
-        if voice_stream_lock.locked():
+        try:
+            await asyncio.wait_for(
+                voice_stream_lock.acquire(),
+                timeout=VOICE_STREAM_LOCK_WAIT_SECONDS,
+            )
+        except TimeoutError:
             await websocket.send_json({
                 "type": "error",
                 "message": "本机语音识别正忙，请稍后重试；音频未发送到云端",
             })
             await websocket.close(code=1013)
             return
-        await voice_stream_lock.acquire()
         lock_acquired = True
         started = False
         total_bytes = 0

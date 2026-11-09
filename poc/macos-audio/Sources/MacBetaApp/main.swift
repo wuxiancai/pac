@@ -346,25 +346,35 @@ final class BetaChatModel {
 
     private func connectVoiceStream(_ client: LocalAPIClient) async throws -> LocalVoiceStream {
         let attempts = 5
+        var lastFailure: String?
         for attempt in 0..<attempts {
             let stream = try client.openVoiceStream()
             do {
                 try await stream.start()
                 let ready = try await stream.receive()
+                if ready.type == "error", let message = ready.message {
+                    throw LocalAPIClientError.voiceStreamRejected(message)
+                }
                 guard ready.type == "ready" else {
                     throw LocalAPIClientError.invalidResponse
                 }
                 return stream
+            } catch let error as LocalAPIClientError {
+                stream.cancel()
+                if case .voiceStreamRejected = error { throw error }
+                lastFailure = error.localizedDescription
+                guard attempt + 1 < attempts else { break }
+                status = "正在重试连接本机语音服务…（\(attempt + 2)/\(attempts)）"
+                try await Task.sleep(nanoseconds: 200_000_000)
             } catch {
                 stream.cancel()
-                guard attempt + 1 < attempts else {
-                    throw LocalAPIClientError.voiceStreamUnavailable
-                }
+                lastFailure = error.localizedDescription
+                guard attempt + 1 < attempts else { break }
                 status = "正在重试连接本机语音服务…（\(attempt + 2)/\(attempts)）"
                 try await Task.sleep(nanoseconds: 200_000_000)
             }
         }
-        throw LocalAPIClientError.voiceStreamUnavailable
+        throw LocalAPIClientError.voiceStreamUnavailable(reason: lastFailure)
     }
 
     func finishVoiceCapture(stopTappedAtUptime: TimeInterval? = nil) async {

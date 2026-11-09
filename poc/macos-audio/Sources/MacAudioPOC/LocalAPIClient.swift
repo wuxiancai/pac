@@ -4,7 +4,8 @@ public enum LocalAPIClientError: Error, Equatable {
     case invalidEndpoint
     case invalidResponse
     case requestFailed(statusCode: Int)
-    case voiceStreamUnavailable
+    case voiceStreamUnavailable(reason: String?)
+    case voiceStreamRejected(String)
 }
 
 extension LocalAPIClientError: LocalizedError {
@@ -16,8 +17,11 @@ extension LocalAPIClientError: LocalizedError {
             return "本机服务返回了无效响应。"
         case .requestFailed(let statusCode):
             return "本机服务请求失败（HTTP \(statusCode)）。"
-        case .voiceStreamUnavailable:
-            return "无法连接本机语音服务，请重试；音频未发送到云端。"
+        case .voiceStreamUnavailable(let reason):
+            let detail = reason.map { "（\($0)）" } ?? ""
+            return "无法连接本机语音服务\(detail)，请重试；音频未发送到云端。"
+        case .voiceStreamRejected(let message):
+            return "本机语音服务拒绝了连接：\(message)"
         }
     }
 }

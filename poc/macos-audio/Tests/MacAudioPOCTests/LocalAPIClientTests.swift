@@ -27,9 +27,20 @@ import Testing
 }
 
 @Test func voiceStreamUnavailableHasActionableLocalOnlyMessage() {
-    let message = LocalAPIClientError.voiceStreamUnavailable.localizedDescription
+    let message = LocalAPIClientError.voiceStreamUnavailable(
+        reason: "服务端测试错误"
+    ).localizedDescription
 
     #expect(message.contains("无法连接本机语音服务"))
     #expect(message.contains("请重试"))
+    #expect(message.contains("服务端测试错误"))
     #expect(message.contains("音频未发送到云端"))
+}
+
+@Test func voiceStreamRejectionPreservesServerReason() {
+    let message = LocalAPIClientError.voiceStreamRejected(
+        "本机语音识别正忙"
+    ).localizedDescription
+
+    #expect(message.contains("本机语音识别正忙"))
 }
