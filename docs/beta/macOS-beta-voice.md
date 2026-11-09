@@ -26,7 +26,7 @@
 - `swift build --package-path poc/macos-audio --product personal-assistant-beta`：通过。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python -m compileall -q pac_poc`（工作目录 `backend/`）：通过。
 - `poc/macos-audio/scripts/run_beta_app.sh`：构建并启动成功；GUI Accessibility 树显示“语音输入”按钮和提示“点击后才开始麦克风采集；音频最多保留在内存 30 秒”。Info.plist 的 `NSMicrophoneUsageDescription` 已读回确认。
-- 2026-11-09 用户确认 ADR-021 的 V1 边界：本机点击触发实时 ASR，语音按钮可打断文字生成，final 放入草稿；不做 AEC、自动声学插话或云 Realtime。决策已记录，但 GUI 的停止后 final/草稿、取消和打断路径仍需实机验证。
+- 2026-11-09 用户确认 ADR-021 的 V1 边界：本机点击触发实时 ASR，语音按钮可打断文字生成，final 放入草稿；不做 AEC、自动声学插话或云 Realtime。之后用户实机确认停止后 final 入草稿、取消丢弃 partial、语音打断生成并开始采集三项均成功。录音中退出清理、真实驱动异常与 P95 端到端指标仍未验证。
 - 本轮没有点击“语音输入”，没有申请权限、打开麦克风或采集音频；没有对录音/ASR endpoint/TTS 播放做运行时验证。没有运行测试。
 
 ## 用户手动冒烟步骤
@@ -40,7 +40,7 @@
 
 ## 未完成项
 
-- 用户实机确认系统权限和录音时 partial 可见；仍需复核 final/草稿、取消/30 秒上限、打断文字生成和 TTS 可听见/可中断。
+- 用户实机确认系统权限和录音时 partial 可见，并验证 final/草稿、取消清空 partial、语音打断文字生成。30 秒上限已有后端自动回归；录音中 app 退出清理、TTS 可听见/可中断仍需实机复核。
 - 当前实时识别仅覆盖本机 ASR；没有云端 Realtime、自动 VAD/AEC 声学插话、与 TTS 全双工混音或锁屏/休眠行为。上述规格阶段 3 能力和 ADR-021 的完整协议/AEC 决策仍未完成。
 - 测试版依赖仓库内 `.poc-data/models/` 的本地模型文件；没有模型时接口返回本机模型不可用，不会回退到云。
 - POC 中双语 Streaming Zipformer 的来源/训练数据权利链仍未核清，详见 `../poc/phase0-model-license-review.md`；本工作仅作为单机测试版接入，不能据此宣称正式分发许可已解决。
