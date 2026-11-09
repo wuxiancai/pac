@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import re
 from collections.abc import AsyncIterator, Mapping
 from pathlib import Path
-from time import time
+from time import monotonic
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -42,6 +43,7 @@ from .security_poc import (
     ModelAction,
     OutboundPolicy,
     create_local_api,
+    _is_loopback_host,
 )
 from .voice_transcription import LocalVoiceTranscriber
 
@@ -114,7 +116,109 @@ def create_beta_api(
         for provider, config in CLOUD_PROVIDERS.items()
     }
     voice_transcriber = LocalVoiceTranscriber(VOICE_MODEL_DIR)
+    voice_stream_lock = asyncio.Lock()
     router = APIRouter()
+
+    @router.websocket("/voice/stream")
+    async def stream_voice(websocket: WebSocket) -> None:
+        authorization = websocket.headers.get("authorization", "")
+        candidate = authorization[7:] if authorization.startswith("Bearer ") else ""
+        valid = (
+            _is_loopback_host(websocket.headers.get("host", ""))
+            and websocket.headers.get("origin") is None
+            and monotonic() < session.expires_at
+            and hmac.compare_digest(candidate.encode(), session.token.encode())
+        )
+        if not valid:
+            await websocket.close(code=1008)
+            return
+        if voice_stream_lock.locked():
+            await websocket.close(code=1013)
+            return
+        await voice_stream_lock.acquire()
+        started = False
+        total_bytes = 0
+        sequence = 0
+        try:
+            await websocket.accept()
+            start = await websocket.receive_json()
+            if start != {
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            }:
+                await websocket.send_json({"type": "error", "message": "不支持的本机语音格式"})
+                await websocket.close(code=1008)
+                return
+            await asyncio.to_thread(voice_transcriber.begin_stream)
+            started = True
+            await websocket.send_json({"type": "ready"})
+            while True:
+                message = await websocket.receive()
+                if message["type"] == "websocket.disconnect":
+                    break
+                if message.get("bytes") is not None:
+                    packet = message["bytes"]
+                    if len(packet) < 6:
+                        await websocket.send_json({"type": "error", "message": "音频帧格式无效"})
+                        await websocket.close(code=1008)
+                        break
+                    frame_sequence = int.from_bytes(packet[:4], "big")
+                    pcm = packet[4:]
+                    if frame_sequence != sequence or len(pcm) % 2 or len(pcm) > 12_800:
+                        await websocket.send_json({"type": "error", "message": "音频帧格式或序号无效"})
+                        await websocket.close(code=1008)
+                        break
+                    total_bytes += len(pcm)
+                    if total_bytes > MAX_VOICE_PCM_BYTES:
+                        await websocket.send_json({"type": "error", "message": "录音超过 30 秒上限"})
+                        await websocket.close(code=1008)
+                        break
+                    event = await asyncio.to_thread(
+                        voice_transcriber.accept_stream_frame, pcm, sequence
+                    )
+                    sequence += 1
+                    if event is not None:
+                        await websocket.send_json({
+                            "type": event.kind,
+                            "text": event.text,
+                            "sequence": event.sequence,
+                            "revision_id": event.revision_id,
+                        })
+                    continue
+                if message.get("text") is not None:
+                    try:
+                        command = json.loads(message["text"])
+                    except json.JSONDecodeError:
+                        command = {}
+                    if command == {"type": "end"}:
+                        event = await asyncio.to_thread(voice_transcriber.end_stream, sequence)
+                        if event is not None:
+                            await websocket.send_json({
+                                "type": "final",
+                                "text": event.text,
+                                "sequence": event.sequence,
+                                "revision_id": event.revision_id,
+                            })
+                        await websocket.send_json({"type": "ended"})
+                        break
+                    await websocket.send_json({"type": "error", "message": "未知语音控制命令"})
+                    await websocket.close(code=1008)
+                    break
+        except WebSocketDisconnect:
+            pass
+        except (FileNotFoundError, RuntimeError, ValueError):
+            try:
+                await websocket.send_json({"type": "error", "message": "本机语音识别不可用；音频未发送到云端"})
+                await websocket.close(code=1011)
+            except RuntimeError:
+                pass
+        finally:
+            if started:
+                await asyncio.to_thread(voice_transcriber.abort_stream)
+            voice_stream_lock.release()
 
     @router.post("/voice/transcribe")
     async def transcribe_voice(request: Request) -> dict[str, str]:
@@ -133,7 +237,12 @@ def create_beta_api(
         if len(pcm) > MAX_VOICE_PCM_BYTES:
             raise HTTPException(status_code=413, detail="audio exceeds 30 seconds")
         try:
-            text = await asyncio.to_thread(voice_transcriber.transcribe_pcm16le, pcm)
+            if voice_stream_lock.locked():
+                raise HTTPException(status_code=409, detail="local voice recognition is busy")
+            async with voice_stream_lock:
+                text = await asyncio.to_thread(voice_transcriber.transcribe_pcm16le, pcm)
+        except HTTPException:
+            raise
         except FileNotFoundError:
             raise HTTPException(status_code=503, detail="本机双语语音模型尚未安装") from None
         except RuntimeError:

@@ -90,6 +90,19 @@ public final class LocalAPIClient: @unchecked Sendable {
         return value.text
     }
 
+    public func openVoiceStream() throws -> LocalVoiceStream {
+        guard let httpURL = URL(string: "/voice/stream", relativeTo: baseURL)?.absoluteURL,
+              var components = URLComponents(url: httpURL, resolvingAgainstBaseURL: false)
+        else { throw LocalAPIClientError.invalidEndpoint }
+        components.scheme = httpURL.scheme == "https" ? "wss" : "ws"
+        guard let url = components.url else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let task = session.webSocketTask(with: request)
+        task.resume()
+        return LocalVoiceStream(task: task)
+    }
+
     public func streamChat(
         messages: [LocalChatMessage],
         provider: String = "ollama",

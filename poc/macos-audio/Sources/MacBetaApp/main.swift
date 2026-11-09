@@ -81,12 +81,19 @@ final class BetaChatModel {
     private let microphone = LocalMicrophoneCapture()
     private let speechPlayback = SpeechPlaybackController(engine: AVSpeechEngine())
     private var voiceTimerTask: Task<Void, Never>?
+    private var voiceSenderTask: Task<Void, Never>?
+    private var voiceReceiverTask: Task<Void, Never>?
+    private var voiceFrameContinuation: AsyncStream<Data>.Continuation?
+    private var voiceStream: LocalVoiceStream?
+    private var voiceFinalSegments: [String] = []
+    private var voiceStreamFailed = false
     private let defaults = UserDefaults.standard
     private(set) var status = "正在连接本机服务…"
     private(set) var messages: [LocalChatMessage] = []
     private(set) var isRecordingVoice = false
     private(set) var isTranscribingVoice = false
     private(set) var voiceSeconds = 0
+    private(set) var partialTranscript = ""
     var draft = ""
     var source: ModelSource {
         didSet {
@@ -109,7 +116,7 @@ final class BetaChatModel {
 
     var isStreaming: Bool { activeRequest != nil }
     var canStartVoiceCapture: Bool {
-        client != nil && activeRequest == nil && !isRecordingVoice && !isTranscribingVoice
+        client != nil && !isRecordingVoice && !isTranscribingVoice
     }
     var usesCloud: Bool { source == .cloud }
     var selectedProvider: String { usesCloud ? cloudProvider.rawValue : "ollama" }
@@ -216,13 +223,63 @@ final class BetaChatModel {
     }
 
     func startVoiceCapture() async {
-        guard client != nil, activeRequest == nil, !isRecordingVoice, !isTranscribingVoice else { return }
-        status = "正在请求麦克风权限…"
+        guard let client, !isRecordingVoice, !isTranscribingVoice else { return }
+        if activeRequest != nil { stop() }
+        stopLocalSpeech()
+        status = "正在连接本机实时识别…"
         do {
-            try await microphone.start()
+            let stream = try client.openVoiceStream()
+            try await stream.start()
+            let ready = try await stream.receive()
+            guard ready.type == "ready" else {
+                throw LocalAPIClientError.invalidResponse
+            }
+            voiceStream = stream
+            voiceFinalSegments = []
+            partialTranscript = ""
+            voiceStreamFailed = false
+            let (frames, continuation) = AsyncStream<Data>.makeStream(bufferingPolicy: .bufferingOldest(6))
+            voiceFrameContinuation = continuation
+            voiceSenderTask = Task { [weak self] in
+                do {
+                    for await frame in frames {
+                        try await stream.sendFrame(frame)
+                    }
+                } catch {
+                    self?.voiceStreamFailed = true
+                }
+            }
+            voiceReceiverTask = Task { [weak self] in
+                do {
+                    while !Task.isCancelled {
+                        let event = try await stream.receive()
+                        await MainActor.run {
+                            guard let self else { return }
+                            if event.type == "partial" {
+                                self.partialTranscript = event.text ?? ""
+                            } else if event.type == "final", let text = event.text, !text.isEmpty {
+                                self.voiceFinalSegments.append(text)
+                                self.partialTranscript = ""
+                            } else if event.type == "error" {
+                                self.voiceStreamFailed = true
+                            }
+                        }
+                        if event.type == "ended" || event.type == "error" { break }
+                    }
+                } catch {
+                    self?.voiceStreamFailed = true
+                }
+            }
+            try await microphone.start(onFrame: { data in
+                switch continuation.yield(data) {
+                case .enqueued: true
+                case .dropped, .terminated: false
+                @unknown default: false
+                }
+            })
             isRecordingVoice = true
             voiceSeconds = 0
-            status = "本机录音中；音频只暂存在内存，最长 30 秒。"
+            status = "本机实时识别中；音频仅发往本机，最长 30 秒。"
             voiceTimerTask?.cancel()
             voiceTimerTask = Task { [weak self] in
                 while !Task.isCancelled {
@@ -237,6 +294,7 @@ final class BetaChatModel {
             }
         } catch {
             microphone.discard()
+            cancelVoiceStream()
             status = error.localizedDescription
         }
     }
@@ -246,29 +304,28 @@ final class BetaChatModel {
         voiceTimerTask?.cancel()
         voiceTimerTask = nil
         isRecordingVoice = false
-        guard let client else {
-            microphone.discard()
-            status = "本机服务已断开；录音已丢弃。"
-            return
-        }
-
         isTranscribingVoice = true
-        status = "正在本机识别；音频不会发送到云端…"
+        status = "正在完成本机实时识别…"
         do {
-            var pcm = try microphone.finish()
-            defer { if !pcm.isEmpty { pcm.resetBytes(in: 0..<pcm.count) } }
-            let transcript = try await client.transcribeVoice(pcm16LE: pcm)
+            try microphone.finishStreaming()
+            voiceFrameContinuation?.finish()
+            voiceFrameContinuation = nil
+            await voiceSenderTask?.value
+            try await voiceStream?.finish()
+            await voiceReceiverTask?.value
+            guard !voiceStreamFailed else { throw LocalAPIClientError.invalidResponse }
+            let transcript = voiceFinalSegments.joined(separator: "")
             let existing = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-            draft = existing.isEmpty ? transcript : existing + "\n" + transcript
-            status = "本机识别完成；转写已放入输入框，请检查后发送。"
-        } catch LocalAPIClientError.requestFailed(let statusCode) where statusCode == 422 {
-            status = "本次录音未识别到语音；音频已丢弃，请重试。"
-        } catch LocalAPIClientError.requestFailed(let statusCode) where statusCode == 503 {
-            status = "本机语音模型不可用；录音已丢弃，没有切换到云端。"
+            if !transcript.isEmpty { draft = existing.isEmpty ? transcript : existing + "\n" + transcript }
+            partialTranscript = ""
+            status = transcript.isEmpty
+                ? "本次录音未识别到语音；音频已丢弃，请重试。"
+                : "本机识别完成；转写已放入输入框，请检查后发送。"
         } catch {
             microphone.discard()
-            status = "本机语音识别失败；录音已丢弃，没有切换到云端。"
+            status = "本机实时识别中断；未完成的转写已丢弃，没有切换到云端。"
         }
+        cancelVoiceStream()
         isTranscribingVoice = false
     }
 
@@ -278,7 +335,20 @@ final class BetaChatModel {
         voiceTimerTask = nil
         isRecordingVoice = false
         microphone.discard()
+        cancelVoiceStream()
+        partialTranscript = ""
         status = "录音已取消并丢弃。"
+    }
+
+    private func cancelVoiceStream() {
+        voiceFrameContinuation?.finish()
+        voiceFrameContinuation = nil
+        voiceSenderTask?.cancel()
+        voiceSenderTask = nil
+        voiceReceiverTask?.cancel()
+        voiceReceiverTask = nil
+        voiceStream?.cancel()
+        voiceStream = nil
     }
 
     func speakLocally(_ text: String) {
@@ -304,6 +374,7 @@ final class BetaChatModel {
         voiceTimerTask = nil
         isRecordingVoice = false
         microphone.discard()
+        cancelVoiceStream()
         stopLocalSpeech()
         activeRequest?.cancel()
         activeRequest = nil
@@ -426,11 +497,18 @@ private struct BetaChatView: View {
                     Button {
                         Task { await model.startVoiceCapture() }
                     } label: {
-                        Label("语音输入", systemImage: "mic")
+                        Label(model.isStreaming ? "打断并语音输入" : "语音输入", systemImage: "mic")
                     }
                     .accessibilityIdentifier("voice-input-button")
                     .disabled(!model.canStartVoiceCapture)
-                    .help("点击后才开始麦克风采集；音频最多保留在内存 30 秒")
+                    .help("点击后开始本机实时识别；生成中点击可打断当前回复并开始语音输入")
+                }
+                if model.isRecordingVoice && !model.partialTranscript.isEmpty {
+                    Text(model.partialTranscript)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .accessibilityIdentifier("voice-partial-transcript")
                 }
                 if model.isStreaming {
                     Button("停止", action: model.stop)

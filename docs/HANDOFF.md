@@ -516,3 +516,11 @@
 - `poc/macos-audio/Sources/MacBetaApp/main.swift`：source、本地模型 ID 或云 Provider 变更时取消旧客户端流、清除 request ID 以忽略迟到回调，并把状态更新为当前 Provider/模型。发送和完成状态显示本轮实际 Provider/模型。
 - 验证：`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。本轮未运行测试、未启动 GUI、未发送云请求；GUI 切换和连续聊天手动复核仍待做。客户端取消不保证 Provider 服务端同步停止生成。
 - 更新 `docs/beta/macOS-beta-chat.md`、`docs/TASKS.md`。如需确认实机行为，请在模型设置中切换本地/千问/DeepSeek/OpenRouter 后观察状态栏，再分别发消息核对显示的本轮 Provider/模型；无需更改任何 Key。接续任务应从 B1 GUI 手动复核开始。
+
+### 2026-11-09：提前接入本机实时语音切片
+
+- 用户报告模型切换与现有语音输入均可用，并要求查看阶段安排后，在不影响流程时提前实现实时语音。文档原计划把 SwiftUI streaming partial、WebSocket、AEC/插话纳入阶段 3；ADR-021（音频协议/AEC/插话）处于 Deferred。用户本轮授权提前做独立的本机 Beta 切片。
+- 本次只实现本机路径：采集 PCM 转为 200 ms 帧，通过带 Bearer token 的 loopback WebSocket 到本机 sherpa-onnx Streaming ASR；部分识别只临时显示，final 在用户停止后进入草稿；点“打断并语音输入”会取消文字生成并停止本机朗读，再请求/启动麦克风。队列与 30 秒音频量有界，错误不切云。
+- 更新文件：`poc/macos-audio/Sources/MacAudioPOC/LocalVoiceStream.swift`、`LocalAPIClient.swift`、`LocalMicrophoneCapture.swift`、`MacBetaApp/main.swift`；`backend/pac_poc/asr.py`、`voice_transcription.py`、`beta_api.py`；`docs/beta/macOS-beta-voice.md`、`docs/PROJECT_CONTEXT.md`、`docs/DECISIONS.md`、`docs/TASKS.md`、`docs/poc/phase0-traceability.md`。
+- 验证：`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；`backend/` 下 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python -m compileall -q pac_poc` 通过。没有运行测试、启动 GUI、申请/启动麦克风或播放语音；WebSocket 协议和真实设备 partial/final 尚待实机验证。
+- 云端 Realtime（包括 Qwen Token Plan）、自动 VAD/AEC 声学插话、全双工 ASR/TTS、锁屏/休眠/切换用户生命周期均未实现；Token Plan 个人版 Key 仍不得用于自建应用。ADR-021 仍 Deferred，阶段 3 未验收。下一步先构建启动 GUI，由用户明确点击“语音输入”进行设备冒烟，复核 partial、停止后的 final 草稿、取消和“打断并语音输入”行为。

@@ -122,6 +122,26 @@ class LocalStreamingASR:
             )
         return None
 
+    def finish(self, *, sequence: int, silence_frames: int = 3) -> ASREvent | None:
+        for offset in range(silence_frames):
+            event = self.accept(
+                AudioFrame(
+                    sequence=sequence + offset,
+                    sample_rate_hz=self._sample_rate_hz,
+                    samples=(0.0,) * int(self._sample_rate_hz * 0.2),
+                )
+            )
+            if event is not None and event.kind == "final":
+                return event
+        if not self._last_text.strip():
+            return None
+        return ASREvent(
+            kind="final",
+            text=self._last_text,
+            sequence=sequence + silence_frames,
+            revision_id=self._revision_id,
+        )
+
     @staticmethod
     def _new_revision() -> str:
         return f"rev_{uuid4().hex}"

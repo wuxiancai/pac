@@ -5,7 +5,13 @@ from array import array
 from pathlib import Path
 from threading import Lock
 
-from .asr import AudioFrame, LocalStreamingASR, SherpaOnnxRecognizer, resolve_model_files
+from .asr import (
+    ASREvent,
+    AudioFrame,
+    LocalStreamingASR,
+    SherpaOnnxRecognizer,
+    resolve_model_files,
+)
 
 
 SAMPLE_RATE_HZ = 16_000
@@ -19,6 +25,52 @@ class LocalVoiceTranscriber:
         self._model_dir = model_dir
         self._recognizer: SherpaOnnxRecognizer | None = None
         self._lock = Lock()
+        self._stream: LocalStreamingASR | None = None
+
+    def begin_stream(self) -> None:
+        with self._lock:
+            recognizer = self._get_recognizer()
+            recognizer.reset()
+            self._stream = LocalStreamingASR(recognizer, sample_rate_hz=SAMPLE_RATE_HZ)
+
+    def accept_stream_frame(self, pcm: bytes, sequence: int) -> ASREvent | None:
+        if not pcm or len(pcm) % 2 or len(pcm) > FRAME_SAMPLES * 2 * 2:
+            raise ValueError("invalid PCM frame")
+        values = array("h")
+        values.frombytes(pcm)
+        if sys.byteorder != "little":
+            values.byteswap()
+        with self._lock:
+            if self._stream is None:
+                raise RuntimeError("streaming recognition has not started")
+            return self._stream.accept(
+                AudioFrame(
+                    sequence=sequence,
+                    sample_rate_hz=SAMPLE_RATE_HZ,
+                    samples=tuple(sample / 32768.0 for sample in values),
+                )
+            )
+
+    def end_stream(self, sequence: int) -> ASREvent | None:
+        with self._lock:
+            if self._stream is None:
+                return None
+            event = self._stream.finish(sequence=sequence)
+            self._stream.reset()
+            self._stream = None
+            return event
+
+    def abort_stream(self) -> None:
+        with self._lock:
+            if self._stream is not None:
+                self._stream.reset()
+                self._stream = None
+
+    def _get_recognizer(self) -> SherpaOnnxRecognizer:
+        if self._recognizer is None:
+            model_files = resolve_model_files(self._model_dir)
+            self._recognizer = SherpaOnnxRecognizer(**model_files.__dict__)
+        return self._recognizer
 
     def transcribe_pcm16le(self, pcm: bytes) -> str:
         if not pcm or len(pcm) % 2:
@@ -30,12 +82,10 @@ class LocalVoiceTranscriber:
             values.byteswap()
 
         with self._lock:
-            if self._recognizer is None:
-                model_files = resolve_model_files(self._model_dir)
-                self._recognizer = SherpaOnnxRecognizer(**model_files.__dict__)
-            self._recognizer.reset()
+            recognizer = self._get_recognizer()
+            recognizer.reset()
             asr = LocalStreamingASR(
-                self._recognizer,
+                recognizer,
                 sample_rate_hz=SAMPLE_RATE_HZ,
             )
             finals: list[str] = []
