@@ -33,14 +33,14 @@
 
 ## 当前执行顺序
 
-0. **阶段 1 工程底座（IN PROGRESS）**：Loopback API 已加入 trace ID 生成/透传和统一 HTTP/校验错误包络（保留 `detail` 兼容现有客户端，提供稳定错误码与 trace ID；校验错误不回显请求值）。后续仍需收敛 app factory/依赖注入和 health。数据库/迁移/会话持久化须等 ADR-019 重开及产品决策后再排期。
+0. **阶段 1 工程底座（IN PROGRESS）**：Loopback API 已加入 trace ID、统一 HTTP/校验错误包络（保留 `detail` 兼容，校验错误不回显请求值）、明确的 `BetaAPIDependencies` 注入入口，以及仅报告存活/版本/uptime 的 health。health 不声称 DB、ASR、Provider 或磁盘状态；后续仍需进一步收敛全局配置与启动装配。数据库/迁移/会话持久化须等 ADR-019 重开及产品决策后再排期。
 
 1. **B0 应用可运行骨架**：基于现有 SwiftUI lifecycle demo，形成开发者可重复启动的单用户 app 入口；本机后端启动、健康状态、错误提示和退出清理纳入该闭环。
 2. **B1 本机文字对话和模型设置**：本机 Ollama/固定云端配置选择；选中云端 Provider 后持续授权，聊天时不弹逐条确认；Keychain 凭据和无自动 fallback；完成设置 UI 手动复核及 API Key/错误路径验证。
 3. **B2 本地语音**：接入本机实时 Streaming ASR、明确点击才采集、有限内存/队列、partial/final 草稿边界和按键打断；识别失败不得转云。完整双向语音、AEC、自动插话和系统生命周期仍需阶段 3 决策与验证。
 4. 后续再按用户实际使用反馈决定会话持久化；D-014 确认 V1 不提供长期记忆/Embedding，D-015 确认 V1 不提供 app 数据导出。文件导入已由 D-012 纳入 V1 范围（TXT/Markdown/PDF，10 MB），需先通过安全 POC 再启用。备份/恢复按 D-006 不在 V1。B4 千问 Token Plan 文本/实时语音仍须符合个人版条款及 Consent/Policy，不接入自建应用路径。
 
-阶段 1 首个切片已完成 trace ID 和统一 HTTP 错误契约；后续推进 app factory/DI 与 health。预算硬拦截、持久审计、文件导入、Embedding、数据库迁移等均明确未实现，按追踪矩阵的触发点排期。
+阶段 1 的无持久化 API 基础已包含 trace、错误包络、依赖注入和最小 liveness health；预算硬拦截、持久审计、文件导入、Embedding、数据库迁移等均明确未实现，按追踪矩阵的触发点排期。
 麦克风复现命令（从仓库根目录，在本机交互式终端运行）：
 
 ```bash

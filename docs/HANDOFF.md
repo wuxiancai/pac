@@ -4,7 +4,13 @@
 
 - API 失败响应现统一包含兼容字段 `detail`，以及稳定的 `error.code`、`error.trace_id`；trace ID 同时通过 `X-Trace-ID` 回传，包含认证中间件提前拒绝的请求。
 - Pydantic 请求校验失败改为通用消息，不回显错误输入值，避免在 body 含提示词或凭据时将其带回响应。
-- 此切片按需做静态编译与差异检查；尚未补齐 app factory/DI、health 详细状态或持久化。
+- 该错误契约切片完成时尚未有明确依赖对象；本轮已补 `BetaAPIDependencies` 工厂入口和最小 liveness health。持久化未实现，且仍按 D-007 暂缓。
+
+### 阶段 1 更新：应用依赖入口与最小 health
+
+- 新增 `BetaAPIDependencies` 和 `create_beta_app()`，把会话、Gateway、凭据、Provider adapter、语音转写器集中为显式注入项；保留 `create_beta_api(...)` 兼容入口，现有启动器与调用点不需要迁移。
+- `/health` 仍需本机认证，只返回 `status`、应用版本和进程 uptime；不读取 Keychain/Provider、不检查或创建数据库，也不采集音频。Swift 客户端只解码 `status`，额外字段保持兼容。
+- 更新既有 health 断言；本轮仅做静态编译和差异检查，未运行测试。
 
 - 用户确认：剩余小功能可以后续补齐，当前文档应明确标为未实现；阶段 0 若已结束则开始阶段 1。
 - 阶段 0 Beta 范围收尾标记为已结束，并保留原始 §13 的 `PARTIAL/OPEN` 与每项触发条件；不宣称完整 V1/发布 POC 全部通过。

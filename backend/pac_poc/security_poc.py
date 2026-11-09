@@ -19,6 +19,7 @@ import uvicorn
 
 
 LOCAL_API_BIND_HOST = "127.0.0.1"
+LOCAL_API_VERSION = "0.1.0"
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,7 @@ def create_local_api(*, session: LocalAPISession) -> FastAPI:
         raise ValueError("local API session token must not be empty")
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    app.state.started_at = time.monotonic()
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_error(request: Request, error: StarletteHTTPException) -> JSONResponse:
@@ -85,8 +87,13 @@ def create_local_api(*, session: LocalAPISession) -> FastAPI:
         return response
 
     @app.get("/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
+    async def health(request: Request) -> dict[str, str | float]:
+        """Authenticated liveness only; omit provider, key, and user-data details."""
+        return {
+            "status": "ok",
+            "version": LOCAL_API_VERSION,
+            "uptime_seconds": round(time.monotonic() - request.app.state.started_at, 3),
+        }
 
     return app
 

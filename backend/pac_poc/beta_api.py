@@ -5,6 +5,7 @@ import hmac
 import json
 import re
 from collections.abc import AsyncIterator, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic, time
 from typing import Literal, Protocol
@@ -92,6 +93,17 @@ class BetaVoiceTranscriber(Protocol):
     def transcribe_pcm16le(self, pcm: bytes) -> str: ...
 
 
+@dataclass(frozen=True)
+class BetaAPIDependencies:
+    """Explicit composition inputs for the in-memory beta application factory."""
+
+    session: LocalAPISession
+    gateway: ModelGateway | None = None
+    credentials: CredentialProvider | None = None
+    remote_adapters: Mapping[str, LocalProviderAdapter] | None = None
+    voice_transcriber: BetaVoiceTranscriber | None = None
+
+
 CLOUD_PROVIDERS: dict[str, RemoteProviderConfig] = {
     "deepseek": DEEPSEEK_PROBE_CONFIG,
     "openrouter": OPENROUTER_PROBE_CONFIG,
@@ -118,7 +130,23 @@ def create_beta_api(
     remote_adapters_override: Mapping[str, LocalProviderAdapter] | None = None,
     voice_transcriber_override: BetaVoiceTranscriber | None = None,
 ) -> FastAPI:
-    """Build the beta's authenticated loopback API; chat data remains in memory."""
+    """Compatibility composition root for the injected beta app factory."""
+    return create_beta_app(dependencies=BetaAPIDependencies(
+        session=session,
+        gateway=gateway,
+        credentials=credentials,
+        remote_adapters=remote_adapters_override,
+        voice_transcriber=voice_transcriber_override,
+    ))
+
+
+def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
+    """Build the authenticated in-memory beta API from explicit dependencies."""
+    session = dependencies.session
+    gateway = dependencies.gateway
+    credentials = dependencies.credentials
+    remote_adapters_override = dependencies.remote_adapters
+    voice_transcriber_override = dependencies.voice_transcriber
     app = create_local_api(session=session)
     ollama = OllamaAdapter()
     credential_provider = credentials or MacOSKeychainCredentialProvider()

@@ -129,7 +129,9 @@ def test_local_api_serves_only_authenticated_loopback_http(live_local_api) -> No
     )
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json()["status"] == "ok"
+    assert response.json()["version"]
+    assert response.json()["uptime_seconds"] >= 0
     assert "access-control-allow-origin" not in response.headers
 
 
