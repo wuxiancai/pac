@@ -539,3 +539,9 @@
 - 用户确认语音输入时能在控件右侧看到正在说的话的文字，证明依赖修复后的实时 partial 已在 GUI 工作。final 在停止后是否稳定写入草稿、取消丢弃和生成中点击打断尚未反馈。
 - 为避免把被打断的回复当作完整上下文，`BetaChatModel` 现在保留部分回答供界面查看，但将其从下一次模型请求的消息历史中排除，并禁用对该部分回答的本机朗读。正常模型切换取消在途请求时也适用。
 - `swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；未运行测试或启动麦克风。新二进制已经构建，但运行中的应用需重启后才载入上下文处理改动。下一步请在保存必要草稿后重启，测试“停止并识别”后 final 进入草稿，再在文字生成中点“打断并语音输入”；不需要切换 Provider 或发送云请求。
+
+### 2026-11-09：启动阶段 0 逐项收尾
+
+- 用户要求逐项完成全部阶段 0。先从工程基线复核：Python 全量首次暴露 2 个云路由 `NameError: time`（`beta_api.py` 改用 monotonic 后遗漏了 `time()`）；已补回导入。窄回归 `tests/test_beta_api.py -k 'cloud_chat_requires_one_time_consent_before_adapter_access or qwen_application_route_is_available_with_exact_region_and_model'` 2 passed；全量 `pytest -q` 170 passed。Swift `swift test --package-path poc/macos-audio` 31 passed；`uv lock --check` 与 Python `compileall` 通过。
+- 阶段 0 矩阵工程基线仍为 PARTIAL：workflow 声明 `push`/`pull_request`/`workflow_dispatch`，但没有实际 PR 运行；当前本机 `main` commit `d5ed799` 比 `origin/main` `51b9ab9` ahead 13 commits，尚未推送。`uv.lock` 新增 `websockets==17.4` 后，既有 SBOM SHA 锚点过期，需要更新。当前不通过推送/PR提前发布 13 个未核准提交；待阶段 0改动收敛再安排实际 PR CI。
+- 更新 `PROJECT_CONTEXT.md`、`TASKS.md` 和追踪矩阵。本次 `beta_api.py` 修复和最新回归记录仍待提交；接下来按追踪矩阵处理下一项，D-001 设备快照可独立刷新，但主力设备/最低系统版本仍需用户确认。

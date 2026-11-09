@@ -6,7 +6,7 @@ import json
 import re
 from collections.abc import AsyncIterator, Mapping
 from pathlib import Path
-from time import monotonic
+from time import monotonic, time
 from typing import Literal
 
 import httpx

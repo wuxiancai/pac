@@ -27,7 +27,7 @@
 
 ## 阶段 0 证据状态（保留追踪，不作为测试版总门禁）
 
-0A–0H 的历史证据和未闭环项仍见追踪矩阵。GitHub Actions 已在 `main` 上真实成功运行（2026-11-09 复核，run `42489738004`，Python `162 passed`、Swift `31 tests passed`），不再是延期项；PR 触发路径尚未经历。独立标注语料/长时压力、Provider 服务端取消与更广稳定性、云 ASR/TTS、许可闭包、锁屏/休眠、系统卷/断电恢复等仍延期至对应能力开发或正式发布前；不要将其记作已验证。用户已明确识别质量可后续优化，SwiftUI 麦克风/AEC 属原规格阶段 3。
+0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 170 项、Swift 31 项通过，`uv lock --check`、`compileall` 通过；历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前 `main` 本地 ahead `origin/main` 13 commits，PR 触发路径尚未实际运行；`uv.lock` 新增 WebSocket 依赖后需更新 Python SBOM。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
 
 ## 当前执行顺序
 
