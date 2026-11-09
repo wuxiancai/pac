@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 4 B5 Swift 文件导入请求契约回归（2026-11-09）
+
+- `LocalAPIClientTests` 增加 URLProtocol fixture，验证导入请求为认证 POST 到 loopback `/imports/text?filename=notes.md`，请求只传 basename 和文件内容，不传原始路径；成功响应正确解码为 `LocalImportedTextFile`。
+- 另验证 PDF 后缀和超出 10 MiB 的文件均在 URLProtocol 收到请求前被客户端拒绝。客户端并不自行解析 PDF，正式导入白名单和 GUI 保持 TXT/Markdown。
+- 验证：`swift test --package-path poc/macos-audio` → 40 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；`git diff --check` 通过。此为请求层自动化证据，不代表 GUI 文件选择/移除/聊天引用手动冒烟已通过；当前运行 GUI 未被改动。
+- 下一步在干净 Beta 测试会话验证 UI 文件选择、移除和仅本机模型使用；PDF 仍需解决 macOS 硬内存隔离和恶意样本压力门。
+
 ## 阶段 2 B1 Swift SSE 错误事件解码回归（2026-11-09）
 
 - Swift 客户端新增 URLProtocol 流 fixture，返回 HTTP 200 的 SSE `error` 事件；确认 `streamChat` 转成 `LocalAPIStreamError`，localizedDescription 保留服务端已经脱敏的 Ollama 提示，便于 UI 展示。

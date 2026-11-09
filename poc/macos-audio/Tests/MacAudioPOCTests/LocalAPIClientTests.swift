@@ -43,6 +43,65 @@ private final class SSEErrorURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class ImportRequestCapture: @unchecked Sendable {
+    static let shared = ImportRequestCapture()
+    private let lock = NSLock()
+    private var storedRequest: URLRequest?
+    private var storedBody: Data?
+
+    func record(_ request: URLRequest) {
+        var body = request.httpBody
+        if body == nil, let stream = request.httpBodyStream {
+            stream.open()
+            var bytes: [UInt8] = []
+            var buffer = [UInt8](repeating: 0, count: 8_192)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                if count <= 0 { break }
+                bytes.append(contentsOf: buffer.prefix(count))
+            }
+            stream.close()
+            body = Data(bytes)
+        }
+        lock.lock()
+        storedRequest = request
+        storedBody = body
+        lock.unlock()
+    }
+
+    func take() -> (URLRequest, Data?)? {
+        lock.lock()
+        defer { lock.unlock() }
+        let request = storedRequest
+        let body = storedBody
+        storedRequest = nil
+        storedBody = nil
+        guard let request else { return nil }
+        return (request, body)
+    }
+}
+
+private final class ImportResponseURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        ImportRequestCapture.shared.record(request)
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 201,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        let body = #"{"import_id":"11111111-1111-4111-8111-111111111111","display_name":"notes.md","byte_count":12,"character_count":12}"#
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 @available(macOS 12.0, *)
 @Test func localAPIClientBuildsAuthenticatedLoopbackRequest() throws {
     let client = try LocalAPIClient(
@@ -107,6 +166,63 @@ private final class SSEErrorURLProtocol: URLProtocol {
         #expect(error.message == "本机模型请求失败，请确认 Ollama 正在运行且模型已安装")
         #expect(error.localizedDescription == error.message)
     }
+}
+
+@available(macOS 12.0, *)
+@Test func selectedTextImportUsesAuthenticatedLoopbackAndSendsNoPath() async throws {
+    _ = ImportRequestCapture.shared.take()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ImportResponseURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43127")!,
+        token: "test-token",
+        sessionConfiguration: configuration
+    )
+    let contents = Data("hello world\n".utf8)
+
+    let imported = try await client.importSelectedText(data: contents, fileName: "notes.md")
+    let captured = try #require(ImportRequestCapture.shared.take())
+    let request = captured.0
+    let sentBody = try #require(captured.1)
+
+    #expect(imported.displayName == "notes.md")
+    #expect(imported.byteCount == contents.count)
+    #expect(imported.characterCount == contents.count)
+    #expect(request.httpMethod == "POST")
+    #expect(request.url?.absoluteString == "http://127.0.0.1:43127/imports/text?filename=notes.md")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
+    #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/octet-stream")
+    #expect(sentBody == contents)
+    #expect(!request.url!.absoluteString.contains("/Users/"))
+}
+
+@available(macOS 12.0, *)
+@Test func selectedTextImportRejectsPDFAndOversizedFilesBeforeNetwork() async throws {
+    _ = ImportRequestCapture.shared.take()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ImportResponseURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43127")!,
+        token: "test-token",
+        sessionConfiguration: configuration
+    )
+
+    do {
+        _ = try await client.importSelectedText(data: Data("%PDF".utf8), fileName: "notes.pdf")
+        Issue.record("Expected PDF import to be rejected")
+    } catch let error as LocalAPIClientError {
+        #expect(error == .invalidResponse)
+    }
+    do {
+        _ = try await client.importSelectedText(
+            data: Data(repeating: 0, count: 10 * 1024 * 1024 + 1),
+            fileName: "oversized.txt"
+        )
+        Issue.record("Expected oversized import to be rejected")
+    } catch let error as LocalAPIClientError {
+        #expect(error == .invalidResponse)
+    }
+    #expect(ImportRequestCapture.shared.take() == nil)
 }
 
 @Test func localChatRunStatusDecodesBackendLifecycleValues() throws {

@@ -19,6 +19,8 @@ PDF 仍禁用。新增隔离的 pypdf 7.0.0 安全 POC（`backend/pac_poc/pdf_im
 
 ## 自动验证
 
+Swift 客户端请求契约回归（2026-11-09）：`swift test --package-path poc/macos-audio` → 40 passed，Beta target build 通过。新增 URLProtocol fixture 验证导入请求只携带 basename、文件内容和 loopback Bearer token；不包含原始路径；PDF 与大于 10 MiB 文件在网络调用前拒绝。此项不代替 GUI 文件选择、移除和聊天引用实机冒烟。
+
 在 `backend/` 目录：
 
 ```bash
