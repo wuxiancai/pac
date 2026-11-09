@@ -25,7 +25,7 @@ private final class FakeSpeechEngine: SpeechEngine {
     let engine = FakeSpeechEngine()
     let controller = SpeechPlaybackController(engine: engine)
 
-    #expect(controller.speak("测试语音打断"))
+    #expect(controller.speak("测试语音打断") == .started)
     #expect(controller.state == .speaking)
     #expect(controller.interrupt())
     #expect(controller.state == .interrupted)
@@ -38,9 +38,47 @@ private final class FakeSpeechEngine: SpeechEngine {
     let engine = FakeSpeechEngine()
     let controller = SpeechPlaybackController(engine: engine)
 
-    #expect(!controller.speak(" \n "))
+    #expect(controller.speak(" \n ") == .emptyText)
     #expect(controller.state == .idle)
     #expect(engine.spokenTexts.isEmpty)
+}
+
+@MainActor
+@Test func newSpeechStopsCurrentUtteranceInsteadOfQueuingBehindIt() {
+    let engine = FakeSpeechEngine()
+    let controller = SpeechPlaybackController(engine: engine)
+
+    #expect(controller.speak("第一条回复") == .started)
+    #expect(controller.speak("第二条回复") == .started)
+
+    #expect(engine.stopCount == 1)
+    #expect(engine.spokenTexts == ["第一条回复", "第二条回复"])
+    #expect(controller.state == .speaking)
+}
+
+@MainActor
+@Test func emptySpeechDoesNotInterruptCurrentUtterance() {
+    let engine = FakeSpeechEngine()
+    let controller = SpeechPlaybackController(engine: engine)
+
+    #expect(controller.speak("正在朗读") == .started)
+    #expect(controller.speak(" \n ") == .emptyText)
+
+    #expect(engine.stopCount == 0)
+    #expect(engine.spokenTexts == ["正在朗读"])
+}
+
+@MainActor
+@Test func failedInterruptDoesNotQueueNewSpeech() {
+    let engine = FakeSpeechEngine()
+    engine.stopResult = false
+    let controller = SpeechPlaybackController(engine: engine)
+
+    #expect(controller.speak("第一条回复") == .started)
+    #expect(controller.speak("第二条回复") == .existingSpeechCouldNotBeStopped)
+
+    #expect(engine.spokenTexts == ["第一条回复"])
+    #expect(controller.state == .speaking)
 }
 
 @MainActor

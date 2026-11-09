@@ -1085,3 +1085,10 @@
 - 验证：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_usage.py tests/test_beta_api.py` → 46 passed；全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 267 passed、1 条既有 Starlette/httpx 弃用警告；`ruff check pac_poc/usage.py tests/test_usage.py`、`mypy pac_poc/usage.py` 通过。
 - 更新 `docs/beta/orchestrator-framework.md`、`TASKS.md` 和 `PROJECT_CONTEXT.md`。不做费用估算/预算拦截，不读 Keychain，不发云请求；真实云 usage/cost E2E 与 GUI Usage 验收仍待完成。
 - 继续处理不依赖桌面的阶段 2 自动验收；桌面手动验收保持未通过状态，因 CUA 对 PAC 测试版的授权审核拒绝仍有效。
+
+### 2026-11-10：本机 TTS 连续点播控制
+
+- SpeechPlaybackController 改为返回明确启动结果。用户点播新回复时，若当前仍在朗读，先尝试立即停止；停止失败时不将新文本排入系统队列，并向状态栏显示原因。空文本仍不影响当前朗读。同步更新 `TTSInterruptPOC` 和 Beta UI 调用点。
+- 自动回归新增：新点播停止旧朗读、系统拒绝停止时新文本不入队、空文本不打断当前内容。一次全量编译捕获到 `TTSInterruptPOC` 的旧 Bool 调用后已修正。
+- 验证：`swift test --package-path poc/macos-audio` → 43 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。没有启动真实语音输出；手动可听性验收仍待用户桌面操作。
+- 更新 `docs/beta/macOS-beta-voice.md`、`TASKS.md`、`PROJECT_CONTEXT.md`。下一段继续处理阶段 2/3 中可独立自动验证的事项；GUI、真机 TTS、费用归一仍保持未验收或待决状态。

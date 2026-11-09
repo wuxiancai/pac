@@ -629,11 +629,14 @@ final class BetaChatModel {
     }
 
     func speakLocally(_ text: String) {
-        guard !speechPlayback.speak(text) else {
+        switch speechPlayback.speak(text) {
+        case .started:
             status = "正在本机朗读回复。"
-            return
+        case .emptyText:
+            status = "没有可朗读的回复。"
+        case .existingSpeechCouldNotBeStopped:
+            status = "无法停止上一段本机朗读；当前回复未排队。"
         }
-        status = "没有可朗读的回复。"
     }
 
     func stopLocalSpeech() {

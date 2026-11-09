@@ -18,7 +18,7 @@ struct TTSInterruptPOC {
         let engine = AVSpeechEngine()
         let controller = SpeechPlaybackController(engine: engine)
 
-        guard controller.speak(utterance) else {
+        guard controller.speak(utterance) == .started else {
             fputs("无法启动语音合成。\n", stderr)
             Foundation.exit(EXIT_FAILURE)
         }

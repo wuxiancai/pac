@@ -6,6 +6,12 @@ public enum SpeechPlaybackState: Equatable {
     case interrupted
 }
 
+public enum SpeechPlaybackStartResult: Equatable {
+    case started
+    case emptyText
+    case existingSpeechCouldNotBeStopped
+}
+
 @MainActor
 public protocol SpeechEngine: AnyObject {
     var isSpeaking: Bool { get }
@@ -41,13 +47,16 @@ public final class SpeechPlaybackController {
     }
 
     @discardableResult
-    public func speak(_ text: String) -> Bool {
+    public func speak(_ text: String) -> SpeechPlaybackStartResult {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return false
+            return .emptyText
+        }
+        if engine.isSpeaking, !engine.stopImmediately() {
+            return .existingSpeechCouldNotBeStopped
         }
         engine.speak(text)
         state = .speaking
-        return true
+        return .started
     }
 
     @discardableResult

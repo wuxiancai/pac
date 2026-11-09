@@ -11,9 +11,12 @@
 - 文字模型正在生成时，点“打断并语音输入”先取消当前文字流，再开始本机采集和实时识别。该交互式按键打断不等于全双工声学插话。
 - 被打断的 assistant 部分回复保留在界面供查看，但会从下一次模型请求上下文排除，也不能作为“完整回复”启动本机朗读。
 - 最新完整 assistant 回复旁提供“本机朗读”和“停止本机朗读”按钮，基于 AVSpeechSynthesizer，需用户手动点播；不会自动播放。
+- 用户开始朗读另一条回复时，先立即停止当前朗读再播放新文本，避免 AVSpeechSynthesizer 将旧回复排队播放；若系统拒绝停止当前朗读，则不排入新文本并给出明确状态。
 - Beta `.app` Info.plist 已设置 `NSMicrophoneUsageDescription`，说明采集触发方式、30 秒上限、本机处理和不上传边界。
 
 ## 当前验证
+
+- **2026-11-10 连续点播行为**：SpeechPlaybackController 将播放结果区分为已启动、空文本和无法停止既有朗读；新文本仅在当前朗读成功停止后入播，空文本不影响当前播放。fake SpeechEngine 回归覆盖替换、停止失败不排队及空文本。`swift test --package-path poc/macos-audio` → 43 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。未启动真实语音播放；系统 TTS 可听性/设备手动验收仍待完成。
 
 - **2026-11-09 WebSocket 消息层帧上限**：本机 Uvicorn `ws_max_size` 收紧为 12,804 字节，略高于最大合法帧（序号 4 字节 + PCM 12,800 字节）；超大单帧可在到达 WebSocket ASGI handler 前由协议服务器拒绝。服务器配置、实时识别路径和批量请求回归通过；后端全量 252 项通过，1 条既有弃用警告。
 
