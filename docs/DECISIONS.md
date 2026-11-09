@@ -31,7 +31,7 @@
 | D-005 | 月 API 预算、币种、软/硬阈值 | **Accepted（2026-11-09）**：每月 100 元人民币；累计到 80 元提示；累计到 100 元硬拦截后续云请求，额度按自然月重置。当前 Beta 尚未实现费用归一和限额拦截；启用前必须明确 Provider 费用来源、汇率/缺失 usage 的 fail-closed 规则，并覆盖并发与月界重置，不能把 token usage 估值冒充实扣费用。 |
 | D-006 | 备份 RPO/RTO、份数和目的地 | **Accepted（2026-11-09）**：V1 不提供备份/恢复；未来若加入持久数据，再确认 RPO/RTO、份数和目的地。 |
 | D-007 | 静态加密方案 | **Accepted（2026-11-09，范围决策）**：V1 不保存会话数据且不做备份，因此不引入 app 数据库或 app 级静态加密实现。未来开始任何持久化功能前，再选择并验证加密方案；ADR-019 在该功能范围内继续 Deferred，SQLCipher POC 不视为产品选型。 |
-| D-008 | 外接盘能否作为活动数据目录 | **DEFERRED（2026-11-08）**；若恢复该范围，需补介质 POC。 |
+| D-008 | 外接盘能否作为活动数据目录 | **Accepted（2026-11-09，范围决策）**：V1 不支持外接盘作为活动数据目录；若未来加入持久化数据目录，再评估外接介质并补断连/故障/性能验证。该决策不批准将模型权重或缓存写到外接盘。 |
 | D-009 | 固定专业 Agent 属于 V2 还是 V3 | **DEFERRED（2026-11-08）**。 |
 | D-010 | V1 首批 Provider | **DEFERRED（2026-11-08）**；用户提供 DeepSeek 与 OpenRouter 两家测试候选，并确认 DeepSeek 按中国处理、OpenRouter 使用 Global 路由。是否将它们定为 V1 首批组合仍待决。两家各有一次经用户逐次确认的 L1 合成文本请求成功；详见 `poc/phase0-remote-provider.md`。 |
 | D-011 | 云 ASR/TTS 供应商与区域 | **阶段 0 交互式 POC 候选已确认（2026-11-08）**：优先千问 Token Plan，北京区域；候选为 `qwen-audio-3.0-asr-flash`、`qwen-audio-3.0-realtime-plus` 和 `qwen-audio-3.0-tts-plus`。服务端能力支持已核实，但个人版 Key 不可用于本项目自建应用；应用内云语音须另选适用于自定义应用的计费凭据，或经官方允许的 Agent 工具扩展路线。接口和用户真实音频尚未验证。范围见[Token Plan 个人版条款](https://platform.qianwenai.com/docs/token-plan/personal/token-plan-personal-overview)、[接入概览](https://platform.qianwenai.com/docs/token-plan/best-practices/integration-overview)、[Token Plan 实时语音接入](https://platform.qianwenai.com/docs/token-plan/best-practices/realtime-voice)、[Realtime API 协议矩阵](https://platform.qianwenai.com/docs/api-reference/realtime-api/overview)。 |
