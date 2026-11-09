@@ -20,6 +20,7 @@
 - 项目 uv Python：3.12.13。
 - 可用空间：检查时数据卷剩余约 18 GiB；属于时点数据。
 - 音频：系统提供 Tingting 中文合成语音；检查时内建麦克风和内建扬声器均为 48 kHz。外部设备名称未记录。
+- 设备快照刷新（2026-11-09）：重新读取到同一 `MacBookAir10,1` / Apple M1 / 16 GiB，macOS 26.5.1（25F80）、Xcode 26.6、Swift 6.3.3、uv Python 3.12.13；数据卷可用空间约 21 GiB。`system_profiler` 当前报告默认内建麦克风单声道、内建输入/输出 48 kHz。此为主机时点信息；主力设备与 V1 最低 macOS 尚待用户确认。
 - sherpa-onnx：2.0.1（arm64 CPU wheel）。
 - sounddevice：0.5.6（macOS arm64 wheel）；默认输入设备的 16 kHz、单声道、PCM16 配置检查通过，未启动采集流。
 - streaming 模型候选：`sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30`，仅存于忽略的 `backend/.poc-data/`；用户曾实机反馈该中文专用模型可录音识别中文，但不覆盖英文。
