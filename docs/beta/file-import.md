@@ -15,7 +15,7 @@
 
 PDF 仍禁用。新增隔离的 pypdf 7.0.0 安全 POC（`backend/pac_poc/pdf_import_poc.py`），仅在 `phase4-pdf-poc` 可选 extra 下可用，不接入 Beta API/UI。它在独立子进程解析，输入上限 10 MiB、CPU 软/硬限额 4/5 秒、墙钟超时 5 秒、页树最多 100 页、提取文本最多 200,000 字符，并设置解析对象/流解压/工作预算；超时会终止子进程。4 项测试覆盖有效 PDF、输入超限、无效 PDF 和页数边界。
 
-此 POC 尚未完成 D-012 启用门：没有证明 macOS 子进程的硬内存上限，也没有恶意 PDF 语料、CPU 压力/超时实测、对象数/解压炸弹专项测试或 Beta GUI 端到端验证。因此 PDF 仍禁用，以上 POC 结果不视为产品保证。文件相关内容仍仅本机临时处理，无云端处理或长期保存。
+此 POC 尚未完成 D-012 启用门：本机尝试对 `RLIMIT_AS`、`RLIMIT_DATA`、`RLIMIT_RSS` 设 512 MiB 有限限额均失败，Python 报 `ValueError: current limit exceeds maximum limit`；当前方案没有可用的硬内存上限。另缺少恶意 PDF 语料、CPU 压力/超时实测、对象数/解压炸弹专项测试或 Beta GUI 端到端验证。因此 PDF 仍禁用，以上 POC 结果不视为产品保证。文件相关内容仍仅本机临时处理，无云端处理或长期保存。
 
 ## 自动验证
 
