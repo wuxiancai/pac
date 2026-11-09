@@ -51,6 +51,6 @@ swift test
 
 ## CI
 
-`.github/workflows/ci.yml` 在 GitHub Actions 的 macOS arm64 runner 上运行锁定依赖的 Python 全量测试、编译检查和 Swift 测试。它只使用仓库依赖，不注入 Provider 密钥，不下载模型，不启动麦克风。
+`.github/workflows/ci.yml` 在 GitHub Actions 的 macOS arm64 runner 上运行锁定依赖的 Python 全量测试、编译检查、Swift 测试，并显式构建 `personal-assistant-beta` 产品，确保应用入口本身参与 CI。它只使用仓库依赖，不注入 Provider 密钥，不下载模型，不启动麦克风。
 
 该 workflow 已在 `main` 分支上由 push 真实触发并成功通过（最近一次对应 commit `51b9ab9`，日志记录 Python `162 passed`、Swift `31 tests passed`）。PR 触发路径尚未实际经历。

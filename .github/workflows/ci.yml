@@ -59,3 +59,7 @@ jobs:
       - name: Run Swift tests
         working-directory: poc/macos-audio
         run: swift test
+
+      - name: Build macOS Beta app
+        working-directory: poc/macos-audio
+        run: swift build --product personal-assistant-beta

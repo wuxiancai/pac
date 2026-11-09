@@ -1,3 +1,9 @@
+# 2026-11-09：阶段 6 CI 增加 Beta 产品构建
+
+- `.github/workflows/ci.yml` 原先运行 `swift test`，但没有显式构建 SwiftPM 的 `personal-assistant-beta` 可执行产品。已添加独立 `swift build --product personal-assistant-beta` 步骤，避免 CI 只编译测试依赖而漏掉应用 target。
+- 本机从 `poc/macos-audio/` 执行新增的同一 build 命令成功；远端 GitHub Actions 尚未运行，CI 工作流修改的远端结果待当前提交进入 Actions 后确认。
+- 同步更新 README、TASKS、PROJECT_CONTEXT 和 HANDOFF；没有改动运行时行为或访问外部 Provider。
+
 # 2026-11-09：B5 当前 Beta 文件入口只读复核
 
 - 确认旧 Beta 进程已退出后，从仓库根目录运行 `poc/macos-audio/scripts/run_beta_app.sh`。新窗口显示“本机服务已连接”，Accessibility 树出现“添加资料”（`import-text-file-button`）；此前旧实例未暴露按钮的问题在当前构建中未复现。
