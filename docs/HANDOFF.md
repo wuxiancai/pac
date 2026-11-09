@@ -1,3 +1,9 @@
+### 2026-11-09：核对本机语音模型文件身份
+
+- 0B/0G 许可与来源审计继续推进。使用本机 `shasum -a 256` 对本机两个 ASR 包比对公开权重文件页：双语 Zipformer 的 encoder/decoder/joiner 三个文件与 `csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20` SHA-256 完全一致；Qwen3-ASR 的 conv frontend/encoder/decoder 三个文件与 `csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25` 固定 revision `68818b2313fe77bd06f6a7c5068ff3ef59d02b8a` 完全一致。详见 `docs/poc/phase0-model-license-review.md`。
+- 这证实本机权重对应的公开模型仓库与具体版本，并不等同于权属审批。双语模型训练数据来源/权利链、Qwen 第三方 ONNX 转换代码/工件许可及测试 WAV 许可仍未闭环；对应追踪矩阵保持 PARTIAL。此轮仅更新文档，无代码测试；`git diff --check` 通过，变更已复核并提交为 `4c30476 docs: verify local ASR model provenance`。
+- D-013 另有 17 个启动样本，纠正单位后 P95=700 ms，但采样计划还差 3 次。用户下次使用修复后的诊断构建时记录即可，无需截图或重新录音。
+
 ### 2026-11-09：修复 D-013 启动性能面板单位并核对样本
 
 - 用户提供 16 个启动值：0.5–0.7；两张截图确认面板单位写的是 ms。根因已在 SwiftUI 读数处找到：`startupLatency` 内部保存秒，但显示格式化时没有乘以 1,000；partial/final 的 P95 路径已正确转换。现已改为启动读数乘以 1,000 后显示 ms，因此 17 个现有值（含截图对应的新增一轮）解释为 500–700 ms，nearest-rank P95=700 ms，低于 5 秒目标。
