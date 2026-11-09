@@ -2,7 +2,7 @@
 
 - 用户确认新千问 API Key 已在测试版保存。模型设置页显示 `已保存（qwen-app）`，GUI 当前选择千问应用 API、中国区、`qwen3.8-flash`。
 - 按交接承诺发送一次固定合成提示 `Reply exactly: PAC-QWEN-SMOKE-20261109`。界面进入云生成后返回“云端凭据不可用或请求失败；已停止发送，不会自动切换 Provider。”错误处理当前会折叠 Keychain 读取失败/传输异常等情况；无回复、Provider 接收证明、usage 或 cost，因此不能判断请求是否到达千问或是否计费。没有重试，避免重复调用。
-- 本次 GUI 和后端实际进程仍在运行，未读 Key 内容、未进行其他出站或麦克风操作。`backend/pac_poc/beta_api.py` 已改为区分 Keychain 不可用、HTTPX 传输错误、明确 HTTP 状态及无法识别响应，并保持不显示密钥/上游正文；Python `compileall` 通过，未运行测试，未重试云请求。报告已更新 `docs/beta/macOS-beta-chat.md` 和 `docs/TASKS.md`。
+- `backend/pac_poc/beta_api.py` 已改为区分 Keychain 不可用、HTTPX 传输错误、明确 HTTP 状态及无法识别响应，并保持不显示密钥/上游正文；Python `compileall` 通过，未运行测试，未重试云请求。随后退出旧应用进程并用启动脚本重启，GUI 再次显示本机服务已连接。报告已更新 `docs/beta/macOS-beta-chat.md` 和 `docs/TASKS.md`。
 - 下一步：用户先查看千问控制台是否记录本次合成请求/用量；确认后再决定是否以新版错误提示重试。之后补相应回归覆盖。窗口关闭清理和停止行为仍待 GUI 冒烟。
 
 ### 2026-11-09：复核千问 Key 状态并推进 B0/B1 手动冒烟
