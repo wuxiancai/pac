@@ -553,3 +553,4 @@
 - 用户确认 D-004 最终采用 30 秒音频上限；保留取消、异常、断连和退出时立即清理规则。新增 API 30 秒上限与 WebSocket 断连清理回归，窄回归 15 passed；之后全量 Python 176 passed、Swift 31 passed，compileall 与 `uv lock --check` 通过。SwiftUI GUI 取消/退出实机清理仍未验证，下一步继续逐条处理阶段 0 缺口。
 - 用户确认 D-005：自然月 API 预算 100 元人民币，80 元提醒，100 元硬拦截。仅记录决策，Beta 尚无跨 Provider 费用归一/硬限额实现；启用前需实现费用来源和 fail-closed、汇率/缺失 usage、并发和月界重置行为。
 - 用户确认 D-006：V1 不提供备份或恢复；未来加入持久数据时再定 RPO/RTO、份数和目的地。现有 SQLCipher/备份 POC 仍只是验证候选和故障行为，不构成产品功能。
+- 用户确认 D-007 的 V1 范围：不保存会话、不备份、不设置 app 数据库；持久化功能开发前再选静态加密方案。ADR-019 继续 Deferred，SQLCipher POC 不视为产品选型。
