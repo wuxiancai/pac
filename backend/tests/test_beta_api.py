@@ -102,6 +102,11 @@ class QuietVoiceTranscriber(StubVoiceTranscriber):
         return None
 
 
+class UnexpectedFailureVoiceTranscriber(StubVoiceTranscriber):
+    def accept_stream_frame(self, pcm: bytes, sequence: int) -> ASREvent:
+        raise LookupError("synthetic recognizer failure")
+
+
 def test_beta_chat_stream_is_authenticated_local_and_non_persistent() -> None:
     async def run() -> None:
         adapter = StubLocalAdapter()
@@ -381,6 +386,51 @@ def test_voice_websocket_abort_clears_session_and_allows_immediate_restart() -> 
 
     assert transcriber.started == 2
     assert transcriber.ended == 1
+    assert transcriber.aborted == 2
+
+
+def test_voice_websocket_reports_unexpected_asr_failure_and_releases_session() -> None:
+    transcriber = UnexpectedFailureVoiceTranscriber()
+    app = create_beta_api(
+        session=LocalAPISession(token="voice-token"),
+        voice_transcriber_override=transcriber,
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect(
+            "/voice/stream",
+            headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+        ) as websocket:
+            websocket.send_json({
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            })
+            assert websocket.receive_json() == {"type": "ready"}
+            websocket.send_bytes((0).to_bytes(4, "big") + b"\x01\x00" * 3_200)
+            error = websocket.receive_json()
+            assert error == {
+                "type": "error",
+                "message": "本机语音识别发生内部错误（LookupError）；音频未发送到云端",
+            }
+
+        with client.websocket_connect(
+            "/voice/stream",
+            headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+        ) as websocket:
+            websocket.send_json({
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            })
+            assert websocket.receive_json() == {"type": "ready"}
+            websocket.send_json({"type": "abort"})
+            assert websocket.receive_json() == {"type": "ended"}
+
+    assert transcriber.started == 2
     assert transcriber.aborted == 2
 
 

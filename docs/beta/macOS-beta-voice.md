@@ -15,7 +15,7 @@
 
 ## 当前验证
 
-- **2026-11-09 快速重连复测状态**：用户两张截图确认第二次点语音仍失败；一张显示“本机实时识别中断”，另一张显示服务端明确拒绝“本机语音识别正忙”，诊断 partial `n=5`、停止→final `n=0`。这证明前端错误是旧会话仍占用服务端 ASR 锁，但具体为何旧会话未正常结束仍需底层错误证据。客户端现保留 sender/receiver 错误原因；停止异常时发送 `abort` 控制消息，取消时也异步发送 `abort` 后关闭 WebSocket；服务端收到后清空 ASR 流、释放锁并返回 `ended`。服务端仍在新会话握手后最多等待锁 2 秒，正常释放后直接接受连接。新增 abort 后立即新建会话回归；语音窄回归 17 项、全量 Python 178 项通过（1 条既有 Starlette/httpx 弃用警告）；Swift Beta build 与 33 项测试通过；追踪文档回归 9 项、compileall、`uv lock --check` 通过。下一步 GUI 复测并查看状态栏中暴露的实际 sender/receiver 错误，再采集 D-013 样本。
+- **2026-11-09 快速重连复测状态**：用户两张截图确认停止后连接断开，错误为 `The operation couldn’t be completed. Socket is not connected.`；第二次连接收到服务端 busy。诊断 partial `n=2`、停止→final `n=0`。异常收尾/取消现在发送 `abort` 控制消息，服务端清空 ASR 流、释放锁并应答 `ended`。客户端保留 sender/receiver 的底层错误。另发现服务端未覆盖的 ASR 异常会直接关闭连接；现会以不含音频/转写的错误事件返回异常类型，并由 `finally` 清理流和释放锁。新增 abort→立即重建会话、未预期 ASR 异常→显式错误且锁释放回归；Python 语音窄回归 18 项通过，全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q`（工作目录 `backend/`）179 项通过、1 条既有 Starlette/httpx 弃用警告；Swift build/33 项测试之前已通过。GUI 仍需复测；若再失败，状态栏应显示 ASR 服务端异常类型或最初的 socket 错误。
 - D-013 本机测量诊断已加入可选模式：从仓库根目录运行 `PAC_BETA_PERF_DIAGNOSTICS=1 poc/macos-audio/scripts/run_beta_app.sh`，聊天窗口底部会显示三项数值。诊断仅在当前进程内保存时间样本，不保存音频或转写：Beta App 初始化至本机服务就绪；PCM 帧组装就绪至对应 partial 更新 SwiftUI 状态；点击“停止并识别”至 final 草稿更新。partial 指标不含 200 ms 帧组装之前的采集时间，也不测屏幕实际绘制完成；须保留定义，不把它直接外推成完整用户感知延迟。诊断关闭时不显示或累计这些分布。
 - 用户随后手动确认 20 次启动计时均约在 0.9–0.11 秒范围内；原文范围端点顺序/小数位存在歧义，因此先只记录全部低于 5 秒门槛的用户报告，待确认最小/最大值后补精确分布。用户尚未能完成语音延迟分布：第一次录音/停止正常，紧接着再次点语音时出现服务端响应错误。
 - 复核发现后端在 WebSocket `/voice/stream` 发送 `ended` 后才释放单例 ASR 锁，存在客户端收到完成事件后立即重连撞上旧锁的竞态。现已改为先结束/清理 ASR 流、释放锁，再发送 `ended`；新增同一客户端会话结束后立即再次连接的回归。后端 15 项窄回归及 Python 全量 176 项通过；GUI 上仍需用户用新构建复测快速再次录音。

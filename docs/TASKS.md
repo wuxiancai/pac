@@ -20,14 +20,14 @@
 |---:|---|---|---|
 | B0 | 应用可运行骨架 | IN PROGRESS | 新增 SwiftUI 测试版 `.app` 构建/启动入口；本轮经启动脚本实机显示本机服务已连接，Cmd-Q 后进程检查未见 app/backend 残留。窗口关闭路径及启动失败恢复体验仍需复核。 |
 | B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或千问应用 API、DeepSeek、OpenRouter 固定路由；本地模型 ID 可配置。选择云端即持续授权后续消息发往该服务商，设置有告知且无逐条弹窗；Keychain、固定目标、L3 拦截、错误脱敏和无自动 fallback 保留。每次发送快照当前 Provider/模型；切换时取消旧客户端流并屏蔽迟到回调，状态栏显示当前及本轮实际路由；用户已实机确认模型间可自由切换，切换后当前聊天使用新选择。用户反馈千问现可正常聊天，旧的一次合成探测失败不再代表当前状态。停止/取消请求 GUI 行为仍需单独复核。D-005 已定自然月 100 元预算/80 元提醒/100 元硬拦截，Beta 尚无费用归一或限额实现，不能作为当前保护承诺；D-010 已确认 V1 Provider 范围为默认千问应用 API、另支持 DeepSeek（中国）与 OpenRouter（Global）；Token Plan `sk-sp-` 个人版不直连自建应用。详见 `beta/macOS-beta-chat.md`。 |
-| B2 | 本地语音闭环 | IN PROGRESS | 已扩展为受认证 loopback WebSocket 本机实时 ASR：200 ms PCM 帧、有界队列、临时 partial、停止后 final 入草稿；用户已验证 final、取消、文字生成时打断、录音中 Cmd-Q 清理。最新截图显示停止路径中断且服务端仍认为 ASR 忙；客户端现保留 sender/receiver 错误、异常停止/取消发送 `abort`，服务端 abort 清理并释放锁。新增 abort→立即新会话回归；语音窄回归 17 项、Swift 33 项通过；GUI 修复效果待用户复测。用户报告 20 次启动值均低于 5 秒，但原范围文本有歧义；partial 与停止→final 分布尚未取得。真实硬件驱动异常仍未复现。D-013 使用 opt-in、仅内存诊断；V1 不做云 Realtime、AEC/自动声学插话或睡眠/锁屏等 ADR-021 排除项。详见 `beta/macOS-beta-voice.md`。 |
+| B2 | 本地语音闭环 | IN PROGRESS | 已扩展为受认证 loopback WebSocket 本机实时 ASR：200 ms PCM 帧、有界队列、临时 partial、停止后 final 入草稿；用户曾验证 final、取消、文字生成时打断、录音中 Cmd-Q 清理。最新截图确认第一次停止时 socket 已断开（`Socket is not connected`），第二次被服务端拒绝为 ASR 忙；partial n=2、停止→final n=0。异常停止/取消发送 `abort`，服务端清理并释放锁；未预期 ASR 异常现在回传不含转写/音频的异常类型并由 `finally` 释放锁。abort→立即新会话及异常→错误事件/释放锁回归通过；Python 全量 179 项通过（1 条既有 Starlette/httpx 弃用警告），Swift 33 项此前通过。新构建 GUI 效果待用户复测。用户报告 20 次启动值均低于 5 秒但范围有歧义；partial 与停止→final 分布尚未取得。详见 `beta/macOS-beta-voice.md`。 |
 | B3 | 会话保存与恢复 | DEFERRED | D-003 已决定不保存对话，D-006 确认 V1 不提供备份/恢复，D-007 确认 V1 不设 app 数据库，D-008 确认不支持外接盘活动数据目录；持久化仍不在当前范围。若未来恢复会话保存，须先重开 ADR-019、完成加密/migration/备份及介质决策和验证。 |
 | B4 | 千问 Token Plan 扩展接入 | DEFERRED | 个人版条款仅允许经官方支持的编程/智能体工具扩展交互使用，排除本项目自建应用后端。只有取得允许自建应用的官方授权/套餐，或实现受支持工具扩展集成后，才能纳入应用选项。协议、地址和状态见 `beta/qwen-token-plan-integration.md`。 |
 | B5 | V1 文件导入及正式发布扩展 | OPEN | D-012 已确定用户主动只读导入 TXT/Markdown/PDF，每个文件最多 10 MB；尚未实现。启用前须完成 PDF 解析资源限制、文件类型/路径安全 POC。D-014 确认 V1 不提供长期记忆/Embedding，D-015 确认 V1 不提供 app 数据导出；云语音、备份/恢复、自动恢复、完整许可通知和正式签名分发仍延后至对应功能开发/发布前。 |
 
 ## 阶段 0 证据状态（保留追踪，不作为测试版总门禁）
 
-0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 176 项、Swift 32 项通过，`uv lock --check`、`compileall` 通过；历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地改动尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 55/55 非根依赖。D-013 已设启动/ASR 延迟门槛，当前没有 Beta 端到端 P95 证据。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
+0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 179 项、Swift 33 项通过，`uv lock --check`、`compileall` 通过；历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地改动尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 55/55 非根依赖。D-013 已设启动/ASR 延迟门槛，当前没有 Beta 端到端 P95 证据。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
 
 ## 当前执行顺序
 

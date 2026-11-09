@@ -255,6 +255,18 @@ def create_beta_api(
                 await websocket.close(code=1011)
             except RuntimeError:
                 pass
+        except Exception as error:
+            try:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": (
+                        "本机语音识别发生内部错误"
+                        f"（{type(error).__name__}）；音频未发送到云端"
+                    ),
+                })
+                await websocket.close(code=1011)
+            except RuntimeError:
+                pass
         finally:
             if started:
                 await asyncio.to_thread(voice_transcriber.abort_stream)

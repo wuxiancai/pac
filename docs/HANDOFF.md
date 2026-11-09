@@ -1,3 +1,10 @@
+### 2026-11-09：排查实时语音停止后 socket 断开
+
+- 用户截图显示第一次录音停止时报 `The operation couldn’t be completed. Socket is not connected.`，partial n=2、停止→final n=0；第二次录音被服务端拒绝为 ASR 忙。该证据确认客户端停止时 socket 已断开且服务端会话锁未释放，但尚未揭示最初断连根因。
+- 后端 WebSocket 现捕获未预期 ASR 异常，只把异常类型发送给客户端（不含错误正文、音频或转写），随后关闭连接；既有 `finally` 会 abort ASR 流并释放锁。新增异常事件与锁释放回归；保留 abort 后立即重连回归。
+- 验证：语音窄回归 18 项通过；`backend/` 下 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q` → 179 passed，1 条既有 Starlette/httpx 弃用警告。Swift 33 项在本轮前已通过；本轮未改 Swift。
+- 下一步：用户 Cmd-Q 退出旧 app，运行 `PAC_BETA_PERF_DIAGNOSTICS=1 ./poc/macos-audio/scripts/run_beta_app.sh` 重建并启动；验证语音→停止并识别后 final 入草稿，再立即第二次录音并停止。若失败，回报状态栏完整错误文字和诊断样本数；不要继续性能采样直到重复录音链路恢复。
+
 ### 2026-11-09：接入 B2 本机语音首个切片
 
 - 用户反馈千问已可正常聊天；本仓库没有该次成功响应或 usage 证据。按测试版队列开始 B2。
