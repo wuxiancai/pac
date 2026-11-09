@@ -1046,3 +1046,10 @@
 - 延续语音 bad response 排查：`/voice/stream` 过去在单会话锁忙时、WebSocket accept 前直接以 1013 关闭，客户端容易呈现泛化握手错误。现改为先验证授权并 accept，再发送明确的 busy `error` 事件并以 1013 结束；无效凭据仍在 accept 前拒绝。新增并发会话回归确认 busy 事件可读取、活动会话保持可用。窄回归 `tests/test_beta_api.py tests/test_local_streaming_asr.py` 16 passed；全量 Python 177 passed（1 条既有 Starlette/httpx 弃用警告）；追踪文档回归 9 passed；compileall 与 `uv lock --check` 通过。GUI 实机根因和修复效果仍待用户复测。
 - 用户提供的新截图确认上一版重试客户端在真实 GUI 仍无法恢复连接；诊断显示启动 ready 0.6 ms、partial n=3/P95 31.4 ms、停止→final n=0。根因仍未证实。进一步加固：服务端在 WebSocket accept 后最多等待 ASR 锁 2 秒，正常收尾后直接接受新会话，超时才返回 busy 事件；Swift 客户端遇到 JSON error 会保留服务端原因并立即显示业务拒绝，底层握手异常仍有限重试，避免把两者合并成同一通用错误。新增 busy 并发回归。验证：语音窄回归 16 passed；Python 全量 177 passed（1 条 Starlette/httpx 弃用警告）；Swift Beta build 成功、Swift 33 项通过；追踪文档回归 9 passed；compileall、`uv lock --check` 和 `git diff --check` 通过。此版仍需用户 GUI 实机复测后才能判断修复。
 - 用户随后提供两张截图：一张显示“本机实时识别中断”，另一张显示服务端返回“本机语音识别正忙”，诊断 partial n=5、停止→final n=0。这证明旧会话确实仍占用 ASR 锁，但尚未解释前一次停止为何进入中断路径。新增客户端保留 sender/receiver 的底层错误文案；异常停止及用户取消均向服务端发送 `abort` 命令，服务端清理转写器、释放锁并应答 `ended`，之后再关闭 WebSocket。新增 abort→立即新建会话回归。语音窄回归 17 passed；Python 全量 178 passed（1 条既有 Starlette/httpx 弃用警告）；Swift Beta build 成功、33 项通过；追踪文档回归 9 passed；compileall 与 `uv lock --check` 通过。GUI 仍需用户用新构建验证，并把“本机实时识别中断：...”完整错误发回。
+
+### 2026-11-09：校正 B5 文件导入交接状态
+
+- 对照当前 `docs/beta/file-import.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`，发现项目上下文将已完成的 GUI 文件选择/暂存/移除仍写成“GUI 导入验收待干净启动”，而其他记录已确认合成 TXT GUI 冒烟通过。
+- 已统一状态：选择、暂存和移除已通过本机 Ollama 模式 GUI 冒烟；资料进入聊天上下文的 GUI 引用仍待验证；PDF 继续关闭，直至内存限制、恶意样本及 CPU/墙钟压力门槛有证据。未扩大 Beta 功能范围。
+- 本次仅改文档；未运行测试或 GUI，也未触发麦克风、Keychain 或云端请求。待执行 `git diff --check`、复核差异并提交。
+- 下一段优先完成 B5 聊天引用的 GUI 验收；随后处理 B1 错误呈现和阶段 2 用量面板的 GUI 验收。真实云 usage/cost、PDF 启用及预算 enforcement 仍须各自满足触发条件与产品决策，不能以本地 mock 代替。
