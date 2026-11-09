@@ -1,3 +1,9 @@
+## 2026-11-09：当前 HEAD 阶段 6 本机 CI 门禁复核
+
+- 在当前 HEAD `4b23b86` 重跑工作流对应本机门禁：`uv lock --check`、`ruff check pac_poc tests`、`mypy`、`python -m compileall -q pac_poc scripts tests`、`git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 均通过。
+- 全量回归：backend all-extras/all-groups pytest → 263 passed，1 条既有 Starlette/httpx 弃用警告；`swift test --package-path poc/macos-audio` → 40 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。Swift 测试目标 arm64e/macOS 14.0。
+- 本轮只更新 `PROJECT_CONTEXT.md` 与此交接记录；没有 GUI 操作、云 Provider 请求、Keychain 读取或麦克风采集。远端 GitHub Actions 未运行。
+
 ## 2026-11-09：聊天 JSON 请求媒体类型兼容
 
 - 手动接管请求解析后，显式保留 FastAPI 原路由的媒体类型行为：没有 Content-Type 时允许按 JSON 解码；只接受 `application/json` 或 `+json`；非 JSON 媒体类型提前返回 415，不消费请求体。
