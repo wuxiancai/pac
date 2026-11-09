@@ -1,3 +1,9 @@
+## 2026-11-09：阶段 3 Uvicorn WebSocket 消息上限
+
+- 实时语音路由在应用层会拒绝大于 12,800 字节的 PCM，但此前 Uvicorn 使用默认 16 MiB WebSocket 消息上限，单帧在应用拒绝前仍可被服务器完整接收。现将服务端 `ws_max_size` 设为 12,804 字节，容纳 4 字节序号和协议最大 12,800 字节 PCM。
+- 新增服务器配置回归；同时重跑实时 WebSocket 和无 Content-Length 的一次性语音上限用例。3 个定向用例通过；Ruff/mypy 通过；后端全量 252 passed，1 条既有 Starlette/httpx 弃用警告。
+- 更新 `docs/beta/macOS-beta-voice.md`、`docs/poc/phase0-traceability.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。未启动麦克风、未操作 GUI/Keychain、未发云请求。
+
 ## 2026-11-09：阶段 3 一次性语音 API 有界读取
 
 - `/voice/transcribe` 先前用 `request.body()` 完整缓存后再检查最大 30 秒，未提供 Content-Length 的请求可在检查前占用无界内存。现改为遍历 ASGI request stream，累计字节超限立即返回 413；拒绝负 Content-Length。

@@ -16,6 +16,7 @@ from pac_poc.security_poc import (
     ConsentStatus,
     DataLevel,
     LocalAPISession,
+    LOCAL_API_WEBSOCKET_MAX_MESSAGE_BYTES,
     ModelAction,
     OutboundRequest,
     OutboundPolicy,
@@ -75,6 +76,15 @@ def test_local_api_requires_session_token_and_returns_no_token() -> None:
     assert response.status_code == 200
     assert "test-token-never-logged" not in response.text
     assert "test-token-never-logged" not in str(response.headers)
+
+
+def test_local_server_caps_websocket_message_size_to_voice_frame_limit() -> None:
+    server = create_local_server(
+        session=LocalAPISession(token="test-token"), port=0
+    )
+
+    assert server.config.ws_max_size == LOCAL_API_WEBSOCKET_MAX_MESSAGE_BYTES
+    assert LOCAL_API_WEBSOCKET_MAX_MESSAGE_BYTES == 12_804
 
 
 def test_local_api_returns_valid_trace_id_and_preserves_valid_client_trace_id() -> None:

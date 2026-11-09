@@ -20,6 +20,7 @@ import uvicorn
 
 LOCAL_API_BIND_HOST = "127.0.0.1"
 LOCAL_API_VERSION = "0.1.0"
+LOCAL_API_WEBSOCKET_MAX_MESSAGE_BYTES = 12_804  # 4-byte sequence + max 400 ms PCM frame
 
 
 @dataclass(frozen=True)
@@ -133,6 +134,7 @@ def create_local_server(
         reload=False,
         access_log=False,
         log_level="critical",
+        ws_max_size=LOCAL_API_WEBSOCKET_MAX_MESSAGE_BYTES,
     )
     return uvicorn.Server(config)
 
