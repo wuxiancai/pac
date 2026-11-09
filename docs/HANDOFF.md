@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 能力报告装配入口（2026-11-09）
+
+- 为精确型号能力报告新增严格 schema version 1 JSON 装配器：校验 manifest/report/entry 字段、枚举、正整数 context limit、精确型号唯一性；有能力声明的报告需有时间戳和证据引用；省略能力保持 UNKNOWN，不根据 Provider 或型号名称推断。
+- 装配入口尚未接入 Beta 默认运行时，没有新增实际启用的模型能力。只有核对具体 Provider/model 的本地证据后，才应显式创建 registry 并注入 Orchestrator。
+- 验证（`backend/`）：`UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_model_capability_registry_poc.py tests/test_orchestrator.py tests/test_beta_api.py tests/test_local_model_gateway.py` → 43 passed，1 条既有 Starlette/httpx 弃用警告；Ruff 和 mypy 通过。未发云请求、不读 Keychain、不启用新能力。代码说明见 `docs/beta/orchestrator-framework.md`。
+- 下一步：以确切 POC 证据形成少量可装配报告，再决定注入的运行时范围；GUI run 状态及 TXT/Markdown 选择/移除手动冒烟待下次正常启动顺带确认。
+
 ## 本机文本文件导入首段（2026-11-09）
 
 - 完成 TXT/Markdown 首个可用导入闭环：macOS 用户文件选择、security-scoped read、限定 10 MiB 有界读取；后端检查扩展名/无路径文件名/严格 UTF-8/NUL/大小，内容只放进容量受限的进程内 Registry，提供用户删除接口。

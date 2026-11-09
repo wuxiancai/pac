@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from pac_poc.model_capabilities import (
     Capability,
     CapabilityNotVerified,
+    CapabilityReportFormatError,
     CapabilityState,
     ModelCapabilityEntry,
     ModelCapabilityRegistry,
@@ -89,3 +92,68 @@ def test_verified_report_requires_timestamp_and_evidence_and_rejects_duplicates(
     )
     with pytest.raises(ValueError, match="duplicate capability"):
         ModelCapabilityRegistry().register(duplicate)
+
+
+def test_json_manifest_assembles_exact_evidence_report_without_inference() -> None:
+    registry = ModelCapabilityRegistry.from_json(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "reports": [
+                    {
+                        "provider_id": "local-fixture",
+                        "model_id": "fixture-v1",
+                        "entries": [
+                            {"capability": "streaming", "state": "supported"},
+                            {"capability": "tools", "state": "limited"},
+                        ],
+                        "verified_at": "2026-11-09T00:00:00Z",
+                        "evidence_refs": ["docs/poc/phase0-model-gateway-local.md"],
+                    }
+                ],
+            }
+        )
+    )
+
+    assert registry.require("local-fixture", "fixture-v1", Capability.STREAMING)
+    assert registry.state("local-fixture", "fixture-v1", Capability.TOOLS) is (
+        CapabilityState.LIMITED
+    )
+    assert registry.state("local-fixture", "fixture-v1", Capability.VISION) is (
+        CapabilityState.UNKNOWN
+    )
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        "not-json",
+        '{"schema_version": true, "reports": []}',
+        '{"schema_version": 2, "reports": []}',
+        '{"schema_version": 1, "reports": [], "enabled": true}',
+        '{"schema_version": 1, "reports": [null]}',
+        '{"schema_version": 1, "reports": [{"provider_id":"p","model_id":"m",'
+        '"entries":[{"capability":"vision","state":"supported"}],'
+        '"verified_at":"", "evidence_refs":[]}]}',
+        '{"schema_version": 1, "reports": [{"provider_id":"p","model_id":"m",'
+        '"entries":[{"capability":"streaming","state":"supported","note":"x"}],'
+        '"verified_at":"2026-11-09T00:00:00Z", "evidence_refs":["fixture:x"]}]}',
+    ],
+)
+def test_json_manifest_rejects_malformed_or_unanchored_reports(manifest: str) -> None:
+    with pytest.raises(CapabilityReportFormatError):
+        ModelCapabilityRegistry.from_json(manifest)
+
+
+def test_json_manifest_rejects_duplicate_exact_model_reports() -> None:
+    report = {
+        "provider_id": "local-fixture",
+        "model_id": "fixture-v1",
+        "entries": [],
+        "verified_at": "2026-11-09T00:00:00Z",
+        "evidence_refs": [],
+    }
+    with pytest.raises(CapabilityReportFormatError, match="duplicate model"):
+        ModelCapabilityRegistry.from_json(
+            json.dumps({"schema_version": 1, "reports": [report, report]})
+        )
