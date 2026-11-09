@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 2 Usage 首段（2026-11-09）
+
+- 新增进程内 `UsageLedger` 与认证 `GET /usage?limit=50`，每个 chat run 完成/失败/取消时记录路由、region/purpose/data level、run 状态和耗时；记录最多 512 条，退出清空，不保留对话、回复、Key 或音频。额度 1–100 可选。
+- 当前流式 Provider 适配器没有向统一接口交付用量/费用 metadata，故 token 与费用为 null、usage/cost 状态为 `unknown`；没有估算费用、账单承诺或预算拦截。后续须先逐 Provider 核对实际 usage 来源、币种和缺失行为，再推进 D-005 硬预算。
+- 验证（`backend/`）：`UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_usage.py tests/test_beta_api.py tests/test_orchestrator.py tests/test_model_capability_registry_poc.py tests/test_local_model_gateway.py` → 46 passed，1 条既有 Starlette/httpx 弃用警告；Ruff 和 mypy 通过。未发云请求、不读 Keychain、不采集麦克风；未做 GUI 手工冒烟。
+- 阶段总数：规格书定义阶段 0–6，共 7 个；阶段 0 Beta 范围、阶段 1 当前决策允许的底座已完成，当前继续阶段 2。阶段路线详见 `docs/TASKS.md`。
+
 ## 能力报告装配入口（2026-11-09）
 
 - 为精确型号能力报告新增严格 schema version 1 JSON 装配器：校验 manifest/report/entry 字段、枚举、正整数 context limit、精确型号唯一性；有能力声明的报告需有时间戳和证据引用；省略能力保持 UNKNOWN，不根据 Provider 或型号名称推断。

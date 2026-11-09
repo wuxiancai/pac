@@ -34,21 +34,26 @@
 
 当前装配 API 是框架入口；运行时仍不从外部文件自动加载能力清单，也没有因此新增已启用能力。只有核对具体报告证据后，才应把构造出的 registry 注入 Orchestrator。
 
+## 进程内 Usage 首段
+
+聊天 run 结束时，`UsageLedger` 保存最近最多 512 条请求 metadata，认证 `GET /usage?limit=50` 可读取（limit 最大 100）。记录仅含 run/provider/model/region/purpose/data level、生命周期状态和 wall latency，不含消息、回复、密钥或音频；进程退出即清空。Beta 流式 Provider 当前不向统一流接口暴露 token/费用 metadata，因此 `usage_state` 与 `cost_state` 返回 `unknown`，token、费用和币种返回 `null`。这不是费用账单或预算保护；D-005 费用来源与缺失 usage 的 fail-closed 方案尚未完成前，不执行额度拦截。
+
 ## 验证
 
 在 `backend/` 目录执行：
 
 ```bash
-UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_orchestrator.py tests/test_model_capability_registry_poc.py tests/test_beta_api.py tests/test_local_model_gateway.py
-UV_CACHE_DIR=.poc-data/uv-cache uv run --locked ruff check pac_poc/orchestrator.py tests/test_orchestrator.py
-UV_CACHE_DIR=.poc-data/uv-cache uv run --locked mypy pac_poc/orchestrator.py pac_poc/model_capabilities.py
+UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_usage.py tests/test_orchestrator.py tests/test_model_capability_registry_poc.py tests/test_beta_api.py tests/test_local_model_gateway.py
+UV_CACHE_DIR=.poc-data/uv-cache uv run --locked ruff check pac_poc/usage.py pac_poc/orchestrator.py pac_poc/model_capabilities.py tests/test_usage.py tests/test_orchestrator.py tests/test_model_capability_registry_poc.py tests/test_beta_api.py
+UV_CACHE_DIR=.poc-data/uv-cache uv run --locked mypy pac_poc/usage.py pac_poc/beta_api.py pac_poc/orchestrator.py pac_poc/model_capabilities.py
 swift test --package-path poc/macos-audio
 ```
 
-结果：能力清单改动后，以上 Python 命令 43 passed；Ruff 全部通过；mypy 无问题。pytest 有一条既有 Starlette/httpx 弃用警告。Swift 35 项及 Beta target 编译记录见上一轮交接，本轮未改 Swift。未重启 GUI 做手动 run 状态冒烟；未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
+结果：Usage 与能力清单改动后，Python 窄回归 46 passed；Ruff 全部通过；mypy 无问题。pytest 有一条既有 Starlette/httpx 弃用警告。Swift 35 项及 Beta target 编译记录见前次相关工作，本轮未改 Swift。未重启 GUI 做手动 run/usage 状态冒烟；未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
 
 ## 下一步
 
 - 补齐客户端断连与取消路径的生命周期 GUI 手动冒烟；不提供退出后后台续跑。
-- 建立有证据锚点的能力报告装配入口；按已验证的 Provider/model/能力逐步启用，未知项继续默认拒绝。
+- 将真实 Provider 可获得的 usage metadata 安全透传到 UsageLedger；逐 Provider 明确 usage 来源和 actual/estimated/unknown 语义后，再实现预算检查。当前无真实云 usage 验证，不做云调用。
+- 将已核对 POC 的精确型号报告装配为本机静态 manifest；未提供的能力继续默认 UNKNOWN。
 - 下一步选取具体、已核对证据的 Provider/model 报告接入运行时；工具、多模态和持久化仍须各自完成决策、实现与验证后再启用。

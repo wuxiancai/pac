@@ -181,12 +181,25 @@ def test_beta_chat_stream_is_authenticated_local_and_non_persistent() -> None:
             )
             run_id = response.headers["x-pac-run-id"]
             run_status = await client.get(f"/chat/runs/{run_id}", headers={"authorization": "Bearer test-token"})
+            usage_denied = await client.get("/usage")
+            usage = await client.get("/usage", headers={"authorization": "Bearer test-token"})
         assert response.status_code == 200
         assert '"delta": "本机"' in response.text
         assert '"delta": "回答"' in response.text
         assert '"done":true' in response.text
         assert run_id in response.text
         assert run_status.json()["status"] == "completed"
+        assert usage_denied.status_code == 401
+        assert usage.json()["retention"] == "process_memory_only"
+        assert usage.json()["summary"]["record_count"] == 1
+        usage_record = usage.json()["records"][0]
+        assert usage_record["run_id"] == run_id
+        assert usage_record["status"] == "completed"
+        assert usage_record["usage_state"] == "unknown"
+        assert usage_record["cost_state"] == "unknown"
+        assert usage_record["prompt_tokens"] is None
+        assert usage_record["cost_amount"] is None
+        assert "你好" not in usage.text
         assert adapter.request is not None
         assert adapter.request.model == BETA_MODEL
         assert adapter.request.provider == "ollama"

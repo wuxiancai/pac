@@ -18,6 +18,8 @@
 
 阶段 0 的原始证据以 [追踪矩阵](poc/phase0-traceability.md) 为准；本清单另行定义当前测试版交付顺序。
 
+项目开发规格共定义 7 个阶段：阶段 0 POC/工程基线、阶段 1 V1 工程底座、阶段 2 V1 对话与 Model Gateway、阶段 3 实时语音、阶段 4 长期记忆与资料导入、阶段 5 安全加固/备份/运维、阶段 6 V1 系统验收/发布候选。阶段 0 Beta 范围和阶段 1 当前决策允许范围已完成；当前按单用户 Beta 队列继续阶段 2，部分阶段 3/4 能力曾提前实现，不代表相应阶段整体完成。
+
 **阶段 0 Beta 范围已结束（2026-11-09），附未实现/延期清单。** 用户确认剩余小功能按触发条件延期；它们不得标为完成或通过。原始 §13 全量 POC 的 `PARTIAL/OPEN` 外部证据在相关功能启用或正式分发前继续追踪。详细清单见[阶段 0 追踪矩阵](poc/phase0-traceability.md)。阶段 1 当前决策允许的无持久化工程底座已完成（2026-11-09，提交 `5f6fe24`）；D-007 范围内的数据库、schema、migration、会话保存和静态加密未实现，保持延期。
 
 ## 单用户 macOS 测试版交付队列
@@ -42,7 +44,7 @@
 1. **B0 应用可运行骨架（DONE）**：SwiftUI 单实例窗口的本机 Beta 入口已完成；本机后端启动、健康状态、错误恢复和关窗退出清理均已验证。
 2. **B1 本机文字对话和模型设置（IN PROGRESS）**：本机 Ollama/固定云端配置选择；选中云端 Provider 后持续授权，聊天时不弹逐条确认；Keychain 凭据和无自动 fallback。用户与本轮 GUI 均确认 Ollama 正常运行时本机聊天可回复。模型设置云端披露已实机复核，本机提示新文案待下次启动确认。长流取消后 Ollama 短请求明显变慢，疑似上游 runner 槽释放问题；停止提示已如实区分客户端取消与上游状态。需确认可用 Ollama 版本/恢复策略，并完成可本地验证的错误路径和云 API 错误 UI 验收。
 3. **B2 本地语音**：接入本机实时 Streaming ASR、明确点击才采集、有限内存/队列、partial/final 草稿边界和按键打断；识别失败不得转云。完整双向语音、AEC、自动插话和系统生命周期仍需阶段 3 决策与验证。
-4. **单助理编排框架（IN PROGRESS）**：已把总助理请求、上下文构建和 Model Gateway 流式调用抽为独立 `MainAssistantOrchestrator`；目前仅启用 `main_assistant`，上下文只使用本轮明确消息和用户主动导入的文本资料，不读写持久存储。API 路由保留认证、云授权和 SSE 错误映射。每次流式请求有有界进程内运行状态，可按 run ID 经认证 API 查询；macOS UI 显示短 ID 和状态，并在停止/切换模型后查询终态。编排层接入精确型号能力注册表，并增加严格版本化 JSON 报告装配入口；缺失能力仍为 UNKNOWN，清单尚未由运行时自动加载。声明工具/多模态等额外能力前须核验精确型号证据，未知时在调用 Gateway 前拒绝。Python/Swift 回归、Ruff/mypy 结果见 `docs/beta/orchestrator-framework.md`；run 状态和文件选择 GUI 手动冒烟待下次启动确认；另见 `docs/beta/file-import.md`。
+4. **单助理编排框架（IN PROGRESS）**：已把总助理请求、上下文构建和 Model Gateway 流式调用抽为独立 `MainAssistantOrchestrator`；目前仅启用 `main_assistant`，上下文只使用本轮明确消息和用户主动导入的文本资料，不读写持久存储。API 路由保留认证、云授权和 SSE 错误映射。每次流式请求有有界进程内运行状态，可按 run ID 经认证 API 查询；macOS UI 显示短 ID 和状态，并在停止/切换模型后查询终态。新增认证 `/usage` 及有界进程内 usage ledger，只保留路由、状态、用途、数据等级和耗时；当前 Provider 流未交付 usage 时 token/费用保持 UNKNOWN/null，不作估算，也不启用预算门。能力注册表支持严格版本化 JSON 报告装配，缺失能力仍为 UNKNOWN，清单尚未由运行时自动加载。声明工具/多模态等额外能力前须核验精确型号证据，未知时在调用 Gateway 前拒绝。Python/Swift 回归、Ruff/mypy 结果见 `docs/beta/orchestrator-framework.md`；run 状态和文件选择 GUI 手动冒烟待下次启动确认；另见 `docs/beta/file-import.md`。
 5. 后续再按用户实际使用反馈决定会话持久化；D-014 确认 V1 不提供长期记忆/Embedding，D-015 确认 V1 不提供 app 数据导出。D-012 文件导入按格式分步启用：TXT/Markdown 本机闭环已实现并待 GUI 冒烟；PDF 在解析器资源限制安全 POC 前保持禁用。备份/恢复按 D-006 不在 V1。B4 千问 Token Plan 文本/实时语音仍须符合个人版条款及 Consent/Policy，不接入自建应用路径。
 
 阶段 1 当前决策允许的无持久化工程底座已完成并有 CI 门禁；预算硬拦截、持久审计、PDF 导入、Embedding、数据库迁移等均明确未实现，按追踪矩阵触发点排期。TXT/Markdown 导入在 B5 增量实现中，不代表完整文件导入验收。完整阶段状态以追踪矩阵 §6 为准。

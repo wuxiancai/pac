@@ -13,7 +13,7 @@ from typing import Literal, Protocol
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -60,6 +60,7 @@ from .security_poc import (
 )
 from .asr import ASREvent
 from .voice_transcription import LocalVoiceTranscriber
+from .usage import UsageLedger, UsageRecord, usage_record_to_dict
 
 
 BETA_MODEL = "qwen3.5:0.8b"
@@ -263,6 +264,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         settings.voice_model_dir
     )
     run_registry = RunRegistry()
+    usage_ledger = UsageLedger()
     imported_text = ImportedTextRegistry()
     voice_stream_lock = asyncio.Lock()
     router = APIRouter()
@@ -495,6 +497,17 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             "updated_at": run.updated_at,
         }
 
+    @router.get("/usage")
+    async def get_usage(limit: int = Query(default=50, ge=1, le=100)) -> dict[str, object]:
+        return {
+            "retention": "process_memory_only",
+            "summary": usage_ledger.summary(),
+            "records": [
+                usage_record_to_dict(record)
+                for record in usage_ledger.list_records(limit=limit)
+            ],
+        }
+
     @router.post("/imports/text", status_code=201)
     async def import_selected_text(request: Request) -> dict[str, str | int]:
         display_name = request.query_params.get("filename", "")
@@ -590,6 +603,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             run_registry.transition(run.run_id, RunStatus.RUNNING)
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail="too many active chat runs") from exc
+        started_monotonic = monotonic()
 
         async def events() -> AsyncIterator[str]:
             try:
@@ -651,7 +665,25 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             finally:
                 current = run_registry.get(run.run_id)
                 if current is not None and current.status is RunStatus.RUNNING:
-                    run_registry.transition(run.run_id, RunStatus.CANCELLED)
+                    current = run_registry.transition(run.run_id, RunStatus.CANCELLED)
+                else:
+                    current = run_registry.get(run.run_id)
+                if current is not None:
+                    completed_at = time()
+                    usage_ledger.record(
+                        UsageRecord(
+                            run_id=run.run_id,
+                            provider=payload.provider,
+                            model=payload.model,
+                            region=region,
+                            purpose=purpose,
+                            data_level=data_level,
+                            status=current.status,
+                            started_at=run.created_at,
+                            completed_at=completed_at,
+                            latency_ms=max(0, round((monotonic() - started_monotonic) * 1000)),
+                        )
+                    )
 
         return StreamingResponse(
             events(),
