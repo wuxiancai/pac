@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 from collections.abc import AsyncIterator, Mapping
@@ -101,6 +102,9 @@ class OpenAICompatibleRemoteAdapter:
     """Fixed-endpoint OpenAI chat-completions adapter for Phase 0 remote probes."""
 
     is_local = False
+    _MAX_ATTEMPTS = 2
+    _RETRY_DELAY_SECONDS = 0.25
+    _PRE_CONNECT_ERRORS = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 
     def __init__(
         self,
@@ -191,60 +195,77 @@ class OpenAICompatibleRemoteAdapter:
         secret = self._credential_for_request()
         client, owns_client = self._client_or_new()
         try:
-            async with client.stream(
-                "POST",
-                self._config.endpoint,
-                headers=self._headers_for_request(secret),
-                json=self._payload(request, stream=True),
-            ) as response:
-                self._raise_for_status(response)
-                async for line in response.aiter_lines():
-                    if not line or not line.startswith("data:"):
-                        continue
-                    data = line[5:].strip()
-                    if data == "[DONE]":
-                        break
-                    try:
-                        event = json.loads(data)
-                        raw_usage = event.get("usage")
-                        usage = raw_usage if isinstance(raw_usage, dict) else {}
-                        prompt_tokens = self._optional_nonnegative_int(usage.get("prompt_tokens"))
-                        completion_tokens = self._optional_nonnegative_int(usage.get("completion_tokens"))
-                        cached_prompt_tokens = self._cached_prompt_tokens(usage)
-                        cost_amount = (
-                            self._optional_nonnegative_number(usage.get("cost"))
-                            if self._config.provider == "openrouter"
+            for attempt in range(self._MAX_ATTEMPTS):
+                try:
+                    async with client.stream(
+                        "POST",
+                        self._config.endpoint,
+                        headers=self._headers_for_request(secret),
+                        json=self._payload(request, stream=True),
+                    ) as response:
+                        retry_delay = (
+                            self._rate_limit_retry_delay(response)
+                            if response.status_code == 429
+                            and attempt + 1 < self._MAX_ATTEMPTS
                             else None
                         )
-                        choices = event.get("choices")
-                        if choices == [] and (
-                            prompt_tokens is not None
-                            or completion_tokens is not None
-                            or cached_prompt_tokens is not None
-                            or cost_amount is not None
-                        ):
-                            content = ""
-                        else:
-                            content = choices[0]["delta"].get("content", "")
-                    except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError) as exc:
-                        raise RemoteProviderError("Provider returned an invalid stream event") from exc
-                    if (
-                        content
-                        or prompt_tokens is not None
-                        or completion_tokens is not None
-                        or cached_prompt_tokens is not None
-                        or cost_amount is not None
-                    ):
-                        if not isinstance(content, str):
-                            raise RemoteProviderError("Provider returned non-text stream content")
-                        yield ProviderStreamChunk(
-                            text=content,
-                            prompt_tokens=prompt_tokens,
-                            completion_tokens=completion_tokens,
-                            cached_prompt_tokens=cached_prompt_tokens,
-                            cost_amount=cost_amount,
-                            cost_currency="USD" if cost_amount is not None else None,
-                        )
+                        if retry_delay is None:
+                            self._raise_for_status(response)
+                            async for line in response.aiter_lines():
+                                if not line or not line.startswith("data:"):
+                                    continue
+                                data = line[5:].strip()
+                                if data == "[DONE]":
+                                    break
+                                try:
+                                    event = json.loads(data)
+                                    raw_usage = event.get("usage")
+                                    usage = raw_usage if isinstance(raw_usage, dict) else {}
+                                    prompt_tokens = self._optional_nonnegative_int(usage.get("prompt_tokens"))
+                                    completion_tokens = self._optional_nonnegative_int(usage.get("completion_tokens"))
+                                    cached_prompt_tokens = self._cached_prompt_tokens(usage)
+                                    cost_amount = (
+                                        self._optional_nonnegative_number(usage.get("cost"))
+                                        if self._config.provider == "openrouter"
+                                        else None
+                                    )
+                                    choices = event.get("choices")
+                                    if choices == [] and (
+                                        prompt_tokens is not None
+                                        or completion_tokens is not None
+                                        or cached_prompt_tokens is not None
+                                        or cost_amount is not None
+                                    ):
+                                        content = ""
+                                    else:
+                                        content = choices[0]["delta"].get("content", "")
+                                except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError) as exc:
+                                    raise RemoteProviderError("Provider returned an invalid stream event") from exc
+                                if (
+                                    content
+                                    or prompt_tokens is not None
+                                    or completion_tokens is not None
+                                    or cached_prompt_tokens is not None
+                                    or cost_amount is not None
+                                ):
+                                    if not isinstance(content, str):
+                                        raise RemoteProviderError("Provider returned non-text stream content")
+                                    yield ProviderStreamChunk(
+                                        text=content,
+                                        prompt_tokens=prompt_tokens,
+                                        completion_tokens=completion_tokens,
+                                        cached_prompt_tokens=cached_prompt_tokens,
+                                        cost_amount=cost_amount,
+                                        cost_currency="USD" if cost_amount is not None else None,
+                                    )
+                    if retry_delay is not None:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    return
+                except self._PRE_CONNECT_ERRORS:
+                    if attempt + 1 >= self._MAX_ATTEMPTS:
+                        raise
+                    await asyncio.sleep(self._RETRY_DELAY_SECONDS)
         finally:
             if owns_client:
                 await client.aclose()
@@ -285,13 +306,30 @@ class OpenAICompatibleRemoteAdapter:
         secret = self._credential_for_request()
         client, owns_client = self._client_or_new()
         try:
-            response = await client.post(
-                self._config.endpoint,
-                headers=self._headers_for_request(secret),
-                json=self._payload(request, stream=stream),
-            )
-            self._raise_for_status(response)
-            return response
+            for attempt in range(self._MAX_ATTEMPTS):
+                try:
+                    response = await client.post(
+                        self._config.endpoint,
+                        headers=self._headers_for_request(secret),
+                        json=self._payload(request, stream=stream),
+                    )
+                except self._PRE_CONNECT_ERRORS:
+                    if attempt + 1 >= self._MAX_ATTEMPTS:
+                        raise
+                    await asyncio.sleep(self._RETRY_DELAY_SECONDS)
+                    continue
+                try:
+                    self._raise_for_status(response)
+                except RemoteProviderError as exc:
+                    if exc.status_code != 429 or attempt + 1 >= self._MAX_ATTEMPTS:
+                        raise
+                    retry_delay = self._rate_limit_retry_delay(response)
+                    if retry_delay is None:
+                        raise
+                    await asyncio.sleep(retry_delay)
+                    continue
+                return response
+            raise RemoteProviderError("Provider request failed after bounded retries")
         finally:
             if owns_client:
                 await client.aclose()
@@ -415,6 +453,19 @@ class OpenAICompatibleRemoteAdapter:
                 message,
                 status_code=status_code,
             )
+
+    @classmethod
+    def _rate_limit_retry_delay(cls, response: httpx.Response) -> float | None:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after is None:
+            return cls._RETRY_DELAY_SECONDS
+        try:
+            delay = float(retry_after)
+        except ValueError:
+            return None
+        if not math.isfinite(delay) or delay < 0 or delay > 2.0:
+            return None
+        return delay
 
     def _client_or_new(self) -> tuple[httpx.AsyncClient, bool]:
         if self._client is not None:

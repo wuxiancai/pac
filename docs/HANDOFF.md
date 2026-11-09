@@ -1092,3 +1092,10 @@
 - 自动回归新增：新点播停止旧朗读、系统拒绝停止时新文本不入队、空文本不打断当前内容。一次全量编译捕获到 `TTSInterruptPOC` 的旧 Bool 调用后已修正。
 - 验证：`swift test --package-path poc/macos-audio` → 43 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。没有启动真实语音输出；手动可听性验收仍待用户桌面操作。
 - 更新 `docs/beta/macOS-beta-voice.md`、`TASKS.md`、`PROJECT_CONTEXT.md`。下一段继续处理阶段 2/3 中可独立自动验证的事项；GUI、真机 TTS、费用归一仍保持未验收或待决状态。
+
+### 2026-11-10：阶段 2 Provider 有界重试
+
+- `OpenAICompatibleRemoteAdapter` 现在最多执行两次尝试。重试范围仅包括明确 HTTP 429（缺省等待 250 ms；数值 `Retry-After` 在 0–2 秒内时遵从；更长、非数值不重试）及请求建立前的 `ConnectError`、`ConnectTimeout`、`PoolTimeout`。401 等其他状态不重试；读/写超时结果可能未知，因此不自动重发。没有跨 Provider fallback。
+- Adapter 重试处于当前 Gateway Consent lease 内；撤销授权会取消退避中的任务，自动回归确认只发出首次 429 请求。
+- MockTransport 覆盖 429→成功、Retry-After 超限、建连前超时→成功、读超时单次失败、401 单次失败及撤销后无再次尝试。定向回归 88 passed；完整后端回归 → 272 passed、1 条既有 Starlette/httpx 弃用警告；Ruff 与 `mypy pac_poc/remote_providers.py` 通过。没有真实云请求、Keychain 读取或 Provider fallback。
+- 更新 `docs/beta/macOS-beta-chat.md`、`TASKS.md`、`PROJECT_CONTEXT.md`。下一步继续阶段 2 可验证主线；预算 enforcement 仍待 D-005 的费用归一/unknown 规则，GUI 错误呈现仍待桌面验收。

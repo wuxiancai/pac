@@ -172,6 +172,111 @@ def test_deepseek_text_request_requires_exact_consent_and_uses_keychain_secret()
     )
 
 
+def test_rate_limited_generate_retries_once_without_fallback() -> None:
+    credentials = FakeCredentials()
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if len(requests) == 1:
+            return httpx.Response(429, text="private provider response")
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "retried once"}}]},
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent)
+    gateway = make_gateway(consent, adapter, "deepseek")
+
+    result = asyncio.run(gateway.generate(request_for()))
+
+    assert result == "retried once"
+    assert len(requests) == 2
+    assert all(str(request.url) == DEEPSEEK_PROBE_CONFIG.endpoint for request in requests)
+    assert credentials.reads == ["deepseek"]
+
+
+def test_preconnect_timeout_retries_once_but_read_timeout_does_not() -> None:
+    credentials = FakeCredentials()
+    connect_requests: list[httpx.Request] = []
+
+    def connect_timeout_once(request: httpx.Request) -> httpx.Response:
+        connect_requests.append(request)
+        if len(connect_requests) == 1:
+            raise httpx.ConnectTimeout("connect timed out", request=request)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "connected"}}]},
+        )
+
+    connect_adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(connect_timeout_once)),
+    )
+    consent = ConsentManager()
+    grant_for(consent)
+    result = asyncio.run(make_gateway(consent, connect_adapter, "deepseek").generate(request_for()))
+    assert result == "connected"
+    assert len(connect_requests) == 2
+
+    read_requests: list[httpx.Request] = []
+
+    def read_timeout(request: httpx.Request) -> httpx.Response:
+        read_requests.append(request)
+        raise httpx.ReadTimeout("response timed out", request=request)
+
+    read_adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(read_timeout)),
+    )
+    read_consent = ConsentManager()
+    grant_for(read_consent)
+    with pytest.raises(httpx.ReadTimeout):
+        asyncio.run(make_gateway(read_consent, read_adapter, "deepseek").generate(request_for()))
+    assert len(read_requests) == 1
+
+
+def test_rate_limited_stream_retries_before_yielding_any_content() -> None:
+    credentials = FakeCredentials()
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if len(requests) == 1:
+            return httpx.Response(429, text="private provider response")
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=(
+                b'data: {"choices":[{"delta":{"content":"streamed"}}]}\n\n'
+                b"data: [DONE]\n\n"
+            ),
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent, actions=frozenset({ModelAction.STREAM}))
+    gateway = make_gateway(consent, adapter, "deepseek")
+
+    async def collect() -> list[str]:
+        return [chunk async for chunk in gateway.stream(request_for())]
+
+    assert asyncio.run(collect()) == ["streamed"]
+    assert len(requests) == 2
+
+
 def test_deepseek_stream_preserves_official_cache_hit_usage_field() -> None:
     credentials = FakeCredentials()
 
@@ -744,13 +849,17 @@ def test_structured_response_format_is_forwarded_without_secret_logging() -> Non
 
 def test_remote_error_is_sanitized_and_does_not_expose_body_or_key() -> None:
     credentials = FakeCredentials()
+    requests: list[httpx.Request] = []
+
+    def unauthorized(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(401, text="invalid test-secret-for-deepseek")
+
     adapter = OpenAICompatibleRemoteAdapter(
         DEEPSEEK_PROBE_CONFIG,
         credentials=credentials,
         client=httpx.AsyncClient(
-            transport=httpx.MockTransport(
-                lambda _request: httpx.Response(401, text="invalid test-secret-for-deepseek")
-            )
+            transport=httpx.MockTransport(unauthorized)
         ),
     )
     consent = ConsentManager()
@@ -765,6 +874,73 @@ def test_remote_error_is_sanitized_and_does_not_expose_body_or_key() -> None:
     assert error.value.is_client_error
     assert error.value.is_authentication_error
     assert not error.value.is_request_validation_error
+    assert credentials.reads == ["deepseek"]
+    assert len(requests) == 1
+
+
+def test_rate_limit_retry_respects_retry_after_and_stays_bounded() -> None:
+    credentials = FakeCredentials()
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            429,
+            headers={"Retry-After": "3"},
+            text="private provider response",
+        )
+
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+    consent = ConsentManager()
+    grant_for(consent)
+
+    with pytest.raises(RemoteProviderError, match="HTTP 429") as error:
+        asyncio.run(make_gateway(consent, adapter, "deepseek").generate(request_for()))
+
+    assert len(requests) == 1
+    assert "private provider response" not in str(error.value)
+
+
+def test_consent_revocation_during_rate_limit_backoff_prevents_retry() -> None:
+    credentials = FakeCredentials()
+    requests: list[httpx.Request] = []
+    first_response = asyncio.Event()
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        first_response.set()
+        return httpx.Response(429)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+    adapter = OpenAICompatibleRemoteAdapter(
+        DEEPSEEK_PROBE_CONFIG,
+        credentials=credentials,
+        client=client,
+    )
+    consent = ConsentManager()
+    grant_for(consent)
+    gateway = make_gateway(consent, adapter, "deepseek")
+
+    async def revoke_during_backoff() -> None:
+        task = asyncio.create_task(gateway.generate(request_for()))
+        await first_response.wait()
+        consent.revoke(
+            DEEPSEEK_PROBE_CONFIG.provider,
+            DEEPSEEK_PROBE_CONFIG.model,
+            DEEPSEEK_PROBE_CONFIG.region,
+            "phase0-provider-probe",
+        )
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        await client.aclose()
+
+    asyncio.run(revoke_during_backoff())
+
+    assert len(requests) == 1
     assert credentials.reads == ["deepseek"]
 
 

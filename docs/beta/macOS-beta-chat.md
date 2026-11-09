@@ -21,9 +21,12 @@
 - 千问应用选项使用普通按量计费 API（`sk-ws-` Key），地址为 `https://maas.qianwenaiapi.com/compatible-mode/v1`，与 Token Plan 个人版的 `sk-sp-` Key 及套餐端点分开。请新建应用 API Key 并保存到 `qwen-app`；不要复用曾在聊天中公开的旧 Key。Token Plan 个人版 Key 仍不用于本自建应用。
 - 选择云端来源/Provider 即表示持续授权后续聊天发往该服务商，不再逐条弹出确认框。设置窗口明确显示当前目标、区域和发送行为；切回本地来源即可停止云端出站。后端仍为每个单独请求建立精确 Provider/model/region/purpose/Data Level 的短时 Consent，并在 Keychain 读取前检查 L3 凭据；取消云模式后不会通过其他 Provider fallback。请求按 L2 处理。
 - HTTP 401 显示 API Key 认证失败，HTTP 402 显示余额/套餐额度不足。错误不会触发 Provider fallback；云端输出上限为 1,024 tokens。
+- 远端请求最多尝试两次：HTTP 429 在 `Retry-After` 缺省时等待 250 ms，或遵从不超过 2 秒的 delta-seconds 值后重试一次；更长/非数值等待不自动重试。仅连接建立前失败（ConnectError/ConnectTimeout/PoolTimeout）可重试一次。401、其他 HTTP 错误和读/写超时不重试；读写超时可能已被服务商受理，UI 保持“是否收到/计费未知”。每次操作的 Consent lease 覆盖退避等待，撤销授权会取消任务并阻止下一次尝试；没有 Provider fallback。
 - 千问 Token Plan 服务端支持文本和 Realtime API，但个人版条款仅允许通过受支持的编程/智能体工具扩展交互调用，明确排除自定义应用后端；因此不在本应用 Provider 列表中直连 `sk-sp-`。GUI 提供适用于自建应用的按量计费 API 选项。详情见 [`qwen-token-plan-integration.md`](qwen-token-plan-integration.md)。
 
 ## 验证记录
+
+- **2026-11-10 有界远端重试**：新增两次总尝试上限，仅自动重试明确 429（尊重短数值 Retry-After）和请求发出前的连接失败；不重试 401/其他状态或读写超时，避免超时后重复计费。Consent 撤销在 429 退避期间会取消当前 Gateway 任务，不产生后续尝试。MockTransport 回归覆盖 429→成功、Retry-After 超出等待上限、连接超时→成功、读超时单次失败、401 单次失败及撤销时不重试。全量后端 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 272 passed、1 条既有 Starlette/httpx 弃用警告；Ruff 与 `mypy pac_poc/remote_providers.py` 通过。未使用真实云凭据或发起 Provider 请求。
 
 - 2026-11-09 Swift SSE error 事件回归：fake URLProtocol 返回 HTTP 200 加本机安全错误 SSE event，`LocalAPIClient.streamChat` 抛出 `LocalAPIStreamError`，错误说明与事件一致。Swift 全量 38 passed；Beta target build 通过。此为客户端流解码测试，不代表 GUI 上状态文字已实机呈现。
 
