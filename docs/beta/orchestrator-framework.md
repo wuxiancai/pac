@@ -38,7 +38,7 @@ Beta 运行时现从随包的 `pac_poc/beta_model_capabilities.json` 装配默�
 
 ## 聊天请求输入边界
 
-`/chat/stream` 按 ASGI 请求流分块读取 JSON，请求体最多 512 KiB；该上限覆盖 40,000 字符上下文以 UTF-16 surrogate-pair JSON 转义时的字节量及结构开销。未提供 `Content-Length` 的分块请求同样受限，超限在 Pydantic 校验、编排和 Provider 调用前返回 413。语义级上下文仍另受 40,000 字符限制。
+`/chat/stream` 只接受缺省或 JSON/`+json` Content-Type，并按 ASGI 请求流分块读取，请求体最多 512 KiB；该上限覆盖 40,000 字符上下文以 UTF-16 surrogate-pair JSON 转义时的字节量及结构开销。未提供 `Content-Length` 的分块请求同样受限，超限在 Pydantic 校验、编排和 Provider 调用前返回 413。语义级上下文仍另受 40,000 字符限制。
 
 ## 进程内 Usage 首段
 

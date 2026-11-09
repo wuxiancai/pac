@@ -1,3 +1,9 @@
+## 2026-11-09：聊天 JSON 请求媒体类型兼容
+
+- 手动接管请求解析后，显式保留 FastAPI 原路由的媒体类型行为：没有 Content-Type 时允许按 JSON 解码；只接受 `application/json` 或 `+json`；非 JSON 媒体类型提前返回 415，不消费请求体。
+- 新增异步流 fixture 证明 `text/plain` 被拒绝且 body generator 未被读取；结合超限与大 Unicode 上下文测试共 3 项通过。Ruff/mypy 通过；后端全量 263 passed，1 条既有 Starlette/httpx 弃用警告。
+- 更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。
+
 ## 2026-11-09：验证聊天请求字节上限容纳有效最大上下文
 
 - 对前一段 512 KiB JSON 请求体上限补充边界证据：使用默认 ASCII 转义 JSON 编码 39,000 个 supplementary Unicode 字符（约 468 KiB）发往本机模型 mock，返回 200 并到达 adapter；无 Content-Length 的超限分块请求仍返回 413。

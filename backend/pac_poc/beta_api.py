@@ -611,6 +611,11 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
 
     @router.post("/chat/stream")
     async def stream_chat(request: Request) -> StreamingResponse:
+        content_type = request.headers.get("content-type")
+        if content_type is not None:
+            media_type = content_type.split(";", 1)[0].strip().lower()
+            if media_type != "application/json" and not media_type.endswith("+json"):
+                raise HTTPException(status_code=415, detail="expected a JSON chat request")
         request_data = bytearray()
         async for chunk in request.stream():
             if len(request_data) + len(chunk) > MAX_CHAT_REQUEST_BYTES:

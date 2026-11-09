@@ -669,6 +669,34 @@ def test_chat_body_limit_allows_large_valid_unicode_context() -> None:
     asyncio.run(run())
 
 
+def test_chat_rejects_non_json_content_type_before_reading_body() -> None:
+    async def run() -> None:
+        app = create_beta_api(session=LocalAPISession(token="test-token"))
+        body_read = False
+
+        async def body_chunks():
+            nonlocal body_read
+            body_read = True
+            yield b'{"messages":[]}'
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            response = await client.post(
+                "/chat/stream",
+                headers={
+                    "authorization": "Bearer test-token",
+                    "content-type": "text/plain",
+                },
+                content=body_chunks(),
+            )
+
+        assert response.status_code == 415
+        assert not body_read
+
+    asyncio.run(run())
+
+
 def test_cloud_chat_requires_one_time_consent_before_adapter_access() -> None:
     async def run() -> None:
         adapter = StubCloudAdapter()
