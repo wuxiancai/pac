@@ -8,6 +8,7 @@
 - 本机服务只绑定 `127.0.0.1`，使用随机 Bearer token、Host/Origin 检查和健康检查；token 与 supervisor 管理的后端进程同寿命，关窗停止服务后销毁。
 - `POST /chat/stream` 默认路由到 Ollama 的 `qwen3.5:0.8b`，并接受 GUI 选择的本地模型或固定云 Provider；只接受 `user`/`assistant` 消息，单条消息上限 16,000 字符、上下文总量 40,000 字符、最多 20 条。未知字段拒绝。
 - SwiftUI 页面支持发消息、增量显示回复和停止当前流。对话只保留在当前 app 进程内存中，关闭后不恢复；UI 明示“不保存对话”。
+- 聊天流响应的 `X-PAC-Run-ID` 会传入 UI；页面显示本轮 run 短 ID 与状态。正常结束/失败后向认证的 `/chat/runs/{run_id}` 查询后端状态；用户停止或切换模型时短暂轮询终态。该状态仅供本机进程内观测，不保存对话，也不表示 Provider 一定停止生成。
 - 模型请求失败时显示经过脱敏的提示，不自动回退到其他 Provider。记忆和文件导入仍未接入；B2 语音首个代码切片见 [`macOS-beta-voice.md`](macOS-beta-voice.md)，尚待用户实机录音/识别/朗读。
 
 ## 模型设置与云端请求
@@ -22,6 +23,8 @@
 - 千问 Token Plan 服务端支持文本和 Realtime API，但个人版条款仅允许通过受支持的编程/智能体工具扩展交互调用，明确排除自定义应用后端；因此不在本应用 Provider 列表中直连 `sk-sp-`。GUI 提供适用于自建应用的按量计费 API 选项。详情见 [`qwen-token-plan-integration.md`](qwen-token-plan-integration.md)。
 
 ## 验证记录
+
+- 2026-11-09 run 生命周期 UI 接入：`swift test --package-path poc/macos-audio` → 35 项通过，包含 Beta target 编译及 run 状态解码测试。自动化构建通过；本轮未重启正在运行的 Beta 做 GUI 手动冒烟，因此 run 状态标签/取消后的状态更新仍待下次启动后实机确认。
 
 - 2026-11-09 本机模型流式保活：为避免流式响应长时间无 SSE 数据时客户端空闲超时，`/chat/stream` 现在每 15 秒发 SSE 注释 keep-alive，不转发 thinking 或提示词；客户端断开时会取消并关闭上游迭代器。具体无数据根因尚未确认。设置拒绝非有限/非正值和 bool。验证：`uv run --locked --all-extras --all-groups pytest -q tests/test_beta_api.py tests/test_local_model_gateway.py` → 22 passed；`ruff check pac_poc tests`、`mypy`（相关 3 个文件）、`uv lock --check`、`python3 -m compileall -q pac_poc scripts tests` 均通过。完整 Python `pytest -q` → 193 passed、1 failed：`test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup[APFS-128]` 在磁盘耗尽脚本返回 `OSError`，与流式保活无关；另有 1 条既有 Starlette/httpx 弃用警告。早先 50 秒 GUI 观察没有记下 Ollama 进程状态，不能据此认定是 thinking；随后发现桌面绑定到了无仓库环境的 app，已用仓库脚本重启。
 

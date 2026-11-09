@@ -26,6 +26,20 @@ import Testing
     }
 }
 
+@Test func localChatRunStatusDecodesBackendLifecycleValues() throws {
+    let completed = try JSONDecoder().decode(
+        LocalChatRunStatus.self,
+        from: Data("\"completed\"".utf8)
+    )
+    let cancelled = try JSONDecoder().decode(
+        LocalChatRunStatus.self,
+        from: Data("\"cancelled\"".utf8)
+    )
+
+    #expect(completed.displayName == "已完成")
+    #expect(cancelled.displayName == "已取消")
+}
+
 @Test func voiceStreamUnavailableHasActionableLocalOnlyMessage() {
     let message = LocalAPIClientError.voiceStreamUnavailable(
         reason: "服务端测试错误"

@@ -82,6 +82,8 @@ final class BetaChatModel {
     private var client: LocalAPIClient?
     private var activeRequest: Task<Void, Never>?
     private var activeRequestID: UUID?
+    private(set) var latestRunID: String?
+    private(set) var latestRunStatus: LocalChatRunStatus?
     private var lastAssistantResponseInterrupted = false
     private let microphone = LocalMicrophoneCapture()
     private let speechPlayback = SpeechPlaybackController(engine: AVSpeechEngine())
@@ -229,10 +231,13 @@ final class BetaChatModel {
         let confirmedForThisRequest = usesCloud
         let requestID = UUID()
         activeRequestID = requestID
+        latestRunID = nil
+        latestRunStatus = nil
         status = "正在使用\(usesCloud ? "云端" : "本地")模型生成：\(provider) / \(modelID)"
         activeRequest = Task { [weak self] in
+            var runID: String?
             do {
-                for try await delta in client.streamChat(
+                for try await item in client.streamChat(
                     messages: context,
                     provider: provider,
                     model: modelID,
@@ -240,20 +245,41 @@ final class BetaChatModel {
                 ) {
                     guard let self else { return }
                     guard self.activeRequestID == requestID else { return }
-                    if !Task.isCancelled, let index = self.messages.indices.last {
-                        self.messages[index] = LocalChatMessage(
-                            role: "assistant", content: self.messages[index].content + delta
-                        )
+                    switch item {
+                    case .runID(let identifier):
+                        runID = identifier
+                        self.latestRunID = identifier
+                        self.latestRunStatus = .running
+                    case .delta(let delta):
+                        if !Task.isCancelled, let index = self.messages.indices.last {
+                            self.messages[index] = LocalChatMessage(
+                                role: "assistant", content: self.messages[index].content + delta
+                            )
+                        }
                     }
                 }
                 guard let self, self.activeRequestID == requestID else { return }
                 self.status = "本机服务已连接；本轮使用：\(provider) / \(modelID)"
+                self.activeRequest = nil
+                self.activeRequestID = nil
+                if runID != nil { self.latestRunStatus = .completed }
+                if let runID {
+                    await self.refreshRunStatus(runID, client: client)
+                }
+                return
             } catch is CancellationError {
                 guard let self, self.activeRequestID == requestID else { return }
                 self.status = "已停止本轮生成"
             } catch {
                 guard let self, self.activeRequestID == requestID else { return }
                 self.status = "模型请求失败：\(error.localizedDescription)"
+                self.activeRequest = nil
+                self.activeRequestID = nil
+                self.latestRunStatus = nil
+                if let runID {
+                    await self.refreshRunStatus(runID, client: client)
+                }
+                return
             }
             guard let self, self.activeRequestID == requestID else { return }
             self.activeRequest = nil
@@ -263,6 +289,8 @@ final class BetaChatModel {
 
     func stop() {
         let interrupted = activeRequest != nil
+        let stoppedRunID = latestRunID
+        let runClient = client
         activeRequest?.cancel()
         activeRequest = nil
         activeRequestID = nil
@@ -274,16 +302,42 @@ final class BetaChatModel {
         } else {
             status = "已停止接收回复；Ollama 可能仍在结束本机生成。"
         }
+        if let stoppedRunID, let runClient { watchStoppedRun(stoppedRunID, client: runClient) }
+    }
+
+    private func refreshRunStatus(_ runID: String, client: LocalAPIClient) async {
+        guard let runStatus = try? await client.chatRunStatus(runID: runID),
+              latestRunID == runID
+        else { return }
+        latestRunStatus = runStatus
+    }
+
+    private func watchStoppedRun(_ runID: String, client: LocalAPIClient) {
+        latestRunStatus = nil
+        Task { @MainActor [weak self] in
+            for _ in 0..<8 {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                guard let self, self.latestRunID == runID else { return }
+                guard let runStatus = try? await client.chatRunStatus(runID: runID) else {
+                    continue
+                }
+                self.latestRunStatus = runStatus
+                if runStatus != .running && runStatus != .created { return }
+            }
+        }
     }
 
     private func modelSelectionDidChange() {
         if activeRequest != nil {
+            let stoppedRunID = latestRunID
+            let runClient = client
             if messages.last?.role == "assistant" {
                 lastAssistantResponseInterrupted = true
             }
             activeRequest?.cancel()
             activeRequest = nil
             activeRequestID = nil
+            if let stoppedRunID, let runClient { watchStoppedRun(stoppedRunID, client: runClient) }
         }
         guard client != nil else { return }
         status = "本机服务已连接；当前模型：\(selectedProvider) / \(selectedModel)"
@@ -543,6 +597,12 @@ private struct BetaChatView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("个人 AI 助理").font(.title2.bold())
                     Text(model.status).font(.caption).foregroundStyle(.secondary)
+                    if let runID = model.latestRunID, let runStatus = model.latestRunStatus {
+                        Text("本轮运行：\(runStatus.displayName)（\(runID.prefix(8))）")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityIdentifier("chat-run-status")
+                    }
                     if model.startupFailed {
                         Button(model.isStarting ? "正在重试…" : "重试连接") {
                             Task { await model.start() }

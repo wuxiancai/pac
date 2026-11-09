@@ -36,6 +36,29 @@ public struct LocalChatMessage: Codable, Equatable, Sendable {
     }
 }
 
+public enum LocalChatRunStatus: String, Decodable, Sendable {
+    case created
+    case running
+    case completed
+    case failed
+    case cancelled
+
+    public var displayName: String {
+        switch self {
+        case .created: "已创建"
+        case .running: "运行中"
+        case .completed: "已完成"
+        case .failed: "失败"
+        case .cancelled: "已取消"
+        }
+    }
+}
+
+public enum LocalChatStreamItem: Sendable {
+    case runID(String)
+    case delta(String)
+}
+
 /// Minimal native client for the authenticated, loopback-only POC health endpoint.
 @available(macOS 12.0, *)
 public final class LocalAPIClient: @unchecked Sendable {
@@ -110,6 +133,32 @@ public final class LocalAPIClient: @unchecked Sendable {
         return value.text
     }
 
+    public func chatRunStatus(runID: String) async throws -> LocalChatRunStatus {
+        guard let identifier = UUID(uuidString: runID),
+              let url = URL(
+                string: "/chat/runs/\(identifier.uuidString.lowercased())",
+                relativeTo: baseURL
+              )?.absoluteURL
+        else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard httpResponse.statusCode == 200 else {
+            throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+        guard let value = try? JSONDecoder().decode(ChatRunStatusResponse.self, from: data) else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        return value.status
+    }
+
     public func openVoiceStream() throws -> LocalVoiceStream {
         guard let httpURL = URL(string: "/voice/stream", relativeTo: baseURL)?.absoluteURL,
               var components = URLComponents(url: httpURL, resolvingAgainstBaseURL: false)
@@ -128,7 +177,7 @@ public final class LocalAPIClient: @unchecked Sendable {
         provider: String = "ollama",
         model: String = "qwen3.5:0.8b",
         confirmedForThisRequest: Bool = false
-    ) -> AsyncThrowingStream<String, Error> {
+    ) -> AsyncThrowingStream<LocalChatStreamItem, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -153,13 +202,21 @@ public final class LocalAPIClient: @unchecked Sendable {
                     guard httpResponse.statusCode == 200 else {
                         throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
                     }
+                    if let runID = httpResponse.value(forHTTPHeaderField: "X-PAC-Run-ID"),
+                       let identifier = UUID(uuidString: runID) {
+                        continuation.yield(.runID(identifier.uuidString.lowercased()))
+                    }
                     for try await line in bytes.lines {
                         guard line.hasPrefix("data: ") else { continue }
                         let event = try JSONDecoder().decode(
                             ChatStreamEvent.self,
                             from: Data(line.dropFirst(6).utf8)
                         )
-                        if let delta = event.delta { continuation.yield(delta) }
+                        if let eventRunID = event.runID,
+                           let identifier = UUID(uuidString: eventRunID) {
+                            continuation.yield(.runID(identifier.uuidString.lowercased()))
+                        }
+                        if let delta = event.delta { continuation.yield(.delta(delta)) }
                         if let message = event.error { throw LocalAPIStreamError(message: message) }
                         if event.done == true { break }
                     }
@@ -208,6 +265,18 @@ private struct ChatStreamEvent: Decodable {
     let delta: String?
     let done: Bool?
     let error: String?
+    let runID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case delta
+        case done
+        case error
+        case runID = "run_id"
+    }
+}
+
+private struct ChatRunStatusResponse: Decodable {
+    let status: LocalChatRunStatus
 }
 
 public struct LocalAPIStreamError: Error, LocalizedError {

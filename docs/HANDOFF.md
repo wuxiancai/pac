@@ -1,5 +1,11 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## macOS run 状态反馈（2026-11-09）
+
+- Swift 客户端现在读取 `X-PAC-Run-ID`，将 run ID/状态作为独立流事件交给 Beta UI；聊天页显示 run 短 ID 和本机生命周期状态。正常结束/失败后调用认证的 `GET /chat/runs/{run_id}`；用户停止或切换模型后短暂轮询后端终态。
+- `swift test --package-path poc/macos-audio` → 35 项通过，Beta target 编译通过。增加 run 状态枚举解码测试。没有重启 GUI 做手动冒烟；状态标签、停止后回传仍需下次启动实机确认。未发云请求、未读取 Keychain、未采集麦克风。
+- 下一步继续完善核心框架/用户功能；下次允许 GUI 手动检查时，顺手验收状态标签和取消终态。已知非阻塞问题仍登记，不回到局部排查。
+
 ## 总助理能力校验接缝（2026-11-09）
 
 - 将 `ModelCapabilityRegistry` 接入 `MainAssistantOrchestrator`。请求可声明必需能力；编排层按精确 Provider/model 检查支持证据，UNKNOWN/UNSUPPORTED/LIMITED 在 Gateway 创建请求前拒绝。覆盖自选未知型号被拦截且不调用 Gateway、精确证据型号可通过。
