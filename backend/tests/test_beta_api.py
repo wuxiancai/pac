@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from time import sleep
 
 import httpx
 import pytest
@@ -83,6 +84,12 @@ class StubVoiceTranscriber:
 
     def transcribe_pcm16le(self, pcm: bytes) -> str:
         raise AssertionError("streaming voice route must not use batch transcription")
+
+
+class SlowCleanupVoiceTranscriber(StubVoiceTranscriber):
+    def abort_stream(self) -> None:
+        sleep(0.2)
+        super().abort_stream()
 
 
 class QuietVoiceTranscriber(StubVoiceTranscriber):
@@ -231,7 +238,7 @@ def test_qwen_application_route_is_available_with_exact_region_and_model() -> No
 
 
 def test_authenticated_voice_websocket_streams_partial_then_final() -> None:
-    transcriber = StubVoiceTranscriber()
+    transcriber = SlowCleanupVoiceTranscriber()
     app = create_beta_api(
         session=LocalAPISession(token="voice-token"),
         voice_transcriber_override=transcriber,
@@ -264,10 +271,28 @@ def test_authenticated_voice_websocket_streams_partial_then_final() -> None:
             assert final["text"] == "你好"
             assert websocket.receive_json() == {"type": "ended"}
 
-    assert transcriber.started == 1
+        # The completion event must only arrive after the single-session ASR lock
+        # has been released, so an immediate next recording can reconnect.
+        with client.websocket_connect(
+            "/voice/stream",
+            headers={"authorization": "Bearer voice-token", "host": "127.0.0.1"},
+        ) as websocket:
+            websocket.send_json({
+                "type": "start",
+                "sample_rate_hz": 16_000,
+                "channels": 1,
+                "encoding": "pcm_s16le",
+                "frame_duration_ms": 200,
+            })
+            assert websocket.receive_json() == {"type": "ready"}
+            websocket.send_json({"type": "end"})
+            assert websocket.receive_json()["type"] == "final"
+            assert websocket.receive_json() == {"type": "ended"}
+
+    assert transcriber.started == 2
     assert transcriber.frames == [(pcm, 0)]
-    assert transcriber.ended == 1
-    assert transcriber.aborted == 1
+    assert transcriber.ended == 2
+    assert transcriber.aborted == 2
 
 
 def test_voice_websocket_rejects_bad_token_and_out_of_order_frames() -> None:

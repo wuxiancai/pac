@@ -16,6 +16,8 @@
 ## 当前验证
 
 - D-013 本机测量诊断已加入可选模式：从仓库根目录运行 `PAC_BETA_PERF_DIAGNOSTICS=1 poc/macos-audio/scripts/run_beta_app.sh`，聊天窗口底部会显示三项数值。诊断仅在当前进程内保存时间样本，不保存音频或转写：Beta App 初始化至本机服务就绪；PCM 帧组装就绪至对应 partial 更新 SwiftUI 状态；点击“停止并识别”至 final 草稿更新。partial 指标不含 200 ms 帧组装之前的采集时间，也不测屏幕实际绘制完成；须保留定义，不把它直接外推成完整用户感知延迟。诊断关闭时不显示或累计这些分布。
+- 用户随后手动确认 20 次启动计时均约在 0.9–0.11 秒范围内；原文范围端点顺序/小数位存在歧义，因此先只记录全部低于 5 秒门槛的用户报告，待确认最小/最大值后补精确分布。用户尚未能完成语音延迟分布：第一次录音/停止正常，紧接着再次点语音时出现服务端响应错误。
+- 复核发现后端在 WebSocket `/voice/stream` 发送 `ended` 后才释放单例 ASR 锁，存在客户端收到完成事件后立即重连撞上旧锁的竞态。现已改为先结束/清理 ASR 流、释放锁，再发送 `ended`；新增同一客户端会话结束后立即再次连接的回归。后端 15 项窄回归及 Python 全量 176 项通过；GUI 上仍需用户用新构建复测快速再次录音。
 
 - 2026-11-09 首次实时语音无响应的根因：Beta 后端仅安装 Uvicorn，没有任何 WebSocket 协议依赖；HTTP 聊天正常，但实时语音握手失败。`backend/pyproject.toml` 与 `uv.lock` 已锁定增加 `websockets==17.4`。本机 Python 3.12 环境检查 `uv run --locked python -c 'from fastapi import FastAPI; from uvicorn.config import Config; config = Config(FastAPI()); config.load(); print(config.ws_protocol_class.__name__)'` 输出 `WebSocketsSansIOProtocol`。已重启 Beta，GUI 确认新实时语音控件显示且本机服务已连接；尚未重试麦克风/语音 WebSocket。
 - 用户随后报告再次点击语音输入后，录音时已能在控件右侧看到所说内容的转写。这是用户实机观察；本仓库没有对应捕获/转写数据，停止后的 final 草稿和打断链路仍未验证。

@@ -1,6 +1,6 @@
 # 阶段 0 POC：开源 Gateway 对照（工作包 0J）
 
-状态：`PARTIAL`。本报告对照规格书和 V1.1 列明的 LiteLLM、Bifrost 与 Portkey；只使用官方文档/仓库进行桌面研究，没有安装、运行或向这些 Gateway 发请求。2026-11-09 用户确认 ADR-020：V1 使用项目自有轻量 ModelGateway，不引入第三方 Gateway 运行依赖；本报告作为后续重新评估的参考，不替代 POC-02 的 Provider E2E。
+状态：`PARTIAL`。本报告对照规格书和 V1.1 列明的 LiteLLM、Bifrost 与 Portkey；只使用官方文档/仓库进行桌面研究，没有安装、运行或向这些 Gateway 发请求。第三方 Gateway 运行依赖仍未定案；2026-11-09 用户确认 ADR-020：V1 使用项目自有轻量 ModelGateway，不引入第三方 Gateway 运行依赖；本报告作为后续重新评估的参考，不替代 POC-02 的 Provider E2E。
 
 ## 评估范围与安全门槛
 

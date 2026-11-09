@@ -585,3 +585,6 @@
 - 阶段 0 性能采样已准备好 opt-in GUI 面板。按上一节的步骤由用户采集 D-013 数据；这是当前需要手动参与的一项。
 - 最近提交 `403b42e`（B1 文档）、`b3e0b19`（性能诊断）和 `d62ff5a`（语音退出及离线指标证据）均在本机 `main`；本轮变更尚未推送。工作区在交接前应保持干净。
 - 用户先贴出 5 次 `bash run_beta_app.sh` 构建日志；日志没有 GUI 计时值，且未设置 `PAC_BETA_PERF_DIAGNOSTICS=1`，故不能用于 D-013。已重新提供仓库根目录的正确命令和采样步骤；当前等待实际数值。
+- 用户随后报告 20 个启动值均低于 5 秒（原范围文本“0.9s-0.11s”端点/小数位有歧义），第一次语音停止正常，但紧接着再次点语音输入无响应。当前 CUA 观察到 Beta GUI 有语音按钮且状态栏显示 WebSocket 服务响应错误；没有开启新的麦克风采集。
+- 根因是服务端在向客户端发送 WebSocket `ended` 后才释放 ASR 单会话锁，快速重连可能撞锁。现改为结束并清理 ASR 流、释放锁后才发 `ended`；同一客户端结束后立即新建会话回归通过。`tests/test_beta_api.py tests/test_local_streaming_asr.py` 15 passed；全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` 176 passed（1 条 Starlette/httpx deprecation warning）。GUI 重构建后的二次录音仍需手动验证。
+- 下一步：用户 Cmd-Q 退出旧 Beta，运行 `PAC_BETA_PERF_DIAGNOSTICS=1 ./poc/macos-audio/scripts/run_beta_app.sh` 构建并重开；先验证停止后立即再次语音可用，再继续累计 20 个 partial 与 20 个停止→final 样本。避免重复做云端请求。
