@@ -639,6 +639,8 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         async def events() -> AsyncIterator[str]:
             prompt_tokens: int | None = None
             completion_tokens: int | None = None
+            cost_amount: float | None = None
+            cost_currency: str | None = None
             try:
                 async for delta in _stream_with_keepalives(
                     orchestrator.stream_request_with_usage(model_request),
@@ -651,6 +653,9 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                         prompt_tokens = delta.prompt_tokens
                     if delta.completion_tokens is not None:
                         completion_tokens = delta.completion_tokens
+                    if delta.cost_amount is not None and delta.cost_currency is not None:
+                        cost_amount = delta.cost_amount
+                        cost_currency = delta.cost_currency
                     if delta.text:
                         yield "data: " + json.dumps({"delta": delta.text}, ensure_ascii=False) + "\n\n"
                 run_registry.transition(run.run_id, RunStatus.COMPLETED)
@@ -725,6 +730,13 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                             usage_state=(
                                 UsageState.ACTUAL
                                 if prompt_tokens is not None or completion_tokens is not None
+                                else UsageState.UNKNOWN
+                            ),
+                            cost_amount=cost_amount,
+                            cost_currency=cost_currency,
+                            cost_state=(
+                                UsageState.ACTUAL
+                                if cost_amount is not None and cost_currency is not None
                                 else UsageState.UNKNOWN
                             ),
                         )

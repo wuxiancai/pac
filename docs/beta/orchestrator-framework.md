@@ -42,11 +42,12 @@ Beta 运行时现从随包的 `pac_poc/beta_model_capabilities.json` 装配默�
 
 macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的 Provider/model、region、状态、耗时，以及实际/估算/未知 token 和费用。当前没有真实 token/费用时明确显示为未知，不作推算。面板查询只访问认证 loopback API，不发起模型请求；数据显示依赖当前进程内 ledger，退出后消失。
 
-### 流式 token usage 透传（2026-11-09）
+### 流式 token 与 OpenRouter 费用透传（2026-11-09）
 
 - `ProviderStreamChunk` 在 Gateway 内携带可选文本增量和 Provider 返回的 prompt/completion token 计数；SSE 客户端仍只收到文本增量。Ollama 完成帧的 `prompt_eval_count`/`eval_count` 和 OpenAI-compatible Provider 最终 usage 帧可进入 `UsageLedger`。
 - 对云端流请求附加 `stream_options.include_usage=true`。DeepSeek 官方 Chat Completions API 文档说明 SSE 最后一帧带整次请求 usage；阿里云 Model Studio 文档说明 Qwen OpenAI-compatible streaming 可用此选项返回最终 token usage；OpenRouter API/SDK 文档列出 `stream_options.include_usage`。这些是协议文档依据，不等于 Beta 当前精确型号的真实 usage 实测：未发云请求、未读取 Keychain。
-- 只有收到非负整数 Provider token 字段才标为 `actual`。中断、缺少最终 usage 或字段不完整时仍是 `unknown`；不从字符长度估 token。费用一直为 `unknown/null`，不依据 token 或价目表估算，D-005 预算门保持未实现。
+- OpenRouter 最终 `usage.cost` 如为有限、非负数值，按 OpenRouter 报告的 USD 标记为 actual 并记账；[Chat Completions 文档](https://openrouter.ai/docs/api/api-reference/chat/create-a-chat-completion) 在 `usage` schema 列出 `cost`，OpenRouter [支持说明](https://openrouter.ai/support)说明费用依据 Provider 使用量计算。mock 回归覆盖了流最终帧。当前固定 Beta 型号尚未做真实流式费用 E2E；DeepSeek/Qwen 没有经核实的实际费用流字段，因此继续 unknown/null。
+- 只有收到非负整数 Provider token 字段才标为 `actual`。中断、缺少最终 usage 或字段不完整时仍是 `unknown`；不从字符长度估 token。费用仅在 OpenRouter 返回已核验的实际 USD 字段时标为 `actual`；其他缺失值保持 `unknown/null`，不依据 token 或价目表估算、不做 USD/CNY 换算，D-005 预算门保持未实现。
 
 ## 验证
 

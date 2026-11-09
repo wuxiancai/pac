@@ -218,7 +218,10 @@ def test_beta_usage_ledger_records_provider_reported_stream_tokens() -> None:
         async def stream_with_usage(self, request: LocalModelRequest):
             self.request = request
             yield ProviderStreamChunk(text="done")
-            yield ProviderStreamChunk(prompt_tokens=11, completion_tokens=4)
+            yield ProviderStreamChunk(
+                prompt_tokens=11, completion_tokens=4,
+                cost_amount=0.00012, cost_currency="USD"
+            )
 
     async def run() -> None:
         gateway = ModelGateway(adapters={"ollama": Adapter()}, policy=LocalOnlyPolicy())
@@ -238,8 +241,9 @@ def test_beta_usage_ledger_records_provider_reported_stream_tokens() -> None:
         assert record["prompt_tokens"] == 11
         assert record["completion_tokens"] == 4
         assert record["usage_state"] == "actual"
-        assert record["cost_state"] == "unknown"
-        assert record["cost_amount"] is None
+        assert record["cost_state"] == "actual"
+        assert record["cost_amount"] == 0.00012
+        assert record["cost_currency"] == "USD"
 
     asyncio.run(run())
 

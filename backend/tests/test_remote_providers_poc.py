@@ -325,7 +325,7 @@ def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:
             content=(
                 b'data: {"choices":[{"delta":{"content":"phase0"}}]}\n\n'
                 b'data: {"choices":[{"delta":{"content":"-stream"}}]}\n\n'
-                b'data: {"choices":[],"usage":{"prompt_tokens":7,"completion_tokens":2,"total_tokens":9}}\n\n'
+                b'data: {"choices":[],"usage":{"prompt_tokens":7,"completion_tokens":2,"total_tokens":9,"cost":0.0012}}\n\n'
                 b"data: [DONE]\n\n"
             ),
         )
@@ -345,7 +345,10 @@ def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:
     assert asyncio.run(collect()) == [
         ProviderStreamChunk(text="phase0"),
         ProviderStreamChunk(text="-stream"),
-        ProviderStreamChunk(text="", prompt_tokens=7, completion_tokens=2),
+        ProviderStreamChunk(
+            text="", prompt_tokens=7, completion_tokens=2,
+            cost_amount=0.0012, cost_currency="USD"
+        ),
     ]
     assert str(seen[0].url) == OPENROUTER_PROBE_CONFIG.endpoint
     assert credentials.reads == ["openrouter"]

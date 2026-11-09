@@ -56,6 +56,8 @@ class ProviderStreamChunk:
     text: str = ""
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    cost_amount: float | None = None
+    cost_currency: str | None = None
 
 
 class LocalProviderAdapter(Protocol):

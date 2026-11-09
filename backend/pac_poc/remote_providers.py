@@ -212,20 +212,31 @@ class OpenAICompatibleRemoteAdapter:
                         usage = raw_usage if isinstance(raw_usage, dict) else {}
                         prompt_tokens = self._optional_nonnegative_int(usage.get("prompt_tokens"))
                         completion_tokens = self._optional_nonnegative_int(usage.get("completion_tokens"))
+                        cost_amount = (
+                            self._optional_nonnegative_number(usage.get("cost"))
+                            if self._config.provider == "openrouter"
+                            else None
+                        )
                         choices = event.get("choices")
-                        if choices == [] and (prompt_tokens is not None or completion_tokens is not None):
+                        if choices == [] and (
+                            prompt_tokens is not None
+                            or completion_tokens is not None
+                            or cost_amount is not None
+                        ):
                             content = ""
                         else:
                             content = choices[0]["delta"].get("content", "")
                     except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError) as exc:
                         raise RemoteProviderError("Provider returned an invalid stream event") from exc
-                    if content or prompt_tokens is not None or completion_tokens is not None:
+                    if content or prompt_tokens is not None or completion_tokens is not None or cost_amount is not None:
                         if not isinstance(content, str):
                             raise RemoteProviderError("Provider returned non-text stream content")
                         yield ProviderStreamChunk(
                             text=content,
                             prompt_tokens=prompt_tokens,
                             completion_tokens=completion_tokens,
+                            cost_amount=cost_amount,
+                            cost_currency="USD" if cost_amount is not None else None,
                         )
         finally:
             if owns_client:
@@ -407,4 +418,12 @@ class OpenAICompatibleRemoteAdapter:
     def _optional_nonnegative_int(value: object) -> int | None:
         if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
             return value
+        return None
+
+    @staticmethod
+    def _optional_nonnegative_number(value: object) -> float | None:
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            number = float(value)
+            if math.isfinite(number) and number >= 0:
+                return number
         return None

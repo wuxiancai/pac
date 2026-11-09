@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 2 OpenRouter 流式实际费用透传（2026-11-09）
+
+- `ProviderStreamChunk` 扩展可选费用值/币种。只有固定 OpenRouter 适配器从最终 usage 帧收到有限、非负 `usage.cost` 时，账本才保存 actual USD；其他 Provider 不推价。聊天 SSE 客户端仍只接收文本 delta。
+- OpenRouter 官方 [Chat Completions](https://openrouter.ai/docs/api/api-reference/chat/create-a-chat-completion) 文档将 `usage.cost` 列为 usage 字段，[支持资料](https://openrouter.ai/support)说明费用依据 Provider 使用量计算。相关流式映射仅由 mock 覆盖，未向当前 Beta 精确型号发送真实云请求。无字段/流中断时仍 UNKNOWN；无汇率换算、未开启人民币预算拦截。
+- 验证：阶段窄回归 57 passed，Ruff/mypy 通过；全量 Python `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 228 passed，1 条既有 Starlette/httpx 弃用警告。
+- 下一步：全量回归完成后记录结果并提交；继续处理 D-005 的 provider 费用覆盖和 CNY 归一缺口，不以单一 Provider 的 USD 字段代替预算门验收。
+
 ## 阶段 2 精确型号能力清单接入（2026-11-09）
 
 - 新增随包 `beta_model_capabilities.json`，按现有 POC 精确登记本机 `qwen3.5:0.8b`、DeepSeek `deepseek-flash`、OpenRouter `deepseek/deepseek-v4.1-flash-1017` 的文本/流式证据。工具能力样本有限，状态为 LIMITED；千问应用 API 型号和其他未收录型号保持 UNKNOWN。
