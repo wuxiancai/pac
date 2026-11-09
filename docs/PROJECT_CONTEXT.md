@@ -10,6 +10,7 @@
 
 - 阶段状态（2026-11-09）：阶段 0 的 Beta 范围已结束，附带明确的未实现/延期清单；原始 §13 全量 POC 仍有 `PARTIAL/OPEN`，不宣称全量验收。阶段 1 当前决策允许的无持久化工程底座已完成并接入 CI lint/type/test/secret-scan 门禁。Loopback API 已有 trace、统一错误、依赖注入、最小 health、可注入启动设置和集中校验配置；云凭据写入/删除需通过 Touch ID 或设备密码。数据库、schema/migration、会话持久化、静态加密、预算硬拦截、PDF 导入及 30 天持久安全审计明确未实现；TXT/Markdown 导入由 B5 增量实现，完整文件导入未完成。触发条件见 `docs/poc/phase0-traceability.md` 和 `docs/TASKS.md`。
 - 阶段路线：规格书共 7 阶段（0–6）；当前继续推进阶段 2 的对话/Gateway/Usage 主线。阶段 3 实时语音及阶段 4 文件导入均已有部分能力提前进入 Beta，但各自阶段验收仍未完成。各阶段范围见 `docs/TASKS.md` 与规格书 §13。
+- 最新开发检查点（2026-11-09，`65ab2d4`）：阶段 4 B5 新增独立、默认关闭的 PDF 安全解析 POC，后端全量测试 232 passed、1 条既有 Starlette/httpx 弃用警告，PDF 因缺少硬内存与压力/恶意样本证据仍保持禁用。工作树干净，分支 `main` 相对 `origin/main` ahead 93。阶段 2 仍是当前主线；后续继续处理 B1 本地错误路径与 B5 文本导入 GUI 冒烟等可在现有授权内完成的闭环。
 
 - 2026-11-08 模型设置更新：SwiftUI 聊天页增加本地/云端选择，默认本机 Ollama；云端默认千问按量计费应用 API（`qwen3.8-flash`、`sk-ws-`、Keychain account `qwen-app`），另有 DeepSeek/OpenRouter 路由。选择云 Provider 即持续授权后续聊天发送到该服务商，不再逐条弹窗；设置文案披露此行为，Key 存 login Keychain，L3 凭据在后端出站前拒绝。千问 Token Plan 个人版 `sk-sp-` 官方条款明确排除自建应用后端，未接入直连 Provider；本会话一次千问合成请求返回通用错误且未重试，用户随后反馈已可正常聊天；未在本地记录该次成功响应/usage。详见 `docs/beta/macOS-beta-chat.md` 和 `docs/beta/qwen-token-plan-integration.md`。
 - 当前目标：单用户 macOS 本机优先测试版；POC 证据仍标为 POC，阶段 0 完整 V1/正式发布验收未完成。SwiftUI Beta、受认证的本机 `/chat/stream`、Ollama 增量对话和 Provider/模型切换已实现；GUI 发消息/显示回复、模型切换与语音冒烟已由用户实机复核，详情见 `docs/beta/macOS-beta-chat.md`、`docs/beta/macOS-beta-voice.md`。生成请求使用 request ID 隔离回调；对话不持久化。B2 现为显式点击采集、本机实时 ASR、partial/final 草稿和手动 AVSpeechSynthesizer 朗读；用户实机验证 final、取消、点击打断和录音中 Cmd-Q 退出清理。延期能力保持清晰扩展边界，不宣称已通过验证。
