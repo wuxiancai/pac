@@ -134,7 +134,7 @@ final class BetaChatModel {
         let partial = Self.p95Milliseconds(partialLatencySamples)
         let final = Self.p95Milliseconds(stopToDraftSamples)
         return [
-            "启动至本机服务就绪：\(startupLatency.map(Self.formatMilliseconds) ?? "采集中") ms",
+            "启动至本机服务就绪：\(startupLatency.map { Self.formatMilliseconds($0 * 1_000) } ?? "采集中") ms",
             "partial 帧就绪至 UI 更新：n=\(partialLatencySamples.count)，P95 \(partial.map(Self.formatMilliseconds) ?? "采集中") ms",
             "停止至 final 入草稿：n=\(stopToDraftSamples.count)，P95 \(final.map(Self.formatMilliseconds) ?? "采集中") ms",
         ].joined(separator: "\n")
