@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 
 import pytest
+import subprocess
 
 pypdf = pytest.importorskip("pypdf")
 
@@ -43,3 +44,12 @@ def test_rejects_invalid_pdf() -> None:
 def test_rejects_pdf_exceeding_page_tree_limit() -> None:
     with pytest.raises(PdfImportRejected, match="safely parsed"):
         extract_pdf_text(make_pdf(page_count=101))
+
+
+def test_converts_child_process_timeout_to_safe_rejection(monkeypatch) -> None:
+    def timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], timeout=kwargs["timeout"])
+
+    monkeypatch.setattr("pac_poc.pdf_import_poc.subprocess.run", timeout)
+    with pytest.raises(PdfImportRejected, match="time limit"):
+        extract_pdf_text(make_pdf())

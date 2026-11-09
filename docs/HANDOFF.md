@@ -4,7 +4,7 @@
 
 - 加入仅供 POC 使用的可选依赖 `pypdf==7.0.0`；默认 Beta 依赖和文件导入 UI/API 均未启用 PDF。
 - 新增隔离子进程解析入口，限制输入 10 MiB、墙钟 5 秒、CPU 软/硬限额 4/5 秒、页数 100、提取文本 200,000 字符，并设置 pypdf 对象数量、流解压输出/工作量、页树深度/条目等边界。超时会终止子进程。
-- POC 测试：`UV_CACHE_DIR=.poc-data/uv-cache uv run --extra phase4-pdf-poc --group dev pytest -q tests/test_pdf_import_poc.py` → 4 passed；Ruff 通过。后端全量回归 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 232 passed，1 条既有 Starlette/httpx 弃用警告；mypy 通过；`git diff --check` 通过。
+- POC 测试：覆盖有效 PDF、输入超限、无效内容、页树超限，以及父进程将子进程超时转换为安全拒绝（模拟）共 5 项；窄回归 5 passed，Ruff 通过。增加超时用例后的完整后端回归 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 233 passed，1 条既有 Starlette/httpx 弃用警告；`git diff --check` 通过。
 - 后续做了 macOS 本机限额可行性探测：尝试对 `RLIMIT_AS`、`RLIMIT_DATA`、`RLIMIT_RSS` 设置 512 MiB 均失败，错误为 `ValueError: current limit exceeds maximum limit`；CPU rlimit 可设置，但内存硬限额仍无可用实现。恶意 PDF 样本、CPU/墙钟压力测试及对象数/解压炸弹专项用例也未完成。
 - 依据 D-012，PDF 继续禁用；本 POC 不构成启用或产品保证。后续须采用可在目标 macOS 上验证的进程内存隔离方案，再补恶意语料和压力用例。详见 `docs/beta/file-import.md`。
 - 后续：补齐可在 macOS 验证的内存与恶意样本测试，再评估是否将解析器接入导入路径。其间继续推进不依赖 PDF 的主线。详见 `docs/beta/file-import.md`。
