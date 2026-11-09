@@ -1071,3 +1071,10 @@
 - Swift 回归增加 L0 本机与 L2 交互聊天元数据、开始时间和区域显示断言；空区域的 Ollama 显示“本机”，真实云区域显示 Provider 返回值。`swift test --package-path poc/macos-audio` → 40 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。扩展回归时最初 fixture 将本机区域写成 `local`，与后端实际空字符串不符；修正 fixture 后全量回归通过。
 - 本轮没有 GUI 用量面板验收、云 Provider 请求、Keychain 读取或麦克风操作。GUI 手动验收仍受本轮 CUA 对 PAC 测试版的自动审核拒绝影响；用量面板与聊天引用路径均不能据此标记通过。
 - 下一步继续检查 B1 本机错误状态/模型设置与阶段 2 能独立自动验收的部分；当前 Python 全量回归另有 APFS-128 临时映像用例 1 项失败，详见本节前述记录，暂列非阻塞问题。
+
+### 2026-11-10：复核 APFS-128 偶发回归并更新当前基线
+
+- APFS-128 `backup-copy` 临时映像目标用例单独复跑：1 passed（2.92 秒）；随后完整后端回归 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）→ 265 passed、1 条既有 Starlette/httpx 弃用警告（28.55 秒）。先前同日一次全量中该目标用例子进程报通用 `OSError`；间歇原因未判定，不归因于代码或 macOS。
+- 同步 `TASKS.md`、`PROJECT_CONTEXT.md`，明确最近全量结果已通过并保留偶发失败为非阻塞观察；B1/编排框架记录从过时的“265 项通过”基线更新到当前实际结果。未更改产品代码。
+- 当前 GUI 手动验收仍无法由本代理完成：此前 CUA 请求已被自动审核拒绝。依赖用户桌面操作的 B1 错误 UI、Usage 面板和 B5 聊天引用仍标未验收；不尝试绕过桌面授权。
+- 下一步继续阶段 2 可自动验证的主干，优先检查 Usage/预算决策边界和 API 错误契约；D-005 的费用来源及缺失 usage fail-closed 规则未闭合前不启用预算拦截。
