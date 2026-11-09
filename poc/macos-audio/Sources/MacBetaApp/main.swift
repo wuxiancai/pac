@@ -962,7 +962,7 @@ private struct UsageHistoryView: View {
                             Text(record.status.displayName)
                         }
                         HStack {
-                            Text(record.region.isEmpty ? "区域未知" : record.region)
+                            Text("\(record.regionDisplayName) · \(record.startedAtDate.formatted(date: .numeric, time: .shortened))")
                             Spacer()
                             Text("\(record.usageState == "actual" ? "实际 token" : record.usageState == "estimated" ? "估算 token" : "token 未知")")
                         }

@@ -96,6 +96,13 @@ public struct LocalUsageRecord: Decodable, Identifiable, Sendable {
 
     public var id: String { runID }
 
+    public var startedAtDate: Date { Date(timeIntervalSince1970: startedAt) }
+
+    public var regionDisplayName: String {
+        if !region.isEmpty { return region }
+        return provider == "ollama" ? "本机" : "区域未知"
+    }
+
     public var purposeDisplayName: String {
         switch purpose {
         case "beta-interactive-chat": "交互式聊天"

@@ -241,7 +241,7 @@ private final class ImportResponseURLProtocol: URLProtocol {
 
 @Test func localUsageSnapshotDecodesUnknownProviderUsageWithoutInventingValues() throws {
     let body = """
-    {"summary":{"record_count":1},"records":[{"run_id":"run-1","provider":"ollama","model":"fixture","region":"local","purpose":"chat","data_level":"L0","status":"completed","started_at":1,"completed_at":2,"latency_ms":1000,"prompt_tokens":null,"completion_tokens":null,"cached_prompt_tokens":null,"cost_amount":null,"cost_currency":null,"usage_state":"unknown","cost_state":"unknown"}]}
+    {"summary":{"record_count":1},"records":[{"run_id":"run-1","provider":"ollama","model":"fixture","region":"","purpose":"chat","data_level":"L0","status":"completed","started_at":1,"completed_at":2,"latency_ms":1000,"prompt_tokens":null,"completion_tokens":null,"cached_prompt_tokens":null,"cost_amount":null,"cost_currency":null,"usage_state":"unknown","cost_state":"unknown"}]}
     """
     let snapshot = try JSONDecoder().decode(LocalUsageSnapshot.self, from: Data(body.utf8))
 
@@ -251,10 +251,14 @@ private final class ImportResponseURLProtocol: URLProtocol {
     #expect(snapshot.records[0].promptTokens == nil)
     #expect(snapshot.records[0].cachedPromptTokens == nil)
     #expect(snapshot.records[0].costAmount == nil)
+    #expect(snapshot.records[0].startedAtDate.timeIntervalSince1970 == 1)
+    #expect(snapshot.records[0].regionDisplayName == "本机")
     #expect(snapshot.records[0].purposeDisplayName == "聊天")
     #expect(snapshot.records[0].dataLevelDisplayName == "数据等级 L0")
 
     let cloudBody = body
+        .replacingOccurrences(of: "\"provider\":\"ollama\"", with: "\"provider\":\"deepseek\"")
+        .replacingOccurrences(of: "\"region\":\"\"", with: "\"region\":\"china\"")
         .replacingOccurrences(of: "\"purpose\":\"chat\"", with: "\"purpose\":\"beta-interactive-chat\"")
         .replacingOccurrences(of: "\"data_level\":\"L0\"", with: "\"data_level\":\"L2\"")
     let cloudSnapshot = try JSONDecoder().decode(
@@ -263,6 +267,7 @@ private final class ImportResponseURLProtocol: URLProtocol {
     )
     #expect(cloudSnapshot.records[0].purposeDisplayName == "交互式聊天")
     #expect(cloudSnapshot.records[0].dataLevelDisplayName == "数据等级 L2")
+    #expect(cloudSnapshot.records[0].regionDisplayName == "china")
 }
 
 @Test func voiceStreamUnavailableHasActionableLocalOnlyMessage() {

@@ -1068,6 +1068,6 @@
 ### 2026-11-10：阶段 2 用量面板元数据
 
 - `LocalUsageRecord` 增加用途显示名（本机处理/聊天/交互式聊天）与数据级别标签；用量列表现在同时显示用途、数据级别、状态和区域，保留现有 token/cost UNKNOWN 呈现。
-- Swift 回归增加 L0 本机与 L2 交互聊天元数据标签断言。`swift test --package-path poc/macos-audio` → 40 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。两条 SwiftPM 命令并行时出现共享 `.build` 等待，最终均成功。
+- Swift 回归增加 L0 本机与 L2 交互聊天元数据、开始时间和区域显示断言；空区域的 Ollama 显示“本机”，真实云区域显示 Provider 返回值。`swift test --package-path poc/macos-audio` → 40 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。扩展回归时最初 fixture 将本机区域写成 `local`，与后端实际空字符串不符；修正 fixture 后全量回归通过。
 - 本轮没有 GUI 用量面板验收、云 Provider 请求、Keychain 读取或麦克风操作。GUI 手动验收仍受本轮 CUA 对 PAC 测试版的自动审核拒绝影响；用量面板与聊天引用路径均不能据此标记通过。
 - 下一步继续检查 B1 本机错误状态/模型设置与阶段 2 能独立自动验收的部分；当前 Python 全量回归另有 APFS-128 临时映像用例 1 项失败，详见本节前述记录，暂列非阻塞问题。
