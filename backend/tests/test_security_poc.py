@@ -4,6 +4,7 @@ import asyncio
 import socket
 import threading
 import time
+import uuid
 
 import httpx
 import pytest
@@ -74,6 +75,25 @@ def test_local_api_requires_session_token_and_returns_no_token() -> None:
     assert response.status_code == 200
     assert "test-token-never-logged" not in response.text
     assert "test-token-never-logged" not in str(response.headers)
+
+
+def test_local_api_returns_valid_trace_id_and_preserves_valid_client_trace_id() -> None:
+    app = create_local_api(session=LocalAPISession(token="trace-test-token"))
+    headers = {
+        "host": "127.0.0.1",
+        "authorization": "Bearer trace-test-token",
+    }
+
+    generated = asgi_get(app, "/health", headers)
+    generated_trace = uuid.UUID(generated.headers["x-trace-id"])
+    assert str(generated_trace) == generated.headers["x-trace-id"]
+
+    requested_trace = str(uuid.uuid4())
+    propagated = asgi_get(app, "/health", {**headers, "x-trace-id": requested_trace})
+    assert propagated.headers["x-trace-id"] == requested_trace
+
+    invalid = asgi_get(app, "/health", {**headers, "x-trace-id": "client supplied text"})
+    assert str(uuid.UUID(invalid.headers["x-trace-id"])) == invalid.headers["x-trace-id"]
 
 
 def test_local_api_rejects_non_loopback_host_and_all_browser_origins() -> None:

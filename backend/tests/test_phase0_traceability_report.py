@@ -26,7 +26,7 @@ def test_phase0_traceability_matches_latest_local_poc_evidence_and_gate() -> Non
         "Touch ID/设备密码",
         "真实 Provider/Gateway 实测尚缺",
         "WAL TRUNCATE checkpoint",
-        "阶段 0：未验收。阶段 1：未开始。",
+        "阶段 0：Beta 范围已结束，附延期清单；原始 §13 全量 POC 未全部验收。阶段 1：进行中（无持久化基础）。",
     ):
         assert required in report
 

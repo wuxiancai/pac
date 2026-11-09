@@ -5,6 +5,7 @@ import hmac
 import ipaddress
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field, replace
 from collections.abc import Callable
 from enum import StrEnum
@@ -30,6 +31,18 @@ def create_local_api(*, session: LocalAPISession) -> FastAPI:
         raise ValueError("local API session token must not be empty")
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+    @app.middleware("http")
+    async def attach_trace_id(request: Request, call_next):
+        supplied = request.headers.get("x-trace-id", "")
+        try:
+            trace_id = str(uuid.UUID(supplied))
+        except (ValueError, AttributeError):
+            trace_id = str(uuid.uuid4())
+        request.state.trace_id = trace_id
+        response = await call_next(request)
+        response.headers["X-Trace-ID"] = trace_id
+        return response
 
     @app.middleware("http")
     async def protect_local_api(request: Request, call_next):

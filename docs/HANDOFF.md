@@ -1,3 +1,11 @@
+# 2026-11-09：阶段 0 收尾并启动阶段 1
+
+- 用户确认：剩余小功能可以后续补齐，当前文档应明确标为未实现；阶段 0 若已结束则开始阶段 1。
+- 阶段 0 Beta 范围收尾标记为已结束，并保留原始 §13 的 `PARTIAL/OPEN` 与每项触发条件；不宣称完整 V1/发布 POC 全部通过。
+- 阶段 1 按 D-007 从无持久化工程基础开始。数据库、schema/migration、会话保存、静态加密、预算硬拦截、持久审计和文件导入均未实现。
+- 首个实现是本机 Loopback API 的 UUID trace ID 生成/校验/回传；有效 UUID 透传，无效或缺失时由服务端生成。Python 全量回归 184 passed，compileall、uv lock --check 和 git diff --check 通过。
+- 工作区进入本轮时干净；分支 `main`，领先 `origin/main` 66 个提交。未推送。
+
 ### 2026-11-09：完成 Beta 范围阶段 0 收尾评审
 
 - 当前提交回归：Python 183 passed，Swift 33 passed；`uv lock --check`、`python -m compileall`、阶段追踪报告契约测试 9 passed。既有 Starlette/httpx deprecation warning 1 条。
