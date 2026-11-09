@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 总助理能力校验接缝（2026-11-09）
+
+- 将 `ModelCapabilityRegistry` 接入 `MainAssistantOrchestrator`。请求可声明必需能力；编排层按精确 Provider/model 检查支持证据，UNKNOWN/UNSUPPORTED/LIMITED 在 Gateway 创建请求前拒绝。覆盖自选未知型号被拦截且不调用 Gateway、精确证据型号可通过。
+- 当前 Beta 基础文本流不声明额外能力，因此不改变本机模型配置与现有云路由；工具和多模态尚未启用，也没有被本次接缝误报为支持。
+- 验证：窄回归 31 passed；Ruff 与 mypy 通过；一条既有 Starlette/httpx 弃用警告。无云请求、无 Keychain 读取、无麦克风采集。详见 `docs/beta/orchestrator-framework.md`。
+- 下一步将已证实能力逐项装配进运行时，再把 run 状态接到 GUI 进度/取消反馈；保持主线优先策略，偶发的 B1/Ollama 取消后延迟问题仍在非阻塞回修队列。
+
 ## 框架主线与开发节奏（2026-11-09）
 
 - 用户明确要求后续优先完成整体框架和主要功能；对不影响闭环的小问题记入待回修项，主线成形后集中处理。已将规则写入根目录 `AGENTS.md`、`docs/TASKS.md`。核心功能/安全/隐私/授权阻断仍优先处理；偶发现象先记录证据，不臆断代码根因。

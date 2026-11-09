@@ -11,6 +11,12 @@ from typing import Protocol
 from uuid import uuid4
 
 from .model_gateway import LocalModelRequest, ModelGateway
+from .model_capabilities import (
+    Capability,
+    CapabilityNotVerified,
+    CapabilityState,
+    ModelCapabilityRegistry,
+)
 from .security_poc import DataLevel
 
 
@@ -97,6 +103,7 @@ class ConversationTurn:
     data_level: DataLevel = DataLevel.L0
     source: str = ""
     assistant_key: str = MAIN_ASSISTANT
+    required_capabilities: tuple[Capability, ...] = ()
 
 
 class ContextBuilder(Protocol):
@@ -122,13 +129,19 @@ class MainAssistantOrchestrator:
         gateway: ModelGateway,
         *,
         context_builder: ContextBuilder | None = None,
+        capability_registry: ModelCapabilityRegistry | None = None,
     ) -> None:
         self._gateway = gateway
         self._context_builder = context_builder or PassThroughContextBuilder()
+        self._capability_registry = capability_registry
 
     def stream(self, turn: ConversationTurn) -> AsyncIterator[str]:
         if turn.assistant_key != MAIN_ASSISTANT:
             raise AssistantNotFound(f"assistant is not enabled: {turn.assistant_key}")
+        for capability in turn.required_capabilities:
+            if self._capability_registry is None:
+                raise CapabilityNotVerified(capability, state=CapabilityState.UNKNOWN)
+            self._capability_registry.require(turn.provider, turn.model, capability)
         request = LocalModelRequest(
             provider=turn.provider,
             model=turn.model,
