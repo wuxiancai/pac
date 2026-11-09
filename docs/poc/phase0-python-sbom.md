@@ -24,6 +24,19 @@ UV_CACHE_DIR=.poc-data/uv-cache uv export \
 
 复核时已解析 JSON、检查 CycloneDX 1.5 标识，并使用 Python `tomllib` 对比 `uv.lock` 的包名/版本集合；55/55 非根依赖匹配。`uv lock --check` 通过，导出过程未修改 lockfile。
 
+## 2026-11-09 可复现性复核
+
+- 使用同一锁文件重新执行上方 `uv export`，临时输出写入忽略目录 `.poc-data/phase0-python-sbom-recheck.cdx.json`；解析临时清单、`uv.lock` 和仓库 BOM 后，CycloneDX `specVersion=1.5`，排除 editable 项目根包后，55 个锁定包与 55 个组件完全匹配；新旧 BOM 的 `(name, version)` 集合完全一致。
+- SHA-256 与本报告记录一致：`uv.lock`=`735d574aefd982525eb28ab397e8e079357e58fc11c5d3e4b7ab3d98b9817eba`；仓库 BOM=`3b87f48363873835d8b7f9a78f07364d632b0ad7ca1da0da06cfdc1ec82072cc`。导出没有改动锁文件或仓库 BOM；临时核对文件随后删除。
+- 复现命令：
+
+```bash
+UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache uv export \
+  --locked --format cyclonedx1.5 --all-extras --all-groups \
+  --preview-features sbom-export \
+  --output-file .poc-data/phase0-python-sbom-recheck.cdx.json >/dev/null
+```
+
 ## 范围与限制
 
 - 这是完整的 **Python 锁定依赖清单**，不包含 Swift Package 依赖、macOS/Xcode 系统组件、下载的模型权重、模型 tokenizer/词表、测试音频或其他外部运行时资产。
