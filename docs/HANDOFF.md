@@ -1,3 +1,9 @@
+# 2026-11-09：更正阶段 0 记忆与文件导入追踪状态
+
+- 复核发现矩阵把 D-014 长期记忆/Embedding 未纳入 V1，与 D-012 下已接入 Beta 的 TXT/Markdown 导入合并成“记忆、Embedding、文件导入尚未进入 Beta”，与当前实现及 TASKS 冲突。
+- 已拆成独立追踪项：记忆/Embedding 继续按决策未纳入；TXT/Markdown 已实现但 GUI 文件选择、移除和聊天引用尚待手动冒烟；PDF 仅保留隔离 POC，因硬内存隔离和恶意输入/压力证据不足仍禁用。明确记录了各自触发点，未将延期项提升为 PASS。
+- 更新 `docs/poc/phase0-traceability.md`、`docs/PROJECT_CONTEXT.md`。本段仅同步状态，不改代码；阶段 6 本机门禁结果见下一节。
+
 # 2026-11-09：阶段 6 当前 Beta 本机门禁复核
 
 - 在源码提交 `bf48e30`（B5 文件导入单飞保护）上重跑本机 CI 等价门禁：`uv lock --check`、`ruff check pac_poc tests`、`mypy`、`python -m compileall -q pac_poc scripts tests`、tracked-file `detect-secrets-hook` 均通过。
