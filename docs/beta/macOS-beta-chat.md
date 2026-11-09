@@ -14,7 +14,7 @@
 
 - 页面右上角齿轮按钮打开“模型设置”。默认来源为本地 Ollama；本地模型名称可填写为 Ollama 中已安装的模型 ID。来源和模型 ID 保存在当前 macOS 用户的 `UserDefaults`，不含密钥。
 - 每次发送都从当前选择快照 Provider、模型 ID 和云端授权标记，并显式放入 `/chat/stream` 请求。切换来源、云 Provider 或本地模型名称时，若旧请求仍在生成，会立即取消客户端流并使旧请求回调失效；状态栏更新为新选择，后续消息使用新选择。状态栏显示请求中的 Provider/模型，以便辨认本轮实际路由。Provider 侧是否立即停止生成仍受服务端取消语义限制。
-- 云端配置提供千问 `qwen3.8-flash`（中国，按量计费应用 API）、DeepSeek `deepseek-flash`（中国）与 OpenRouter `deepseek/deepseek-v4.1-flash-1017`（Global）。型号和区域固定，不能填写任意端点。默认云服务商为千问；D-010 仍为待决，不代表正式 V1 Provider 选型。
+- 云端配置提供千问 `qwen3.8-flash`（中国，按量计费应用 API）、DeepSeek `deepseek-flash`（中国）与 OpenRouter `deepseek/deepseek-v4.1-flash-1017`（Global）。型号和区域固定，不能填写任意端点。2026-11-09 用户确认 D-010：V1 默认千问应用 API，另支持 DeepSeek（中国）和 OpenRouter（Global）；能力证据仍依 POC-02 矩阵逐项验收。
 - 云端 API Key 可在设置窗口的 SecureField 保存到 macOS login Keychain：service `com.personal-ai-assistant.phase0.provider`，account 为 `qwen-app`、`deepseek` 或 `openrouter`。界面只显示是否已保存；后端逐次从 Keychain 读取，密钥不进入聊天、本机 API 请求体、环境变量、设置文件或日志。
 - 千问应用选项使用普通按量计费 API（`sk-ws-` Key），地址为 `https://maas.qianwenaiapi.com/compatible-mode/v1`，与 Token Plan 个人版的 `sk-sp-` Key 及套餐端点分开。请新建应用 API Key 并保存到 `qwen-app`；不要复用曾在聊天中公开的旧 Key。Token Plan 个人版 Key 仍不用于本自建应用。
 - 选择云端来源/Provider 即表示持续授权后续聊天发往该服务商，不再逐条弹出确认框。设置窗口明确显示当前目标、区域和发送行为；切回本地来源即可停止云端出站。后端仍为每个单独请求建立精确 Provider/model/region/purpose/Data Level 的短时 Consent，并在 Keychain 读取前检查 L3 凭据；取消云模式后不会通过其他 Provider fallback。请求按 L2 处理。

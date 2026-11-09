@@ -116,4 +116,4 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/probe_provider_ca
 
 - 两家真实 SSE 各有一次成功；DeepSeek 与 OpenRouter 工具提案各有一次成功且均未执行（OpenRouter 前两次曾为空）；OpenRouter JSON 一次成功；DeepSeek JSON 三次一空两成功；DeepSeek 服务侧费用/区域字段未返回；无 Consent 时 PID 级 OS socket 检查无活动 socket；客户端 SSE 取消探测已实现，本地测试证明关闭响应流；DeepSeek 与 OpenRouter 均已有一次首片段后客户端取消结果；两家 Provider 是否停止生成/计费未由服务侧证实。DeepSeek JSON 三次观察为一空两成功，空正文原因及更广泛稳定性仍未知。能力矩阵 CLI 已准备，每个外发请求仍须用户逐次确认。PID 级 lsof 是活动 socket 快照，不是完整包级证明；用户提供的全局 tcpdump 流量未按 PID 过滤，无法归因。Provider 响应元数据仍只有少量观测，不能视为稳定性或性能证据。
 - 本 POC 未实现长期授权存储、交互式产品 Consent UI、持久审计、费用硬限制或产品级 Keychain 生命周期。
-- D-010 仍为 Deferred：两家是本次 POC 候选，不自动构成 V1 Provider 选型。
+- 2026-11-09 用户确认 D-010：V1 默认云 Provider 为千问应用 API，另支持 DeepSeek（中国）与 OpenRouter（Global）。本决定只确定产品范围；两家已测 Provider 的能力样本仍有限，千问新应用端点、完整错误/取消/usage/cost/区域能力须在对应功能启用前补测。真实出站请求仍须单独的 Consent + Policy。

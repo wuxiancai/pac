@@ -556,3 +556,4 @@
 - 用户确认 D-007 的 V1 范围：不保存会话、不备份、不设置 app 数据库；持久化功能开发前再选静态加密方案。ADR-019 继续 Deferred，SQLCipher POC 不视为产品选型。
 - 用户确认 D-008：V1 不支持外接盘作为活动数据目录；随持久化数据目录功能再评估。该决策也不批准将模型权重或缓存写到外接盘。
 - 用户确认 D-009：少量固定专业 Agent 归入 V2，完整 Agent 集归入 V3；V1 继续单总助理。Agent Registry POC 仍为模拟接口。
+- 用户确认 D-010：V1 默认千问应用 API，并支持 DeepSeek（中国）及 OpenRouter（Global）。此为 Provider 范围决策，不替代 POC-02 尚缺的完整能力、费用、区域、错误和取消验证；每个真实远端请求仍受 Consent/Policy 控制。
