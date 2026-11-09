@@ -17,7 +17,7 @@ extension LocalAPIClientError: LocalizedError {
         case .requestFailed(let statusCode):
             return "本机服务请求失败（HTTP \(statusCode)）。"
         case .voiceStreamUnavailable:
-            return "本机语音服务仍在完成上一段识别，请稍后重试；音频未发送到云端。"
+            return "无法连接本机语音服务，请重试；音频未发送到云端。"
         }
     }
 }

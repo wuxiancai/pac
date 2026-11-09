@@ -29,6 +29,7 @@ import Testing
 @Test func voiceStreamUnavailableHasActionableLocalOnlyMessage() {
     let message = LocalAPIClientError.voiceStreamUnavailable.localizedDescription
 
-    #expect(message.contains("稍后重试"))
+    #expect(message.contains("无法连接本机语音服务"))
+    #expect(message.contains("请重试"))
     #expect(message.contains("音频未发送到云端"))
 }
