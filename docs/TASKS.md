@@ -35,7 +35,7 @@
 
 ## 阶段 0 证据状态（已结束；延期项保留原状态）
 
-**Beta 范围阶段 0 收尾评审：PASS（2026-11-09）**。当前已启用本机优先 Beta 路径的证据和回归已核对；原始 §13 全量 POC 仍有 `PARTIAL/OPEN` 项，不宣称全量阶段 0 通过。按 C-007，这些项目在对应能力启用或正式分发前补齐，触发点见追踪矩阵。0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 183 项、Swift 33 项通过，`uv lock --check`、`compileall` 通过；历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地提交尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 55/55 非根依赖。D-013 Beta GUI 样本已达到计划数量并低于门槛：启动 n=20/P95=700 ms，partial 216 次/各窗口 P95≤41.5 ms，停止→final n=21/P95=97.9 ms。POC-01 并发 probe 新增 13 轮，详见 `phase0-local-asr.md` 与逐轮 CSV；Consent/Policy 新增在途 generate/stream 撤销取消 fake-adapter 回归，窄回归 50 项通过（含同一 Consent 下并发撤销）；完整 Agent/产品负载和 Consent 持久审计仍未验收。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
+**Beta 范围阶段 0 收尾评审：PASS（2026-11-09）**。当前已启用本机优先 Beta 路径的证据和回归已核对；原始 §13 全量 POC 仍有 `PARTIAL/OPEN` 项，不宣称全量阶段 0 通过。按 C-007，这些项目在对应能力启用或正式分发前补齐，触发点见追踪矩阵。0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 183 项、Swift 33 项通过，`uv lock --check`、`compileall` 通过；2026-11-10 当前代码复核：Python 264 passed、1 failed（`test_backup_copy_enospc_preserves_source_and_previous_backup`，APFS-128 临时映像子进程仅报通用 `OSError`）；Swift 40 项通过，Beta target 由启动脚本成功构建。2026-11-09 记录的 Python 265 passed 与 CI 等价门禁属于此前源码提交，不能代替本次失败结果。历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地提交尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 55/55 非根依赖。D-013 Beta GUI 样本已达到计划数量并低于门槛：启动 n=20/P95=700 ms，partial 216 次/各窗口 P95≤41.5 ms，停止→final n=21/P95=97.9 ms。POC-01 并发 probe 新增 13 轮，详见 `phase0-local-asr.md` 与逐轮 CSV；Consent/Policy 新增在途 generate/stream 撤销取消 fake-adapter 回归，窄回归 50 项通过（含同一 Consent 下并发撤销）；完整 Agent/产品负载和 Consent 持久审计仍未验收。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
 
 ## 当前执行顺序
 
@@ -52,7 +52,7 @@
 ### 非阻塞问题回修清单
 
 - **B1 / Ollama 取消后紧接请求变慢**：曾观察到一轮长流取消后短请求延迟明显增加；本机版本、模型、时序和上游行为都可能影响结果，当前根因未证实。停止提示已说明本机可能仍在收尾。当前不阻塞聊天主闭环；等框架和核心功能主线完成后，若仍影响正常使用，再按可复现步骤做一次集中排查。
-- **阶段 0 SQLCipher APFS-128 临时映像 POC 偶发失败**：2026-11-09 全量回归中一轮返回通用 `RuntimeError`，紧接的同用例复跑通过，随后全量 264 项通过；原因未判定。该测试只在仓库 `.poc-data` 下创建临时映像，不影响 Beta 数据；若后续再次出现，集中收集子进程状态/挂载清理证据，不据单次结果推断 APFS 根因。
+- **阶段 0 SQLCipher APFS-128 临时映像 POC 偶发失败**：2026-11-09 全量回归中一轮返回通用 `RuntimeError`，紧接的同用例复跑通过，随后全量 264 项通过；2026-11-10 全量回归再次在 `backup-copy` 场景失败，子进程返回 `{"status":"error","error_type":"OSError"}`，另 264 项通过，原因未判定。该测试只在仓库 `.poc-data` 下创建临时映像，不影响 Beta 数据；若后续再次出现，集中收集子进程状态/挂载清理证据，不据单次结果推断 APFS 根因。
 麦克风复现命令（从仓库根目录，在本机交互式终端运行）：
 
 ```bash

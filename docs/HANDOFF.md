@@ -1062,3 +1062,5 @@
 - 同步 `docs/beta/file-import.md`，澄清文件选择/暂存/移除的 GUI 冒烟已经通过，唯独资料进入聊天上下文仍未验证；PDF 保持禁用。仅文档变更，未运行测试；随后执行 `git diff --check`、暂存差异复核并提交。
 - 下一步：桌面操作可用时，明确选中 Ollama，用合成无敏感内容 TXT 验证附件引用后模型可读到唯一测试短语；继续前检查新 Beta 窗口未承载用户未保存聊天。若桌面仍被自动审核拦截，转向不依赖 GUI 的阶段 2 工作，勿把手动验收标为通过。
 - 2026-11-10 后续资料核对：Apple App Sandbox 文档将其描述为文件、网络和硬件访问边界；`os_proc_available_memory()` 仅为随 app 生命周期变化的建议值，且非 app 调用返回 0，不能作为当前 Python worker 硬内存上限。没有据此启用 PDF；平台证据及限制写入 `docs/beta/file-import.md`，追踪矩阵同步保持 PDF 未启用。
+- 当前提交 `75306b9` 的回归：`swift test --package-path poc/macos-audio` → 40 passed；`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）→ 264 passed、1 failed、1 条既有 Starlette/httpx 弃用警告。唯一失败为 `test_backup_copy_enospc_preserves_source_and_previous_backup`，临时 APFS image 子进程输出 `{"status":"error","error_type":"OSError"}`。按主干优先作为非阻塞问题记录，不在此暂停主线。Beta target 已由启动脚本成功构建。
+- 下一段可独立推进阶段 2 Usage 面板可见字段/可读性，或 B1 本机配置及错误状态；仍不触发云请求、读取 Keychain 或麦克风。完成后更新本交接、`TASKS.md`，运行适用回归并逐段提交。
