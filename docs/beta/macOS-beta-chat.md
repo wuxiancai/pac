@@ -25,6 +25,8 @@
 
 ## 验证记录
 
+- 2026-11-09 本机 API HTTP 错误客户端回归：注入仅供测试的 ephemeral URLSession 配置，以 URLProtocol 返回 HTTP 503 和带敏感标记的错误正文；`streamChat` 只抛出 `.requestFailed(statusCode: 503)`，正文不进入 localizedDescription。生产 initializer 仍创建 ephemeral session，保留 loopback delegate 与禁重定向。`swift test --package-path poc/macos-audio` → 37 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。本次未对运行中 GUI 做手动错误冒烟，也未发起云请求；HTTP 错误的 UI 呈现仍待实机确认。
+
 - 2026-11-09 run 生命周期 UI 接入：`swift test --package-path poc/macos-audio` → 35 项通过，包含 Beta target 编译及 run 状态解码测试。自动化构建通过；本轮未重启正在运行的 Beta 做 GUI 手动冒烟，因此 run 状态标签/取消后的状态更新仍待下次启动后实机确认。
 
 - 2026-11-09 本机模型流式保活：为避免流式响应长时间无 SSE 数据时客户端空闲超时，`/chat/stream` 现在每 15 秒发 SSE 注释 keep-alive，不转发 thinking 或提示词；客户端断开时会取消并关闭上游迭代器。具体无数据根因尚未确认。设置拒绝非有限/非正值和 bool。验证：`uv run --locked --all-extras --all-groups pytest -q tests/test_beta_api.py tests/test_local_model_gateway.py` → 22 passed；`ruff check pac_poc tests`、`mypy`（相关 3 个文件）、`uv lock --check`、`python3 -m compileall -q pac_poc scripts tests` 均通过。完整 Python `pytest -q` → 193 passed、1 failed：`test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup[APFS-128]` 在磁盘耗尽脚本返回 `OSError`，与流式保活无关；另有 1 条既有 Starlette/httpx 弃用警告。早先 50 秒 GUI 观察没有记下 Ollama 进程状态，不能据此认定是 thinking；随后发现桌面绑定到了无仓库环境的 app，已用仓库脚本重启。

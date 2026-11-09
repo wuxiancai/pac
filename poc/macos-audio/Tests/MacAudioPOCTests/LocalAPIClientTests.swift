@@ -2,6 +2,25 @@ import Foundation
 import Testing
 @testable import MacAudioPOC
 
+private final class ErrorResponseURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 503,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"detail":"secret-response-body"}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 @available(macOS 12.0, *)
 @Test func localAPIClientBuildsAuthenticatedLoopbackRequest() throws {
     let client = try LocalAPIClient(
@@ -23,6 +42,27 @@ import Testing
     }
     #expect(throws: LocalAPIClientError.invalidEndpoint) {
         try LocalAPIClient(baseURL: URL(string: "https://127.0.0.1")!, token: "token")
+    }
+}
+
+@available(macOS 12.0, *)
+@Test func chatStreamReportsHTTPStatusWithoutSurfacingResponseBody() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ErrorResponseURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43127")!,
+        token: "test-token",
+        sessionConfiguration: configuration
+    )
+
+    do {
+        for try await _ in client.streamChat(
+            messages: [LocalChatMessage(role: "user", content: "test")]
+        ) {}
+        Issue.record("Expected the API client's HTTP error")
+    } catch let error as LocalAPIClientError {
+        #expect(error == .requestFailed(statusCode: 503))
+        #expect(!error.localizedDescription.contains("secret-response-body"))
     }
 }
 

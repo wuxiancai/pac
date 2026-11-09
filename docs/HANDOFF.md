@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 2 B1 HTTP 错误正文脱敏回归（2026-11-09）
+
+- Swift `LocalAPIClient` 增加内部测试用 `URLSessionConfiguration` 注入 initializer；生产入口仍创建 ephemeral session，使用 loopback-only delegate 并拒绝重定向。
+- URLProtocol fixture 模拟本机 `/chat/stream` HTTP 503，响应正文含敏感标记；验证客户端仅抛 `.requestFailed(statusCode: 503)`，不暴露正文。
+- 验证：`swift test --package-path poc/macos-audio` → 37 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。未做 GUI 手动错误冒烟、未发云请求。UI 错误呈现及云 API 错误 UI 仍待实机/授权内验证。
+- 下一步继续 B1 错误路径与 B5 TXT/Markdown 导入 GUI 冒烟；本轮现有 GUI 窗口/状态自动化检查超时，尚无该 GUI 检查的可用结果。
+
 ## 阶段 4 PDF 安全解析 POC（2026-11-09）
 
 - 加入仅供 POC 使用的可选依赖 `pypdf==7.0.0`；默认 Beta 依赖和文件导入 UI/API 均未启用 PDF。

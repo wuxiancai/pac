@@ -122,14 +122,22 @@ public final class LocalAPIClient: @unchecked Sendable {
     private let token: String
     private let session: URLSession
 
-    public init(baseURL: URL, token: String) throws {
+    public convenience init(baseURL: URL, token: String) throws {
+        try self.init(baseURL: baseURL, token: token, sessionConfiguration: nil)
+    }
+
+    init(
+        baseURL: URL,
+        token: String,
+        sessionConfiguration: URLSessionConfiguration?
+    ) throws {
         guard Self.isAllowedEndpoint(baseURL), !token.isEmpty else {
             throw LocalAPIClientError.invalidEndpoint
         }
         self.baseURL = baseURL
         self.token = token
         self.session = URLSession(
-            configuration: .ephemeral,
+            configuration: sessionConfiguration ?? .ephemeral,
             delegate: LocalOnlyURLSessionDelegate(),
             delegateQueue: nil
         )
