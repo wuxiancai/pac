@@ -1,5 +1,12 @@
 # 2026-11-09：阶段 0 收尾并启动阶段 1
 
+## 阶段 2 Provider token usage 透传（2026-11-09）
+
+- Gateway 新增 `ProviderStreamChunk`，适配器可将文本增量与最终帧的 input/output token 分开返回；聊天 SSE 仍仅发送文本 delta。Ollama 读取完成帧的 `prompt_eval_count`/`eval_count`；固定云 Provider 请求带 `stream_options.include_usage=true` 并解析 OpenAI-compatible usage 帧。
+- 已核对 [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)、[阿里云 Model Studio streaming](https://help.aliyun.com/en/model-studio/stream)、[OpenRouter Chat Completions](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request?explorer=true) 官方协议文档。未发云请求或读 Keychain；精确 Beta 型号实际兼容性仍需按触发条件核对。中断/缺帧时 usage 保持 UNKNOWN，费用保持 UNKNOWN/null，不估算，不实现预算门。
+- 验证：Python 窄回归 56 passed；Ruff 与相关 mypy 通过；全量 Python `pytest -q` → 226 passed，1 条既有 Starlette/httpx 弃用警告。Usage UI Swift 36 项和 Beta build 已于前一提交验证。
+- 下一段继续处理单助理/usage 主线；正常 GUI 启动时顺带验收用量面板。预算门须先得到精确 Provider 费用来源、币种归一与缺失 usage 规则；D-005 的决策和安全前提不因 token 透传而改变。
+
 ## 阶段 2 macOS 用量面板（2026-11-09）
 
 - macOS Beta 新增“用量”面板，调用认证 loopback `GET /usage` 显示本进程最近的 Provider/model、区域、状态、耗时、token 和费用状态。只有服务端实际/估算记录才显示数值；未知继续显示为空/未知，不估算。

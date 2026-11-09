@@ -11,7 +11,7 @@ from time import time
 from typing import Protocol
 from uuid import uuid4
 
-from .model_gateway import LocalModelRequest, ModelGateway
+from .model_gateway import LocalModelRequest, ModelGateway, ProviderStreamChunk
 from .imported_text import ImportedTextDocument
 from .model_capabilities import (
     Capability,
@@ -181,6 +181,11 @@ class MainAssistantOrchestrator:
 
     def stream_request(self, request: LocalModelRequest) -> AsyncIterator[str]:
         return self._gateway.stream(request)
+
+    def stream_request_with_usage(
+        self, request: LocalModelRequest
+    ) -> AsyncIterator[ProviderStreamChunk]:
+        return self._gateway.stream_with_usage(request)
 
     def stream(self, turn: ConversationTurn) -> AsyncIterator[str]:
         return self.stream_request(self.prepare_request(turn))

@@ -18,6 +18,7 @@ from pac_poc.model_gateway import (
     ConsentAwarePolicy,
     LocalModelRequest,
     ModelGateway,
+    ProviderStreamChunk,
     PolicyDenied,
 )
 from pac_poc.remote_providers import (
@@ -324,6 +325,7 @@ def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:
             content=(
                 b'data: {"choices":[{"delta":{"content":"phase0"}}]}\n\n'
                 b'data: {"choices":[{"delta":{"content":"-stream"}}]}\n\n'
+                b'data: {"choices":[],"usage":{"prompt_tokens":7,"completion_tokens":2,"total_tokens":9}}\n\n'
                 b"data: [DONE]\n\n"
             ),
         )
@@ -337,14 +339,19 @@ def test_openrouter_stream_uses_global_endpoint_and_parses_sse() -> None:
     grant_for(consent, OPENROUTER_PROBE_CONFIG, actions=frozenset({ModelAction.STREAM}))
     gateway = make_gateway(consent, adapter, "openrouter")
 
-    async def collect() -> list[str]:
-        return [chunk async for chunk in gateway.stream(request_for(OPENROUTER_PROBE_CONFIG))]
+    async def collect() -> list[ProviderStreamChunk]:
+        return [chunk async for chunk in gateway.stream_with_usage(request_for(OPENROUTER_PROBE_CONFIG))]
 
-    assert asyncio.run(collect()) == ["phase0", "-stream"]
+    assert asyncio.run(collect()) == [
+        ProviderStreamChunk(text="phase0"),
+        ProviderStreamChunk(text="-stream"),
+        ProviderStreamChunk(text="", prompt_tokens=7, completion_tokens=2),
+    ]
     assert str(seen[0].url) == OPENROUTER_PROBE_CONFIG.endpoint
     assert credentials.reads == ["openrouter"]
     assert seen[0].headers["x-openrouter-metadata"] == "enabled"
     assert b'"provider":{"allow_fallbacks":false}' in seen[0].read()
+    assert b'"stream_options":{"include_usage":true}' in seen[0].read()
 
 
 def test_closing_remote_sse_after_first_chunk_closes_response_stream() -> None:

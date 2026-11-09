@@ -18,7 +18,12 @@ from pac_poc.beta_api import (
     create_beta_app,
     _stream_with_keepalives,
 )
-from pac_poc.model_gateway import LocalModelRequest, ModelGateway, LocalOnlyPolicy
+from pac_poc.model_gateway import (
+    LocalModelRequest,
+    ModelGateway,
+    LocalOnlyPolicy,
+    ProviderStreamChunk,
+)
 from pac_poc.security_poc import LocalAPISession
 
 
@@ -204,6 +209,37 @@ def test_beta_chat_stream_is_authenticated_local_and_non_persistent() -> None:
         assert adapter.request.model == BETA_MODEL
         assert adapter.request.provider == "ollama"
         assert adapter.request.messages == [{"role": "user", "content": "你好"}]
+
+    asyncio.run(run())
+
+
+def test_beta_usage_ledger_records_provider_reported_stream_tokens() -> None:
+    class Adapter(StubLocalAdapter):
+        async def stream_with_usage(self, request: LocalModelRequest):
+            self.request = request
+            yield ProviderStreamChunk(text="done")
+            yield ProviderStreamChunk(prompt_tokens=11, completion_tokens=4)
+
+    async def run() -> None:
+        gateway = ModelGateway(adapters={"ollama": Adapter()}, policy=LocalOnlyPolicy())
+        app = create_beta_api(session=LocalAPISession(token="test-token"), gateway=gateway)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            response = await client.post(
+                "/chat/stream",
+                headers={"authorization": "Bearer test-token"},
+                json={"messages": [{"role": "user", "content": "count tokens"}]},
+            )
+            usage = await client.get("/usage", headers={"authorization": "Bearer test-token"})
+        assert response.status_code == 200
+        assert '"delta": "done"' in response.text
+        record = usage.json()["records"][0]
+        assert record["prompt_tokens"] == 11
+        assert record["completion_tokens"] == 4
+        assert record["usage_state"] == "actual"
+        assert record["cost_state"] == "unknown"
+        assert record["cost_amount"] is None
 
     asyncio.run(run())
 

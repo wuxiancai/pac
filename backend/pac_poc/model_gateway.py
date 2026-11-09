@@ -49,6 +49,15 @@ class ToolCallResult:
     region: str | None = None
 
 
+@dataclass(frozen=True)
+class ProviderStreamChunk:
+    """A text delta and optional provider reported usage from the same stream."""
+
+    text: str = ""
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+
+
 class LocalProviderAdapter(Protocol):
     is_local: bool
 
@@ -196,6 +205,27 @@ class ModelGateway:
         finally:
             self._close_operation(lease)
 
+    async def stream_with_usage(
+        self, request: LocalModelRequest
+    ) -> AsyncIterator[ProviderStreamChunk]:
+        adapter = self._get_authorized_adapter(request, ModelAction.STREAM)
+        lease = self._begin_operation(adapter, request, ModelAction.STREAM)
+        try:
+            stream_with_usage = getattr(adapter, "stream_with_usage", None)
+            if callable(stream_with_usage):
+                stream = stream_with_usage(request)
+                async for chunk in stream:
+                    yield chunk
+            else:
+                stream = adapter.stream(request)
+                async for text in stream:
+                    yield ProviderStreamChunk(text=text)
+        finally:
+            close = getattr(locals().get("stream"), "aclose", None)
+            if close is not None:
+                await close()
+            self._close_operation(lease)
+
     async def call_with_tools(self, request: LocalModelRequest) -> ToolCallResult:
         adapter = self._get_authorized_adapter(request, ModelAction.TOOL_PROPOSAL)
         call = getattr(adapter, "call_with_tools", None)
@@ -280,6 +310,13 @@ class OllamaAdapter:
             raise RuntimeError("Ollama returned an invalid tool-call response") from exc
 
     async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
+        async for chunk in self.stream_with_usage(request):
+            if chunk.text:
+                yield chunk.text
+
+    async def stream_with_usage(
+        self, request: LocalModelRequest
+    ) -> AsyncIterator[ProviderStreamChunk]:
         client = self._client or httpx.AsyncClient(timeout=120.0)
         owns_client = self._client is None
         try:
@@ -295,10 +332,16 @@ class OllamaAdapter:
                     try:
                         event = json.loads(line)
                         content = event.get("message", {}).get("content", "")
+                        prompt_tokens = self._optional_nonnegative_int(event.get("prompt_eval_count"))
+                        completion_tokens = self._optional_nonnegative_int(event.get("eval_count"))
                     except (json.JSONDecodeError, AttributeError) as exc:
                         raise RuntimeError("Ollama returned an invalid stream event") from exc
-                    if content:
-                        yield content
+                    if content or prompt_tokens is not None or completion_tokens is not None:
+                        yield ProviderStreamChunk(
+                            text=content,
+                            prompt_tokens=prompt_tokens,
+                            completion_tokens=completion_tokens,
+                        )
         finally:
             if owns_client:
                 await client.aclose()
@@ -326,6 +369,12 @@ class OllamaAdapter:
         if request.tools:
             payload["tools"] = list(request.tools)
         return payload
+
+    @staticmethod
+    def _optional_nonnegative_int(value: object) -> int | None:
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+        return None
 
     @staticmethod
     def _is_loopback(host: str) -> bool:

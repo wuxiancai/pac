@@ -27,6 +27,7 @@ from .model_gateway import (
     LocalProviderAdapter,
     LocalOnlyPolicy,
     ModelGateway,
+    ProviderStreamChunk,
     OllamaAdapter,
 )
 from .imported_text import (
@@ -60,7 +61,7 @@ from .security_poc import (
 )
 from .asr import ASREvent
 from .voice_transcription import LocalVoiceTranscriber
-from .usage import UsageLedger, UsageRecord, usage_record_to_dict
+from .usage import UsageLedger, UsageRecord, UsageState, usage_record_to_dict
 
 
 BETA_MODEL = "qwen3.5:0.8b"
@@ -161,15 +162,15 @@ class BetaVoiceTranscriber(Protocol):
 
 
 async def _stream_with_keepalives(
-    source: AsyncIterator[str], interval_seconds: float
-) -> AsyncIterator[str | None]:
+    source: AsyncIterator[ProviderStreamChunk], interval_seconds: float
+) -> AsyncIterator[ProviderStreamChunk | None]:
     """Keep an SSE response active without exposing upstream thinking content."""
     iterator = source.__aiter__()
 
-    async def next_value() -> str:
+    async def next_value() -> ProviderStreamChunk:
         return await iterator.__anext__()
 
-    next_delta: asyncio.Task[str] = asyncio.create_task(next_value())
+    next_delta: asyncio.Task[ProviderStreamChunk] = asyncio.create_task(next_value())
     try:
         while True:
             completed, _ = await asyncio.wait({next_delta}, timeout=interval_seconds)
@@ -606,15 +607,22 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         started_monotonic = monotonic()
 
         async def events() -> AsyncIterator[str]:
+            prompt_tokens: int | None = None
+            completion_tokens: int | None = None
             try:
                 async for delta in _stream_with_keepalives(
-                    orchestrator.stream_request(model_request),
+                    orchestrator.stream_request_with_usage(model_request),
                     settings.chat_stream_keepalive_seconds,
                 ):
                     if delta is None:
                         yield ": keep-alive\n\n"
                         continue
-                    yield "data: " + json.dumps({"delta": delta}, ensure_ascii=False) + "\n\n"
+                    if delta.prompt_tokens is not None:
+                        prompt_tokens = delta.prompt_tokens
+                    if delta.completion_tokens is not None:
+                        completion_tokens = delta.completion_tokens
+                    if delta.text:
+                        yield "data: " + json.dumps({"delta": delta.text}, ensure_ascii=False) + "\n\n"
                 run_registry.transition(run.run_id, RunStatus.COMPLETED)
                 yield "data: " + json.dumps(
                     {"done": True, "run_id": run.run_id}, separators=(",", ":")
@@ -682,6 +690,13 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                             started_at=run.created_at,
                             completed_at=completed_at,
                             latency_ms=max(0, round((monotonic() - started_monotonic) * 1000)),
+                            prompt_tokens=prompt_tokens,
+                            completion_tokens=completion_tokens,
+                            usage_state=(
+                                UsageState.ACTUAL
+                                if prompt_tokens is not None or completion_tokens is not None
+                                else UsageState.UNKNOWN
+                            ),
                         )
                     )
 

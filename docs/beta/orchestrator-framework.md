@@ -40,6 +40,12 @@
 
 macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的 Provider/model、region、状态、耗时，以及实际/估算/未知 token 和费用。当前没有真实 token/费用时明确显示为未知，不作推算。面板查询只访问认证 loopback API，不发起模型请求；数据显示依赖当前进程内 ledger，退出后消失。
 
+### 流式 token usage 透传（2026-11-09）
+
+- `ProviderStreamChunk` 在 Gateway 内携带可选文本增量和 Provider 返回的 prompt/completion token 计数；SSE 客户端仍只收到文本增量。Ollama 完成帧的 `prompt_eval_count`/`eval_count` 和 OpenAI-compatible Provider 最终 usage 帧可进入 `UsageLedger`。
+- 对云端流请求附加 `stream_options.include_usage=true`。DeepSeek 官方 Chat Completions API 文档说明 SSE 最后一帧带整次请求 usage；阿里云 Model Studio 文档说明 Qwen OpenAI-compatible streaming 可用此选项返回最终 token usage；OpenRouter API/SDK 文档列出 `stream_options.include_usage`。这些是协议文档依据，不等于 Beta 当前精确型号的真实 usage 实测：未发云请求、未读取 Keychain。
+- 只有收到非负整数 Provider token 字段才标为 `actual`。中断、缺少最终 usage 或字段不完整时仍是 `unknown`；不从字符长度估 token。费用一直为 `unknown/null`，不依据 token 或价目表估算，D-005 预算门保持未实现。
+
 ## 验证
 
 在 `backend/` 目录执行：
@@ -51,7 +57,7 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked mypy pac_poc/usage.py pac_poc/be
 swift test --package-path poc/macos-audio
 ```
 
-结果：Usage 与能力清单改动后，Python 窄回归 46 passed；Ruff 全部通过；mypy 无问题。Usage 面板接入后 `swift test --package-path poc/macos-audio` → 36 项通过，`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。新面板尚未 GUI 手动冒烟；未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
+结果：本轮 Provider usage 透传窄回归 56 passed；Ruff 和相关模块 mypy 通过；Python 全量 `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 226 passed，1 条既有 Starlette/httpx 弃用警告。上一段用量面板接入后 `swift test --package-path poc/macos-audio` → 36 项通过，Beta target build 成功。面板 GUI 手动冒烟尚未做；未发起云请求、未读取 Keychain、未采集麦克风，也未增加持久化。
 
 ## 下一步
 
