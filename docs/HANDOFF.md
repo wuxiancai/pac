@@ -1099,3 +1099,12 @@
 - Adapter 重试处于当前 Gateway Consent lease 内；撤销授权会取消退避中的任务，自动回归确认只发出首次 429 请求。
 - MockTransport 覆盖 429→成功、Retry-After 超限、建连前超时→成功、读超时单次失败、401 单次失败及撤销后无再次尝试。定向回归 88 passed；完整后端回归 → 272 passed、1 条既有 Starlette/httpx 弃用警告；Ruff 与 `mypy pac_poc/remote_providers.py` 通过。没有真实云请求、Keychain 读取或 Provider fallback。
 - 更新 `docs/beta/macOS-beta-chat.md`、`TASKS.md`、`PROJECT_CONTEXT.md`。下一步继续阶段 2 可验证主线；预算 enforcement 仍待 D-005 的费用归一/unknown 规则，GUI 错误呈现仍待桌面验收。
+
+
+### 2026-11-10：B5 导入资料提示注入上下文回归
+
+- 新增 `test_imported_prompt_injection_stays_untrusted_user_data_without_tools`：合成注入文本及 JSON 样式文件名进入单条 user 消息中的 JSON 资料；system/user 角色保持固定，注入内容不进入 system prompt，当前请求没有注册工具。
+- 这项自动回归证明上下文结构和工具边界，不声称模型对任意提示注入具备语义免疫；云端导入仍由 API 拒绝，聊天引用 GUI 仍待桌面验收。
+- 定向 `tests/test_orchestrator.py tests/test_beta_api.py -k 'imported_prompt_injection or user_selected_text_import or untrusted_document_framing'`：4 passed；Ruff 通过。后端全量：273 passed、1 条既有 Starlette/httpx 弃用警告。
+- 已同步 `docs/beta/file-import.md`、`docs/TASKS.md` 与 `docs/PROJECT_CONTEXT.md`。
+- 下一步继续阶段 2/4 可本机闭环项；GUI 手动验收需可用桌面操作，PDF 保持禁用。

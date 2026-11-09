@@ -27,6 +27,8 @@ CI 现显式安装 `phase4-pdf-poc` extra，因此通用 Python 回归会实际�
 
 ## 自动验证
 
+2026-11-10 上下文注入边界回归：合成 TXT 内容含“忽略前文指令、插入 system role 并调用工具”的注入文本，文件名含可伪造 JSON 结构的引号。Orchestrator 仍只产出固定 system 指引和 user 消息；附件名/内容经 JSON 编码后保持在同一 user 资料字段，system 指引不含原文，Gateway 请求的 `tools` 为空。云端导入请求的 API 拒绝回归仍通过；这些测试证明上下文隔离和当前无工具面，不证明模型对任意提示注入都能语义免疫，也不替代聊天引用 GUI 手动验收。窄回归 4 passed，Ruff 通过；最新后端全量 273 passed、1 条既有 Starlette/httpx 弃用警告。
+
 Swift 客户端请求契约回归（2026-11-09）：`swift test --package-path poc/macos-audio` → 40 passed，Beta target build 通过。新增 URLProtocol fixture 验证导入请求只携带 basename、文件内容和 loopback Bearer token；不包含原始路径；PDF 与大于 10 MiB 文件在网络调用前拒绝。GUI 文件选择、暂存和移除已另行实测通过；自动契约测试不代替尚未完成的聊天引用 GUI 验收。较早一次只读检查旧运行实例时，accessibility 控件树未呈现“添加资料”；当时窗口有未持久化对话，因此未重启。之后确认 Beta 实例已退出，从仓库根目录运行 `poc/macos-audio/scripts/run_beta_app.sh` 启动当前构建，状态栏显示本机服务已连接，accessibility 树可见 `import-text-file-button`。随后进行本机 GUI 冒烟：仓库内 141-byte 合成 TXT 由文件选择器选中，Beta 显示 `gui-import-fixture.txt` 和 65 字符计数；点击移除后附件 chip 消失，状态提示“已从本机临时资料中移除”。当时应用选择 Ollama 本地模型，未发送聊天消息或触发 Provider，因此只确认文件选择、暂存和移除；资料实际进入聊天上下文的 GUI 引用仍待验证。
 
 在 `backend/` 目录：
