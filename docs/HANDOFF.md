@@ -1,3 +1,10 @@
+### 2026-11-09：扩充本机 ASR+LLM 并发性能样本
+
+- 在既有 7 轮的基础上，固定 `bilingual-mandarin-16k.wav` + `qwen3.5:0.8b` 新增 13 轮本机同步屏障 probe；13/13 产生 final、10 partial，模型响应非空且确认 ASR/LLM 实际重叠。
+- 新 13 轮结果：ASR wall/重叠 0.244–0.893 秒；运行级帧 P95=15.05–78.43 ms，n=13 的 P95=78.43 ms；单帧最大 25.25–121.72 ms；模型加载 0.609–1.456 秒；Python+Ollama RSS 峰值约 686–855 MB；LLM wall 4.98–45.95 秒。逐轮原始指标见 `docs/poc/phase0-concurrent-asr-llm-samples-2026-11-09.csv`。
+- 离线本机运行、无麦克风/云出站、无正文/转写记录且不执行工具。样本仍为同一合成 WAV 的 LLM probe，不代表 Agent 或产品负载；POC-01 性能保持 `PARTIAL`，GPU 和真实负载/阈值未覆盖。
+- 验证命令：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked python scripts/measure_concurrent_asr_llm_poc.py .poc-data/audio/bilingual-mandarin-16k.wav .poc-data/models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20 --llm-model qwen3.5:0.8b`，连续运行 13 次，全部 `status=completed`。
+
 ### 2026-11-09：阶段 0 性能采样关闭并缩小 Beta 依赖审查范围
 
 - D-013 Beta GUI 采样已完成：启动 20 次/P95=700 ms；partial 216 次/各窗口 P95≤41.5 ms；停止→final 21 次/pooled P95=97.9 ms。相应追踪行标为 `PASS（本机 Beta 样本）`，其范围限制已写入矩阵。

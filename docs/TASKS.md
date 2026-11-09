@@ -27,7 +27,7 @@
 
 ## 阶段 0 证据状态（保留追踪，不作为测试版总门禁）
 
-0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 180 项、Swift 33 项通过，`uv lock --check`、`compileall` 通过；历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地改动尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 55/55 非根依赖。D-013 Beta GUI 样本已达到计划数量并低于门槛：启动 n=20/P95=700 ms，partial 216 次/各窗口 P95≤41.5 ms，停止→final n=21/P95=97.9 ms。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
+0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-09 最新本机回归：Python 180 项、Swift 33 项通过，`uv lock --check`、`compileall` 通过；历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地改动尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 55/55 非根依赖。D-013 Beta GUI 样本已达到计划数量并低于门槛：启动 n=20/P95=700 ms，partial 216 次/各窗口 P95≤41.5 ms，停止→final n=21/P95=97.9 ms。POC-01 并发 probe 新增 13 轮，详见 `phase0-local-asr.md` 与逐轮 CSV；完整 Agent/产品负载仍未验收。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
 
 ## 当前执行顺序
 
