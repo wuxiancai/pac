@@ -19,7 +19,7 @@
 | 顺序 | 工作包 | 状态 | 完成条件 / 说明 |
 |---:|---|---|---|
 | B0 | 应用可运行骨架 | IN PROGRESS | 新增 SwiftUI 测试版 `.app` 构建/启动入口；本轮经启动脚本实机显示本机服务已连接，Cmd-Q 后进程检查未见 app/backend 残留。窗口关闭路径及启动失败恢复体验仍需复核。 |
-| B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或千问应用 API、DeepSeek、OpenRouter 固定路由；本地模型 ID 可配置。选择云端即持续授权后续消息发往该服务商，设置有告知且无逐条弹窗；Keychain、固定目标、L3 拦截、错误脱敏和无自动 fallback 保留。每次发送快照当前 Provider/模型；切换时取消旧客户端流并屏蔽迟到回调，状态栏显示当前及本轮实际路由（已构建，GUI 手动切换/请求冒烟待复核）。此前本机一次千问合成请求结果不明；用户随后反馈千问已可正常聊天（本轮未独立复测）。D-010 仍待决；Token Plan `sk-sp-` 个人版不直连自建应用。详见 `beta/macOS-beta-chat.md`。 |
+| B1 | 本机文字对话及模型设置 | IN PROGRESS | GUI 可选本地 Ollama 或千问应用 API、DeepSeek、OpenRouter 固定路由；本地模型 ID 可配置。选择云端即持续授权后续消息发往该服务商，设置有告知且无逐条弹窗；Keychain、固定目标、L3 拦截、错误脱敏和无自动 fallback 保留。每次发送快照当前 Provider/模型；切换时取消旧客户端流并屏蔽迟到回调，状态栏显示当前及本轮实际路由（已构建，GUI 手动切换/请求冒烟待复核）。此前本机一次千问合成请求结果不明；用户随后反馈千问已可正常聊天（本轮未独立复测）。D-005 已定自然月 100 元预算/80 元提醒/100 元硬拦截，Beta 尚无费用归一或限额实现，不能作为当前保护承诺；D-010 仍待决；Token Plan `sk-sp-` 个人版不直连自建应用。详见 `beta/macOS-beta-chat.md`。 |
 | B2 | 本地语音闭环 | IN PROGRESS | 已扩展为受认证 loopback WebSocket 本机实时 ASR：200 ms PCM 帧、有界队列、临时 partial、停止后 final 入草稿；文字生成中可点击打断并开始语音输入。补齐 `websockets` 依赖；用户确认录音时 partial 可见。新增 WebSocket/ASR finish 自动回归；停止后的 final/草稿、取消和打断路径仍需实机复核。云 Realtime、AEC/自动声学插话和睡眠/锁屏等仍按阶段 3/ADR-021 处理。手动本机朗读仍保留。详见 `beta/macOS-beta-voice.md`。 |
 | B3 | 会话保存与恢复 | DEFERRED | D-003 已决定不保存对话；持久化仍不在当前范围。若未来恢复会话保存，须先完成静态加密 D-007/ADR-019、migration、备份和恢复验证。 |
 | B4 | 千问 Token Plan 扩展接入 | DEFERRED | 个人版条款仅允许经官方支持的编程/智能体工具扩展交互使用，排除本项目自建应用后端。只有取得允许自建应用的官方授权/套餐，或实现受支持工具扩展集成后，才能纳入应用选项。协议、地址和状态见 `beta/qwen-token-plan-integration.md`。 |
