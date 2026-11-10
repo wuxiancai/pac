@@ -193,7 +193,7 @@ private final class FakeDatabaseKeychainAccess: DatabaseKeychainAccessing {
 private final class FakeTaskReminderNotificationCenter: TaskReminderNotificationCenter {
     var requestAuthorizationResult = false
     var currentAuthorizationStatus: UNAuthorizationStatus = .notDetermined
-    var requests: [UNNotificationRequest] = []
+    var requests: [String] = []
 
     func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
         requestAuthorizationResult
@@ -203,27 +203,21 @@ private final class FakeTaskReminderNotificationCenter: TaskReminderNotification
         currentAuthorizationStatus
     }
 
-    func pendingNotificationRequests() async -> [UNNotificationRequest] {
+    func pendingNotificationIdentifiers() async -> [String] {
         requests
     }
 
     func removePendingNotificationRequests(withIdentifiers identifiers: [String]) {
-        requests.removeAll { identifiers.contains($0.identifier) }
+        requests.removeAll { identifiers.contains($0) }
     }
 
-    func add(_ request: UNNotificationRequest) async throws {
-        requests.removeAll { $0.identifier == request.identifier }
-        requests.append(request)
+    func add(identifier: String, title: String, date: Date) async throws {
+        requests.removeAll { $0 == identifier }
+        requests.append(identifier)
     }
 
     func seed(identifier: String) {
-        requests.append(
-            UNNotificationRequest(
-                identifier: identifier,
-                content: UNMutableNotificationContent(),
-                trigger: nil
-            )
-        )
+        requests.append(identifier)
     }
 }
 
@@ -241,7 +235,7 @@ private final class FakeTaskReminderNotificationCenter: TaskReminderNotification
     let granted = try await manager.requestAndEnable()
     #expect(!granted)
     #expect(!manager.isEnabled)
-    let afterDenial = await center.pendingNotificationRequests().map(\.identifier)
+    let afterDenial = await center.pendingNotificationIdentifiers()
     #expect(afterDenial == ["other.app.notification"])
 
     defaults.set(true, forKey: TaskReminderManager.preferenceKey)
@@ -250,6 +244,6 @@ private final class FakeTaskReminderNotificationCenter: TaskReminderNotification
     await manager.reconcile(tasks: [])
 
     #expect(!manager.isEnabled)
-    let afterRevocation = await center.pendingNotificationRequests().map(\.identifier)
+    let afterRevocation = await center.pendingNotificationIdentifiers()
     #expect(afterRevocation == ["other.app.notification"])
 }

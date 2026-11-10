@@ -54,7 +54,12 @@ private final class EventKitCalendarWriter: CalendarEventWriting {
     var hasDefaultCalendarForNewEvents: Bool { eventStore.defaultCalendarForNewEvents != nil }
 
     func requestWriteOnlyAccess() async throws -> Bool {
-        try await eventStore.requestWriteOnlyAccessToEvents()
+        try await withCheckedThrowingContinuation { continuation in
+            eventStore.requestWriteOnlyAccessToEvents { granted, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: granted) }
+            }
+        }
     }
 
     func save(_ draft: CalendarEventDraft) throws {

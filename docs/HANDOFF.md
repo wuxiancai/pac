@@ -1,3 +1,9 @@
+# 2026-11-11：修复 macOS 15 SDK 下 Swift 6 并发编译
+
+- Actions run `42921606051` 的 macOS 15 job 成功分配 runner，但 Swift 编译因 UserNotifications 的非 Sendable 对象跨 actor，以及 EventKit async 授权方法接收主 actor 隔离 `EKEventStore` 而失败；同一 run 的常规 CI job 全部成功（Python 347、Swift 96、Beta build 等）。
+- 通知适配器现只在测试缝中传递标识、标题和日期值；系统对象在适配器内部创建/读取，待处理请求回调直接提取 `[String]`。EventKit 授权改用 macOS 14 专用 completion-handler API，避免将 EventKit store 传入非隔离 async API。没有使用 `@unchecked Sendable` 或屏蔽并发诊断。
+- 验证：`swift test --package-path poc/macos-audio` → 96 项通过；`poc/macos-audio/scripts/build_beta_app.sh` 成功；`git diff --check` 通过。待提交推送后取得 macOS 15/Xcode 16.4 远端回归结果。该验证不覆盖真实系统授权弹窗或通知投递。
+
 # 2026-11-11：替换已退役的 macOS 14 Actions runner
 
 - 提交 `140e69f` 触发 Actions run `42920718612`。新增 job 的 `runs-on: macos-14` 在 runner 分配阶段立即失败，诊断为 `macos-14-arm64-us-default` 不受支持。复核 GitHub 第一方 runner images 公告，macOS 14 Actions 镜像已于 2026-11-02 全面退役（[官方退役公告](https://github.com/actions/runner-images/issues/13518)）。这是 runner 配置错误，不是 Swift 测试/打包失败。主 job 已成功完成：Python 347 passed（1 条既有警告）、Swift 96 passed、Ruff、mypy、lock、secret scan、compileall 和 Beta target build 全通过。

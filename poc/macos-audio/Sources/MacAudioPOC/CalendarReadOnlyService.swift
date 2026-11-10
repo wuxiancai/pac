@@ -43,7 +43,12 @@ private final class EventKitCalendarReader: CalendarEventReading {
     }
 
     func requestFullAccess() async throws -> Bool {
-        try await eventStore.requestFullAccessToEvents()
+        try await withCheckedThrowingContinuation { continuation in
+            eventStore.requestFullAccessToEvents { granted, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: granted) }
+            }
+        }
     }
 
     func events(from start: Date, to end: Date) -> [LocalCalendarEvent] {
@@ -143,7 +148,12 @@ private final class EventKitCalendarReminderReader: CalendarReminderReading {
     }
 
     func requestFullAccess() async throws -> Bool {
-        try await eventStore.requestFullAccessToReminders()
+        try await withCheckedThrowingContinuation { continuation in
+            eventStore.requestFullAccessToReminders { granted, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: granted) }
+            }
+        }
     }
 
     func incompleteReminders(dueBy end: Date) async throws -> [LocalCalendarReminder] {

@@ -6,15 +6,63 @@ import UserNotifications
 protocol TaskReminderNotificationCenter {
     func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
     func authorizationStatus() async -> UNAuthorizationStatus
-    func pendingNotificationRequests() async -> [UNNotificationRequest]
+    func pendingNotificationIdentifiers() async -> [String]
     func removePendingNotificationRequests(withIdentifiers identifiers: [String])
-    func add(_ request: UNNotificationRequest) async throws
+    func add(identifier: String, title: String, date: Date) async throws
 }
 
+@MainActor
 @available(macOS 14.0, *)
-extension UNUserNotificationCenter: TaskReminderNotificationCenter {
+private final class SystemTaskReminderNotificationCenter: TaskReminderNotificationCenter {
+    private let center: UNUserNotificationCenter
+
+    init(center: UNUserNotificationCenter = .current()) {
+        self.center = center
+    }
+
+    func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
+        try await center.requestAuthorization(options: options)
+    }
+
     func authorizationStatus() async -> UNAuthorizationStatus {
-        await notificationSettings().authorizationStatus
+        await withCheckedContinuation { continuation in
+            center.getNotificationSettings { settings in
+                continuation.resume(returning: settings.authorizationStatus)
+            }
+        }
+    }
+
+    func pendingNotificationIdentifiers() async -> [String] {
+        await withCheckedContinuation { continuation in
+            center.getPendingNotificationRequests { requests in
+                continuation.resume(returning: requests.map(\.identifier))
+            }
+        }
+    }
+
+    func removePendingNotificationRequests(withIdentifiers identifiers: [String]) {
+        center.removePendingNotificationRequests(withIdentifiers: identifiers)
+    }
+
+    func add(identifier: String, title: String, date: Date) async throws {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = "本机任务提醒"
+        content.sound = .default
+        let components = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second], from: date
+        )
+        let request = UNNotificationRequest(
+            identifier: identifier,
+            content: content,
+            trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        )
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            center.add(request) { error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume() }
+            }
+        }
     }
 }
 
@@ -28,7 +76,7 @@ public final class TaskReminderManager {
     private let defaults: UserDefaults
 
     public init(center: UNUserNotificationCenter = .current()) {
-        self.center = center
+        self.center = SystemTaskReminderNotificationCenter(center: center)
         defaults = .standard
     }
 
@@ -54,8 +102,7 @@ public final class TaskReminderManager {
 
     public func disable() async {
         defaults.set(false, forKey: Self.preferenceKey)
-        let requests = await center.pendingNotificationRequests()
-        let identifiers = requests.map(\.identifier).filter { $0.hasPrefix("pac.task.") }
+        let identifiers = await center.pendingNotificationIdentifiers().filter { $0.hasPrefix("pac.task.") }
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
     }
 
@@ -69,8 +116,8 @@ public final class TaskReminderManager {
         let now = Date()
         let eligible = tasks.filter { Self.isEligible($0, now: now) }
         let keep = Set(eligible.map { Self.identifier(for: $0.id) })
-        let pending = await center.pendingNotificationRequests()
-        let stale = pending.map(\.identifier).filter {
+        let pending = await center.pendingNotificationIdentifiers()
+        let stale = pending.filter {
             $0.hasPrefix("pac.task.") && !keep.contains($0)
         }
         center.removePendingNotificationRequests(withIdentifiers: stale)
@@ -94,20 +141,7 @@ public final class TaskReminderManager {
             await disable()
             return
         }
-        let content = UNMutableNotificationContent()
-        content.title = task.title
-        content.body = "本机任务提醒"
-        content.sound = .default
-        let trigger = UNCalendarNotificationTrigger(
-            dateMatching: Calendar.current.dateComponents(
-                [.year, .month, .day, .hour, .minute, .second], from: date
-            ),
-            repeats: false
-        )
-        let request = UNNotificationRequest(
-            identifier: Self.identifier(for: task.id), content: content, trigger: trigger
-        )
-        try? await center.add(request)
+        try? await center.add(identifier: Self.identifier(for: task.id), title: task.title, date: date)
     }
 
     public func remove(taskID: String) {
