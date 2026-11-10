@@ -36,18 +36,6 @@ enum CloudProvider: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-fileprivate struct BetaModelPreset: Codable, Identifiable, Equatable {
-    let id: UUID
-    var name: String
-    var source: ModelSource
-    var localModel: String
-    var cloudProvider: CloudProvider
-
-    var summary: String {
-        source == .local ? "本机 · \(localModel)" : "\(cloudProvider.title) · \(cloudProvider.model) · \(cloudProvider.region)"
-    }
-}
-
 @main
 @available(macOS 14.0, *)
 struct PersonalAssistantBetaApp: App {
@@ -181,12 +169,14 @@ final class BetaChatModel {
     var speechRatePreset: SpeechRatePreset {
         didSet { defaults.set(speechRatePreset.rawValue, forKey: "beta.speech.rate-preset") }
     }
-    fileprivate private(set) var modelPresets: [BetaModelPreset] {
+    private var modelPresetStore: LocalModelPresetStore {
         didSet {
-            guard let data = try? JSONEncoder().encode(modelPresets) else { return }
-            defaults.set(data, forKey: "beta.model.presets")
+            if let data = modelPresetStore.serializedData() {
+                defaults.set(data, forKey: "beta.model.presets")
+            }
         }
     }
+    fileprivate var modelPresets: [LocalModelPreset] { modelPresetStore.presets }
     let assistantProfiles: [(key: String, title: String)] = [
         ("main_assistant", "总助理"),
         ("project_assistant", "项目助理"),
@@ -238,8 +228,9 @@ final class BetaChatModel {
         speechRatePreset = SpeechRatePreset(
             rawValue: defaults.string(forKey: "beta.speech.rate-preset") ?? SpeechRatePreset.normal.rawValue
         ) ?? .normal
-        modelPresets = (defaults.data(forKey: "beta.model.presets")
-            .flatMap { try? JSONDecoder().decode([BetaModelPreset].self, from: $0) }) ?? []
+        modelPresetStore = LocalModelPresetStore(
+            serializedData: defaults.data(forKey: "beta.model.presets")
+        )
         supervisor = LocalBackendSupervisor(
             pythonExecutableURL: configuration.pythonExecutableURL,
             backendDirectoryURL: configuration.backendDirectoryURL
@@ -1171,29 +1162,31 @@ final class BetaChatModel {
     }
 
     fileprivate func saveModelPreset(named rawName: String) -> Bool {
-        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let selectedLocalModel = localModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, name.count <= 32,
-              source != .local || !selectedLocalModel.isEmpty,
-              !modelPresets.contains(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame })
-        else { return false }
-        modelPresets.append(BetaModelPreset(
-            id: UUID(), name: name, source: source,
-            localModel: selectedLocalModel,
-            cloudProvider: cloudProvider
-        ))
-        return true
+        modelPresetStore.save(
+            name: rawName,
+            sourceID: source.rawValue,
+            localModel: localModel,
+            providerID: selectedProvider
+        )
     }
 
-    fileprivate func applyModelPreset(_ preset: BetaModelPreset) {
+    fileprivate func applyModelPreset(_ preset: LocalModelPreset) {
         guard modelPresets.contains(preset) else { return }
-        localModel = preset.localModel
-        cloudProvider = preset.cloudProvider
-        source = preset.source
+        switch preset.sourceID {
+        case ModelSource.local.rawValue:
+            localModel = preset.localModel
+            source = .local
+        case ModelSource.cloud.rawValue:
+            guard let provider = CloudProvider(rawValue: preset.providerID) else { return }
+            cloudProvider = provider
+            source = .cloud
+        default:
+            return
+        }
     }
 
-    fileprivate func deleteModelPreset(_ preset: BetaModelPreset) {
-        modelPresets.removeAll { $0.id == preset.id }
+    fileprivate func deleteModelPreset(_ preset: LocalModelPreset) {
+        modelPresetStore.delete(id: preset.id)
     }
 
     private func nonemptyMessages(_ values: [LocalChatMessage]) -> [LocalChatMessage] {
@@ -2455,7 +2448,7 @@ private struct BetaModelSettingsView: View {
                             HStack(alignment: .center) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(preset.name).font(.headline)
-                                    Text(preset.summary).font(.caption).foregroundStyle(.secondary)
+                                    Text(modelPresetSummary(preset)).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                                 Button("使用") { model.applyModelPreset(preset) }
@@ -2580,6 +2573,16 @@ private struct BetaModelSettingsView: View {
         case "unsupported": "已核验不支持"
         default: "未知"
         }
+    }
+
+    private func modelPresetSummary(_ preset: LocalModelPreset) -> String {
+        if preset.sourceID == ModelSource.local.rawValue {
+            return "本机 · \(preset.localModel)"
+        }
+        guard let provider = CloudProvider(rawValue: preset.providerID) else {
+            return "未知服务商配置（无法应用）"
+        }
+        return "\(provider.title) · \(provider.model) · \(provider.region)"
     }
 
     private func saveCredential() {

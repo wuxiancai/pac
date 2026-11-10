@@ -1,7 +1,7 @@
 # 2026-11-10：V1.1 本机模型预设
 
 - 模型设置支持保存、使用和删除命名预设；仅本机保存模型来源、Ollama 型号和固定云 Provider 标识，不存 Key。预设名称非空、最多 32 字且不区分大小写去重。云预设展示 Provider/型号/区域，并沿用现有 Keychain/预算/安全审计流程。
-- 验证：`swift test --package-path poc/macos-audio` → 69 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。设置界面实机验收待做。
+- 存储/校验逻辑已抽到 `LocalModelPresetStore`，自动回归覆盖序列化、字段范围、名字裁剪/去重和定向删除。验证：`swift test --package-path poc/macos-audio` → 72 passed；Beta target build 成功。设置界面实机验收待做。
 - 该功能不新增 Provider 或权限，也不代表真实云请求通过。
 
 # 2026-11-10：V1.1 本机朗读语速预设
