@@ -367,6 +367,7 @@ final class BetaChatModel: CalendarEventAuditRecording {
                     case .delta(let delta):
                         if !Task.isCancelled, let index = self.messages.indices.last {
                             self.messages[index] = LocalChatMessage(
+                                stableID: self.messages[index].stableID,
                                 role: "assistant", content: self.messages[index].content + delta
                             )
                         }
@@ -1246,14 +1247,6 @@ final class BetaChatModel: CalendarEventAuditRecording {
 }
 
 @available(macOS 14.0, *)
-private struct ChatMessageRow: Identifiable {
-    let index: Int
-    let message: LocalChatMessage
-
-    var id: String { message.id ?? "transient-\(index)" }
-}
-
-@available(macOS 14.0, *)
 private struct BetaChatView: View {
     @Bindable var model: BetaChatModel
     @FocusState private var isDraftFocused: Bool
@@ -1435,15 +1428,11 @@ private struct BetaChatView: View {
                             )
                             .padding(.top, 80)
                         }
-                        ForEach(Array(model.messages.enumerated()).map {
-                            ChatMessageRow(index: $0.offset, message: $0.element)
-                        }) { row in
-                            let index = row.index
-                            let message = row.message
+                        ForEach(model.messages, id: \.stableID) { message in
                             HStack(alignment: .top) {
                                 if message.role == "assistant" {
                                     responseBubble(message.content)
-                                    if index == model.messages.count - 1,
+                                    if model.messages.last?.stableID == message.stableID,
                                        model.latestAssistantText == message.content {
                                         VStack(spacing: 6) {
                                             Button {
@@ -1470,7 +1459,7 @@ private struct BetaChatView: View {
                                     userBubble(message.content)
                                 }
                             }
-                            .id(row.id)
+                            .id(message.id ?? message.stableID.uuidString)
                         }
                     }
                     .padding()
@@ -1479,7 +1468,7 @@ private struct BetaChatView: View {
                     guard !model.messages.isEmpty else { return }
                     guard let lastMessage = model.messages.last else { return }
                     proxy.scrollTo(
-                        lastMessage.id ?? "transient-\(model.messages.count - 1)",
+                        lastMessage.id ?? lastMessage.stableID.uuidString,
                         anchor: .bottom
                     )
                 }

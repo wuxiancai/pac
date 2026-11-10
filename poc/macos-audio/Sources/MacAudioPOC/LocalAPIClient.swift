@@ -28,11 +28,14 @@ extension LocalAPIClientError: LocalizedError {
 
 public struct LocalChatMessage: Codable, Equatable, Sendable {
     public let id: String?
+    /// Stable identity for SwiftUI rows; intentionally excluded from the API payload.
+    public let stableID: UUID
     public let role: String
     public let content: String
 
-    public init(id: String? = nil, role: String, content: String) {
+    public init(id: String? = nil, stableID: UUID = UUID(), role: String, content: String) {
         self.id = id
+        self.stableID = stableID
         self.role = role
         self.content = content
     }
@@ -42,6 +45,7 @@ public struct LocalChatMessage: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(String.self, forKey: .id)
+        stableID = UUID()
         role = try container.decode(String.self, forKey: .role)
         content = try container.decode(String.self, forKey: .content)
     }
@@ -50,6 +54,10 @@ public struct LocalChatMessage: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(role, forKey: .role)
         try container.encode(content, forKey: .content)
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id && lhs.role == rhs.role && lhs.content == rhs.content
     }
 }
 

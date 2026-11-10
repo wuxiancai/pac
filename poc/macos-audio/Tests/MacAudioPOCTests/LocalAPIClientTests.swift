@@ -2,6 +2,25 @@ import Foundation
 import Testing
 @testable import MacAudioPOC
 
+@Test func chatMessageUIIdentityStaysOutOfWirePayload() throws {
+    let stableID = UUID()
+    let message = LocalChatMessage(
+        id: "persisted-id", stableID: stableID, role: "assistant", content: "streamed"
+    )
+    let object = try #require(
+        JSONSerialization.jsonObject(with: JSONEncoder().encode(message)) as? [String: String]
+    )
+
+    #expect(Set(object.keys) == Set(["role", "content"]))
+    #expect(object["role"] == "assistant")
+    #expect(object["content"] == "streamed")
+
+    let replacement = LocalChatMessage(
+        stableID: message.stableID, role: "assistant", content: "streamed reply"
+    )
+    #expect(replacement.stableID == stableID)
+}
+
 private final class ErrorResponseURLProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
