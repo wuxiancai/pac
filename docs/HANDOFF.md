@@ -1629,3 +1629,9 @@
 
 - 在本机 Ollama 新会话选择“行动项整理”，消息为三项合成读书周准备事项。点击发送后控件从 `Skills 1` 立即清为 `Skills 0`，验证单轮选择消费路径。
 - 请求使用 `qwen3.5:0.8b`，超过两分钟仍显示运行中且没有正文；点击“停止”后 run 显示已取消。该样本不证明 Skill 输出质量或 Skill 导致延迟，原因未判定；未切换 Provider、未调用云、未采集麦克风。合成测试聊天保留在本机 SQLCipher 历史。
+
+### 2026-11-10：阶段 6 本地等价门禁复核
+
+- 在提交 `2790722` 后复核：后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --directory backend --locked --all-extras --all-groups pytest -q` → 346 passed、1 条既有 Starlette/httpx 弃用警告；`swift test --package-path poc/macos-audio` → 62 passed；Beta target build 成功。
+- 静态门禁：Ruff 全目录通过；`mypy pac_poc` 37 个源文件无问题；`uv lock --check`、Python `compileall` 通过。SwiftPM 曾等待另一构建实例释放 `.build`，随后成功完成。未运行远端 GitHub Actions，故不更新远端 CI/PR 证据；阶段 6 仍开放。
+- 本轮未发起 Provider 请求、未采集麦克风、未读写真实 Keychain 或触发系统通知授权。

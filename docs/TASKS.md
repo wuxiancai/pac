@@ -51,6 +51,8 @@
 
 ## 当前执行顺序
 
+2026-11-10 阶段 6 本地门禁复核：后端全量 346 passed（1 条既有 Starlette/httpx 弃用警告），Swift 62 passed，Ruff/mypy/锁文件/compileall 和 Beta target build 均通过；未运行远端 GitHub Actions，阶段 6 不关闭。精确命令及边界见 `docs/HANDOFF.md`。
+
 2026-11-10 B8 Skill GUI 冒烟：选择“行动项整理”后发送即清空至 `Skills 0`；本机 qwen3.5:0.8b 超过两分钟仍无正文，停止后已取消。仅选择消费路径通过，延迟原因未判定，不外推为 Skill 缺陷。
 
 2026-11-10 B9 输出质量迭代：专业角色与综合层现明确约束目标相关性及数量/长度/格式；API 自动回归确认三次本机调用均收到指令。强化后的 `qwen3.5:0.8b` GUI 样本中，综合结果首次达到相关、三条编号且逐条 ≤12 字，但专业角色观点仍超长；单样本不构成稳定保证，B9 保持 IN PROGRESS。后端全量 346 passed，详见 `docs/beta/orchestrator-framework.md`。
