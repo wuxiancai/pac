@@ -88,6 +88,33 @@ class WaitingStreamAdapter(RemoteProbeAdapter):
             self.closed.set()
 
 
+class CloseFailingStream:
+    def __init__(self) -> None:
+        self.sent = False
+
+    def __aiter__(self) -> CloseFailingStream:
+        return self
+
+    async def __anext__(self) -> str:
+        if self.sent:
+            raise StopAsyncIteration
+        self.sent = True
+        return "one chunk"
+
+    async def aclose(self) -> None:
+        raise RuntimeError("synthetic stream close failure")
+
+
+class CloseFailingAdapter:
+    is_local = False
+
+    async def generate(self, request: LocalModelRequest) -> str:
+        raise AssertionError("test uses a stream")
+
+    def stream(self, request: LocalModelRequest) -> CloseFailingStream:
+        return CloseFailingStream()
+
+
 def remote_request(**overrides: object) -> LocalModelRequest:
     fields: dict[str, object] = {
         "provider": "provider-test",
@@ -329,6 +356,24 @@ def test_revocation_cancels_in_flight_stream_and_closes_adapter() -> None:
 
         assert adapter.calls == 1
         assert closed.is_set()
+
+    asyncio.run(run())
+
+
+def test_usage_stream_releases_consent_lease_when_upstream_close_fails() -> None:
+    async def run() -> None:
+        consent = ConsentManager()
+        grant_consent(consent, actions=frozenset({ModelAction.STREAM}))
+        gateway = make_gateway(consent, CloseFailingAdapter())  # type: ignore[arg-type]
+
+        async def consume() -> None:
+            async for _ in gateway.stream_with_usage(remote_request()):
+                pass
+
+        with pytest.raises(RuntimeError, match="synthetic stream close failure"):
+            await consume()
+
+        assert consent._in_flight == {}
 
     asyncio.run(run())
 

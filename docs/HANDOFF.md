@@ -1132,3 +1132,11 @@
 - Python 全量：276 passed，1 条既有 Starlette/httpx 弃用警告。Swift `swift test --package-path poc/macos-audio`：43 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。
 - 未触发远端 GitHub Actions；本机等价门禁不能证明 PR/push workflow 已运行。工作区保持干净。
 - 后续继续阶段 2 可本机闭环开发；GUI 手动验收、D-005 预算决策、真实 Provider usage/cost 和 PDF 安全启用证据仍分别保持未完成。
+
+
+### 2026-11-10：Gateway 流清理异常仍释放 Consent lease
+
+- 发现 `ModelGateway.stream_with_usage()` 的 `finally` 先等待上游 iterator 的 `aclose()`，再关闭 Consent lease；若上游清理抛异常，会跳过 lease 注销并把已结束的 task/loop 保留在 ConsentManager 在途表。
+- 将 lease 注销放入独立嵌套 `finally`，确保清理异常和取消路径都释放登记。增加故意在 `aclose()` 抛错的异步迭代器回归，并断言 in-flight 表为空。
+- 定向 `tests/test_consent_aware_gateway.py -k 'usage_stream_releases_consent_lease or revocation_cancels_in_flight_stream'`：2 passed；Ruff 与 `mypy pac_poc/model_gateway.py` 通过。后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：277 passed、1 条既有 Starlette/httpx 弃用警告。
+- 已更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md` 与 `docs/PROJECT_CONTEXT.md`。无真实云请求，未读取 Keychain。

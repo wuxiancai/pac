@@ -224,10 +224,12 @@ class ModelGateway:
                 async for text in stream:
                     yield ProviderStreamChunk(text=text)
         finally:
-            close = getattr(locals().get("stream"), "aclose", None)
-            if close is not None:
-                await close()
-            self._close_operation(lease)
+            try:
+                close = getattr(locals().get("stream"), "aclose", None)
+                if close is not None:
+                    await close()
+            finally:
+                self._close_operation(lease)
 
     async def call_with_tools(self, request: LocalModelRequest) -> ToolCallResult:
         adapter = self._get_authorized_adapter(request, ModelAction.TOOL_PROPOSAL)
