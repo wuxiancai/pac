@@ -1,3 +1,9 @@
+# 2026-11-10：D-007 SQLCipher 加密方案决议
+
+- 用户选择 SQLCipher 产品数据库，随机数据库密钥保存在 macOS Keychain；登录解锁后自动打开，不要求每次启动 Touch ID。Apple Keychain 文档分别说明 `WhenUnlocked` 的设备解锁可访问性与 `userPresence` 的显式生物识别/设备口令约束；本次决议选择自动打开路径，具体 macOS Keychain 属性仍需实现时核验。SQLCipher 官方文档说明可设置密钥及 `rekey`，密钥生命周期仍需产品设计。
+- D-007 已记录为“方向已选、产品实现待验收”。密钥生成/ACL/轮换/丢失恢复、备份恢复、迁移、Community attribution/NOTICE、性能及断电语义都不是当前 POC 已证明项。
+- 同步 `docs/DECISIONS.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md` 与阶段 0 追踪矩阵。未创建产品数据库或读取/写入 Keychain。
+
 # 2026-11-10：持久数据保留规则决定
 
 - 用户决定聊天及已确认记忆保留至手动删除，完成任务自动保留 30 天后清理。既有安全日志元数据 30 天、临时会话/音频缓存退出或中断时清理的规则继续适用。

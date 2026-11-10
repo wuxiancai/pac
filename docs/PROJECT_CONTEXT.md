@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-- 2026-11-10 范围扩展：用户要求完成 V1.1、V2、V3 开发。用户已决定本地持久化聊天、任务和已确认记忆；聊天/已确认记忆手动删除，完成任务 30 天后清理。备份/加密、Embedding 与导出策略仍待定。现有 Beta 的本机优先和不持久化边界在新架构决议生效前继续有效。路线与门禁见 `docs/TASKS.md` 和 `docs/DECISIONS.md`。
+- 2026-11-10 范围扩展：用户要求完成 V1.1、V2、V3 开发。用户已决定本地持久化聊天、任务和已确认记忆；聊天/已确认记忆手动删除，完成任务 30 天后清理。SQLCipher + Keychain 随机密钥、登录后自动打开已选为加密方向，正式密钥生命周期/产品验证仍未完成；备份、Embedding 与导出策略仍待定。现有 Beta 的本机优先和不持久化边界在新架构决议生效前继续有效。路线与门禁见 `docs/TASKS.md` 和 `docs/DECISIONS.md`。
 - 2026-11-10 D-005 官方计费来源补证：DeepSeek `deepseek-flash` 价目区分缓存/时段，API usage 提供 token 明细但没有请求级 cost；价目会变动。不得将 token 反推结果称为实扣费用；人民币预算硬拦截及其缺失值/持久累计语义仍未实现，研究见 `docs/beta/orchestrator-framework.md`。
 - 阶段状态（2026-11-09）：阶段 0 的 Beta 范围已结束，附带明确的未实现/延期清单；原始 §13 全量 POC 仍有 `PARTIAL/OPEN`，不宣称全量验收。阶段 1 当前决策允许的无持久化工程底座已完成并接入 CI lint/type/test/secret-scan 门禁。Loopback API 已有 trace、统一错误、依赖注入、最小 health、可注入启动设置和集中校验配置；云凭据写入/删除需通过 Touch ID 或设备密码。数据库、schema/migration、会话持久化、静态加密、预算硬拦截、PDF 导入及 30 天持久安全审计明确未实现；TXT/Markdown 导入由 B5 增量实现，完整文件导入未完成。触发条件见 `docs/poc/phase0-traceability.md` 和 `docs/TASKS.md`。
 - 阶段路线：规格书共 7 阶段（0–6）；当前继续推进阶段 2 的对话/Gateway/Usage 主线。阶段 3 实时语音及阶段 4 文件导入均已有部分能力提前进入 Beta，但各自阶段验收仍未完成。各阶段范围见 `docs/TASKS.md` 与规格书 §13。
