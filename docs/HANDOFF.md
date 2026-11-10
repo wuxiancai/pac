@@ -1,3 +1,9 @@
+# 2026-11-10：SQLCipher 加密备份导出核心
+
+- `EncryptedApplicationStore.export_encrypted_backup()` 使用 SQLCipher Online Backup API 从运行库生成口令密钥加密的临时数据库，关闭并执行 `PRAGMA integrity_check`/schema version 验证后写入版本化容器。来源连接仍由 SQLAlchemy pool 管理；临时 DB 与 WAL/SHM/journal 文件均清理，用户目标通过同目录 0600 staging + fsync + 原子替换交付。
+- 验证：`tests/test_backup.py` 5 passed；完整后端回归 305 passed，1 条既有 Starlette/httpx 弃用警告；Ruff、mypy、`uv lock --check` 通过。
+- 尚未接 API/UI，也未实现 restore、restore 前预备份、换钥/回滚或系统认证。
+
 # 2026-11-10：D-006 版本化备份容器核心
 
 - 新增 `pac_poc.backup`：scrypt 派生（N=32768/r=8/p=1，16-byte random salt、32-byte 输出）、版本化严格头部、HMAC 校验、当前安装数据库密钥 SHA-256 指纹绑定，以及 1 MiB 缓冲的流式容器写入/提取。目标文件使用同目录临时文件、0600 权限、fsync 与原子替换；口令或密钥不写日志/文件头。

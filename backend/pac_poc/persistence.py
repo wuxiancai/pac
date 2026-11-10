@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import stat
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -14,6 +15,12 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine, URL
+
+from .backup import (
+    EncryptedBackupError,
+    derive_backup_key,
+    write_backup_container,
+)
 
 
 APP_DATA_DIRECTORY_NAME = "PersonalAI"
@@ -85,11 +92,112 @@ class EncryptedApplicationStore:
         if engine is not None:
             engine.dispose()
 
+    def export_encrypted_backup(
+        self, target: Path, *, password: str, replace_existing: bool = False
+    ) -> dict[str, int]:
+        """Create and validate a password-encrypted snapshot of the live SQLCipher store."""
+        engine = self._require_engine()
+        if not isinstance(target, Path) or not target.is_absolute():
+            raise ValueError("backup destination must be an absolute path")
+        if target.resolve(strict=False) == self._path.resolve(strict=False):
+            raise ValueError("backup destination must differ from the live database")
+        if target.is_symlink():
+            raise ValueError("backup destination must not be a symbolic link")
+        if target.exists() and not replace_existing:
+            raise FileExistsError("backup destination already exists")
+        salt = os.urandom(16)
+        backup_key = derive_backup_key(password, salt)
+        temporary_database: Path | None = None
+        destination_connection = None
+        source_connection = None
+        try:
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=".pac-backup-db-", suffix=".sqlite", dir=self._path.parent
+            )
+            os.fchmod(descriptor, 0o600)
+            os.close(descriptor)
+            temporary_database = Path(temporary_name)
+            # SQLCipher's documented raw backup API creates a snapshot while writes
+            # continue. The caller's target is untouched until the copy validates.
+            destination_connection = self._open_password_database(temporary_database, backup_key.hex())
+            source_connection = engine.raw_connection()
+            source_driver = source_connection.driver_connection
+            if source_driver is None:
+                raise PersistentStoreError("SQLCipher backup source is unavailable")
+            source_driver.backup(destination_connection)
+            destination_connection.close()
+            destination_connection = None
+            self._verify_password_database(temporary_database, backup_key.hex())
+            # Reuse the generated salt so the validated SQLCipher key and envelope
+            # header derive from the same per-backup password profile.
+            write_backup_container(
+                temporary_database,
+                target,
+                password=password,
+                database_key=self._database_key_bytes(),
+                salt=salt,
+                replace_existing=replace_existing,
+            )
+            return {"bytes_written": target.stat().st_size}
+        except (EncryptedBackupError, PersistentStoreError):
+            raise
+        except Exception:
+            raise PersistentStoreError("encrypted backup could not be created") from None
+        finally:
+            if source_connection is not None:
+                source_connection.close()
+            if destination_connection is not None:
+                destination_connection.close()
+            if temporary_database is not None:
+                for suffix in ("", "-wal", "-shm", "-journal"):
+                    Path(f"{temporary_database}{suffix}").unlink(missing_ok=True)
+
     def connection(self):
         """Return a SQLAlchemy connection; callers own and must close it."""
         if self._engine is None:
             raise PersistentStoreError("database is not open")
         return self._engine.connect()
+
+    def _database_key_bytes(self) -> bytes:
+        return bytes.fromhex(self._key_hex)
+
+    @staticmethod
+    def _open_password_database(path: Path, passphrase: str):
+        connection = None
+        try:
+            connection = sqlcipher.connect(str(path))
+            escaped_passphrase = passphrase.replace("'", "''")
+            connection.execute(f"PRAGMA key = '{escaped_passphrase}'")
+            cipher_version = connection.execute("PRAGMA cipher_version").fetchone()
+            if not cipher_version or not cipher_version[0]:
+                raise PersistentStoreError("SQLCipher is unavailable for backup operations")
+            connection.execute("SELECT count(*) FROM sqlite_master").fetchone()
+            return connection
+        except PersistentStoreError:
+            if connection is not None:
+                connection.close()
+            raise
+        except Exception as exc:
+            if connection is not None:
+                connection.close()
+            raise PersistentStoreError("encrypted backup database could not be opened") from exc
+
+    @classmethod
+    def _verify_password_database(cls, path: Path, passphrase: str) -> None:
+        connection = cls._open_password_database(path, passphrase)
+        try:
+            result = connection.execute("PRAGMA integrity_check").fetchone()
+            if result is None or str(result[0]).lower() != "ok":
+                raise PersistentStoreError("encrypted backup database integrity check failed")
+            version = connection.execute("SELECT version_num FROM alembic_version").fetchone()
+            if version is None or not str(version[0]):
+                raise PersistentStoreError("encrypted backup schema version is missing")
+        except PersistentStoreError:
+            raise
+        except Exception as exc:
+            raise PersistentStoreError("encrypted backup database validation failed") from exc
+        finally:
+            connection.close()
 
 
 

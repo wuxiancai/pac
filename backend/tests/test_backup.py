@@ -10,6 +10,7 @@ from pac_poc.backup import (
     read_backup_header,
     write_backup_container,
 )
+from pac_poc.persistence import EncryptedApplicationStore
 
 
 def test_backup_container_round_trips_payload_without_loading_it_into_memory(tmp_path: Path) -> None:
@@ -68,3 +69,42 @@ def test_backup_password_and_container_header_have_strict_bounds(tmp_path: Path)
     backup.write_bytes(b"PACBACK\x00\xff\xff\xff\xff")
     with pytest.raises(EncryptedBackupError, match="header length is invalid"):
         read_backup_header(backup, password="correct horse", database_key=b"d" * 32)
+
+
+def test_live_sqlcipher_store_exports_valid_encrypted_snapshot(tmp_path: Path) -> None:
+    database_key = b"d" * 32
+    database = (tmp_path / "product.db").resolve()
+    backup = tmp_path / "product.pacbackup"
+    staging = tmp_path / "extracted.db"
+    store = EncryptedApplicationStore(path=database, key=database_key)
+    store.open()
+    try:
+        conversation = store.get_or_create_default_conversation()
+        store.append_chat_turn(
+            conversation_id=str(conversation["id"]),
+            run_id="backup-export-test",
+            user_content="local-only backup test",
+            assistant_content="persisted response",
+            provider="ollama",
+            model="fixture",
+            status="COMPLETED",
+        )
+        result = store.export_encrypted_backup(backup, password="archive passphrase")
+        assert result["bytes_written"] == backup.stat().st_size
+        assert database.exists()
+    finally:
+        store.close()
+
+    header, derived_key = read_backup_header(
+        backup, password="archive passphrase", database_key=database_key
+    )
+    extract_backup_payload(backup, staging, payload_offset=header.payload_offset)
+    connection = EncryptedApplicationStore._open_password_database(staging, derived_key.hex())
+    try:
+        row = connection.execute(
+            "SELECT content FROM messages WHERE content='local-only backup test'"
+        ).fetchone()
+        assert row == ("local-only backup test",)
+        assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    finally:
+        connection.close()

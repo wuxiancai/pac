@@ -72,6 +72,7 @@ def write_backup_container(
     *,
     password: str,
     database_key: bytes,
+    salt: bytes | None = None,
     replace_existing: bool = False,
 ) -> None:
     """Wrap an already encrypted SQLCipher database in an authenticated format header."""
@@ -90,7 +91,9 @@ def write_backup_container(
     except OSError as exc:
         raise EncryptedBackupError("backup destination is unavailable") from exc
 
-    salt = secrets.token_bytes(SALT_BYTES)
+    salt = secrets.token_bytes(SALT_BYTES) if salt is None else salt
+    if not isinstance(salt, bytes) or len(salt) != SALT_BYTES:
+        raise ValueError("backup salt has an invalid length")
     key = derive_backup_key(password, salt)
     core = {
         "format_version": FORMAT_VERSION,
