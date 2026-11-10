@@ -1503,3 +1503,8 @@
 - 云请求在本机上下文大小校验或 Skill 可用性校验处被拦截时，现在也记录固定 `DENIED` reason code；用量页提供相应中文说明。拒绝仍发生在 Provider adapter 之前。
 - 新增契约验证：上下文超限返回 413、无 Provider adapter 调用且 SQLCipher 中只出现 `context_limit_exceeded` 元数据事件。
 - 验证：后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 338 passed、1 条既有 Starlette/httpx 弃用警告；Ruff/mypy 通过；Swift 全量 60 passed，Beta target build 通过。真实 Provider 与 GUI 手动验证仍未执行。
+
+# 2026-11-10：统一会话行滚动与身份标识
+
+- 长会话分页按钮按持久 message ID 保留顶部锚点，但新增消息自动滚动曾按数组 offset 查找，和行实际 ID 不一致。现统一由稳定 row ID 驱动 LazyVStack、分页锚点和新增消息自动滚动；临时流式行在持久化刷新前以当前数组索引作为临时 ID。
+- 验证：`swift test --package-path poc/macos-audio` → 60 passed，包含 Beta target 编译；人工 GUI 滚动/长会话压力验收仍待执行。首次并行运行时，BetaChatView 的 macOS 可用性标注被新行模型声明隔开，且源文件恰在编译期间更新，构建失败；恢复可用性标注后串行重跑通过。

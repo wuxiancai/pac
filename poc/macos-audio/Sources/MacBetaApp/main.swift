@@ -1095,6 +1095,14 @@ final class BetaChatModel {
 }
 
 @available(macOS 14.0, *)
+private struct ChatMessageRow: Identifiable {
+    let index: Int
+    let message: LocalChatMessage
+
+    var id: String { message.id ?? "transient-\(index)" }
+}
+
+@available(macOS 14.0, *)
 private struct BetaChatView: View {
     @Bindable var model: BetaChatModel
     @State private var showingSettings = false
@@ -1262,7 +1270,11 @@ private struct BetaChatView: View {
                             )
                             .padding(.top, 80)
                         }
-                        ForEach(Array(model.messages.enumerated()), id: \.offset) { index, message in
+                        ForEach(Array(model.messages.enumerated()).map {
+                            ChatMessageRow(index: $0.offset, message: $0.element)
+                        }) { row in
+                            let index = row.index
+                            let message = row.message
                             HStack(alignment: .top) {
                                 if message.role == "assistant" {
                                     responseBubble(message.content)
@@ -1293,14 +1305,18 @@ private struct BetaChatView: View {
                                     userBubble(message.content)
                                 }
                             }
-                            .id(message.id ?? "transient-\(index)")
+                            .id(row.id)
                         }
                     }
                     .padding()
                 }
                 .onChange(of: model.messages.last?.content) { _, _ in
                     guard !model.messages.isEmpty else { return }
-                    proxy.scrollTo(model.messages.count - 1, anchor: .bottom)
+                    guard let lastMessage = model.messages.last else { return }
+                    proxy.scrollTo(
+                        lastMessage.id ?? "transient-\(model.messages.count - 1)",
+                        anchor: .bottom
+                    )
                 }
                 .onChange(of: model.pendingSourceMessageID) { _, messageID in
                     guard let messageID else { return }
