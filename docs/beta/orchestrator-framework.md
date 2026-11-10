@@ -54,7 +54,7 @@ Beta 运行时现从随包的 `pac_poc/beta_model_capabilities.json` 装配默�
 
 ## 进程内 Usage 首段
 
-聊天 run 结束时，`UsageLedger` 保存最近最多 512 条请求 metadata，认证 `GET /usage?limit=50` 可读取（limit 最大 100）。记录含 run/provider/model/region/purpose/data level、生命周期状态、wall latency，以及 Provider 明确报告的 token/cache/cost metadata；不含消息、回复、密钥或音频，进程退出即清空。Gateway 已把 Ollama 与 OpenAI-compatible 流最终帧中实际返回的 token 计数交给 ledger；只有 OpenRouter 的非流式或流式响应中，`usage.cost` 经验证且可由有限浮点数表示时才记录为实际 USD；其他 Provider 即使返回同名字段也保持费用 unknown；超大整数、非有限数和负值视为未知，不让异常数值转换中断流处理。未返回或不完整的 usage/cost 仍为 `unknown`/`null`。这不是完整费用账单或预算保护：精确 Beta 型号真实 usage/cost E2E、其他 Provider 费用来源及人民币归一尚未完成；D-005 月额度拦截当前未实现。
+聊天 run 结束时，`UsageLedger` 保存最近最多 512 条请求 metadata，认证 `GET /usage?limit=50` 可读取（limit 最大 100）。记录含 run/provider/model/region/purpose/data level、生命周期状态、wall latency，以及 Provider 明确报告的 token/cache/cost metadata；不含消息、回复、密钥或音频，进程退出即清空。Gateway 已把 Ollama 与 OpenAI-compatible 流最终帧中实际返回的 token 计数交给 ledger；只有 OpenRouter 的非流式或流式响应中，`usage.cost` 经验证且可由有限浮点数表示时才记录为实际 USD；其他 Provider 即使返回同名字段也保持费用 unknown；超大整数、非有限数和负值视为未知，不让异常数值转换中断流处理。未返回或不完整的 usage/cost 在请求明细中仍为 `unknown`/`null`。另有 D-005 版本化 CNY 估算器，但尚未接入请求记录、月累计或预算拦截；这不是完整费用账单或预算保护。
 
 Ledger 在写入时拒绝非有限时间戳、布尔/非整数毫秒延迟，以及负数、布尔或非有限音频时长，避免无效数值进入 `/usage` JSON 响应；未知音频时长仍以 `null` 表示。
 
@@ -66,7 +66,7 @@ macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的
 - Gateway 现也保留 Provider 报告的缓存命中输入 token：DeepSeek 使用 `usage.prompt_cache_hit_tokens`；Qwen/OpenAI-compatible 用法读取 `usage.prompt_tokens_details.cached_tokens`，校验它不超过 prompt 总 token 后再写入 bounded ledger，并显示在 macOS 用量面板。Qwen 官方说明此字段表示输入缓存命中 token；DeepSeek 官方 usage 分别提供 cache hit/miss token。当前这是原始用量明细，不据此推算费用。
 - 对云端流请求附加 `stream_options.include_usage=true`。DeepSeek 官方 Chat Completions API 文档说明 SSE 最后一帧带整次请求 usage；阿里云 Model Studio 文档说明 Qwen OpenAI-compatible streaming 可用此选项返回最终 token usage；OpenRouter API/SDK 文档列出 `stream_options.include_usage`。这些是协议文档依据，不等于 Beta 当前精确型号的真实 usage 实测：未发云请求、未读取 Keychain。
 - OpenRouter 最终 `usage.cost` 如为有限、非负数值，按 OpenRouter 报告的 USD 标记为 actual 并记账；[Chat Completions 文档](https://openrouter.ai/docs/api/api-reference/chat/create-a-chat-completion) 在 `usage` schema 列出 `cost`，OpenRouter [支持说明](https://openrouter.ai/support)说明费用依据 Provider 使用量计算。mock 回归覆盖了流最终帧。当前固定 Beta 型号尚未做真实流式费用 E2E；DeepSeek/Qwen 没有经核实的实际费用流字段，因此继续 unknown/null。
-- 只有收到非负整数 Provider token 字段才标为 `actual`。中断、缺少最终 usage 或字段不完整时仍是 `unknown`；不从字符长度估 token。费用仅在 OpenRouter 返回已核验的实际 USD 字段时标为 `actual`；其他缺失值保持 `unknown/null`，不依据 token 或价目表估算、不做 USD/CNY 换算，D-005 预算门保持未实现。
+- 请求用量明细只有收到非负整数 Provider token 字段才标为 `actual`。中断、缺少最终 usage 或字段不完整时仍是 `unknown`；独立的 D-005 预算估算器会在用量缺失时按请求文本字符数估 token 并标记估算，不改写此实际 usage 记录。
 
 #### D-005 计费输入研究（公开官方资料，2026-11-10 更新）
 
@@ -75,7 +75,7 @@ macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的
 - Qwen `qwen3.8-flash` 官方模型页公布北京价目及 cache-hit 单价；页面同时提示价格为原价、不含活动优惠。Model Studio 字段文档将 OpenAI Chat compatible 的 `usage.prompt_tokens_details.cached_tokens` 定义为缓存命中输入 token。见[模型信息与价目表](https://help.aliyun.com/zh/model-studio/qwen3-8-flash)、[缓存/用量字段说明](https://help.aliyun.com/en/model-studio/ptu-long-input-and-cache)。
 - DeepSeek API 的缓存命中/未命中字段及对应缓存机制见[官方缓存说明](https://api-docs.deepseek.com/guides/kv_cache/)；本 Gateway 保留 hit 数，但仍缺精确 Beta 型号真实 stream 验证。当前费率与 usage schema 的映射见上条。
 - OpenRouter 返回值中的 cost 以 USD 记录；其官方说明模型推理成本按 Provider 价格透传，购买 credits 时另收平台费，可能另有支付处理费用。故 `usage.cost` 不必然等同用户信用卡/支付宝最终人民币支出。见[OpenRouter 用量与费用说明](https://openrouter.ai/support)。
-- 上述公开价目会变化，且缓存/时段/活动/下游路由和充值费用口径不同。它们能支持后续设计估算或上界规则，但不足以当前实现“实扣费用”人民币累加。D-005 仍需确定价目版本/更新、USD→CNY 口径、未知字段拦截、额度跨进程保存及并发/月界事务策略，再进入预算 enforcement；未完成前保持 unknown，不拦截或宣称预算保护。
+- 上述公开价目会变化，且缓存/时段/活动/下游路由和充值费用口径不同。2026-11-10 SAFE 美元兑人民币中间价为 6.7167 CNY/USD，估算快照采用向上取整的 6.72；汇率来源为[国家外汇管理局人民币汇率中间价](https://www.safe.gov.cn/AppStructured/hlw/RMBQuery.do)。这只是带日期的估算换算，不是实时汇率。
 
 ## 验证
 
@@ -119,3 +119,10 @@ swift test --package-path poc/macos-audio
 2026-11-10 RunRegistry 并发创建顺序：`created_at` 现在在取得注册锁后读取，与实际插入及容量淘汰的序列化顺序一致，避免线程被抢占时出现时间戳倒序。并发回归持有注册锁后启动创建线程，确认时间读取发生在锁释放后。`tests/test_orchestrator.py -k run_registry` → 3 passed；Ruff/mypy 通过；后端全量 280 passed、1 条既有弃用警告。
 
 2026-11-10 系统时钟回拨边界：RunRegistry 状态转换令 `updated_at` 不早于前一状态时间；UsageLedger 的 `completed_at` 复用终态 run 的 `updated_at`，避免实际记录完成早于创建时间而被校验拒绝。测试通过回归时将 API 模块墙上时钟模拟为 0，确认失败请求仍写入合法用量记录。定向 `tests/test_orchestrator.py tests/test_beta_api.py -k 'run_registry or local_model_error_is_sanitized'` → 5 passed；Ruff/mypy 通过；后端全量 281 passed、1 条既有弃用警告。
+
+
+#### D-005 版本化估算器首版（2026-11-10）
+
+- `pac_poc/budget.py` 保存 `PRICE_VERSION=2026-11-10` 的静态价目快照：DeepSeek 直连按官方峰时价估算；Qwen `qwen3.8-flash` 按北京原价；OpenRouter 固定 `deepseek/deepseek-v4.1-flash-1017` 按公开模型目录的输入/缓存/输出费率。USD 统一使用 SAFE 2026-11-10 中间价向上取整为 6.72 CNY/USD，记录汇率版本。缓存 usage 可用时拆分命中/未命中；缺失 token usage 时暂按文本字符数作估算 token，并返回 `estimated` 成本估算。
+- 未登记的 Provider/model、价币不符、无效数值拒绝估算（调用方必须 fail-closed）。当前估算器仍是独立纯函数，尚未连接 Stream API、SQLCipher 月度账本、80 元提醒、100 元门禁或用量 UI，不代表预算保护已经启用。月度并发/自然月边界及精确型号真实 usage E2E 仍待实现/验证。
+- 公开来源： [DeepSeek 模型与价目](https://api-docs.deepseek.com/quick_start/pricing/)、[阿里云 Qwen3.8-Flash 价目](https://help.aliyun.com/zh/model-studio/qwen3-8-flash)、[OpenRouter models API](https://openrouter.ai/api/v1/models)、[SAFE 汇率中间价](https://www.safe.gov.cn/AppStructured/hlw/RMBQuery.do)。OpenRouter 实扣推理 USD 转成人民币后仍是估算，且不含充值手续费、税费或个人账户折扣。

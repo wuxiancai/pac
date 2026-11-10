@@ -1462,3 +1462,10 @@
 - 用户已确认先做离线候选评测，再决定是否产品启用。本轮扩展 `scripts/run_local_embedding_eval.py`：12 条合成中英记忆、24 条中英改写查询，输出 top-1/top-3 及语言分组统计；评测脚本仅在推理成功时返回成功，不以人为 100% 命中设门槛。
 - 在 `UV_OFFLINE=1`、`HF_HUB_OFFLINE=1`、`TRANSFORMERS_OFFLINE=1` 下三次独立运行均为 top-1 23/24、top-3 24/24；中文 12/12、英文 11/12。唯一首位错误为英文工作地点查询被工作时间记忆抢先，目标记忆保持在 top-3。首轮 1.25 秒，observed maximum RSS 881,983,488 bytes；只记录这一轮资源观察。未下载模型、未读取用户数据。
 - 修改了候选评测脚本及 `phase0-local-embedding.md`、追踪矩阵、决策/任务/项目上下文。此结果揭示语义邻近条目的错排，仍不足以决定产品启用；Embedding 保持关闭，后续应扩充经标注合成语料并对照 FTS。
+
+
+# 2026-11-10：D-005 版本化费用估算器
+
+- 浏览并核对 DeepSeek 官方模型价目、Qwen3.8-Flash 北京价目、OpenRouter models API 中固定 DeepSeek Flash 的费率，以及 SAFE 2026-11-10 USD/CNY 中间价。实现 `pac_poc/budget.py`：价目版本 2026-11-10、USD/CNY 采用 6.72 向上取整快照；缓存 token 拆分定价，缺失 usage 按文本字符数估算 token；未知 Provider/model 与无效币种 fail closed。
+- 估算器窄回归 `tests/test_budget.py` 5 passed，Ruff 和 mypy 通过。该模块尚未接入云请求 Stream API、SQLCipher 月累计、80 元提示、100 元拦截或 UI，D-005 仍未完成。
+- 完整来源与价目数值记录在 `docs/beta/orchestrator-framework.md`，并更新 D-005 与任务清单。
