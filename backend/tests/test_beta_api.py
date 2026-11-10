@@ -1438,6 +1438,7 @@ def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path)
         ) as client:
             created = await client.post("/tasks", headers=headers, json={
                 "title": "Read calendar", "priority": 2,
+                "schedule_at": "2026-11-11T10:30:00+08:00",
                 "idempotency_key": "33333333-3333-4333-8333-333333333333",
             })
             task = created.json()
@@ -1446,6 +1447,7 @@ def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path)
             listed = await client.get("/tasks", headers=headers)
             deleted = await client.delete(f"/tasks/{task['id']}", headers=headers)
         assert created.status_code == 201
+        assert created.json()["schedule_at"] == "2026-11-11T10:30:00+08:00"
         assert ready.json()["status"] == "READY"
         assert invalid.status_code == 409
         assert len(listed.json()["tasks"]) == 1

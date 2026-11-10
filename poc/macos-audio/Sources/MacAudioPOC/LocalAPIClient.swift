@@ -349,7 +349,9 @@ public final class LocalAPIClient: @unchecked Sendable {
         return list.tasks
     }
 
-    public func createTask(title: String, description: String = "", priority: Int = 0) async throws -> LocalTaskItem {
+    public func createTask(
+        title: String, description: String = "", priority: Int = 0, scheduleAt: String? = nil
+    ) async throws -> LocalTaskItem {
         guard let url = URL(string: "/tasks", relativeTo: baseURL)?.absoluteURL else { throw LocalAPIClientError.invalidEndpoint }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -359,6 +361,7 @@ public final class LocalAPIClient: @unchecked Sendable {
             title: title,
             description: description,
             priority: priority,
+            scheduleAt: scheduleAt,
             idempotencyKey: UUID().uuidString.lowercased()
         ))
         let (data, response) = try await session.data(for: request)
@@ -735,10 +738,12 @@ private struct TaskCreatePayload: Encodable {
     let title: String
     let description: String
     let priority: Int
+    let scheduleAt: String?
     let idempotencyKey: String
 
     enum CodingKeys: String, CodingKey {
         case title, description, priority
+        case scheduleAt = "schedule_at"
         case idempotencyKey = "idempotency_key"
     }
 }

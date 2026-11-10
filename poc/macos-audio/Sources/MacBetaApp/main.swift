@@ -120,6 +120,8 @@ final class BetaChatModel {
     private(set) var memories: [LocalMemoryItem] = []
     private(set) var memoryStatus = ""
     private(set) var taskStatus = ""
+    private(set) var taskNotificationStatus = "通知默认关闭。"
+    private let taskReminderManager = TaskReminderManager.shared
     private(set) var isRecordingVoice = false
     private(set) var isTranscribingVoice = false
     private(set) var voiceSeconds = 0
@@ -201,6 +203,14 @@ final class BetaChatModel {
             messages = history.messages
             conversations = try await localClient.conversations()
             client = localClient
+            if taskReminderManager.isEnabled {
+                do {
+                    tasks = try await localClient.listTasks()
+                    await taskReminderManager.reconcile(tasks: tasks)
+                } catch {
+                    taskNotificationStatus = "无法重建任务提醒：\(error.localizedDescription)"
+                }
+            }
             startupFailed = false
             startupLatency = max(0, ProcessInfo.processInfo.systemUptime - processStartedAt)
             status = "本机服务已连接；当前模型：\(selectedProvider) / \(selectedModel)"
@@ -511,26 +521,54 @@ final class BetaChatModel {
         guard let client else { return }
         do {
             tasks = try await client.listTasks()
+            await taskReminderManager.reconcile(tasks: tasks)
             taskStatus = "本机任务 · 完成 30 天后自动清理"
+            taskNotificationStatus = taskReminderManager.isEnabled
+                ? "本机任务提醒已启用。"
+                : "通知默认关闭。"
         } catch {
             taskStatus = "无法读取本机任务：\(error.localizedDescription)"
         }
     }
 
-    func addTask(title: String) async {
+    func addTask(title: String, reminderDate: Date?) async {
         guard let client else { return }
         do {
-            _ = try await client.createTask(title: title)
+            let scheduleAt: String? = reminderDate.map {
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                return formatter.string(from: $0)
+            }
+            let task = try await client.createTask(title: title, scheduleAt: scheduleAt)
+            await taskReminderManager.schedule(task: task)
             await refreshTasks()
         } catch {
             taskStatus = "无法保存本机任务：\(error.localizedDescription)"
         }
     }
 
+    func enableTaskNotifications() async {
+        do {
+            let granted = try await taskReminderManager.requestAndEnable()
+            taskNotificationStatus = granted
+                ? "已允许系统通知；本机任务提醒已开启。"
+                : "系统未授权通知；任务仍保存在本机。"
+            if granted { await taskReminderManager.reconcile(tasks: tasks) }
+        } catch {
+            taskNotificationStatus = "无法启用系统通知：\(error.localizedDescription)"
+        }
+    }
+
+    func disableTaskNotifications() async {
+        await taskReminderManager.disable()
+        taskNotificationStatus = "本机任务提醒已关闭。"
+    }
+
     func deleteTask(_ task: LocalTaskItem) async {
         guard let client else { return }
         do {
             try await client.deleteTask(id: task.id)
+            taskReminderManager.remove(taskID: task.id)
             tasks.removeAll { $0.id == task.id }
             taskStatus = "已从本机数据库删除任务。"
         } catch {
@@ -541,7 +579,11 @@ final class BetaChatModel {
     func updateTask(_ task: LocalTaskItem, status: String) async {
         guard let client else { return }
         do {
-            _ = try await client.transitionTask(id: task.id, status: status)
+            let updated = try await client.transitionTask(id: task.id, status: status)
+            if ["COMPLETED", "CANCELLED"].contains(updated.status) {
+                taskReminderManager.remove(taskID: updated.id)
+            }
+            await taskReminderManager.schedule(task: updated)
             await refreshTasks()
         } catch {
             taskStatus = "无法更新任务状态：\(error.localizedDescription)"
@@ -1283,6 +1325,8 @@ private struct ConfirmedMemoryView: View {
 private struct TaskBoardView: View {
     @Bindable var model: BetaChatModel
     @State private var title = ""
+    @State private var reminderEnabled = false
+    @State private var reminderDate = Date().addingTimeInterval(3_600)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1295,15 +1339,35 @@ private struct TaskBoardView: View {
                     let value = title.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !value.isEmpty else { return }
                     title = ""
-                    Task { await model.addTask(title: value) }
+                    Task {
+                        await model.addTask(
+                            title: value,
+                            reminderDate: reminderEnabled ? reminderDate : nil
+                        )
+                    }
                 }
                 .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            Toggle("为新任务设置提醒", isOn: $reminderEnabled)
+            if reminderEnabled {
+                DatePicker("提醒时间", selection: $reminderDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                    .datePickerStyle(.compact)
+            }
+            HStack {
+                Text(model.taskNotificationStatus).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if TaskReminderManager.shared.isEnabled {
+                    Button("关闭系统提醒") { Task { await model.disableTaskNotifications() } }
+                } else {
+                    Button("启用系统提醒") { Task { await model.enableTaskNotifications() } }
+                }
             }
             List(model.tasks) { task in
                 HStack {
                     VStack(alignment: .leading) {
                         Text(task.title)
-                        Text(task.status).font(.caption).foregroundStyle(.secondary)
+                        Text(task.scheduleAt.map { "\(task.status) · \($0)" } ?? task.status)
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     if task.status == "PENDING" || task.status == "PAUSED" || task.status == "FAILED" {

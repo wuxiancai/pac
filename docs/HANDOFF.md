@@ -1,3 +1,9 @@
+# 2026-11-10：B3 本机任务提醒实现
+
+- V2 任务新增可选 `schedule_at`；macOS 客户端通过 `TaskReminderManager` 安排本机通知。通知默认关闭，系统授权只由用户显式点击触发；已授权时应用启动重建有效待发提醒，任务进入完成/取消等终态或删除时撤销提醒。
+- 更新任务创建 API 契约与 Swift 回归，覆盖持久化 schedule 字段及稳定应用通知标识。Swift 全量 49 项通过；Beta target build 通过；Ruff、mypy 与 `uv lock --check` 通过。后端全量 300 passed，1 条既有 Starlette/httpx 弃用警告。
+- 未启动 Beta 或请求真实系统通知授权；真实通知授权、实际投递、过期边界和重启恢复 GUI 验收仍待完成。备份/恢复及任务状态迁移语义仍是 B3/V2 后续工作。
+- 同步更新本报告、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。下一步继续按主干推进备份/恢复，未决的口令 KDF、跨机恢复等产品决定不得自行假设。
 # 2026-11-10：B3 SQLCipher 持久化基础切片
 
 - 将 SQLAlchemy/Alembic/SQLCipher 纳入后端默认依赖；新增加密应用数据库入口、私有 Application Support 路径、0700 目录/0600 数据库文件、WAL/foreign-key 配置、错误密钥安全拒绝与打包 Alembic 初始迁移。
