@@ -130,6 +130,8 @@ swift test --package-path poc/macos-audio
 
 2026-11-10 D-005 月预算请求门禁实现：新增 Alembic `0004_monthly_cloud_budget`，只在 SQLCipher 中保存每个自然月的估算人民币总额、请求数和价目版本，不保存提示词或回复。数据库 upsert 原子累加，store 内串行化 SQLCipher 连接池访问；出站前在共享数据库事务中检查累计值和所有未过期预留，再原子创建当前请求预留，完成后在同一事务中删除预留并计入最终估算。单个 Beta 服务进程另用异步锁串行云请求；预估按 UTF-8 字节输入和适配器最大 1,024 输出 token，预留五分钟过期回收、活动流每分钟续租（远端 HTTP 读取空闲超时 45 秒）。无持久库、账本写入失败或未知价目时阻止云请求。`GET /usage` 在单个 SQLCipher read transaction 中返回已结算、在途预留与合计预估，并据合计状态报告 80 元提示和 100 元拦截；macOS 用量页分别显示已累计估算与执行中预留。当前月历史账单无法回填；真实 Provider usage/cost E2E 与价格快照更新流程仍待验收。双 store 实例并发预留/结算自动回归通过，完整测试与 GUI 手动验收详见最新 HANDOFF。
 
+2026-11-10 B9 GUI 复核：新会话显式选择“会议助理”和“项目助理”，提交合成校园图书馆延长开放问题。Beta 显示会议观点、项目观点及总助理综合结论，约 10 秒完成；状态栏确认本轮 `ollama / qwen3.5:0.8b`，符合仅本机顺序调用路径。合成提示要求 3 条且每条不超过 20 字，综合结论中有 1 条超长，角色观点也有偏题建议。说明编排闭环可用，模型内容/格式质量仍不稳定；单次测试不构成质量保证。测试问题和回复保留在本机 SQLCipher 会话；未调用云 Provider、麦克风或 Keychain。
+
 #### D-003 30 天 metadata-only 云请求审计（2026-11-10）
 
 - SQLCipher migration `0005_security_audit` 为当前 Beta 云聊天写入策略拒绝、用户确认/预算门后请求尝试和完成/失败/取消终态。审计仅保留 provider/model/region/purpose/data level/决策与固定 reason code、trace/resource UUID 和时间；不保存 Consent grant、消息正文、回复、Key/Token 或音频。
