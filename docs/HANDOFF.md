@@ -1,3 +1,9 @@
+# 2026-11-10：B3 恢复认证取消竞态保护
+
+- 修复用户取消本机认证与 LocalAuthentication 成功回调并发时，迟到成功仍可能继续调用恢复 API 的竞态。认证尝试使用一次性门闩；只有当前未取消尝试能认领认证结果并进入恢复，旧尝试或已取消尝试不能继续。取消时立即使尝试失效、显示“本机认证已取消，未开始恢复”，并调用 `LAContext.invalidate()`。
+- 新增两项门闩回归：取消后拒绝迟到成功；较新尝试开始后拒绝旧回调，且当前尝试只能认领一次。
+- `swift test --package-path poc/macos-audio` → 94 passed；`poc/macos-audio/scripts/build_beta_app.sh` 成功；`git diff --check` 通过。没有触发真实系统认证或恢复 API；GUI 取消/认证成功与恢复仍需实机验收。
+
 # 2026-11-10：B3 Keychain 适配器提交后的 Beta 重启检查
 
 - 在提交 `4f29682` 后通过仓库脚本重启 Beta；真实界面从“正在连接本机服务”进入“本机服务已连接；当前模型：ollama / qwen3.5:0.8b”，并加载新对话界面。

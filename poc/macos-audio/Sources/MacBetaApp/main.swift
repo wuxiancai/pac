@@ -141,6 +141,8 @@ final class BetaChatModel: CalendarEventAuditRecording {
     private(set) var backupStatus = "备份口令仅用于本次导出，不会保存。"
     private(set) var isBackupRestoreAuthenticating = false
     private var activeRestoreAuthorizer: TouchIDAuthorizer?
+    private let restoreAuthenticationGate = AuthenticationAttemptGate()
+    private var activeRestoreAuthenticationAttempt: UUID?
     private let taskReminderManager = TaskReminderManager.shared
     private(set) var isRecordingVoice = false
     private(set) var isTranscribingVoice = false
@@ -710,11 +712,15 @@ final class BetaChatModel: CalendarEventAuditRecording {
 
     func restoreEncryptedBackup(from url: URL, password: String) async {
         invalidateHistoryRequests()
+        let attempt = restoreAuthenticationGate.begin()
+        activeRestoreAuthenticationAttempt = attempt
         let authorizer = TouchIDAuthorizer()
         activeRestoreAuthorizer = authorizer
         isBackupRestoreAuthenticating = true
         do {
             try await authorizer.authorize(reason: "恢复本机加密数据")
+            guard restoreAuthenticationGate.claim(attempt) else { return }
+            activeRestoreAuthenticationAttempt = nil
             activeRestoreAuthorizer = nil
             isBackupRestoreAuthenticating = false
             guard let client else { backupStatus = "本机服务尚未就绪。"; return }
@@ -731,6 +737,8 @@ final class BetaChatModel: CalendarEventAuditRecording {
             await refreshTasks()
             await refreshMemories()
         } catch {
+            guard restoreAuthenticationGate.claim(attempt) else { return }
+            activeRestoreAuthenticationAttempt = nil
             activeRestoreAuthorizer = nil
             isBackupRestoreAuthenticating = false
             if let message = DeviceAuthenticationFailureMessage.localized(for: error) {
@@ -743,8 +751,15 @@ final class BetaChatModel: CalendarEventAuditRecording {
 
     func cancelBackupRestoreAuthentication() {
         guard isBackupRestoreAuthenticating else { return }
-        backupStatus = "正在取消本机认证…"
-        activeRestoreAuthorizer?.cancel()
+        if let attempt = activeRestoreAuthenticationAttempt {
+            restoreAuthenticationGate.cancel(attempt)
+        }
+        let authorizer = activeRestoreAuthorizer
+        activeRestoreAuthenticationAttempt = nil
+        activeRestoreAuthorizer = nil
+        isBackupRestoreAuthenticating = false
+        backupStatus = "本机认证已取消，未开始恢复。"
+        authorizer?.cancel()
     }
 
     func refreshMemoryVersions(id: String) async {
