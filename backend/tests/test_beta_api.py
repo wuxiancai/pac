@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from threading import Event
 from time import sleep
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -1687,6 +1687,53 @@ def test_persistent_chat_history_round_trips_and_can_be_manually_deleted(tmp_pat
         assert after_delete.json()["messages"] == []
         assert memories.json()["memories"][0]["source_message_id"] is None
         assert source_after_delete.json()["source"] is None
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()
+
+
+def test_confirmed_memory_can_reference_message_from_another_conversation(tmp_path) -> None:
+    store = EncryptedApplicationStore(path=(tmp_path / "cross-conversation-memory.db").resolve(), key=b"x" * 32)
+    store.open()
+    first = store.get_or_create_default_conversation()
+    second = store.create_conversation(title="另一个本机会话")
+    store.append_chat_turn(
+        conversation_id=str(first["id"]), run_id=str(uuid4()), user_content="第一会话内容",
+        assistant_content="第一会话回答", provider="ollama", model="local", status="COMPLETED",
+    )
+    store.append_chat_turn(
+        conversation_id=str(second["id"]), run_id=str(uuid4()), user_content="跨会话来源内容",
+        assistant_content="第二会话回答", provider="ollama", model="local", status="COMPLETED",
+    )
+    source_message_id = store.load_conversation(str(second["id"]))["messages"][0]["id"]
+    app = create_beta_api(
+        session=LocalAPISession(token="cross-memory-token"),
+        gateway=ModelGateway(adapters={"ollama": StubLocalAdapter()}, policy=LocalOnlyPolicy()),
+        persistence_store=store,
+    )
+
+    async def run() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            response = await client.post(
+                "/memories",
+                headers={"authorization": "Bearer cross-memory-token"},
+                json={
+                    "subject": "第二会话来源", "content": "已确认内容", "category": "fact",
+                    "confirmed": True, "source_message_id": source_message_id,
+                },
+            )
+            source = await client.get(
+                f"/memories/{response.json()['id']}/source",
+                headers={"authorization": "Bearer cross-memory-token"},
+            )
+        assert response.status_code == 201
+        assert source.json()["source"]["conversation_id"] == second["id"]
+        assert source.json()["source"]["conversation_title"] == "另一个本机会话"
+        assert source.json()["source"]["content"] == "跨会话来源内容"
 
     try:
         asyncio.run(run())
