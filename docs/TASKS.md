@@ -39,6 +39,8 @@
 
 2026-11-10 0G 更新：核对 Qwen 官方 Apache-2.0 声明、sherpa 官方导出指引、第三方转换仓库文件列表和镜像模型卡后，仍未找到转换工件与随包音频的独立许可；训练数据权利链也无逐项证据。阶段 0 原始模型许可项继续 PARTIAL；Beta 不打包该候选。详见 `poc/phase0-model-license-review.md`。
 
+2026-11-10 D-005 费用输入补证：DeepSeek 官方当前价目将 `deepseek-flash` 映射到 V4.1-Flash-1017，并按缓存命中/未命中、输出 token、UTC 峰谷时段定价；Chat Completions usage 提供 token 分类但没有请求级费用字段，价目可调整。故现有 token 只能支持明示为估算的计算，不能据此声称实扣成本；仍须确定估算口径/版本更新、OpenRouter USD 与实际充值支出的关系、缺失值 fail-closed、跨进程累加及并发/月界策略。D-005 保持未实现，细节见 `docs/beta/orchestrator-framework.md`。
+
 ## 当前执行顺序
 
 2026-11-10 B5 补充自动客户端证据：Swift URLProtocol 回归捕获认证 loopback `/chat/stream` 请求并确认 `import_ids` 序列化；Swift 全量 44 项通过，`personal-assistant-beta` target 构建通过。另在 API 调用 ContextBuilder 前增加附件字符数下限检查，100,000 字符超大附件在 Orchestrator 构建前返回 413；后端全量 282 passed，1 条既有警告。它不替代 GUI 对话中实际引用资料的手动验收，B5 保持 IN PROGRESS。

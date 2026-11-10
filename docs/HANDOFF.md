@@ -1,3 +1,9 @@
+# 2026-11-10：D-005 DeepSeek 费用来源补证
+
+- 核对 DeepSeek 官方价目表与 Chat Completions schema：固定 Beta 型号 `deepseek-flash` 映射到 V4.1-Flash-1017；输入缓存命中/未命中、输出及 UTC 峰谷时段费率不同，价目可能调整。响应 usage 包含 prompt/completion 与 cache hit/miss token，没有请求级费用金额。
+- 结论仅用于预算设计：按 token 和当前公开价计算只能标记为估算，不能代表服务商账户实际扣款；D-005 的版本更新、USD/CNY 与充值费用口径、未知 usage fail-closed、跨进程累计及并发/月界处理仍未决定或实现。
+- 更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。未发起云请求、未读取 Keychain；本段为文档证据更新，无代码测试。
+
 # 2026-11-10：阶段 0/6 Qwen ASR 许可来源链复核
 
 - 读取 `docs/poc/phase0-traceability.md` 与模型许可报告，并核对 Qwen 官方模型页、Qwen 官方仓库 LICENSE、sherpa 官方 Qwen ONNX 导出文档、Wasser1462 导出仓库文件列表及 sherpa ONNX 镜像模型卡。

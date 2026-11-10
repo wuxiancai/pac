@@ -56,10 +56,12 @@ macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的
 - OpenRouter 最终 `usage.cost` 如为有限、非负数值，按 OpenRouter 报告的 USD 标记为 actual 并记账；[Chat Completions 文档](https://openrouter.ai/docs/api/api-reference/chat/create-a-chat-completion) 在 `usage` schema 列出 `cost`，OpenRouter [支持说明](https://openrouter.ai/support)说明费用依据 Provider 使用量计算。mock 回归覆盖了流最终帧。当前固定 Beta 型号尚未做真实流式费用 E2E；DeepSeek/Qwen 没有经核实的实际费用流字段，因此继续 unknown/null。
 - 只有收到非负整数 Provider token 字段才标为 `actual`。中断、缺少最终 usage 或字段不完整时仍是 `unknown`；不从字符长度估 token。费用仅在 OpenRouter 返回已核验的实际 USD 字段时标为 `actual`；其他缺失值保持 `unknown/null`，不依据 token 或价目表估算、不做 USD/CNY 换算，D-005 预算门保持未实现。
 
-#### D-005 计费输入研究（公开官方资料，2026-11-09）
+#### D-005 计费输入研究（公开官方资料，2026-11-10 更新）
+
+- DeepSeek 当前价目页将 `deepseek-flash` 映射到 V4.1-Flash-1017，并按 cache-hit、cache-miss、输出 token 及 UTC 峰谷时段计价；页面说明费用从充值或赠送余额扣除，价格可能调整。Chat Completions usage 提供 prompt/completion token 与 cache hit/miss 数，不返回每请求 `cost` 金额。因此可验证用量构成，但要按公开价格重算仍需固定价目版本、请求时段与精确计费时区规则，并接受公开费率变化带来的估算性质。见[DeepSeek 价目表](https://api-docs.deepseek.com/quick_start/pricing/)和[Chat Completions usage schema](https://api-docs.deepseek.com/api/create-chat-completion/)。
 
 - Qwen `qwen3.8-flash` 官方模型页公布北京价目及 cache-hit 单价；页面同时提示价格为原价、不含活动优惠。Model Studio 字段文档将 OpenAI Chat compatible 的 `usage.prompt_tokens_details.cached_tokens` 定义为缓存命中输入 token。见[模型信息与价目表](https://help.aliyun.com/zh/model-studio/qwen3-8-flash)、[缓存/用量字段说明](https://help.aliyun.com/en/model-studio/ptu-long-input-and-cache)。
-- DeepSeek 官方价目把输入分为 cache hit/miss，并按峰谷时段区别价格；API usage 文档分别给出 `prompt_cache_hit_tokens` 和 `prompt_cache_miss_tokens`。本 Gateway 现保留 hit 数，但仍缺供应商真实 stream 验证及可依据模型、时段和账户口径归一费用的完整信息。见[官方价格](https://api-docs.deepseek.com/quick_start/pricing/)和[缓存命中字段](https://api-docs.deepseek.com/guides/kv_cache/)。
+- DeepSeek API 的缓存命中/未命中字段及对应缓存机制见[官方缓存说明](https://api-docs.deepseek.com/guides/kv_cache/)；本 Gateway 保留 hit 数，但仍缺精确 Beta 型号真实 stream 验证。当前费率与 usage schema 的映射见上条。
 - OpenRouter 返回值中的 cost 以 USD 记录；其官方说明模型推理成本按 Provider 价格透传，购买 credits 时另收平台费，可能另有支付处理费用。故 `usage.cost` 不必然等同用户信用卡/支付宝最终人民币支出。见[OpenRouter 用量与费用说明](https://openrouter.ai/support)。
 - 上述公开价目会变化，且缓存/时段/活动/下游路由和充值费用口径不同。它们能支持后续设计估算或上界规则，但不足以当前实现“实扣费用”人民币累加。D-005 仍需确定价目版本/更新、USD→CNY 口径、未知字段拦截、额度跨进程保存及并发/月界事务策略，再进入预算 enforcement；未完成前保持 unknown，不拦截或宣称预算保护。
 
