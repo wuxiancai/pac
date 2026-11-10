@@ -1371,3 +1371,8 @@
 - `GET /chat/history` 现在默认最多返回最新 100 条；UI 可按稳定的 `(created_at,id)` 游标请求更早记录，服务端页大小限制 1–200，`has_more` 表示是否尚有更早消息。SwiftUI 在用户点击后加载并将原首条消息保留在滚动锚点；模型上下文仍只发送最近 20 条。新增迁移以 `(conversation_id,created_at,id)` 复合索引支持 keyset 查询，并替换被其覆盖的旧索引。
 - 验证：后端分页 repository/API 窄回归 2 passed；Swift 全量 54 项通过；后端全量 314 passed、1 条既有 Starlette/httpx 弃用警告；Ruff/mypy/`uv lock --check` 通过；Beta build 成功。
 - 未做真实 GUI 长对话或百万级消息/超长单体性能验收；来源跨会话跳转仍待完成。
+
+# 2026-11-10：任务完成状态幂等时间戳
+
+- 重复提交当前任务状态现在直接返回既有记录，不再刷新 `updated_at`、`completed_at` 或清除既有错误码；特别是重复完成不会延后用户选择的 30 天清理期限。
+- 验证：任务 lifecycle 定向 1 passed；Ruff 与 mypy 通过。

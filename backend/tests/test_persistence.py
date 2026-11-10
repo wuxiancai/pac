@@ -266,6 +266,9 @@ def test_task_lifecycle_is_idempotent_and_completed_tasks_expire_after_30_days(
         assert running["started_at"] is not None
         completed = store.transition_task(str(task["id"]), "COMPLETED")
         assert completed["completed_at"] is not None
+        repeated_completion = store.transition_task(str(task["id"]), "COMPLETED")
+        assert repeated_completion["completed_at"] == completed["completed_at"]
+        assert repeated_completion["updated_at"] == completed["updated_at"]
         with pytest.raises(ValueError, match="transition"):
             store.transition_task(str(task["id"]), "READY")
 

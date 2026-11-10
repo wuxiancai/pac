@@ -612,6 +612,8 @@ class EncryptedApplicationStore:
             current = str(row["status"])
             if status != current and status not in self.TASK_TRANSITIONS[current]:
                 raise ValueError("task status transition is not allowed")
+            if status == current:
+                return self.get_task(task_id, connection=connection)
             started_at = row["started_at"] or (now if status == "RUNNING" else None)
             completed_at = now if status == "COMPLETED" else None
             connection.execute(text(
