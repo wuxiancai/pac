@@ -2407,7 +2407,8 @@ private struct BetaModelSettingsView: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
             HStack {
                 Text("模型设置").font(.title2.bold())
                 Spacer()
@@ -2552,7 +2553,8 @@ private struct BetaModelSettingsView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Spacer()
+                Spacer(minLength: 0)
+            }
         }
         .padding(24)
         .frame(minWidth: 520, minHeight: 360)
