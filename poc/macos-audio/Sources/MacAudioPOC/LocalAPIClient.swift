@@ -351,6 +351,8 @@ public struct LocalUsageSnapshot: Decodable, Sendable {
 public struct LocalMonthlyCloudBudget: Decodable, Sendable {
     public let month: String
     public let estimatedSpentCNY: Double
+    public let estimatedInFlightCNY: Double
+    public let estimatedProjectedCNY: Double
     public let warningThresholdCNY: Double
     public let limitCNY: Double
     public let isEstimate: Bool
@@ -360,6 +362,8 @@ public struct LocalMonthlyCloudBudget: Decodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case month, blocked
         case estimatedSpentCNY = "estimated_spent_cny"
+        case estimatedInFlightCNY = "estimated_in_flight_cny"
+        case estimatedProjectedCNY = "estimated_projected_cny"
         case warningThresholdCNY = "warning_threshold_cny"
         case limitCNY = "limit_cny"
         case isEstimate = "is_estimate"

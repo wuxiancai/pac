@@ -1763,14 +1763,19 @@ private struct UsageHistoryView: View {
     }
 
     private func budgetDescription(_ budget: LocalMonthlyCloudBudget) -> String {
-        let amount = budget.estimatedSpentCNY.formatted(.number.precision(.fractionLength(4)))
+        let spent = budget.estimatedSpentCNY.formatted(.number.precision(.fractionLength(4)))
+        let reserved = budget.estimatedInFlightCNY.formatted(.number.precision(.fractionLength(4)))
+        let projected = budget.estimatedProjectedCNY.formatted(.number.precision(.fractionLength(4)))
+        let estimate = budget.estimatedInFlightCNY > 0
+            ? "已累计估算 ¥\(spent) + 执行中预留 ¥\(reserved)"
+            : "云端费用估算 ¥\(spent)"
         if budget.blocked {
-            return "\(budget.month) 云端费用估算 ¥\(amount) / ¥100，已达到预算上限并拦截。"
+            return "\(budget.month) \(estimate)，合计预估 ¥\(projected) / ¥100，已拦截新的云端请求。"
         }
         if budget.warningReached {
-            return "\(budget.month) 云端费用估算 ¥\(amount) / ¥100，已达到 ¥80 提示线。"
+            return "\(budget.month) \(estimate)，合计预估 ¥\(projected) / ¥100，已达到 ¥80 提示线。"
         }
-        return "\(budget.month) 云端费用估算 ¥\(amount) / ¥100（80 元提示线）。"
+        return "\(budget.month) \(estimate)，合计预估 ¥\(projected) / ¥100（80 元提示线）。"
     }
 }
 

@@ -929,6 +929,36 @@ def test_cloud_budget_blocks_at_monthly_limit_before_adapter_access(tmp_path: Pa
     store.close()
 
 
+def test_usage_snapshot_includes_in_flight_cloud_budget_reservations(tmp_path: Path) -> None:
+    store = EncryptedApplicationStore(
+        path=(tmp_path / "cloud-budget-reservation-summary.db").resolve(), key=b"r" * 32
+    )
+    store.open()
+    store.reserve_monthly_cloud_budget(
+        beta_api_module._budget_month_key(),
+        reservation_id="usage-summary-reservation",
+        amount_micros=85_000_000,
+        limit_micros=100_000_000,
+        expires_at="2999-01-01T00:00:00+00:00",
+    )
+    app = create_beta_api(
+        session=LocalAPISession(token="budget-summary-token"), persistence_store=store
+    )
+    with TestClient(app) as client:
+        response = client.get(
+            "/usage",
+            headers={"authorization": "Bearer budget-summary-token", "host": "127.0.0.1"},
+        )
+    assert response.status_code == 200
+    budget = response.json()["budget"]
+    assert budget["estimated_spent_cny"] == 0
+    assert budget["estimated_in_flight_cny"] == 85
+    assert budget["estimated_projected_cny"] == 85
+    assert budget["warning_reached"] is True
+    assert budget["blocked"] is False
+    store.close()
+
+
 def test_cloud_request_fails_closed_without_encrypted_budget_storage() -> None:
     adapter = StubCloudAdapter()
     app = create_beta_api(

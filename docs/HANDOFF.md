@@ -1484,3 +1484,9 @@
 - 预留 5 分钟后自动回收，活动流每分钟续租；当前 Provider HTTP 读取空闲超时为 45 秒。进程异常退出留下的预留最多短暂占用额度，后续预算请求会清理过期记录。单实例锁仍用于避免同一 SQLCipher store 的连接池并发问题。
 - 双 store 实例并发 60 元预留回归确认仅一个获准；完成 50 元结算后，50 元新请求被拦截、49.999999 元可预留。定向后端 73 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 335 passed、1 条既有 Starlette/httpx 弃用警告；阶段追踪契约 9 passed，Ruff/mypy 通过。
 - 仍未完成当前月历史账单回填、真实 Provider usage/cost E2E、用量 GUI 手动验收与价格快照更新流程；没有发起真实云请求。
+
+# 2026-11-10：用量面板展示在途预算预留
+
+- `/usage` 现在在同一个 SQLCipher read transaction 中读取已结算估算与未过期请求预留，返回在途预留及合计预估，并按“已结算 + 在途预留”计算 ¥80 提示和 ¥100 后续请求拦截状态，避免两次读取之间结算导致显示暂时漏算。
+- macOS 用量页单独标明已累计估算和执行中预留，并显示合计预估；仍明确该数字是预算估算，不是账单实扣。
+- Python API/持久层窄回归 69 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 336 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 60 passed，Beta target build 通过；Ruff/mypy 通过。

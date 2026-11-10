@@ -669,17 +669,22 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             budget = None
         else:
             try:
-                spent_micros = persistent_store.monthly_cloud_budget_micros(budget_month)
+                spent_micros, reserved_micros = persistent_store.monthly_cloud_budget_snapshot_micros(
+                    budget_month
+                )
             except (PersistentStoreError, ValueError):
                 raise HTTPException(status_code=503, detail="cloud budget summary is unavailable") from None
+            projected_micros = spent_micros + reserved_micros
             budget = {
                 "month": budget_month,
                 "estimated_spent_cny": spent_micros / 1_000_000,
+                "estimated_in_flight_cny": reserved_micros / 1_000_000,
+                "estimated_projected_cny": projected_micros / 1_000_000,
                 "warning_threshold_cny": 80,
                 "limit_cny": 100,
                 "is_estimate": True,
-                "warning_reached": spent_micros >= MONTHLY_CLOUD_WARNING_MICROS,
-                "blocked": spent_micros >= MONTHLY_CLOUD_BUDGET_MICROS,
+                "warning_reached": projected_micros >= MONTHLY_CLOUD_WARNING_MICROS,
+                "blocked": projected_micros >= MONTHLY_CLOUD_BUDGET_MICROS,
                 "price_version": PRICE_VERSION,
             }
         return {

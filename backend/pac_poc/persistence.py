@@ -177,6 +177,34 @@ class EncryptedApplicationStore:
             ).first()
         return int(row[0]) if row is not None else 0
 
+    def monthly_cloud_budget_reserved_micros(self, month_key: str) -> int:
+        """Return unexpired in-flight reservations for a budget month."""
+        _validate_budget_month_key(month_key)
+        engine = self._require_engine()
+        with self._cloud_budget_lock, engine.connect() as connection:
+            amount = connection.execute(text(
+                "SELECT COALESCE(SUM(reserved_micros_cny), 0) "
+                "FROM monthly_cloud_budget_reservations "
+                "WHERE month_key=:month AND expires_at > :now"
+            ), {"month": month_key, "now": _utc_timestamp()}).scalar_one()
+        return int(amount)
+
+    def monthly_cloud_budget_snapshot_micros(self, month_key: str) -> tuple[int, int]:
+        """Read settled and in-flight estimates from one database snapshot."""
+        _validate_budget_month_key(month_key)
+        engine = self._require_engine()
+        with self._cloud_budget_lock, engine.connect() as connection:
+            with connection.begin():
+                spent = connection.execute(text(
+                    "SELECT estimated_micros_cny FROM monthly_cloud_budget WHERE month_key=:month"
+                ), {"month": month_key}).scalar_one_or_none() or 0
+                reserved = connection.execute(text(
+                    "SELECT COALESCE(SUM(reserved_micros_cny), 0) "
+                    "FROM monthly_cloud_budget_reservations "
+                    "WHERE month_key=:month AND expires_at > :now"
+                ), {"month": month_key, "now": _utc_timestamp()}).scalar_one()
+        return int(spent), int(reserved)
+
     def add_monthly_cloud_budget_estimate(
         self, month_key: str, *, amount_micros: int, price_version: str
     ) -> int:
