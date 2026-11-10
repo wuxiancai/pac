@@ -2,6 +2,8 @@
 
 最后核对：2026-11-10（Asia/Shanghai）
 
+2026-11-10 B5/PDF：追加核对本机 `launchd.plist(5)` 的 `ResidentSetSize` 资源项。其文档只说明内存紧张时系统优先从超过申报 RSS 的进程回收内存，尚未证明超限必拒绝或 worker 隔离有效；不能满足 D-012 硬内存上限门槛。PDF 继续禁用，保持查找并实测候选隔离方案；见 `docs/beta/file-import.md`。
+
 ## 状态和流程
 
 - `DONE`：工作包的明确完成条件已满足，证据可复核。

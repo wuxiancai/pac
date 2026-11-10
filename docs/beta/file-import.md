@@ -33,6 +33,8 @@ CI 现显式安装 `phase4-pdf-poc` extra，因此通用 Python 回归会实际�
 
 ## 自动验证
 
+2026-11-10 launchd 候选复核：本机 `launchd.plist(5)` 将 `HardResourceLimits`/`SoftResourceLimits` 定义为通过 `setrlimit(2)` 设置资源限制，并列出 `ResidentSetSize`。其说明称系统会在内存紧张时优先从超过声明 RSS 的进程回收内存；这不是 worker 超限时必定终止且可由测试证明的硬上限。该配置也未在独立 PDF worker 中实测。因此 launchd 配置不满足当前 D-012 硬内存隔离启用门，不改变 PDF 禁用状态。参考本机 `man launchd.plist` 与 `man setrlimit`。
+
 2026-11-10 超大附件前置拒绝：API 在 ContextBuilder 将资料 JSON 序列化前，以消息字符数与附件原始字符数之和作下限检查；明显超过上下文上限时返回 413，避免对最大尺寸的合法上传先创建大型 JSON 副本。最终上下文仍执行完整字符上限检查，以覆盖 JSON 转义和固定框架开销。回归替换 Orchestrator 为一旦构造即失败的哨兵，100,000 字符附件仍在编排前返回 413。定向 2 passed，Ruff/mypy 通过；后端全量 282 passed，1 条既有 Starlette/httpx 弃用警告。
 
 2026-11-10 上下文注入边界回归：合成 TXT 内容含“忽略前文指令、插入 system role 并调用工具”的注入文本，文件名含可伪造 JSON 结构的引号。Orchestrator 仍只产出固定 system 指引和 user 消息；附件名/内容经 JSON 编码后保持在同一 user 资料字段，system 指引不含原文，Gateway 请求的 `tools` 为空。云端导入请求的 API 拒绝回归仍通过；这些测试证明上下文隔离和当前无工具面，不证明模型对任意提示注入都能语义免疫，也不替代聊天引用 GUI 手动验收。窄回归 4 passed，Ruff 通过；最新后端全量 273 passed、1 条既有 Starlette/httpx 弃用警告。

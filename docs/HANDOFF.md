@@ -1,5 +1,11 @@
 # 2026-11-10：B3 恢复认证可取消与中文终态
 
+# 2026-11-10：B5 PDF launchd 资源限制候选复核
+
+- 检查本机 `man launchd.plist`：`HardResourceLimits`/`SoftResourceLimits` 通过 `setrlimit(2)` 调整限制；`ResidentSetSize` 描述为系统内存紧张时优先从超过声明 RSS 的进程回收内存。没有证据表明 worker 超限时会确定性拒绝/终止，也未在独立 PDF worker 验证。
+- 判定该方案暂不满足当前 PDF 启用门。保持 PDF 禁用，继续寻找可用且可用超限样本验证的隔离方案；不将回收行为作为硬限制承诺。更新 `docs/beta/file-import.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md` 与阶段 0 追踪矩阵。
+- 备份 UI 同轮只读收尾：清除合成口令并关闭空备份表单；没有生成备份、选取已有文件或执行恢复。
+
 - 追查恢复窗仍停在认证时发现，操作期间“完成”按钮可关窗而认证任务继续，用户离开后若认证迟到可能触发未观察到的恢复。现保留活动 `TouchIDAuthorizer`，新增“取消认证”按钮，通过 `LAContext.invalidate()` 取消正在进行的身份验证；认证/导出操作期间禁用“完成”和交互式关窗。取消由 LAContext 错误路径返回，尚未进入 LocalAPI restore 调用。
 - CUA 实机取消验证：点击“取消认证”后等待立即结束，界面从“正在认证本机设备…”恢复为失败状态，恢复按钮仍因口令已清空而禁用；显示系统英文 `Authentication canceled.`。这一轮没有调用恢复 API；275 KB 临时备份已精确删除。
 - 新增系统取消/用户取消/应用取消与系统中断到中文提示的映射，并添加 fake invalidation 与错误映射回归。`swift test --package-path poc/macos-audio` → 86 passed；Beta target build 与 `build_beta_app.sh` 均成功。最新中文映射的 UI 复核未完成：重启新包后 CUA 连续超时，PID 显示进程仍在，未见可用 AX 窗口；没有重试认证或修改数据。

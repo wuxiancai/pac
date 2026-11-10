@@ -1,5 +1,7 @@
 # 项目上下文
 
+- 2026-11-10 PDF 隔离候选复核：本机 `launchd.plist(5)` 虽提供 `ResidentSetSize` 资源项，但文档语义是在内存紧张时优先从超出申报 RSS 的进程回收内存；没有证明 worker 超限会确定性拒绝/终止，也未对独立解析 worker 实测。故不作为硬内存隔离证据，PDF 保持禁用。详见 `docs/beta/file-import.md`。
+
 - 2026-11-10 B3 恢复认证现可由用户显式取消（`LAContext.invalidate()`）；认证/导出时禁用完成与交互式关窗。GUI 点击取消后立即退出等待、未启动恢复 API，但系统原始文案为英文；新中文错误映射有 86 项 Swift 回归覆盖。新包重新打开时 CUA 超时，映射暂未实机确认。LocalAuthentication 成功提示/恢复仍未验收，见最新 HANDOFF。
 - 2026-11-10 B3 GUI 已在 NSSavePanel 中选择 `/Users/wuxiancai/Documents` 成功导出 274,726-byte 合成备份，精确路径/大小核实后删除；这覆盖用户自选本地目录，不代表外接卷或恢复验收。测试后 Beta 已退出，详见最新 HANDOFF。
 - 2026-11-10 阶段 6 在 `58c771d` 复核本地 CI 等价门禁：Python 347 passed（1 条既有弃用警告）、Swift 84 passed、Ruff/mypy/lock/compileall/secret scan/Beta build/App 打包及 plist 用途键校验全部通过；远端 Actions、系统认证/恢复、macOS 14 runtime 和正式签名安装仍未验，阶段 6 开放。详见最新 HANDOFF。
