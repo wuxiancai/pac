@@ -38,6 +38,13 @@
 - 此候选仅保留在本机 `backend/.poc-data/models/` 并被 Git 忽略。阶段 0 的本机推理已完成；产品分发仍需确认 ONNX 转换产物和测试语料各自的许可/来源。
 - 推理说明：此包由 sherpa-onnx `OfflineRecognizer.from_qwen3_asr` 执行整段识别。Qwen 官方文档说明 streaming inference 当前仅提供给 vLLM backend；本次没有验证流式运行时。许可证核查不能取代实时语音技术验收。
 
+### 2026-11-10 补充：官方来源链和许可范围复核
+
+- Qwen 官方 [Qwen3-ASR-0.6B 模型页](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) 当前标注 Apache-2.0；官方 [Qwen3-ASR 仓库](https://github.com/QwenLM/Qwen3-ASR/blob/main/LICENSE) 含 Apache License 2.0 文本。这支持官方源模型/官方代码的许可声明，不单独裁定第三方转换物或样本数据的权利链。
+- sherpa 官方 [Qwen3-ASR 导出说明](https://k2-fsa.github.io/sherpa/onnx/qwen3-asr/export.html) 指向 `Wasser1462/Qwen3-ASR-onnx` 作为导出代码，并指向 sherpa-onnx 发布包和 ModelScope 下载路径。当前发布镜像 [模型卡](https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25)说明文件来自 ModelScope、导出脚本来自 Wasser1462；该镜像页没有显示独立许可证字段。2026-11-10 检查 [导出仓库文件列表](https://github.com/Wasser1462/Qwen3-ASR-onnx)时，公开文件含 README/脚本/test_wavs，未见 LICENSE 文件；README 也没有单独写明仓库或工件许可。当前公开页面仍不足以明确第三方导出代码及 ONNX 量化文件的授权条件。
+- 本机随包 `test_wavs/README.md` 将音频指向 [Qwen 官方博客](https://qwen.ai/blog?id=qwen3asr)，该页面这次无法通过公开文本提取核实具体样本来源/许可；官方模型页说明训练使用大规模语音数据，但没有在本次核对范围内提供可逐项审计的数据集权利清单。因此训练数据和随包样本的权利链仍未闭环。
+- 结论保持：本机 POC 可使用不代表可随安装包再分发；继续不打包/镜像该候选，不改变 POC 或 Beta 范围，也不将此记录作为法律意见。关闭条件仍是取得转换工件与随包音频的明确许可/权利依据，或换用并重新验证许可与样本来源闭合的模型包。
+
 ### 2026-11-08 补充：公开许可来源交叉核对
 
 - 官方 Hugging Face `Qwen/Qwen3-ASR-0.6B-hf` 模型页标注 `apache-2.0`；官方 `QwenLM/Qwen3-ASR` 仓库包含 Apache License 2.0 文本。该证据覆盖官方源模型/官方仓库各自的许可声明，不自动覆盖第三方转换代码、导出工件或测试音频。

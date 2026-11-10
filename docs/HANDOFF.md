@@ -1,3 +1,9 @@
+# 2026-11-10：阶段 0/6 Qwen ASR 许可来源链复核
+
+- 读取 `docs/poc/phase0-traceability.md` 与模型许可报告，并核对 Qwen 官方模型页、Qwen 官方仓库 LICENSE、sherpa 官方 Qwen ONNX 导出文档、Wasser1462 导出仓库文件列表及 sherpa ONNX 镜像模型卡。
+- 确认官方源模型页声明 Apache-2.0；官方 sherpa 文档指向第三方转换代码和 ModelScope/sherpa 发布路径。第三方转换仓库当前文件列表未见 LICENSE，ONNX 镜像模型卡未显示独立许可字段；随包 WAV README 只指向 Qwen 博客，博客页面本轮无法提取许可/样本来源，官方材料也未提供可逐项审计的训练语料权利清单。
+- 不据此推断法律结论：该候选仍只作本机 POC，不纳入 Beta 安装包。更新模型许可报告、阶段 0 矩阵、TASKS 与 PROJECT_CONTEXT；未下载或修改模型资产。
+
 # 2026-11-10：B1 Ollama 取消后延迟本机复测
 
 - 核实本机服务为 Ollama `0.40.15`，模型 `qwen3.5:0.8b`，全部请求限于 `127.0.0.1:11434`，不保存回复正文。首轮默认 thinking 测量：基线 22.82 秒；在首块响应后 0.10 秒取消长流；后续短句 51.45 秒。此轮取消时长太短且冷/热状态不一致，不作归因。

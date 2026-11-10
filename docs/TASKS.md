@@ -37,6 +37,8 @@
 
 **Beta 范围阶段 0 收尾评审：PASS（2026-11-09）**。当前已启用本机优先 Beta 路径的证据和回归已核对；原始 §13 全量 POC 仍有 `PARTIAL/OPEN` 项，不宣称全量阶段 0 通过。按 C-007，这些项目在对应能力启用或正式分发前补齐，触发点见追踪矩阵。0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-10 当前代码复核：Python 全量 281 passed、1 条既有 Starlette/httpx 弃用警告；此前一轮全量中 APFS-128 `backup-copy` 临时映像子进程通用 `OSError`，目标用例单独复跑 1 passed，随后当前全量也通过，偶发原因未判定；Swift 全量 43 项通过，Beta target 构建成功。2026-11-10 于代码基线 `0418d25` 复核 CI 等价门禁：Ruff、mypy、`uv lock --check`、后端全量 276 passed、compileall、tracked-file detect-secrets、Swift 43 项与 Beta target build 全部通过；本次没有触发远端 GitHub Actions。历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地提交尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 55/55 非根依赖。D-013 Beta GUI 样本已达到计划数量并低于门槛：启动 n=20/P95=700 ms，partial 216 次/各窗口 P95≤41.5 ms，停止→final n=21/P95=97.9 ms。POC-01 并发 probe 新增 13 轮，详见 `phase0-local-asr.md` 与逐轮 CSV；Consent/Policy 新增在途 generate/stream 撤销取消 fake-adapter 回归，窄回归 50 项通过（含同一 Consent 下并发撤销）；完整 Agent/产品负载和 Consent 持久审计仍未验收。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。
 
+2026-11-10 0G 更新：核对 Qwen 官方 Apache-2.0 声明、sherpa 官方导出指引、第三方转换仓库文件列表和镜像模型卡后，仍未找到转换工件与随包音频的独立许可；训练数据权利链也无逐项证据。阶段 0 原始模型许可项继续 PARTIAL；Beta 不打包该候选。详见 `poc/phase0-model-license-review.md`。
+
 ## 当前执行顺序
 
 2026-11-10 B5 补充自动客户端证据：Swift URLProtocol 回归捕获认证 loopback `/chat/stream` 请求并确认 `import_ids` 序列化；Swift 全量 44 项通过，`personal-assistant-beta` target 构建通过。另在 API 调用 ContextBuilder 前增加附件字符数下限检查，100,000 字符超大附件在 Orchestrator 构建前返回 413；后端全量 282 passed，1 条既有警告。它不替代 GUI 对话中实际引用资料的手动验收，B5 保持 IN PROGRESS。
