@@ -1436,3 +1436,8 @@
 - 新建本机测试会话，使用 macOS 文件选择器导入 `.poc-data/gui-reference-test.txt`（85 bytes，85 字符）。提问“我刚才选择的资料中，唯一 lookup marker 是什么？只回复标记本身。”本机 `qwen3.5:0.8b` 回复包含精确标记 `PAC-TXT-REF-20261110-K7Q2`，确认 Beta GUI 的文件选择、Loopback 导入、请求 ID 引用及模型上下文链路端到端可用；点击附件移除后 chip 消失并提示成功。
 - 回复用时约 45 秒。该结果仅覆盖单一合成 TXT/本机模型，不覆盖 PDF 或其他模型语义质量。无云请求、无麦克风。临时 chip 已移除，测试文件随后删除；验收聊天留存在本机 SQLCipher 历史。
 - 已更新 `docs/beta/file-import.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。B5 仍 IN PROGRESS，因为 PDF 安全启用门槛与正式分发相关工作仍未完成。
+
+# 2026-11-10：B1 Ollama 设置帮助文案复核
+
+- 在仓库 Beta 的模型设置页确认“本地大模型”被选中、模型字段为 `qwen3.5:0.8b`；帮助文字明确 PAC 本机服务与 Ollama 是独立进程，并提示确认 Ollama 运行和模型已安装。关闭设置页后恢复原会话；未修改设置、读取 Key 或发起请求。
+- 更新 `docs/beta/macOS-beta-chat.md` 与 `docs/TASKS.md`。B1 其他本机/云端错误 UI 验收仍待完成。

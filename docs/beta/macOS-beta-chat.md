@@ -82,3 +82,7 @@
 ### 2026-11-10 本机传输错误提示
 
 `httpx.RequestError` 现在按 Provider 分流提示：Ollama 连接失败时引导检查本机服务；本机响应超时时提示生成状态可能未知、先检查 Ollama 后再重试。错误内容不回显底层异常，也不出现云端服务/计费措辞。合成 adapter 回归覆盖 `ConnectError` 和 `ReadTimeout`；连同原有本机错误及云端状态码脱敏回归共 8 passed。后端全量 276 passed，1 条既有 Starlette/httpx 弃用警告；Ruff/mypy 通过。GUI 错误文案呈现仍待手动验收；没有真实 Provider 请求。
+
+### 2026-11-10 本机模型帮助文案 GUI 复核
+
+在仓库当前 Beta 中打开“模型设置”，确认当前默认来源为本地大模型、模型字段为 `qwen3.5:0.8b`；说明文字清楚区分 PAC 本机服务和 Ollama，提示 PAC 已连接不等于 Ollama 已运行，并要求确认目标模型已安装。查看后关闭设置页，没有修改模型设置、触发 Keychain 状态读取或发起请求。
