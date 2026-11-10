@@ -1156,3 +1156,11 @@
 - 普通流现沿用相同契约：迭代/取消异常时尽力关闭上游但保留原异常；正常结束时关闭异常继续上抛；Consent lease 始终在外层 `finally` 注销。
 - 定向 `tests/test_consent_aware_gateway.py -k 'preserves_cancellation_when_upstream_close_fails or releases_consent_lease_when_upstream_close_fails'`：3 passed；Ruff、`mypy pac_poc/model_gateway.py` 通过。后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：279 passed、1 条既有 Starlette/httpx 弃用警告。
 - 已更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md` 与 `docs/PROJECT_CONTEXT.md`。无 Provider/Keychain 操作。
+
+
+### 2026-11-10：RunRegistry 并发创建时间顺序
+
+- `RunRegistry.create()` 原先在拿锁前读取 `created_at`，再在锁内决定插入顺序；线程抢占可能使 API 时间戳和注册表 FIFO 淘汰顺序不一致。
+- 现把时间戳生成与注册/容量淘汰放在同一临界区。新增并发回归，持有注册锁启动 worker，确认其必须等到获锁后才读取时间。
+- 定向 `tests/test_orchestrator.py -k run_registry`：3 passed；Ruff、`mypy pac_poc/orchestrator.py` 通过。后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：280 passed、1 条既有 Starlette/httpx 弃用警告。
+- 已更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。未调用 Provider、Keychain 或麦克风。

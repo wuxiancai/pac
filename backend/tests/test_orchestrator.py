@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from threading import Event, Thread
 
 import pytest
 
@@ -137,6 +138,40 @@ def test_run_registry_does_not_evict_active_runs_when_full() -> None:
         pass
     else:
         raise AssertionError("active run metadata must not be evicted")
+
+
+def test_run_registry_timestamps_are_taken_after_acquiring_insertion_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runs = RunRegistry(capacity=1)
+    time_called = Event()
+    creator_started = Event()
+    created = []
+
+    def fake_time() -> float:
+        time_called.set()
+        return 123.0
+
+    monkeypatch.setattr("pac_poc.orchestrator.time", fake_time)
+
+    def create_run() -> None:
+        creator_started.set()
+        created.append(runs.create())
+
+    runs._lock.acquire()
+    worker = Thread(target=create_run)
+    worker.start()
+    try:
+        assert creator_started.wait(timeout=1)
+        assert not time_called.wait(timeout=0.05)
+    finally:
+        runs._lock.release()
+    worker.join(timeout=1)
+
+    assert not worker.is_alive()
+    assert time_called.is_set()
+    assert len(created) == 1
+    assert created[0].created_at == created[0].updated_at == 123.0
 
 
 def test_orchestrator_requires_exact_capability_evidence_before_gateway_call() -> None:

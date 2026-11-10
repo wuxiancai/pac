@@ -94,3 +94,5 @@ swift test --package-path poc/macos-audio
 2026-11-10 补充取消路径：若流迭代/取消时上游 `aclose()` 也抛错，Gateway 保留原始 `CancelledError` 或迭代异常，不让清理错误覆盖；正常流完成时仍传播关闭异常。Consent lease 在外层 `finally` 无条件释放。定向 `tests/test_consent_aware_gateway.py -k 'usage_stream_'` → 2 passed；Ruff 与 mypy 通过；后端全量 278 passed、1 条既有 Starlette/httpx 弃用警告。
 
 2026-11-10 补齐无 usage 流接口：`ModelGateway.stream()` 也在取消/迭代异常时保留原异常并尽力关闭上游，正常结束仍传播关闭异常，finally 无条件释放 lease。它与 `stream_with_usage()` 的清理语义一致。定向清理/取消回归 3 passed，Ruff/mypy 通过；后端全量 279 passed，1 条既有 Starlette/httpx 弃用警告。
+
+2026-11-10 RunRegistry 并发创建顺序：`created_at` 现在在取得注册锁后读取，与实际插入及容量淘汰的序列化顺序一致，避免线程被抢占时出现时间戳倒序。并发回归持有注册锁后启动创建线程，确认时间读取发生在锁释放后。`tests/test_orchestrator.py -k run_registry` → 3 passed；Ruff/mypy 通过；后端全量 280 passed、1 条既有弃用警告。

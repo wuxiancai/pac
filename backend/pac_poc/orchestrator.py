@@ -61,9 +61,11 @@ class RunRegistry:
     def create(self, assistant_key: str = MAIN_ASSISTANT) -> RunSnapshot:
         if assistant_key != MAIN_ASSISTANT:
             raise AssistantNotFound(f"assistant is not enabled: {assistant_key}")
-        now = time()
-        snapshot = RunSnapshot(str(uuid4()), assistant_key, RunStatus.CREATED, now, now)
         with self._lock:
+            # Timestamp at the same linearization point as insertion so concurrent
+            # creates cannot be ordered differently in the API than in the registry.
+            now = time()
+            snapshot = RunSnapshot(str(uuid4()), assistant_key, RunStatus.CREATED, now, now)
             if len(self._runs) >= self._capacity:
                 oldest_terminal = next(
                     (key for key, run in self._runs.items() if run.status in self._TERMINAL),
