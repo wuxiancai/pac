@@ -133,4 +133,4 @@ swift test --package-path poc/macos-audio
 #### D-003 30 天 metadata-only 云请求审计（2026-11-10）
 
 - SQLCipher migration `0005_security_audit` 为当前 Beta 云聊天写入策略拒绝、用户确认/预算门后请求尝试和完成/失败/取消终态。审计仅保留 provider/model/region/purpose/data level/决策与固定 reason code、trace/resource UUID 和时间；不保存 Consent grant、消息正文、回复、Key/Token 或音频。
-- 记录写入、服务启动和认证用量查询时清理 30 天前记录。`GET /usage` 返回最多 100 条审计事件；Swift 用量页按最近 30 天安全记录与进程内 Usage 明细分区显示。自动契约覆盖拒绝/成功路径、超期删除与无正文；还没有真实 Provider 请求或 GUI 实机呈现验收。Consent 持久授权本身仍不保存，未来新增外部写或其他敏感能力时必须补充对应审计事件。
+- 写入、服务启动及认证用量查询时清理 30 天前记录；数据库密钥启动的 Beta 服务另外每 6 小时执行一次本机 SQLCipher 清理，退出时取消维护任务后关闭 store。`GET /usage` 返回最多 100 条审计事件；Swift 用量页按最近 30 天安全记录与进程内 Usage 明细分区显示。自动契约覆盖拒绝/成功路径、超期删除、周期清理循环与无正文；还没有真实 Provider 请求或 GUI 实机呈现验收。Consent 持久授权本身仍不保存，未来新增外部写或其他敏感能力时必须补充对应审计事件。

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import logging
 import math
 import re
 from collections.abc import AsyncIterator, Mapping
@@ -87,7 +88,9 @@ CHAT_STREAM_KEEPALIVE_SECONDS = 15.0
 MONTHLY_CLOUD_BUDGET_MICROS = 100_000_000
 MONTHLY_CLOUD_WARNING_MICROS = 80_000_000
 _BUDGET_RESERVATION_TTL = timedelta(minutes=5)
+_AUDIT_RETENTION_CLEANUP_INTERVAL_SECONDS = 6 * 60 * 60
 _BUDGET_TIMEZONE = ZoneInfo("Asia/Shanghai")
+_LOGGER = logging.getLogger(__name__)
 VOICE_MODEL_DIR = (
     Path(__file__).resolve().parent.parent
     / ".poc-data"
@@ -264,6 +267,10 @@ class BetaVoiceTranscriber(Protocol):
     def abort_stream(self) -> None: ...
 
     def transcribe_pcm16le(self, pcm: bytes) -> str: ...
+
+
+class SecurityAuditRetentionStore(Protocol):
+    def purge_expired_security_audit_events(self) -> int: ...
 
 
 async def _stream_with_keepalives(
@@ -1667,5 +1674,38 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         persistent_store.open()
         persistent_store.purge_expired_completed_tasks()
         persistent_store.purge_expired_security_audit_events()
+
+        audit_cleanup_task: asyncio.Task[None] | None = None
+
+        async def start_audit_cleanup() -> None:
+            nonlocal audit_cleanup_task
+            audit_cleanup_task = asyncio.create_task(
+                _security_audit_cleanup_loop(persistent_store)
+            )
+
+        async def stop_audit_cleanup() -> None:
+            if audit_cleanup_task is None:
+                return
+            audit_cleanup_task.cancel()
+            try:
+                await audit_cleanup_task
+            except asyncio.CancelledError:
+                pass
+
+        app.router.on_startup.append(start_audit_cleanup)
+        app.router.on_shutdown.append(stop_audit_cleanup)
         app.router.on_shutdown.append(persistent_store.close)
     return app
+
+
+async def _security_audit_cleanup_loop(
+    store: SecurityAuditRetentionStore,
+    *,
+    sleep: Callable[[float], Any] = asyncio.sleep,
+) -> None:
+    while True:
+        await sleep(_AUDIT_RETENTION_CLEANUP_INTERVAL_SECONDS)
+        try:
+            store.purge_expired_security_audit_events()
+        except Exception:
+            _LOGGER.exception("Scheduled security audit retention cleanup failed")

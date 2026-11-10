@@ -22,6 +22,7 @@ from pac_poc.beta_api import (
     MAX_CHAT_REQUEST_BYTES,
     create_beta_api,
     create_beta_app,
+    _security_audit_cleanup_loop,
     _run_voice_worker,
     _stream_with_keepalives,
 )
@@ -975,6 +976,61 @@ def test_cloud_context_limit_rejection_is_audited_before_provider_access(tmp_pat
         "context_limit_exceeded"
     ]
     store.close()
+
+
+def test_security_audit_retention_cleanup_runs_periodically() -> None:
+    class StoreStub:
+        purges = 0
+
+        def purge_expired_security_audit_events(self) -> int:
+            self.purges += 1
+            return 0
+
+    async def run() -> None:
+        store = StoreStub()
+        waits = 0
+
+        async def controlled_sleep(delay_seconds: float) -> None:
+            nonlocal waits
+            assert delay_seconds == 6 * 60 * 60
+            waits += 1
+            if waits == 2:
+                raise asyncio.CancelledError
+
+        with pytest.raises(asyncio.CancelledError):
+            await _security_audit_cleanup_loop(store, sleep=controlled_sleep)
+        assert waits == 2
+        assert store.purges == 1
+
+    asyncio.run(run())
+
+
+def test_database_key_app_starts_and_stops_audit_maintenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    started = Event()
+    stopped = Event()
+    monkeypatch.setattr(
+        beta_api_module, "default_database_path", lambda: tmp_path / "maintenance.db"
+    )
+
+    async def wait_for_shutdown(_store: object) -> None:
+        started.set()
+        try:
+            await asyncio.Future()
+        finally:
+            stopped.set()
+
+    monkeypatch.setattr(beta_api_module, "_security_audit_cleanup_loop", wait_for_shutdown)
+    app = create_beta_app(
+        dependencies=BetaAPIDependencies(
+            session=LocalAPISession(token="maintenance-token"), database_key=b"m" * 32
+        )
+    )
+
+    with TestClient(app):
+        assert started.wait(timeout=5)
+    assert stopped.wait(timeout=5)
 
 
 def test_usage_snapshot_includes_in_flight_cloud_budget_reservations(tmp_path: Path) -> None:
