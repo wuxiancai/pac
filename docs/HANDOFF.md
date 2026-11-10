@@ -35,6 +35,11 @@
 - 结果：后端 347 passed，1 条既有 Starlette/httpx 弃用警告；Ruff、mypy（3 个 CI 目标文件）、`uv lock --check`、compileall、detect-secrets hook 均通过；Swift 82 passed；Beta target 构建成功。
 - 该验证没有触发远端 GitHub Actions、真实 Provider 请求、麦克风、系统日历授权/写入或备份恢复。阶段 6 仍开放；GUI 授权/错误路径、Keychain/恢复实机和剩余用户操作须依各工作包逐项验收。
 
+# 2026-11-10：B10 审批 UI 关闭保护
+
+- EventKit 审计/写入正在进行时禁止关闭创建 sheet，避免异步结果提示被关闭窗口隐藏；“完成”按钮在忙碌时禁用。标题、起止日期、地点、备注输入项均提供稳定 accessibility identifier，支持后续 GUI 点验。
+- 验证：`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；`git diff --check` 通过。尚未实机打开创建页或授权日历。
+
 # 2026-11-10：模型预设旧格式迁移
 
 - `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。

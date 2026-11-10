@@ -1882,10 +1882,14 @@ private struct CalendarEventCreationView: View {
                 TextField("标题", text: $title)
                     .accessibilityIdentifier("calendar-event-title-field")
                 DatePicker("开始", selection: $startDate)
+                    .accessibilityIdentifier("calendar-event-start-date-picker")
                 DatePicker("结束", selection: $endDate)
+                    .accessibilityIdentifier("calendar-event-end-date-picker")
                 TextField("地点（可选）", text: $location)
+                    .accessibilityIdentifier("calendar-event-location-field")
                 TextField("备注（可选）", text: $notes, axis: .vertical)
                     .lineLimit(2...5)
+                    .accessibilityIdentifier("calendar-event-notes-field")
             }
             HStack {
                 Text(status).font(.caption).foregroundStyle(.secondary)
@@ -1918,10 +1922,12 @@ private struct CalendarEventCreationView: View {
             HStack {
                 Spacer()
                 Button("完成") { dismiss() }
+                    .disabled(isCreating)
                     .keyboardShortcut(.cancelAction)
             }
         }
         .padding(18)
+        .interactiveDismissDisabled(isCreating)
         .confirmationDialog(
             "确认创建此日历事件？",
             isPresented: $showingConfirmation,
