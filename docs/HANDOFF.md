@@ -1,3 +1,9 @@
+# 2026-11-11：补齐最低部署目标 job 的测试运行时
+
+- `b9fcf02` 的 macOS 15 job 已越过 Swift 并发编译并开始执行 96 项测试，但 12 项 backend supervisor/config 测试因该独立 job 没有安装 `backend/.venv` 而失败；主 job 先运行 Python sync，所以具备该运行时。最低部署目标 job 现复用同版本 uv 和锁定依赖安装步骤，确保测试条件一致。
+- 同一 run 常规 job 仍仅有 APFS-128 ENOSPC POC 失败（347 项中 346 passed）；隔离本机复跑 → 1 passed、6 deselected（13.23 秒）。CI 摘要未给出故障阶段，原因未判定。
+- 修复已作本机检查：Swift 全量 96 项通过；Beta bundle 构建成功；`git diff --check` 通过。新 workflow 提交远端结果待验证。
+
 # 2026-11-11：补齐 LocalAuthentication 与通知回调并发边界
 
 - macOS 15 job 对 `0aea258` 仍报告两个 Swift 6 并发错误：UserNotifications 的授权 async 入口和 `LAContext.evaluatePolicy` async 入口将主 actor 隔离对象送入非隔离 SDK 方法。已改为对应 completion-handler API，并在主 actor 服务中通过 checked continuation 返回布尔值；不改授权策略、不做系统认证实测。

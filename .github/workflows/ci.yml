@@ -72,6 +72,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: 0.11.17
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install locked Python dependencies
+        working-directory: backend
+        run: uv sync --locked --extra phase0-embedding --extra phase4-pdf-poc --group dev
+
       - name: Run Swift tests with macOS 14 deployment target
         working-directory: poc/macos-audio
         run: swift test
