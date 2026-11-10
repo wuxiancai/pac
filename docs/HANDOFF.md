@@ -1,3 +1,10 @@
+# 2026-11-10：V1.1 已确认记忆人工修正
+
+- 记忆中心新增显式确认编辑 API 与 SwiftUI 编辑流程。每次修正更新加密数据库中的当前记忆、由 FTS 触发器同步索引，并追加 `user_confirmed_edit` 版本快照；未确认更新返回 409。删除仍会级联删除版本记录。
+- 验证：`tests/test_persistence.py tests/test_beta_api.py` 54 passed，1 条既有 Starlette/httpx 弃用警告；Swift 全量 49 项通过；`personal-assistant-beta` 构建、Ruff、mypy 和 `uv lock --check` 通过。后端全量 300 passed，1 条既有 Starlette/httpx 弃用警告。
+- 来源消息选择/跳转与版本历史查看 UI、Embedding 和备份恢复仍未完成；本轮未读取真实用户数据或调用 Provider/Keychain。
+- 已同步本报告、`docs/beta/persistent-storage.md`、`docs/TASKS.md` 与 `docs/PROJECT_CONTEXT.md`。
+
 # 2026-11-10：B3 本机任务提醒实现
 
 - V2 任务新增可选 `schedule_at`；macOS 客户端通过 `TaskReminderManager` 安排本机通知。通知默认关闭，系统授权只由用户显式点击触发；已授权时应用启动重建有效待发提醒，任务进入完成/取消等终态或删除时撤销提醒。

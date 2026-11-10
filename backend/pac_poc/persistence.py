@@ -159,6 +159,56 @@ class EncryptedApplicationStore:
             ), {"limit": limit}).mappings().all()
             return [_memory_row(row) for row in rows]
 
+    def update_confirmed_memory(
+        self,
+        memory_id: str,
+        *,
+        subject: str,
+        content: str,
+        category: str,
+    ) -> dict[str, object]:
+        if category not in self.MEMORY_CATEGORIES:
+            raise ValueError("memory category is invalid")
+        if not subject.strip() or len(subject) > 512:
+            raise ValueError("memory subject must contain 1 to 512 characters")
+        if not content.strip() or len(content) > 20_000:
+            raise ValueError("memory content must contain 1 to 20000 characters")
+        engine = self._require_engine()
+        now = _utc_timestamp()
+        with engine.begin() as connection:
+            row = connection.execute(text(
+                "SELECT * FROM memory_items WHERE id=:id AND status='ACTIVE' AND deleted_at IS NULL"
+            ), {"id": memory_id}).mappings().first()
+            if row is None:
+                raise KeyError("memory not found")
+            version_no = int(connection.execute(text(
+                "SELECT COALESCE(MAX(version_no), 0) + 1 FROM memory_versions WHERE memory_id=:id"
+            ), {"id": memory_id}).scalar_one())
+            snapshot = {
+                "subject": subject.strip(),
+                "content": content.strip(),
+                "category": category,
+                "claim_type": str(row["claim_type"]),
+                "source_message_id": row["source_message_id"],
+                "confirmed_at": now,
+            }
+            connection.execute(text(
+                "UPDATE memory_items SET subject=:subject, content=:content, category=:category, "
+                "confirmed_at=:now, updated_at=:now WHERE id=:id"
+            ), {
+                "subject": subject.strip(), "content": content.strip(), "category": category,
+                "now": now, "id": memory_id,
+            })
+            connection.execute(text(
+                "INSERT INTO memory_versions(id,memory_id,version_no,snapshot_json,change_reason,created_at) "
+                "VALUES(:version_id,:memory_id,:version_no,:snapshot,'user_confirmed_edit',:now)"
+            ), {
+                "version_id": str(uuid4()), "memory_id": memory_id, "version_no": version_no,
+                "snapshot": json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")),
+                "now": now,
+            })
+            return self.get_memory(memory_id, connection=connection)
+
     def get_memory(self, memory_id: str, *, connection=None) -> dict[str, object]:
         engine = self._require_engine()
         if connection is not None:

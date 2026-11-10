@@ -159,6 +159,17 @@ class ConfirmedMemoryCreateRequest(BaseModel):
     source_message_id: UUID | None = None
 
 
+class ConfirmedMemoryUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str = Field(min_length=1, max_length=512)
+    content: str = Field(min_length=1, max_length=20_000)
+    category: Literal[
+        "fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"
+    ]
+    confirmed: bool
+
+
 class TaskCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -764,6 +775,25 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             return {"deleted": persistent_store.delete_memory(str(memory_id))}
         except Exception:
             raise HTTPException(status_code=503, detail="memory could not be deleted") from None
+
+    @router.put("/memories/{memory_id}")
+    async def update_memory(
+        memory_id: UUID, payload: ConfirmedMemoryUpdateRequest
+    ) -> dict[str, object]:
+        if not payload.confirmed:
+            raise HTTPException(status_code=409, detail="explicit user confirmation is required")
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent memory storage is unavailable")
+        try:
+            return persistent_store.update_confirmed_memory(
+                str(memory_id), subject=payload.subject, content=payload.content, category=payload.category
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="memory not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="memory details are invalid") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="memory could not be updated") from None
 
     @router.get("/tasks")
     async def list_tasks(include_completed: bool = True, limit: int = Query(default=100, ge=1, le=500)) -> dict[str, object]:

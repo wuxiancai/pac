@@ -292,11 +292,17 @@ def test_confirmed_memory_search_version_and_delete_lifecycle(storage_root: Path
         )
         assert memory["claim_type"] == "user_confirmed_fact"
         assert store.search_memories("encrypted archive")[0]["id"] == memory["id"]
+        updated = store.update_confirmed_memory(
+            str(memory["id"]), subject="Project Atlas", content="Use a local private archive", category="decision"
+        )
+        assert updated["content"] == "Use a local private archive"
+        assert store.search_memories("private archive")[0]["id"] == memory["id"]
+        assert store.search_memories("encrypted archive") == []
         with store.connection() as connection:
             assert connection.execute(
                 text("SELECT count(*) FROM memory_versions WHERE memory_id=:id"),
                 {"id": memory["id"]},
-            ).scalar_one() == 1
+            ).scalar_one() == 2
         assert store.delete_memory(str(memory["id"]))
         assert store.search_memories("encrypted archive") == []
         assert store.list_memories() == []

@@ -320,6 +320,26 @@ public final class LocalAPIClient: @unchecked Sendable {
         return memory
     }
 
+    public func updateConfirmedMemory(
+        id: String, subject: String, content: String, category: String
+    ) async throws -> LocalMemoryItem {
+        guard let memoryID = UUID(uuidString: id),
+              let url = URL(string: "/memories/\(memoryID.uuidString.lowercased())", relativeTo: baseURL)?.absoluteURL
+        else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(ConfirmedMemoryPayload(
+            subject: subject, content: content, category: category, confirmed: true
+        ))
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let memory = try? JSONDecoder().decode(LocalMemoryItem.self, from: data) else { throw LocalAPIClientError.invalidResponse }
+        return memory
+    }
+
     public func deleteMemory(id: String) async throws {
         guard let memoryID = UUID(uuidString: id),
               let url = URL(string: "/memories/\(memoryID.uuidString.lowercased())", relativeTo: baseURL)?.absoluteURL

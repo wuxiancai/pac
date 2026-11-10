@@ -494,12 +494,19 @@ final class BetaChatModel {
         }
     }
 
-    func saveConfirmedMemory(subject: String, content: String, category: String) async {
+    func saveConfirmedMemory(subject: String, content: String, category: String, editingID: String? = nil) async {
         guard let client else { return }
         do {
-            _ = try await client.createConfirmedMemory(
-                subject: subject, content: content, category: category
-            )
+            if let editingID {
+                _ = try await client.updateConfirmedMemory(
+                    id: editingID, subject: subject, content: content, category: category
+                )
+            } else {
+                _ = try await client.createConfirmedMemory(
+                    subject: subject, content: content, category: category
+                )
+            }
+            memoryStatus = editingID == nil ? "已保存并确认记忆。" : "已确认修正并保存新版本。"
             await refreshMemories()
         } catch {
             memoryStatus = "无法保存已确认记忆：\(error.localizedDescription)"
@@ -1269,6 +1276,7 @@ private struct ConfirmedMemoryView: View {
     @State private var subject = ""
     @State private var content = ""
     @State private var category = "fact"
+    @State private var editingID: String?
     private let categories = ["fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"]
 
     var body: some View {
@@ -1284,20 +1292,38 @@ private struct ConfirmedMemoryView: View {
             TextEditor(text: $content)
                 .frame(minHeight: 90)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
-            Button("确认并保存这条记忆") {
+            HStack {
+            Button(editingID == nil ? "确认并保存这条记忆" : "确认修正并保存新版本") {
                 let cleanSubject = subject.trimmingCharacters(in: .whitespacesAndNewlines)
                 let cleanContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !cleanSubject.isEmpty, !cleanContent.isEmpty else { return }
-                Task { await model.saveConfirmedMemory(subject: cleanSubject, content: cleanContent, category: category) }
+                let memoryID = editingID
+                Task { await model.saveConfirmedMemory(subject: cleanSubject, content: cleanContent, category: category, editingID: memoryID) }
                 subject = ""
                 content = ""
+                editingID = nil
             }
             .disabled(subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if editingID != nil {
+                Button("取消修正") {
+                    editingID = nil
+                    subject = ""
+                    content = ""
+                }
+            }
+            }
             List(model.memories) { memory in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text(memory.subject).font(.headline)
                         Spacer()
+                        Button("编辑") {
+                            editingID = memory.id
+                            subject = memory.subject
+                            content = memory.content
+                            category = memory.category
+                        }
+                        .buttonStyle(.borderless)
                         Button(role: .destructive) {
                             Task { await model.deleteMemory(memory) }
                         } label: {
