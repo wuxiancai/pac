@@ -1,3 +1,9 @@
+# 2026-11-11：补齐已完成任务 30 天保留边界回归
+
+- 核对 D-003：任务清理以 `completed_at` 为准，30 天定时清理逻辑已在 B3 接入；原测试只覆盖 31 天前已完成任务。本次补强同一 SQLCipher 存储回归：31 天和正好 30 天前的 COMPLETED 被清理，29 天前的 COMPLETED 保留，31 天前的 FAILED 保留，防止把未完成任务误当作过期完成任务。
+- 定向验证：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_persistence.py -k task_lifecycle_is_idempotent_and_completed_tasks_expire_after_30_days` → 1 passed、18 deselected。后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 347 passed，1 条既有 Starlette/httpx 弃用警告（46.02 秒）。`ruff check tests/test_persistence.py` 与 `mypy pac_poc/persistence.py` 通过。
+- 该回归只验证 SQLCipher store 保留/删除条件，不验证 Beta 启动、定时轮询和 GUI 显示；这些仍按既有工作包证据跟踪。本段按独立提交交付。
+
 # 2026-11-11：最低 macOS 部署目标与常规 CI 通过
 
 - 提交 `1b94ef3` 的 Actions run `42924078724` 两个 job 全部成功。主 job：Python 347 passed（1 条既有 Starlette/httpx 弃用警告）、Swift 96 passed、Ruff、mypy、lock、secret scan、compileall 和 Beta build 均通过。macOS 15/Xcode 16.4 job：锁定 Python 环境安装、Swift 96 项和 Beta `.app` 最低版本校验全部通过；SwiftPM 部署目标为 macOS 14。

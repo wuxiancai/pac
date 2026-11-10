@@ -2,6 +2,8 @@
 
 最后核对：2026-11-11（Asia/Shanghai）
 
+2026-11-11 B3 任务保留边界：补强 SQLCipher 存储测试，确认 COMPLETED 满 30 天即清理、29 天保留，FAILED 即使超过 30 天也保留；定向回归 1 passed，后端全量 347 passed（1 条既有 Starlette/httpx 弃用警告），Ruff 和 mypy 通过。该段不替代 Beta 定时清理运行和 GUI 生命周期验收，详见 `docs/beta/persistent-storage.md` 与最新 `docs/HANDOFF.md`。
+
 2026-11-10 B5/PDF：追加核对本机 `launchd.plist(5)` 的 `ResidentSetSize` 资源项。其文档只说明内存紧张时系统优先从超过申报 RSS 的进程回收内存，尚未证明超限必拒绝或 worker 隔离有效；不能满足 D-012 硬内存上限门槛。PDF 继续禁用，保持查找并实测候选隔离方案；见 `docs/beta/file-import.md`。
 
 2026-11-10 B3 备份 UI 复测：通过 accessibility 对导出按钮点击两次均未出现 NSSavePanel。临时口令已清空，无备份文件、无导出或恢复调用。原因待判定；下次先确认真实键盘/GUI action 是否触发，再区分 Beta 按钮与系统面板呈现问题。既有用户自选目录成功导出证据仍有效。

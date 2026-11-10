@@ -248,8 +248,6 @@ def test_conversation_turns_load_in_order_and_manual_delete_removes_content(
 def test_task_lifecycle_is_idempotent_and_completed_tasks_expire_after_30_days(
     storage_root: Path,
 ) -> None:
-    from datetime import datetime, timedelta, timezone
-
     store = _store((storage_root / "tasks.db").resolve())
     store.open()
     now = datetime(2026, 11, 10, tzinfo=timezone.utc)
@@ -280,18 +278,31 @@ def test_task_lifecycle_is_idempotent_and_completed_tasks_expire_after_30_days(
         with pytest.raises(ValueError, match="transition"):
             store.transition_task(str(task["id"]), "READY")
 
-        old_id = "expired-task"
+        seeded_tasks = [
+            ("expired-task", "COMPLETED", now - timedelta(days=31)),
+            ("exactly-30-days-task", "COMPLETED", now - timedelta(days=30)),
+            ("recent-completed-task", "COMPLETED", now - timedelta(days=29)),
+            ("old-failed-task", "FAILED", now - timedelta(days=31)),
+        ]
         with store.connection() as connection, connection.begin():
-            old = (now - timedelta(days=31)).isoformat()
-            connection.execute(
-                text(
+            for task_id, status, completed_at in seeded_tasks:
+                timestamp = completed_at.isoformat()
+                connection.execute(text(
                     "INSERT INTO tasks(id,title,status,priority,retry_count,idempotency_key,"
                     "created_at,updated_at,started_at,completed_at) "
-                    "VALUES(:id,'Old task','COMPLETED',0,0,'old-task',:old,:old,:old,:old)"
-                ), {"id": old_id, "old": old}
-            )
-        assert store.purge_expired_completed_tasks(now=now) == 1
-        assert [item["id"] for item in store.list_tasks()] == [task["id"]]
+                    "VALUES(:id,:title,:status,0,0,:idempotency,:timestamp,:timestamp,:timestamp,:timestamp)"
+                ), {
+                    "id": task_id,
+                    "title": task_id,
+                    "status": status,
+                    "idempotency": f"{task_id}-key",
+                    "timestamp": timestamp,
+                })
+        assert store.purge_expired_completed_tasks(now=now) == 2
+        remaining_ids = {item["id"] for item in store.list_tasks()}
+        assert remaining_ids == {
+            task["id"], "recent-completed-task", "old-failed-task"
+        }
     finally:
         store.close()
 
