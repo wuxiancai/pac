@@ -1,6 +1,7 @@
 # 项目上下文
 
-- 2026-11-10 只读检查发现本地 `main`（`cad3e01`）比 `origin/main` 超前 319 个提交；远端 `main` 仍为 `51b9ab9`，最近成功 Actions 也只验证旧提交。未推送，详见最新 HANDOFF；阶段 6 远端 CI 对当前本地基线仍未验证。
+- 2026-11-10 当前 GitHub Actions run `42836277748` 首步因无效 `phase0-security` extra 失败；该依赖实际位于 `dev` group。工作流参数已修正，本机精确复跑 `uv sync --locked --extra phase0-embedding --extra phase4-pdf-poc --group dev` 成功；修复待提交并重触发远端全门禁。
+- 2026-11-10 本地 `main` 曾领先远端 319 个提交；用户授权后已推送至 `c4b9a1e`，远端 Actions 触发但暴露 workflow dependency extra 配置错误。待修复提交后重验远端门禁。详见最新 HANDOFF。
 - 2026-11-10 阶段 6 当前提交 `000f341` 本机 CI 等价门禁通过：后端 347 passed（1 条既有 Starlette/httpx 弃用警告）、Swift 94 passed、Beta target build、Ruff、CI mypy、锁文件、compileall、tracked-file secret scan 通过。远端 Actions、Provider、麦克风、系统恢复与 macOS 14 实机未验。详见最新 HANDOFF。
 - 2026-11-10 B3 修复认证取消与迟到成功回调的竞态：已取消或被新尝试替代的本机认证结果不能调用恢复 API；取消状态立即明确显示未开始恢复。Swift 94 项通过，Beta `.app` 构建通过。未做真实认证/恢复 GUI；详见最新 HANDOFF。
 - 2026-11-10 B3 数据库 Keychain 生命周期新增 5 项 mock 回归，覆盖已存键只读、首次设备专用键创建、重复创建竞争取胜者以及读取/随机数/写入失败关闭；系统 Keychain 接口与数据未在本轮操作。Swift 92 项通过，Beta build 成功。详见 HANDOFF。

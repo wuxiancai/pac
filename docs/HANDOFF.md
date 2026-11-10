@@ -1,7 +1,12 @@
+# 2026-11-10：修复 GitHub Actions 依赖安装参数
+
+- 推送后的 Actions run `42836277748` 在首步失败，尚未执行 lint/测试。失败日志精确显示 `.github/workflows/ci.yml` 请求不存在的 `phase0-security` extra；`backend/pyproject.toml` 只声明 `phase0-embedding`、`phase4-pdf-poc` 两个 extras，安全扫描依赖已由 `dev` dependency group 提供。
+- 删除无效 extra 后，按 CI 原命令在 `backend/` 执行 `uv sync --locked --extra phase0-embedding --extra phase4-pdf-poc --group dev` → 成功，解析 64 packages、检查 61 packages。用户授权后已将此前本地 319 个领先提交推送至 `origin/main`（达到 `c4b9a1e`）；本工作流修正仍待提交并推送，之后重新运行 Actions。
+
 # 2026-11-10：远端 CI 与本地分支差异核对
 
-- 只读检查 `gh run list --limit 5`、`git branch -vv` 与 `git ls-remote origin refs/heads/main`：远端 `main` 当前为 `51b9ab9c46871e7213eb18ab685a8120e1419f27`；本地 `main` 为 `cad3e01` 且 `ahead 319`。最近可见的成功 Actions run `42489738004` 也是 2026-11-08 的旧提交 `51b9ab9`，不覆盖当前代码。
-- 未推送远端。将本地 `main` 推送会一次发布其全部 319 个领先提交，不是本轮单段提交动作；远端 Actions 验收仍待处理。当前本机等价 CI 已于 `000f341` 通过，见下方阶段 6 记录。
+- 只读检查时远端 `main` 为 `51b9ab9c46871e7213eb18ab685a8120e1419f27`，本地 `main` 为 `cad3e01` 且 `ahead 319`。最近可见成功 Actions run `42489738004` 仅覆盖旧提交 `51b9ab9`。
+- 用户随后授权推送全部领先提交；推送成功，远端 `main` 已核实到达 `c4b9a1e`，本机分支同步。Actions run `42836277748` 随即启动，但在依赖安装步骤因工作流传入未定义的 `phase0-security` extra 而失败；见本节上方修复记录。
 
 # 2026-11-10：阶段 6 当前提交本机 CI 等价门禁复核
 

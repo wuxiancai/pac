@@ -31,7 +31,7 @@ jobs:
 
       - name: Install locked Python dependencies
         working-directory: backend
-        run: uv sync --locked --extra phase0-security --extra phase0-embedding --extra phase4-pdf-poc --group dev
+        run: uv sync --locked --extra phase0-embedding --extra phase4-pdf-poc --group dev
 
       - name: Lint Python sources
         working-directory: backend
