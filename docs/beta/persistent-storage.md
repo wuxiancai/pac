@@ -2,6 +2,8 @@
 
 最后核对：2026-11-11（Asia/Shanghai）
 
+2026-11-11 本机提醒授权成功回归：通过 fake `UNUserNotificationCenter` 验证用户显式授权成功后设置启用状态；重建时删除过期 PAC 自有通知、保留其他应用通知，并为未来 READY 任务建立提醒。Swift 全量 97 项、Beta 产品构建通过。真实系统授权、实际投递和重启后通知仍未验收。
+
 2026-11-11 恢复认证 watchdog：认证开始后 60 秒仍无系统结果时，一次性门闩自动失效，调用当前 `LAContext.invalidate()`，结束 UI 忙碌状态并说明“本机认证等待超时，未开始恢复”。迟到成功无法认领该尝试；若认证提前完成则取消 watchdog。自动回归覆盖超时与成功先到两条顺序。此为失败关闭的等待上限，不表示 LocalAuthentication 系统提示/回调根因已查明；真实设备认证/恢复仍开放。
 
 2026-11-10 Keychain 重复授权诊断：旧构建脚本把未重签名 SwiftPM binary 放入 `.app`，签名标识是 hash 且 designated requirement 为 cdhash。脚本现在在写完 Info.plist 后对 bundle 按 `com.personal-ai-assistant.beta` 重签并验证；`PAC_BETA_SIGNING_IDENTITY` 可指定已安装的稳定证书身份。本机默认 ad-hoc 签名构建和 `codesign --verify --deep --strict` 通过，但默认无 Team ID、cdhash 身份仍不稳定。要持久保留 Keychain app ACL，需配置稳定签名身份，并由用户本人在场审阅/批准首次 Keychain 提示；这一步及重复启动实机验证未完成。未访问 Keychain、未启动 GUI、未使用聊天中披露的 macOS 密码。

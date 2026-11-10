@@ -1,3 +1,8 @@
+# 2026-11-11：补齐本机任务提醒授权成功重建回归
+
+- 为 `TaskReminderManager` 新增注入通知中心回归：模拟用户显式授权成功后开启提醒；执行启动时共用的 reconcile 路径，移除过期 PAC 自有提醒、重建未来 READY 任务提醒，同时保留其他应用的待发通知。
+- 验证：`swift test --package-path poc/macos-audio` → 97 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。未请求真实 macOS 通知授权、未投递系统通知；真实重启投递与 GUI 授权路径仍待实机验收。
+
 # 2026-11-11：补齐已完成任务启动与周期清理回归
 
 - 为 B3 任务保留新增 SQLCipher 应用打开路径回归：先在加密库构造 31 天和 29 天前的 COMPLETED 记录，再通过数据库密钥创建 Beta app；应用打开存储时自动删除超期项，保留近期项。既有受控 sleep 回归同时确认任务清理维护循环按 6 小时等待并触发清理；结合此前存储边界和认证任务 API 回归，覆盖了清理条件、启动、周期及列表读取四处触发路径。

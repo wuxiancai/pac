@@ -247,3 +247,38 @@ private final class FakeTaskReminderNotificationCenter: TaskReminderNotification
     let afterRevocation = await center.pendingNotificationIdentifiers()
     #expect(afterRevocation == ["other.app.notification"])
 }
+
+@available(macOS 14.0, *)
+@MainActor
+@Test func taskReminderGrantRebuildsEligibleRequestsAndPreservesOtherApps() async throws {
+    let suiteName = "TaskReminderGrantTests-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let center = FakeTaskReminderNotificationCenter()
+    center.requestAuthorizationResult = true
+    center.currentAuthorizationStatus = .authorized
+    center.seed(identifier: "pac.task.stale")
+    center.seed(identifier: "other.app.notification")
+    let manager = TaskReminderManager(center: center, defaults: defaults)
+
+    let granted = try await manager.requestAndEnable()
+    #expect(granted)
+    #expect(manager.isEnabled)
+
+    let future = ISO8601DateFormatter().string(from: Date().addingTimeInterval(3600))
+    let task = LocalTaskItem(
+        id: "task-restored-after-launch",
+        title: "synthetic",
+        description: "",
+        status: "READY",
+        priority: 1,
+        scheduleAt: future,
+        startedAt: nil,
+        completedAt: nil,
+        allowedTransitions: nil
+    )
+    await manager.reconcile(tasks: [task])
+
+    let rebuilt = await center.pendingNotificationIdentifiers()
+    #expect(rebuilt == ["other.app.notification", "pac.task.task-restored-after-launch"])
+}
