@@ -1554,3 +1554,9 @@
 - 在新建本机会话临时选择不存在的 Ollama 模型 `pac-test-model-not-installed`，发送合成短句后，GUI 显示明确的本机模型/安装检查提示，本轮 run 标为失败；Provider 保持 Ollama，没有云 fallback。之后恢复原模型 `qwen3.5:0.8b`，界面显示本机服务已连接、当前模型已恢复。
 - 测试短句和失败状态保留在新建 SQLCipher 会话；没有删除用户数据。没有发送云请求、读取 Keychain 或采集麦克风。仍需真实验证 Ollama 停止/恢复、读超时和云 API 错误 UI。
 - 已更新 `docs/beta/macOS-beta-chat.md`、`docs/TASKS.md` 与 `docs/PROJECT_CONTEXT.md`。
+
+### 2026-11-10：B3 恢复切换硬退出注入
+
+- 新增 `test_process_exit_during_restore_swap_recovers_original_database`：以独立子进程打开临时 SQLCipher 数据库，在 `os.replace(live_db, rollback)` 成功后立即调用 `os._exit(91)`，不运行 Python `finally`；父进程确认退出码，重新打开 store 后原始两轮对话完整且 rollback 文件已清除。
+- 验证：`tests/test_backup.py` 11 passed；后端全量 342 passed、1 条既有 Starlette/httpx 弃用警告；修改测试 Ruff 通过。
+- 故障注入同时发现 3 个 mode 0600 的加密 staging 文件残留（`.pac-pre-restore-*.sqlite`、`.pac-restore-payload-*.sqlite`、`.pac-restore-local-*.sqlite`）。尚未实现清理，因为需要避免误删另一活动 store 的 staging；下一步先设计可跨实例判定 restore 独占/中断的协调机制，再加入无残留断言。现有自动恢复测试只证明旧库完整，不宣称 staging 生命周期闭环。

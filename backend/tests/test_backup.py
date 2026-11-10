@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -252,4 +254,68 @@ def test_store_open_recovers_uncommitted_restore_rollback(tmp_path: Path, databa
     recovered.open()
     assert recovered.load_conversation(str(conversation["id"]))["messages"][0]["content"] == "rollback should win"
     assert not rollback.exists()
+    recovered.close()
+
+
+def test_process_exit_during_restore_swap_recovers_original_database(tmp_path: Path) -> None:
+    database = (tmp_path / "product.db").resolve()
+    backup = tmp_path / "snapshot.pacbackup"
+    key = b"c" * 32
+    store = EncryptedApplicationStore(path=database, key=key)
+    store.open()
+    conversation = store.get_or_create_default_conversation()
+    store.append_chat_turn(
+        conversation_id=str(conversation["id"]), run_id="before-hard-exit",
+        user_content="original database survives process exit",
+        assistant_content="original response", provider="ollama", model="fixture",
+        status="COMPLETED",
+    )
+    store.export_encrypted_backup(backup, password="process exit fixture")  # pragma: allowlist secret
+    store.append_chat_turn(
+        conversation_id=str(conversation["id"]), run_id="backup-content",
+        user_content="restored database content", assistant_content="backup response",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    store.close()
+
+    child_program = """
+import os
+import sys
+from pathlib import Path
+from pac_poc.persistence import EncryptedApplicationStore
+
+database, backup = Path(sys.argv[1]), Path(sys.argv[2])
+original_replace = os.replace
+
+def exit_after_moving_live_database(source, destination):
+    original_replace(source, destination)
+    if Path(source) == database and Path(destination).name.endswith('.rollback'):
+        os._exit(91)
+
+os.replace = exit_after_moving_live_database
+store = EncryptedApplicationStore(path=database, key=bytes.fromhex(sys.argv[3]))
+store.open()
+store.restore_encrypted_backup(backup, password=sys.argv[4])
+raise SystemExit('restore did not reach the injected process-exit point')
+"""
+    child = subprocess.run(
+        [sys.executable, "-c", child_program, str(database), str(backup), key.hex(), "process exit fixture"],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert child.returncode == 91, child.stderr
+    assert list(tmp_path.glob(".product.db.*.rollback"))
+
+    recovered = EncryptedApplicationStore(path=database, key=key)
+    recovered.open()
+    messages = recovered.load_conversation(str(conversation["id"]))["messages"]
+    assert [message["content"] for message in messages] == [
+        "original database survives process exit",
+        "original response",
+        "restored database content",
+        "backup response",
+    ]
+    assert not list(tmp_path.glob(".product.db.*.rollback"))
     recovered.close()
