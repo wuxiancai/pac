@@ -41,6 +41,12 @@ uv lock --check
 - 真实用户规模、冷/热启动、长期运行、并发负载、CPU/RSS 及外接盘/NAS 性能未测；当前仅有三轮合成工作负载对照，未据此做产品取舍。
 - 尚未完成其他成熟加密候选比较、最终 ADR 和恢复演练，因此不得宣告静态加密验收完成。
 
+## 2026-11-10 产品方向决议（实现仍待验收）
+
+用户已选择 SQLCipher 用于产品持久数据库，随机数据库密钥存 macOS Keychain，登录解锁后自动打开；手动备份写入用户选择位置，每份用独立口令；恢复前系统认证并预备份当前数据。Apple 文档说明 Keychain accessibility 与 user-presence 可分别约束设备解锁状态和显式认证；本产品选自动打开，不要求每次启动认证（[WhenUnlocked](https://developer.apple.com/documentation/security/ksecattraccessiblewhenunlocked)、[userPresence](https://developer.apple.com/documentation/security/secaccesscontrolcreateflags/userpresence)）。SQLCipher 要求在数据库首次读写前配置 key，并支持 rekey（[官方 API](https://www.zetetic.net/sqlcipher/sqlcipher-api/)）。
+
+这只记录选型方向，不代表现有 POC 满足产品要求。macOS Keychain ACL/访问属性、随机密钥创建与轮换/丢失、独立备份口令格式/KDF与恢复范围、SQLCipher Community attribution、App Support 私有目录权限、正式 migration、RTO 和发布许可均须实现并实测。
+
 ## 版本与安全边界
 
 此 extra 是阶段 0 的可选工具，不等于 V1 已集成 SQLCipher。产品 API Key 仍只能经 Keychain 管理；SQLCipher 测试 key 与 Provider API Key 是不同数据，不写数据库日志或普通配置。V1 的所有产品 schema 仍必须通过 Alembic migration，并带备份/回滚说明。
