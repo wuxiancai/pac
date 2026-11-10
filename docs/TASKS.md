@@ -57,7 +57,7 @@
 
 2026-11-10 阶段 6 模型设置 GUI 检查：显示本地 `qwen3.5:0.8b` 和 Ollama 安装/运行说明；没有 capability 明细面板，故型号配置显示通过而 capability 查询/认证失败 UI 仍开放。
 
-2026-11-10 阶段 6 精确型号 capability 查询：认证 loopback 客户端、设置页显式查询和 unknown-safe 状态展示已实现；Swift 63 项、Beta build 通过。GUI 点验未完成，重启后 CUA 窗口读取超时且未见受管 backend 子进程，需复核启动路径后再验收。
+2026-11-10 阶段 6 精确型号 capability 查询：认证 loopback 客户端及设置页显式查询已实现并实机通过；`ollama / qwen3.5:0.8b` 报告精确显示已核验能力、有限能力、未知项及证据时间/引用。Swift 63 项与 Beta build 通过。重启时曾短暂 CUA 超时后恢复，原因未判定。
 
 2026-11-10 B8 Skill GUI 冒烟：选择“行动项整理”后发送即清空至 `Skills 0`；本机 qwen3.5:0.8b 超过两分钟仍无正文，停止后已取消。仅选择消费路径通过，延迟原因未判定，不外推为 Skill 缺陷。
 

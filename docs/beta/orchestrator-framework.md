@@ -107,7 +107,7 @@ swift test --package-path poc/macos-audio
 ## 下一步
 
 - 已在 Beta GUI 检查有本机请求记录时的用量呈现：本机 L0、token 输入/输出、未知缓存/费用和云预算估算说明可见。空记录、加载失败和认证失败提示仍待 GUI 验收。
-- 模型设置 GUI 显示当前本地 `qwen3.5:0.8b` 及 Ollama 运行/安装提示；现已加入用户点击触发的精确型号 capability 查询和 unknown-safe 展示，客户端回归通过。新查询 UI 尚待实机点验，最新启动遇到 CUA 窗口超时和 backend 子进程缺失，详见 `docs/HANDOFF.md`。
+- 模型设置 GUI 显示当前本地 `qwen3.5:0.8b` 及 Ollama 运行/安装提示；显式精确型号 capability 查询已实机点验并展示证据和 unknown-safe 状态。重启后首次 CUA 读取短暂超时，稍后恢复，原因未判定；本项最终 GUI 查询通过，详见 `docs/HANDOFF.md`。
 - 客户端断连后的服务端取消、run 终态和 usage 记录已有 ASGI 自动回归；仍需在干净 Beta 会话做 GUI 手动冒烟；不提供退出后后台续跑。
 - 精确 Beta 云型号真实 usage/cost E2E 仍待对应功能验收；真实云测试须按 Provider 和数据范围另行获得用户明确确认。现有协议透传仅由 mock 回归证明，不作 Provider 端到端证据。
 - 工具、多模态和持久化等新能力继续按各自决策、实现和验证门禁推进。
