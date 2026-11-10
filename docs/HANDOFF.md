@@ -1519,3 +1519,8 @@
 
 - D-003：审计行与已完成任务原先分别在启动、写入或读取时惰性清理；进程若持续运行且长时间无请求，审计元数据和到期任务都可能晚于保留期才删除。数据库密钥启动的 Beta 服务每 6 小时清理两类 SQLCipher 数据，启动仍先立即清理；关闭服务先取消本机维护任务，再关闭 store。任务只删除到期元数据和已完成任务，不读取聊天正文、记忆或音频，也不访问 Provider 或麦克风。
 - 验证：`tests/test_beta_api.py -k 'security_audit or cloud_context_limit or audit_maintenance'` → 3 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 340 passed、1 条既有 Starlette/httpx 弃用警告；`ruff check pac_poc tests` 与 mypy 通过；阶段追踪契约 9 passed。尚未等待实际六小时周期；循环调度及 app 启停取消由受控时钟和 TestClient 生命周期测试验证。
+
+# 2026-11-10：V1.1 跨会话记忆来源选择
+
+- 已确认记忆表单从本地 SQLCipher 会话列表选择来源会话，显示最近 100 条稳定 ID 消息，并通过显式按钮按 keyset cursor 加载更早记录；用户可选“不关联聊天消息”。保存仍由用户明确确认，数据不发给 Provider。现有已关联来源继续支持只读查看并跳回原会话定位消息。
+- 验证：`swift test --package-path poc/macos-audio` → 60 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。未在 GUI 中操作已有持久化会话；新来源选择、分页和跳转需要用户实机验收。

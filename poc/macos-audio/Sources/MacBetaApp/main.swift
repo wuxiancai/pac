@@ -517,6 +517,15 @@ final class BetaChatModel {
         }
     }
 
+    func memorySourceHistory(
+        conversationID: String, beforeMessageID: String? = nil
+    ) async throws -> LocalChatHistory {
+        guard let client else { throw LocalAPIClientError.invalidEndpoint }
+        return try await client.chatHistory(
+            conversationID: conversationID, beforeMessageID: beforeMessageID
+        )
+    }
+
     func selectConversation(_ conversation: LocalConversationItem) async {
         guard activeRequest == nil, let client else {
             status = "请先停止当前生成，再切换会话。"
@@ -1871,6 +1880,11 @@ private struct ConfirmedMemoryView: View {
     @State private var category = "fact"
     @State private var editingID: String?
     @State private var sourceMessageID = ""
+    @State private var sourceConversationID = ""
+    @State private var sourceMessages: [LocalChatMessage] = []
+    @State private var sourceHasOlderMessages = false
+    @State private var sourceHistoryLoading = false
+    @State private var sourceHistoryError = ""
     @State private var historyMemory: LocalMemoryItem?
     @State private var sourceMemory: LocalMemoryItem?
     private let categories = ["fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"]
@@ -1886,11 +1900,29 @@ private struct ConfirmedMemoryView: View {
                 ForEach(categories, id: \.self) { Text($0).tag($0) }
             }
             if editingID == nil {
-                Picker("来源消息（当前会话）", selection: $sourceMessageID) {
-                    Text("不关联聊天消息").tag("")
-                    ForEach(model.messages.filter { $0.id != nil }, id: \.id) { message in
-                        Text("\(message.role == "user" ? "我" : "助理")：\(message.content.prefix(70))")
-                            .tag(message.id ?? "")
+                Picker("来源会话", selection: $sourceConversationID) {
+                    Text("选择会话").tag("")
+                    ForEach(model.conversations) { conversation in
+                        Text("\(conversation.title)（\(conversation.messageCount) 条）")
+                            .tag(conversation.id)
+                    }
+                }
+                if !sourceConversationID.isEmpty {
+                    if !sourceHistoryError.isEmpty {
+                        Text(sourceHistoryError).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Picker("来源消息", selection: $sourceMessageID) {
+                        Text("不关联聊天消息").tag("")
+                        ForEach(sourceMessages.filter { $0.id != nil }, id: \.id) { message in
+                            Text("\(message.role == "user" ? "我" : "助理")：\(message.content.prefix(70))")
+                                .tag(message.id ?? "")
+                        }
+                    }
+                    if sourceHasOlderMessages {
+                        Button(sourceHistoryLoading ? "正在加载…" : "加载更早来源消息") {
+                            Task { await loadSourceHistory(reset: false) }
+                        }
+                        .disabled(sourceHistoryLoading)
                     }
                 }
             } else if !sourceMessageID.isEmpty {
@@ -1974,6 +2006,22 @@ private struct ConfirmedMemoryView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
+        .task {
+            await model.refreshConversations()
+            if sourceConversationID.isEmpty {
+                sourceConversationID = model.conversationID ?? model.conversations.first?.id ?? ""
+            }
+        }
+        .onChange(of: sourceConversationID) { _, conversationID in
+            sourceMessageID = ""
+            sourceHistoryError = ""
+            guard !conversationID.isEmpty else {
+                sourceMessages = []
+                sourceHasOlderMessages = false
+                return
+            }
+            Task { await loadSourceHistory(reset: true) }
+        }
         .padding()
         .sheet(item: $historyMemory) { memory in
             NavigationStack {
@@ -2028,6 +2076,25 @@ private struct ConfirmedMemoryView: View {
                 }
             }
             .frame(minWidth: 480, minHeight: 360)
+        }
+    }
+
+    @MainActor
+    private func loadSourceHistory(reset: Bool) async {
+        guard !sourceHistoryLoading, !sourceConversationID.isEmpty else { return }
+        sourceHistoryLoading = true
+        defer { sourceHistoryLoading = false }
+        sourceHistoryError = ""
+        do {
+            let cursor = reset ? nil : sourceMessages.first?.id
+            let page = try await model.memorySourceHistory(
+                conversationID: sourceConversationID, beforeMessageID: cursor
+            )
+            guard page.conversationID == sourceConversationID else { return }
+            sourceMessages = reset ? page.messages : page.messages + sourceMessages
+            sourceHasOlderMessages = page.hasMore
+        } catch {
+            sourceHistoryError = "无法读取来源会话：\(error.localizedDescription)"
         }
     }
 }
