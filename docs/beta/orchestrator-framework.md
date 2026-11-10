@@ -106,11 +106,10 @@ swift test --package-path poc/macos-audio
 
 ## 下一步
 
+- 已在 Beta GUI 检查有本机请求记录时的用量呈现：本机 L0、token 输入/输出、未知缓存/费用和云预算估算说明可见。空记录、加载失败和认证失败提示仍待 GUI 验收。
 - 客户端断连后的服务端取消、run 终态和 usage 记录已有 ASGI 自动回归；仍需在干净 Beta 会话做 GUI 手动冒烟；不提供退出后后台续跑。
-- 在正常启动 Beta 时手动检查“用量”面板的空记录、UNKNOWN/null 呈现和加载失败提示。
-- 精确 Beta 云型号仍需按功能触发条件验证真实 usage/cost E2E；目前已实现的协议透传只由 mock 回归证明。之后再明确各 Provider 的费用来源、汇率与缺失值 fail-closed 规则，并实现 D-005 预算门；当前不做云调用，也不把 mock 当作供应商端到端证据。
-- 在正常启动 Beta 时检查精确型号 capability 查询、用量面板、空记录和认证失败状态。
-- 精确云型号的 usage 兼容性尚需依产品功能触发条件验证；工具、多模态和持久化仍须各自完成决策、实现与验证后再启用。
+- 精确 Beta 云型号真实 usage/cost E2E 仍待对应功能验收；真实云测试须按 Provider 和数据范围另行获得用户明确确认。现有协议透传仅由 mock 回归证明，不作 Provider 端到端证据。
+- 工具、多模态和持久化等新能力继续按各自决策、实现和验证门禁推进。
 
 
 2026-11-10 Consent lease 清理异常回归：Gateway `stream_with_usage()` 将上游 `aclose()` 包在内层清理中，外层 `finally` 无条件注销 Consent 在途操作。合成 iterator 在 `aclose()` 故意抛错后，测试确认 ConsentManager 不再保留 in-flight task；与现有 stream 撤销取消测试定向共 2 passed，Ruff 和 `mypy pac_poc/model_gateway.py` 通过。后端全量 277 passed，1 条既有 Starlette/httpx 弃用警告。

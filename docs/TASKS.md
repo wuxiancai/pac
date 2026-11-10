@@ -53,6 +53,8 @@
 
 2026-11-10 阶段 6 本地门禁复核：后端全量 346 passed（1 条既有 Starlette/httpx 弃用警告），Swift 62 passed，Ruff、37 模块 mypy、CI mypy、tracked-file secret scan、锁文件/compileall 和 Beta target build 均通过；未运行远端 GitHub Actions，阶段 6 不关闭。精确命令及边界见 `docs/HANDOFF.md`。
 
+2026-11-10 阶段 6 用量面板 GUI 检查：本机已完成 Ollama 请求显示 L0、token 输入/输出；费用及缓存命中呈未知，云预算 ¥0/¥100 与估算说明可见。空记录和加载失败仍待 GUI 验收；无云请求。
+
 2026-11-10 B8 Skill GUI 冒烟：选择“行动项整理”后发送即清空至 `Skills 0`；本机 qwen3.5:0.8b 超过两分钟仍无正文，停止后已取消。仅选择消费路径通过，延迟原因未判定，不外推为 Skill 缺陷。
 
 2026-11-10 B9 输出质量迭代：专业角色与综合层明确约束相关性、逐项覆盖及数量/长度/格式；API 回归确认所选角色和综合调用均含约束。多次本机 GUI 合成题表现波动：有样本综合达到三条且切题，也有样本漏项/顺序偏离并臆造时间与数量。单样本改善不构成稳定保证，不能用于时间/数量承诺或自动执行；B9 保持 IN PROGRESS。后端全量 346 passed，详见 `docs/beta/orchestrator-framework.md`。
