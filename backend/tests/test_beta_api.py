@@ -1666,6 +1666,55 @@ def test_multi_agent_collaboration_runs_selected_local_roles_sequentially(tmp_pa
         store.close()
 
 
+def test_multi_agent_output_limit_fails_run_before_synthesis(tmp_path) -> None:
+    from pac_poc.persistence import EncryptedApplicationStore
+
+    class OversizedSpecialistAdapter:
+        is_local = True
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def generate(self, request):
+            raise AssertionError("collaboration must stream")
+
+        async def call_with_tools(self, request):
+            raise AssertionError("collaboration must not invoke tools")
+
+        async def stream(self, request):
+            self.calls += 1
+            yield "x" * 4_001
+
+    store = EncryptedApplicationStore(path=(tmp_path / "collab-limit.db").resolve(), key=b"l" * 32)
+    store.open()
+    adapter = OversizedSpecialistAdapter()
+    app = create_beta_api(
+        session=LocalAPISession(token="collab-limit-token"),
+        gateway=ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy()),
+        persistence_store=store,
+    )
+
+    async def run() -> None:
+        headers = {"authorization": "Bearer collab-limit-token"}
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1") as client:
+            response = await client.post("/chat/stream", headers=headers, json={
+                "messages": [{"role": "user", "content": "分析"}],
+                "collaborator_keys": ["project_assistant", "meeting_assistant"],
+            })
+            assert response.status_code == 200
+            assert "协作输出超过本机上下文上限" in response.text
+            assert '"done":true' not in response.text
+            run_id = response.headers["x-pac-run-id"]
+            run_status = await client.get(f"/chat/runs/{run_id}", headers=headers)
+        assert adapter.calls == 1
+        assert run_status.json()["status"] == "failed"
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()
+
+
 def test_memory_api_requires_explicit_confirmation_and_supports_search_delete(tmp_path) -> None:
     from pac_poc.persistence import EncryptedApplicationStore
 
