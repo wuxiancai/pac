@@ -16,6 +16,8 @@
 
 2026-11-10 B3 恢复认证取消竞态保护：取消/失效的认证尝试无法认领迟到成功或进入恢复 API，新尝试会使旧回调失效；新增两项门闩回归。Swift 94 项、Beta `.app` 构建通过。未触发真实认证/恢复，GUI 恢复验收继续开放。详见 `docs/HANDOFF.md`。
 
+2026-11-10 B3 Keychain 重复授权提示：发现原 Beta bundle 未重签名，ad-hoc identifier 随可执行文件 hash 变化；现构建脚本按固定 Bundle ID 重签并验证，支持显式稳定签名身份 `PAC_BETA_SIGNING_IDENTITY`。本机默认 ad-hoc bundle 构建及签名验证通过，但 ad-hoc designated requirement 仍为 cdhash，不能保证每次构建后授权保留。稳定证书、首次 Keychain 授权和重复启动 GUI 验收需用户在场完成。
+
 ## 状态和流程
 
 - `DONE`：工作包的明确完成条件已满足，证据可复核。

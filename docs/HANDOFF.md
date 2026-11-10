@@ -1,3 +1,10 @@
+# 2026-11-10：排查 Beta 每次启动的 Keychain 系统授权提示
+
+- 没有输入或保存用户在聊天中提供的 macOS 登录密码。该凭据已暴露于对话中，建议用户尽快自行更改；系统对 Keychain 的“允许”授权也须由用户本人操作。
+- 静态检查发现 `build_beta_app.sh` 之前直接把 SwiftPM 可执行文件复制进 `.app`，没有对最终 app bundle 签名。原产物 `codesign -dv` 显示标识为 `personal-assistant-beta-<hash>`、ad-hoc、无 Team ID；designated requirement 仅为当前 cdhash，且 bundle 未通过签名验证。源代码显示 Beta 每次启动都会调用 `DatabaseKeychainStore().loadOrCreateKey()`，这与 Keychain 每次将新构建视为不同程序、反复询问授权高度吻合。
+- 构建脚本现写入 plist 后以 `com.personal-ai-assistant.beta` 对最终 `.app` 执行 `codesign` 并 `codesign --verify --deep --strict`；可用 `PAC_BETA_SIGNING_IDENTITY` 选择已有稳定签名身份。默认仍为 ad-hoc；本轮构建/签名验证通过，产物显示 bundle identifier 已一致，但仍无 Team ID，ad-hoc designated requirement 依旧是 cdhash。因此本次**没有声称彻底解决**授权重复问题；需要用户提供/配置稳定证书，并在场时对新签名程序执行一次 Keychain 授权。系统认证与真实 Keychain 项未访问，未启动 GUI。
+- 验证：`poc/macos-audio/scripts/build_beta_app.sh` 成功；最终 bundle 的 `codesign --verify --deep --strict` 通过；Shell 语法检查及 `git diff --check` 通过。下一步：由用户本人更改已暴露的系统密码；确认可用的稳定签名身份，在场选择该身份构建后，用户在 macOS 提示中审阅并授权一次，再多次重启验证授权是否保留。
+
 # 2026-11-10：当前远端 CI 重跑通过
 
 - 同一提交 `541ad6aa287d127706a7bdf804d25d948fc48a9d` 的 Actions run `42836663902` 第一次后端全量测试中，APFS-128 ENOSPC 临时映像子进程返回通用 `RuntimeError`（其余 346 项通过）；该脚本只输出安全错误类型，未暴露失败阶段。隔离重跑 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_sqlcipher_enospc_poc.py -k 'bounded_disk_image_exhaustion and APFS'` → 1 passed、6 deselected（13.36 秒）。这与既有间歇记录一致，原因仍未判定。

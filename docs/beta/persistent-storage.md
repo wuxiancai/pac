@@ -2,6 +2,8 @@
 
 最后核对：2026-11-10（Asia/Shanghai）
 
+2026-11-10 Keychain 重复授权诊断：旧构建脚本把未重签名 SwiftPM binary 放入 `.app`，签名标识是 hash 且 designated requirement 为 cdhash。脚本现在在写完 Info.plist 后对 bundle 按 `com.personal-ai-assistant.beta` 重签并验证；`PAC_BETA_SIGNING_IDENTITY` 可指定已安装的稳定证书身份。本机默认 ad-hoc 签名构建和 `codesign --verify --deep --strict` 通过，但默认无 Team ID、cdhash 身份仍不稳定。要持久保留 Keychain app ACL，需配置稳定签名身份，并由用户本人在场审阅/批准首次 Keychain 提示；这一步及重复启动实机验证未完成。未访问 Keychain、未启动 GUI、未使用聊天中披露的 macOS 密码。
+
 2026-11-10 恢复认证取消路径新增一次性尝试门闩，防止取消后迟到认证成功继续调用恢复 API，也防止旧尝试回调覆盖较新尝试。取消立即清除活动授权并显示未开始恢复；`LAContext` 仍会失效。两项竞态回归与 Swift 全量（94 项）通过，Beta `.app` 构建通过。没有实机触发认证/恢复；GUI 验收仍开放。
 
 2026-11-10 Keychain 生命周期回归提交 `4f29682` 后，使用仓库脚本重启 Beta，GUI 显示本机 `ollama / qwen3.5:0.8b` 已连接并正常加载新对话。该次仅作启动/加载检查；未发送聊天或操作 Keychain 项、数据库数据及恢复流程。锁屏/睡眠唤醒、ACL、数据库读写和恢复认证仍未实机验收；此前一次首启 Keychain 错误经重试恢复的根因仍待判定。完整细节见 `docs/HANDOFF.md`。
