@@ -61,6 +61,8 @@
 
 2026-11-10 阶段 6 capability 负向回归：未知型号保持 unknown，跨型号报告拒绝，HTTP 503 正文不进入客户端错误。Swift 全量增至 66 项，Beta build 通过。
 
+2026-11-10 阶段 6 后续本地门禁：后端 346 passed（1 条既有弃用警告）、Swift 66 passed、Ruff、CI mypy、锁文件、compileall、tracked-file secret scan 和 Beta build 全通过；远端 Actions 未运行，阶段 6 保持开放。
+
 2026-11-10 B8 Skill GUI 冒烟：选择“行动项整理”后发送即清空至 `Skills 0`；本机 qwen3.5:0.8b 超过两分钟仍无正文，停止后已取消。仅选择消费路径通过，延迟原因未判定，不外推为 Skill 缺陷。
 
 2026-11-10 B9 输出质量迭代：专业角色与综合层明确约束相关性、逐项覆盖、未知数值不得臆造及数量/长度/格式；API 回归确认指令传递。多次本机 GUI 合成题表现波动：近期复测未臆造时长，但仍以泛化的工具准备替换明确的场地清洁要求，角色观点超长。单样本不构成保证，不能用于时间/数量承诺或自动执行；B9 保持 IN PROGRESS。后端全量 346 passed，详见 `docs/beta/orchestrator-framework.md`。

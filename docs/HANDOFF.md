@@ -1687,6 +1687,11 @@
 - 自动验证：`swift test --package-path poc/macos-audio --filter localAPIClientLoadsAuthenticatedExactModelCapabilities` → 1 passed；Swift 全量 → 63 passed；Beta target build 成功。测试确认 Bearer loopback 请求、精确 query、精确型号匹配、缺失能力默认 unknown。
 - 重启后初次两次 CUA 窗口读取超时；稍后读取恢复，UI 显示本机服务已连接。随后点击“查询当前型号能力”，`ollama / qwen3.5:0.8b` 显示文本生成/流式输出“已核验支持”、工具调用“有限支持”、其余 10 项“未知”，并展示核验时间 `2026-11-09T00:00:00Z` 与证据 `docs/poc/phase0-model-gateway-local.md`。GUI 验收通过；早期超时原因未判定，不据此归因代码。未发起云请求或麦克风采集。
 
+### 2026-11-10：提交 `b06aa7e` 后本地阶段 6 等价门禁
+
+- 后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --directory backend --locked --all-extras --all-groups pytest -q` → 346 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 `swift test --package-path poc/macos-audio` → 66 passed；Beta target build 成功。
+- CI 静态门禁：Ruff 全目录通过；CI mypy 3 个目标文件通过；`uv lock --check`、`compileall -q pac_poc scripts tests`、tracked-file `detect-secrets-hook --baseline .secrets.baseline` 通过（无新 secret 命中）。SwiftPM 等待另一实例后正常完成。本地门禁不替代远端 Actions、最低 macOS 14 runtime/安装验证或剩余 GUI/Provider 验收；阶段 6 继续开放。
+
 ### 2026-11-10：阶段 6 capability 查询负向客户端回归
 
 - Swift URLProtocol 新增覆盖：未知 `qwen3.5:8b` 报告无核验时间/证据时，所有缺失能力均保持 `unknown`；服务器返回另一型号的能力报告时客户端拒绝；HTTP 503 响应体不暴露给 UI，只映射安全状态码错误。
