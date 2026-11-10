@@ -420,6 +420,30 @@ def test_usage_stream_preserves_cancellation_when_upstream_close_fails() -> None
     asyncio.run(run())
 
 
+def test_plain_stream_preserves_cancellation_when_upstream_close_fails() -> None:
+    async def run() -> None:
+        consent = ConsentManager()
+        grant_consent(consent, actions=frozenset({ModelAction.STREAM}))
+        started = asyncio.Event()
+        pending = asyncio.Event()
+        adapter = CloseFailingAdapter(CancelCloseFailingStream(started, pending))
+        gateway = make_gateway(consent, adapter)  # type: ignore[arg-type]
+
+        async def consume() -> None:
+            async for _ in gateway.stream(remote_request()):
+                pass
+
+        task = asyncio.create_task(consume())
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert consent._in_flight == {}
+
+    asyncio.run(run())
+
+
 def test_revocation_cancels_all_concurrent_requests_for_the_consent_scope() -> None:
     async def run() -> None:
         consent = ConsentManager()

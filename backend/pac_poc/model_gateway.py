@@ -196,15 +196,24 @@ class ModelGateway:
     async def stream(self, request: LocalModelRequest) -> AsyncIterator[str]:
         adapter = self._get_authorized_adapter(request, ModelAction.STREAM)
         lease = self._begin_operation(adapter, request, ModelAction.STREAM)
+        stream: Any = None
         try:
             stream = adapter.stream(request)
-            try:
-                async for chunk in stream:
-                    yield chunk
-            finally:
-                close = getattr(stream, "aclose", None)
-                if close is not None:
+            async for chunk in stream:
+                yield chunk
+        except BaseException:
+            close = getattr(stream, "aclose", None)
+            if close is not None:
+                try:
                     await close()
+                except Exception:
+                    # Keep the original stream error or cancellation as the result.
+                    pass
+            raise
+        else:
+            close = getattr(stream, "aclose", None)
+            if close is not None:
+                await close()
         finally:
             self._close_operation(lease)
 

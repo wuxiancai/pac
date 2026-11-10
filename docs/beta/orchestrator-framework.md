@@ -92,3 +92,5 @@ swift test --package-path poc/macos-audio
 2026-11-10 Consent lease 清理异常回归：Gateway `stream_with_usage()` 将上游 `aclose()` 包在内层清理中，外层 `finally` 无条件注销 Consent 在途操作。合成 iterator 在 `aclose()` 故意抛错后，测试确认 ConsentManager 不再保留 in-flight task；与现有 stream 撤销取消测试定向共 2 passed，Ruff 和 `mypy pac_poc/model_gateway.py` 通过。后端全量 277 passed，1 条既有 Starlette/httpx 弃用警告。
 
 2026-11-10 补充取消路径：若流迭代/取消时上游 `aclose()` 也抛错，Gateway 保留原始 `CancelledError` 或迭代异常，不让清理错误覆盖；正常流完成时仍传播关闭异常。Consent lease 在外层 `finally` 无条件释放。定向 `tests/test_consent_aware_gateway.py -k 'usage_stream_'` → 2 passed；Ruff 与 mypy 通过；后端全量 278 passed、1 条既有 Starlette/httpx 弃用警告。
+
+2026-11-10 补齐无 usage 流接口：`ModelGateway.stream()` 也在取消/迭代异常时保留原异常并尽力关闭上游，正常结束仍传播关闭异常，finally 无条件释放 lease。它与 `stream_with_usage()` 的清理语义一致。定向清理/取消回归 3 passed，Ruff/mypy 通过；后端全量 279 passed，1 条既有 Starlette/httpx 弃用警告。

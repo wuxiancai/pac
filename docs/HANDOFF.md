@@ -1148,3 +1148,11 @@
 - 现在迭代异常/取消期间会尽力关闭上游但保留原始异常；无异常正常结束时，关闭异常继续传播用于诊断。Consent lease 无论哪条路径均在外层 `finally` 注销。
 - 定向 `tests/test_consent_aware_gateway.py -k 'usage_stream_'`：2 passed，覆盖自然结束关闭失败和取消时关闭失败；Ruff、`mypy pac_poc/model_gateway.py` 通过。后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：278 passed、1 条既有 Starlette/httpx 弃用警告。
 - 已更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md` 与 `docs/PROJECT_CONTEXT.md`。未发云请求或读取 Keychain。
+
+
+### 2026-11-10：补齐 Gateway 普通流取消清理语义
+
+- 后续检查发现此前取消优先级修复只覆盖 Beta 当前使用的 `stream_with_usage()`；`ModelGateway.stream()` 也有相同的 `aclose()` 异常覆盖 `CancelledError` 风险。
+- 普通流现沿用相同契约：迭代/取消异常时尽力关闭上游但保留原异常；正常结束时关闭异常继续上抛；Consent lease 始终在外层 `finally` 注销。
+- 定向 `tests/test_consent_aware_gateway.py -k 'preserves_cancellation_when_upstream_close_fails or releases_consent_lease_when_upstream_close_fails'`：3 passed；Ruff、`mypy pac_poc/model_gateway.py` 通过。后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：279 passed、1 条既有 Starlette/httpx 弃用警告。
+- 已更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md` 与 `docs/PROJECT_CONTEXT.md`。无 Provider/Keychain 操作。
