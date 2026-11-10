@@ -1701,3 +1701,9 @@
 
 - 检查发现加载较早消息后若用户切换会话，旧分页响应可能在切换后返回并追加到当前消息数组；快速连续选择会话也可能由较早请求的迟到响应覆盖较新选择。Beta 客户端增加历史读取代际校验、分页请求 ID 和会话 ID 核对；创建/删除、恢复、发送、来源跳转和会话选择会令旧请求及加载态失效，迟到请求不会清除新分页请求的加载态。
 - 验证：`swift test --package-path poc/macos-audio` → 66 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。尚未实机验证并发切换；Beta UI 访问超时。之前新增的显式来源跳转按钮仍待 GUI 点验，临时记忆仍需在 UI 中删除。未直接操作数据库。
+
+# 2026-11-10：阶段 6 当前 HEAD 本机 CI 等价门禁
+
+- 对照 `.github/workflows/ci.yml`，在 HEAD `0e109f9` 执行依赖锁、Ruff、mypy、tracked-file secret scan、Python compileall、后端全量、Swift 全量和 Beta 产品构建。
+- 结果：`uv lock --check`、`ruff check pac_poc tests`、CI `mypy`、`git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline`、`python -m compileall -q pac_poc scripts tests` 均通过；后端 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --directory backend --locked --all-extras --all-groups pytest -q` → 346 passed，1 条既有 Starlette/httpx 弃用警告；`swift test --package-path poc/macos-audio` → 66 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。
+- 首次 compileall 路径按仓库根目录写入、但命令已切到 `backend/` 工作目录，输出 `Can't list`；随后改为 CI 相同的 backend 相对路径并通过。未将第一次无效调用记作通过。远端 GitHub Actions 未运行，阶段 6 仍开放。

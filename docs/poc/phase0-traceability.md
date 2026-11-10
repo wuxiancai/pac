@@ -25,6 +25,8 @@
 
 **Beta 范围阶段 0 收尾评审：PASS。原始 §13 全量 POC：仍未验收。**
 
+2026-11-10 当前 HEAD `0e109f9` 本机 CI 等价门禁复核：`uv lock --check`、`ruff check pac_poc tests`、`mypy`、tracked-file `detect-secrets-hook`、`python -m compileall -q pac_poc scripts tests` 均通过；后端 all-extras/all-groups 全量 346 passed，1 条既有 Starlette/httpx 弃用警告；Swift 全量 66 passed，Beta target 构建成功。Ruff、Python 和 Swift 命令均在 CI 对应工作目录下执行。远端 GitHub Actions 未运行，此复核不证明 macOS 14 runtime 或正式发行物通过；阶段 6 保持开放。
+
 收尾证据：当前提交 Python 全量 183 项、Swift 全量 33 项通过；`uv lock --check`、Python `compileall` 和阶段追踪报告契约测试通过。Beta GUI 当前构建显示本机服务已连接；用户此前已确认模型切换、语音 final/取消/打断/退出清理和 D-013 指标。本轮另在本机 Ollama 上确认流式生成可由“停止”按钮中断，状态显示“已停止本轮生成”；未发起云请求。测试后通过启动脚本重启，恢复此前 OpenRouter 选择和未发送草稿。
 
 按 C-007 逐类处置剩余证据，不提升原始矩阵状态：
