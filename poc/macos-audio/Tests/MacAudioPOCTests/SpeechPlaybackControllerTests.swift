@@ -4,12 +4,14 @@ import Testing
 @MainActor
 private final class FakeSpeechEngine: SpeechEngine {
     private(set) var spokenTexts: [String] = []
+    private(set) var spokenRates: [Float] = []
     private(set) var stopCount = 0
     var isSpeaking = false
     var stopResult = true
 
-    func speak(_ text: String) {
+    func speak(_ text: String, rate: Float) {
         spokenTexts.append(text)
+        spokenRates.append(rate)
         isSpeaking = true
     }
 
@@ -88,4 +90,13 @@ private final class FakeSpeechEngine: SpeechEngine {
 
     #expect(!controller.interrupt())
     #expect(engine.stopCount == 0)
+}
+
+@MainActor
+@Test func speechPlaybackUsesSelectedRatePreset() {
+    let engine = FakeSpeechEngine()
+    let controller = SpeechPlaybackController(engine: engine)
+
+    #expect(controller.speak("语速检查", rate: SpeechRatePreset.fast.rate) == .started)
+    #expect(engine.spokenRates == [SpeechRatePreset.fast.rate])
 }

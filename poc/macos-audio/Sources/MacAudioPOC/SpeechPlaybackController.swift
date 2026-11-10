@@ -12,10 +12,32 @@ public enum SpeechPlaybackStartResult: Equatable {
     case existingSpeechCouldNotBeStopped
 }
 
+public enum SpeechRatePreset: String, CaseIterable, Identifiable {
+    case slow
+    case normal
+    case fast
+
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .slow: "较慢"
+        case .normal: "标准"
+        case .fast: "较快"
+        }
+    }
+    public var rate: Float {
+        switch self {
+        case .slow: 0.42
+        case .normal: 0.5
+        case .fast: 0.58
+        }
+    }
+}
+
 @MainActor
 public protocol SpeechEngine: AnyObject {
     var isSpeaking: Bool { get }
-    func speak(_ text: String)
+    func speak(_ text: String, rate: Float)
     func stopImmediately() -> Bool
 }
 
@@ -28,8 +50,10 @@ public final class AVSpeechEngine: SpeechEngine {
 
     public var isSpeaking: Bool { synthesizer.isSpeaking }
 
-    public func speak(_ text: String) {
-        synthesizer.speak(AVSpeechUtterance(string: text))
+    public func speak(_ text: String, rate: Float) {
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.rate = rate
+        synthesizer.speak(utterance)
     }
 
     public func stopImmediately() -> Bool {
@@ -47,14 +71,17 @@ public final class SpeechPlaybackController {
     }
 
     @discardableResult
-    public func speak(_ text: String) -> SpeechPlaybackStartResult {
+    public func speak(
+        _ text: String,
+        rate: Float = 0.5
+    ) -> SpeechPlaybackStartResult {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return .emptyText
         }
         if engine.isSpeaking, !engine.stopImmediately() {
             return .existingSpeechCouldNotBeStopped
         }
-        engine.speak(text)
+        engine.speak(text, rate: rate)
         state = .speaking
         return .started
     }

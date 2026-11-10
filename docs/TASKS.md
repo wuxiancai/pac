@@ -55,6 +55,8 @@
 
 2026-11-10 V1.1 快捷指令：聊天页“新对话”按钮增加 macOS `⌘N`；`⌘L` 聚焦消息输入框，不发送、不启动语音。快捷键复用既有会话创建逻辑和 SwiftUI FocusState；Swift 全量回归与 Beta target build 结果记录于 `docs/HANDOFF.md`，GUI 实机点验仍待完成。
 
+2026-11-10 V1.1 本机朗读语速预设：模型设置提供较慢/标准/较快三档，保存在本机，只用于本机语音合成。SpeechEngine 传递速率有自动回归；GUI 及真实声学体验验收待完成，详见 `docs/HANDOFF.md`。
+
 2026-11-10 B3 客户端历史读取并发保护：SwiftUI 为分页、会话选择、记忆来源跳转和聊天历史刷新增加代际校验、会话 ID 核对和分页请求 ID，阻止失效的迟到响应覆盖当前会话、追加到错误会话或清除新分页请求状态。Swift 全量 68 项（含分页代际及加载态竞争回归）、Beta target build 通过；并发 GUI 复测尚未完成。来源跳转按钮 GUI 点验及临时合成记忆清理仍待 Beta 窗口恢复后执行。
 
 2026-11-10 阶段 6 本地门禁复核：后端全量 346 passed（1 条既有 Starlette/httpx 弃用警告），Swift 62 passed，Ruff、37 模块 mypy、CI mypy、tracked-file secret scan、锁文件/compileall 和 Beta target build 均通过；未运行远端 GitHub Actions，阶段 6 不关闭。精确命令及边界见 `docs/HANDOFF.md`。

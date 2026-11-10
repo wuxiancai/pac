@@ -1,3 +1,9 @@
+# 2026-11-10：V1.1 本机朗读语速预设
+
+- 模型设置新增“较慢/标准/较快”本机朗读语速，选择保存在本机 UserDefaults；点按朗读时将速率传给 AVSpeechUtterance。默认仍为系统标准语速，只有本机 TTS 使用，不改变 ASR/模型请求。
+- 自动化覆盖控制器把所选速率传至 SpeechEngine；`swift test --package-path poc/macos-audio` → 69 passed，Beta target build 成功。GUI 和设备可听性仍待实机验收。
+- 若无设备手动反馈，继续按任务清单处理其余 V1.1/V2/V3 项。
+
 # 2026-11-10：V1.1 输入框快捷指令
 
 - 聊天页新增 `⌘L`“输入消息”指令，通过 SwiftUI `FocusState` 聚焦草稿输入框；不发送消息，也不启动语音。

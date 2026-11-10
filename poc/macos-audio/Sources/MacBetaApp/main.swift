@@ -165,6 +165,9 @@ final class BetaChatModel {
     var assistantKey: String {
         didSet { defaults.set(assistantKey, forKey: "beta.assistant.key") }
     }
+    var speechRatePreset: SpeechRatePreset {
+        didSet { defaults.set(speechRatePreset.rawValue, forKey: "beta.speech.rate-preset") }
+    }
     let assistantProfiles: [(key: String, title: String)] = [
         ("main_assistant", "总助理"),
         ("project_assistant", "项目助理"),
@@ -213,6 +216,9 @@ final class BetaChatModel {
         let savedAssistant = defaults.string(forKey: "beta.assistant.key") ?? "main_assistant"
         assistantKey = ["main_assistant", "project_assistant", "meeting_assistant", "task_planner"].contains(savedAssistant)
             ? savedAssistant : "main_assistant"
+        speechRatePreset = SpeechRatePreset(
+            rawValue: defaults.string(forKey: "beta.speech.rate-preset") ?? SpeechRatePreset.normal.rawValue
+        ) ?? .normal
         supervisor = LocalBackendSupervisor(
             pythonExecutableURL: configuration.pythonExecutableURL,
             backendDirectoryURL: configuration.backendDirectoryURL
@@ -1127,7 +1133,7 @@ final class BetaChatModel {
     }
 
     func speakLocally(_ text: String) {
-        switch speechPlayback.speak(text) {
+        switch speechPlayback.speak(text, rate: speechRatePreset.rate) {
         case .started:
             status = "已开始本机朗读回复。"
         case .emptyText:
@@ -2364,6 +2370,17 @@ private struct BetaModelSettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
+
+            GroupBox("本机朗读语速") {
+                Picker("语速", selection: $model.speechRatePreset) {
+                    ForEach(SpeechRatePreset.allCases) { preset in
+                        Text(preset.title).tag(preset)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text("仅影响点按“本机朗读回复”时的 macOS 合成语速；设置保存在本机，不会发送到模型服务商。")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
 
             if model.source == .local {
                 TextField("Ollama 模型名称", text: $model.localModel)

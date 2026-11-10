@@ -8,6 +8,7 @@
 
 ## 当前状态
 
+- 2026-11-10 V1.1 本机朗读预设：模型设置新增较慢/标准/较快三档，默认系统标准值并保存在本机，仅传给本机 TTS；GUI/声学体验待验收，见 `docs/HANDOFF.md`。
 - 2026-11-10 V1.1 快捷指令：聊天页“新对话”支持 `⌘N`，`⌘L` 聚焦消息输入，发送沿用既有 `⌘↩`。自动化/构建结果和 GUI 实机点验状态见 `docs/HANDOFF.md`。
 - 2026-11-10 阶段 6 代码提交 `35d6644` 本机 CI 等价门禁：后端全量 346 passed、1 条既有 Starlette/httpx 弃用警告；Swift 68 passed，Beta target build、Ruff、CI mypy、`uv lock --check`、tracked-file detect-secrets、compileall 全通过。远端 GitHub Actions 未运行，macOS 14 runtime/正式安装器也未验收；阶段 6 保持开放。
 - 2026-11-10 B3 历史读取竞态保护：切换会话、恢复备份、创建/删除、发送和来源跳转都会使先前分页/选择请求失效；迟到响应需同时匹配历史代际与当前会话 ID 才可写入消息数组；分页忙碌态另绑定请求 ID，避免旧请求迟到清除新分页状态。Swift 68 项通过（含分页请求协调器的两项新回归），Beta target 构建通过；并发 GUI 实测未完成，来源跳转验收和临时记忆 UI 清理仍待完成。
