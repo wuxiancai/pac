@@ -1,3 +1,9 @@
+# 2026-11-10：B3 用户自选备份保存目录 GUI 验收
+
+- 启动最新 Beta，在备份表单输入仅本轮使用的合成口令；通过保存面板快捷路径选择 `/Users/wuxiancai/Documents`，将备份命名为 `PAC-B3-UserLocation-20261110.pacbackup`。
+- GUI 显示导出成功（275 KB）；文件系统确认该精确路径存在、大小 274,726 bytes，随后删除并确认不存在。口令未写入文件或文档；未选择或覆盖其他文件、未执行恢复、未访问 Keychain、Provider、麦克风或系统权限。
+- 用户自选本地 Documents 目录导出路径验收通过；此证据不代表外接卷、错误口令或恢复切换已验收。测试后退出 Beta 并确认无相关进程。
+
 # 2026-11-10：阶段 6 最新 CI 等价门禁（代码提交 58c771d）
 
 - 后端 all-extras/all-groups：`cd backend && UV_OFFLINE=1 UV_CACHE_DIR=../.poc-data/uv-cache TMPDIR=../.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 347 passed，1 条既有 Starlette/httpx 弃用警告。
