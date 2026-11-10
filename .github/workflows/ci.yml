@@ -76,6 +76,5 @@ jobs:
         working-directory: poc/macos-audio
         run: swift test
 
-      - name: Build macOS Beta app on minimum macOS
-        working-directory: poc/macos-audio
-        run: swift build --product personal-assistant-beta
+      - name: Build and validate macOS Beta app on minimum macOS
+        run: poc/macos-audio/scripts/build_beta_app.sh

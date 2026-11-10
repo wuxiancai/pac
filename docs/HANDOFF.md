@@ -1,3 +1,9 @@
+# 2026-11-11：强化最低 macOS Beta 产物验证
+
+- `build_beta_app.sh` 将最低系统版本提升为单一变量，并在构建时断言最终 `Info.plist` 的 `LSMinimumSystemVersion` 精确为 `14.0`。GitHub Actions 的 `macos-14` job 改为运行完整 `.app` 打包脚本，连同现有 Bundle ID、Face ID 用途键和 codesign 验证一起检查实际 Beta bundle。
+- 本机验证：`poc/macos-audio/scripts/build_beta_app.sh` 成功，最终 plist 读回 `14.0`，`codesign --verify --deep --strict` 通过；`sh -n poc/macos-audio/scripts/build_beta_app.sh`、工作流 YAML 解析及 `git diff --check` 通过。该构建运行于 macOS 26.5.1；不是 macOS 14 实机证据。GitHub job 尚未运行。
+- 变更单独提交；后续推送后检查 macos-14 Actions job，再按结果更新阶段 6 状态。B3 真实认证/恢复、Keychain 稳定签名和 GUI 验收仍开放。
+
 # 2026-11-10：增加最低 macOS 14 CI 构建门禁
 
 - 当前 GitHub Actions 主 job 固定运行 `macos-26`，不能为 Beta 声明的最低版本 `macOS 14.0` 提供编译/运行环境覆盖。按官方 runner 文档确认 `macos-14` 可作为 GitHub-hosted runner 标签后，新增独立 `minimum-macos` job，运行 `swift test` 和 `swift build --product personal-assistant-beta`；保持现有完整 Python/Swift CI 在 `macos-26`。

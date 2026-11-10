@@ -1,6 +1,6 @@
 # 项目上下文
 
-- 2026-11-10 阶段 6 最低系统 CI：新增 GitHub Actions `macos-14` job，运行 Swift 全量测试并构建 Beta target；当前本机无法代替 GitHub macOS 14 runner 实测，需等待此提交对应的 Actions 结果。该 job 只覆盖最低系统 runner 上的 Swift 测试/编译，不等同于真实用户设备 GUI、Keychain、通知或恢复验收。
+- 2026-11-11 阶段 6 最低系统 CI：GitHub Actions `macos-14` job 运行 Swift 全量测试并调用正式 Beta `.app` 打包脚本；脚本对 Bundle ID、`LSMinimumSystemVersion=14.0`、Face ID 用途键及代码签名作构建期校验。当前本机无法代替 GitHub macOS 14 runner 实测，需等待此提交对应 Actions 结果；runner 构建不等同于真实设备 GUI、Keychain、通知或恢复验收。
 - 2026-11-10 Keychain 重复授权提示：Beta 原来把未重签名的 SwiftPM binary 装入 bundle，ad-hoc identifier 是哈希且 designated requirement 为 cdhash。构建脚本现可按 Bundle ID 重签/校验 bundle，并支持 `PAC_BETA_SIGNING_IDENTITY`。默认签名仍 ad-hoc、无 Team ID，不能保证授权持久；稳定签名和用户本人首次授权/重启验收待完成。用户密码未写入项目；建议自行更换已在对话暴露的系统密码。详见最新 HANDOFF。
 - 2026-11-10 远端 Actions run `42836663902` attempt 2 在当前提交 `541ad6a` 全部通过：后端 347、Swift 94、静态/依赖门禁和 Beta build 成功。attempt 1 的 APFS-128 ENOSPC POC 曾间歇返回通用 RuntimeError；本机窄重跑通过，根因未判定。详见最新 HANDOFF。
 - 2026-11-10 当前 GitHub Actions run `42836277748` 首步因无效 `phase0-security` extra 失败；该依赖实际位于 `dev` group。工作流参数已修正，本机精确复跑 `uv sync --locked --extra phase0-embedding --extra phase4-pdf-poc --group dev` 成功；修复待提交并重触发远端全门禁。
@@ -21,7 +21,7 @@
 - 2026-11-10 B3 最新包实机复测：可导出并选择 274,726-byte 合成备份；点恢复后正确显示“正在认证并恢复…”，但未见 LocalAuthentication 提示，进程日志无可用记录。退出 Beta 后确认进程已停并清理备份；未检查 Library 数据库或宣称恢复成功。认证提示/回调仍需调查，见最新 HANDOFF。
 - 2026-11-10 B3 恢复 UI 新增独立进度状态，认证/恢复与备份导出分别显示并互斥禁用；Swift 84 项与 Beta target build 通过。此修正不解释或解决上轮 LocalAuthentication 未返回的问题，实机恢复验收仍开放，详见 `docs/HANDOFF.md`。
 
-最后核对：2026-11-10（Asia/Shanghai）
+最后核对：2026-11-11（Asia/Shanghai）
 
 ## 项目目标
 

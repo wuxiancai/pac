@@ -1,6 +1,6 @@
 # 阶段任务清单
 
-最后核对：2026-11-10（Asia/Shanghai）
+最后核对：2026-11-11（Asia/Shanghai）
 
 2026-11-10 B5/PDF：追加核对本机 `launchd.plist(5)` 的 `ResidentSetSize` 资源项。其文档只说明内存紧张时系统优先从超过申报 RSS 的进程回收内存，尚未证明超限必拒绝或 worker 隔离有效；不能满足 D-012 硬内存上限门槛。PDF 继续禁用，保持查找并实测候选隔离方案；见 `docs/beta/file-import.md`。
 
@@ -67,7 +67,7 @@
 
 ### 阶段 6 本机门禁复核（2026-11-10，仍开放）
 
-- 最低系统自动覆盖：当前主 CI 仍运行于 `macos-26`。本段新增独立 `macos-14` GitHub Actions job，执行 `swift test` 与 Beta target build；本地只完成工作流 YAML 解析和 diff 检查，macOS 14 runner 结果尚未产生。此项待提交触发的 Actions 成功后才关闭；仍需真实 macOS 14 用户设备做 GUI/Keychain/通知/恢复验收。
+- 最低系统自动覆盖：主 CI 运行于 `macos-26`，另有独立 `macos-14` job 执行 `swift test` 并运行 Beta `.app` 打包脚本。打包脚本校验 Bundle ID、`LSMinimumSystemVersion=14.0`、Face ID 用途键与签名；本机打包验证通过，GitHub `macos-14` runner 结果需等待推送后确认。仍需真实 macOS 14 设备验收 GUI/Keychain/通知/恢复。
 
 - 当前提交 `000f341`：后端 all-extras/all-groups 347 passed（1 条既有弃用警告）；Swift 94 passed；Beta target build、Ruff、CI mypy、`uv lock --check`、compileall、tracked-file secret scan 全通过。远端 Actions、Provider、麦克风、真实恢复认证与 macOS 14 runtime 未验；阶段 6 继续开放。命令及边界见最新 `docs/HANDOFF.md`。
 - 用户授权后已将当时领先远端的 319 个提交推送；随后修正 workflow 未定义的 `phase0-security` extra 并推送 `541ad6a`。run `42836663902` attempt 2 全部门禁通过：Python 347、Swift 94、lint/typecheck/secret scan/lock/compileall/Beta build 成功。attempt 1 的 APFS-128 用例间歇失败，隔离重跑和远端 attempt 2 通过，原因未判定。阶段 6 其他系统/产品验收仍开放。

@@ -7,6 +7,7 @@ PACKAGE_DIR="$REPO_ROOT/poc/macos-audio"
 APP_DIR="$REPO_ROOT/.poc-data/personal-assistant-beta.app"
 EXECUTABLE="personal-assistant-beta"
 BUNDLE_IDENTIFIER="com.personal-ai-assistant.beta"
+MINIMUM_SYSTEM_VERSION="14.0"
 SIGNING_IDENTITY="${PAC_BETA_SIGNING_IDENTITY:--}"
 
 swift build --package-path "$PACKAGE_DIR" --product "$EXECUTABLE"
@@ -20,7 +21,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <key>CFBundleIdentifier</key><string>$BUNDLE_IDENTIFIER</string>
 <key>CFBundleName</key><string>个人 AI 助理测试版</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSMinimumSystemVersion</key><string>$MINIMUM_SYSTEM_VERSION</string>
 <key>NSFaceIDUsageDescription</key><string>用于恢复本机加密数据或管理模型凭据等敏感操作的设备认证；应用不会读取或保存生物识别数据。</string>
 <key>NSMicrophoneUsageDescription</key><string>仅在你点击“语音输入”后采集最多 30 秒音频，并在本机识别；音频不会写入文件或发送到云端。</string>
 <key>NSCalendarsFullAccessUsageDescription</key><string>仅在你点击“日历”后读取未来 30 天的事件以便在本机查看；创建事件位于单独入口，只有你逐次确认且加密审计成功后才写入默认日历。</string>
@@ -30,6 +31,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_DIR/Contents/Info.plist" >/dev/null
+/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP_DIR/Contents/Info.plist" | grep -Fx "$MINIMUM_SYSTEM_VERSION" >/dev/null
 /usr/libexec/PlistBuddy -c 'Print :NSFaceIDUsageDescription' "$APP_DIR/Contents/Info.plist" >/dev/null
 codesign --force --deep --sign "$SIGNING_IDENTITY" --identifier "$BUNDLE_IDENTIFIER" "$APP_DIR"
 codesign --verify --deep --strict "$APP_DIR"
