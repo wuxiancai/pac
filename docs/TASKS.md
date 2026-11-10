@@ -49,6 +49,11 @@
 - 先行段已新增认证 `/security-audit/calendar-event`，只接受受限决策/原因码，并在 SQLCipher 中记录 metadata-only 的 `ATTEMPTED/SUCCEEDED/FAILED`（敏感级别 L2），不接收标题/时间/备注。
 - 审计 API 窄回归通过；Ruff/mypy 通过，后端全量 347 passed（1 条既有弃用警告）。EventKit 创建服务/协调器现有 7 项自动回归，覆盖权限准备不写入、校验、审批审计失败关闭、写入失败记 FAILED、成功结果审计失败不重试。Swift 审计客户端另有 2 项窄回归覆盖 metadata-only 与 503 失败关闭。Beta 独立创建入口现有手填字段、默认日历同步披露、权限检查、确切预览和逐次二次确认；协调器统一执行 ATTEMPTED→EventKit→SUCCEEDED/FAILED。Swift 全量 82 passed，Beta target 与 `.app` 打包成功。尚未实机验收首次权限/拒绝/创建成功与审计故障路径；未创建真实事件。详见 `docs/HANDOFF.md`。
 
+### 阶段 6 本机门禁复核（2026-11-10，仍开放）
+
+- 当前 `c07df4e`：后端 347 passed（1 条既有弃用警告），Swift 82 passed；Ruff、CI mypy、`uv lock --check`、Python compileall、tracked-file detect-secrets 和 Beta target build 全部通过。
+- 没有运行远端 GitHub Actions、真实 Provider、麦克风、EventKit 权限/创建或备份恢复。GUI 与系统级验收未齐，不能关闭阶段 6。
+
 ## 阶段 0 证据状态（已结束；延期项保留原状态）
 
 **Beta 范围阶段 0 收尾评审：PASS（2026-11-09）**。当前已启用本机优先 Beta 路径的证据和回归已核对；原始 §13 全量 POC 仍有 `PARTIAL/OPEN` 项，不宣称全量阶段 0 通过。按 C-007，这些项目在对应能力启用或正式分发前补齐，触发点见追踪矩阵。0A–0H 的历史证据和未闭环项仍见追踪矩阵。2026-11-10 当前代码复核：Python 全量 281 passed、1 条既有 Starlette/httpx 弃用警告；此前一轮全量中 APFS-128 `backup-copy` 临时映像子进程通用 `OSError`，目标用例单独复跑 1 passed，随后当前全量也通过，偶发原因未判定；Swift 全量 43 项通过，Beta target 构建成功。2026-11-10 于代码基线 `0418d25` 复核 CI 等价门禁：Ruff、mypy、`uv lock --check`、后端全量 276 passed、compileall、tracked-file detect-secrets、Swift 43 项与 Beta target build 全部通过；本次没有触发远端 GitHub Actions。历史 GitHub Actions run `42489738004` 仍只证明旧 commit `51b9ab9`（当时 Python 162、Swift 31）。当前本地提交尚未推送，PR 触发路径未实际运行；最新 Python SBOM 已按 `uv.lock` 重生成并校验 63/63 非根依赖。D-013 Beta GUI 样本已达到计划数量并低于门槛：启动 n=20/P95=700 ms，partial 216 次/各窗口 P95≤41.5 ms，停止→final n=21/P95=97.9 ms。POC-01 并发 probe 新增 13 轮，详见 `phase0-local-asr.md` 与逐轮 CSV；Consent/Policy 新增在途 generate/stream 撤销取消 fake-adapter 回归，窄回归 50 项通过（含同一 Consent 下并发撤销）；完整 Agent/产品负载和 Consent 持久审计仍未验收。其他缺口继续按追踪矩阵逐项关闭，不以延期冒充通过。

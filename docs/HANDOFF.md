@@ -29,6 +29,12 @@
 - 新增三项自动回归，验证审批审计失败时保存次数为 0、EventKit 失败时产生 ATTEMPTED/FAILED、成功但终态审计失败时只保存一次并准确返回。B10 服务/协调器窄回归共 7 passed；Beta target build 成功。提交后完整 `swift test --package-path poc/macos-audio` → 82 passed。
 - 该协调器测试为 fake 审计和 fake EventKit，不代表 macOS 权限/日历真实写入已验收。
 
+# 2026-11-10：阶段 6 本机全量门禁复核
+
+- 在当前 HEAD `c07df4e` 对照 `.github/workflows/ci.yml` 运行本机门禁：后端 all-extras/all-groups pytest、Ruff（含 scripts）、CI mypy、锁文件、compileall、tracked-file detect-secrets hook、Swift 全量与 Beta target build。
+- 结果：后端 347 passed，1 条既有 Starlette/httpx 弃用警告；Ruff、mypy（3 个 CI 目标文件）、`uv lock --check`、compileall、detect-secrets hook 均通过；Swift 82 passed；Beta target 构建成功。
+- 该验证没有触发远端 GitHub Actions、真实 Provider 请求、麦克风、系统日历授权/写入或备份恢复。阶段 6 仍开放；GUI 授权/错误路径、Keychain/恢复实机和剩余用户操作须依各工作包逐项验收。
+
 # 2026-11-10：模型预设旧格式迁移
 
 - `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。
