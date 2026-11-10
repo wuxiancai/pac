@@ -1,3 +1,10 @@
+# 2026-11-11：稳定后端启动并发回归的等待条件
+
+- `4d2ca9d` 的 macOS 15/Xcode 16.4 job 已具备 `.venv`，Swift 96 项中仅 `supervisorStopWaitsForAnInFlightStartup` 失败：runner 两秒内未生成子进程标记，测试仍继续调用 stop，可能在 detached startup 取得生命周期锁前先调用 stop。其他 95 项通过。
+- 修正测试最多等待 10 秒，并在标记仍不存在时记录失败后立即退出，不再执行依赖“startup 已持锁”的 stop 断言。该变化只修测试同步条件，不改 supervisor 生产代码。
+- 常规 job 的 APFS-128 ENOSPC POC 再次失败（346 passed）；此前本机隔离复跑 1 passed。不同 run 安全摘要分别为 `RuntimeError`/`CalledProcessError`，具体失败阶段不可见，原因仍未判定。
+- 本轮需重新跑 Swift 96 项和 Beta build，并等新远端 run；完成后更新结果。
+
 # 2026-11-11：补齐最低部署目标 job 的测试运行时
 
 - `b9fcf02` 的 macOS 15 job 已越过 Swift 并发编译并开始执行 96 项测试，但 12 项 backend supervisor/config 测试因该独立 job 没有安装 `backend/.venv` 而失败；主 job 先运行 Python sync，所以具备该运行时。最低部署目标 job 现复用同版本 uv 和锁定依赖安装步骤，确保测试条件一致。

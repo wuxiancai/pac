@@ -55,12 +55,15 @@ import Testing
     let startup = Task.detached { try supervisor.start() }
 
     let startedMarker = fixtureDirectory.appendingPathComponent("pac_poc/local_service.py.started")
-    let deadline = ProcessInfo.processInfo.systemUptime + 2
+    let deadline = ProcessInfo.processInfo.systemUptime + 10
     while !FileManager.default.fileExists(atPath: startedMarker.path),
           ProcessInfo.processInfo.systemUptime < deadline {
         usleep(10_000)
     }
-    #expect(FileManager.default.fileExists(atPath: startedMarker.path))
+    guard FileManager.default.fileExists(atPath: startedMarker.path) else {
+        #expect(Bool(false), "backend startup fixture did not start before the deadline")
+        return
+    }
     try supervisor.stop()
     _ = try await startup.value
     #expect(!supervisor.isRunning)

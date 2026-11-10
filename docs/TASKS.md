@@ -164,6 +164,7 @@
 ### 非阻塞问题回修清单
 
 - **阶段 6 / 最低部署目标 CI**：UserNotifications、EventKit、LocalAuthentication 并发边界已改用 callback API 与 checked continuation。本机 Swift 96 项和 Beta bundle 构建通过。最低 macOS job 随后暴露缺少 Python runtime fixture，workflow 已补入锁定 uv 环境安装；新 run 待确认。常规 CI 的 APFS-128 ENOSPC POC 在远端重复偶发失败，隔离本机复跑通过，根因未判定，不影响 Beta 主线。详见 `docs/HANDOFF.md`。
+- **阶段 6 / 最低部署目标 CI**：UserNotifications、EventKit、LocalAuthentication 并发边界和 Python runtime fixture 已修正；最新 Swift run 中 95/96 通过，唯一失败为启动锁回归的 2 秒子进程标记等待竞态。测试现等待至 10 秒，并在 fixture 未启动时不继续执行停止断言。更新提交的 macOS 15/Xcode 16.4 CI 尚待确认。APFS-128 ENOSPC POC 远端重复偶发失败、隔离本机复跑通过，根因未判定且不影响 Beta 主线。详见 `docs/HANDOFF.md`。
 
 - **B1 / Ollama 取消后紧接请求变慢**：曾观察到一轮长流取消后短请求延迟明显增加；本机版本、模型、时序和上游行为都可能影响结果，当前根因未证实。2026-11-10 同机复测中默认 thinking 请求延迟波动较大，无法归因；显式 `think:false` 下，短句基线 1.80 秒、长流取消后短句 1.31 秒，未复现取消后变慢。停止提示已说明本机可能仍在收尾。此项不阻塞聊天主闭环；若后续默认配置下仍可稳定复现，再集中排查。详见 `beta/macOS-beta-chat.md`。
 - **阶段 0 SQLCipher APFS-128 临时映像 POC 偶发失败**：2026-11-09 全量回归中一轮返回通用 `RuntimeError`，紧接的同用例复跑通过，随后全量通过；2026-11-10 一轮全量回归在 `backup-copy` 场景失败，子进程返回 `{"status":"error","error_type":"OSError"}`，随后目标用例单独复跑通过、全量 265 项也通过，原因未判定。该测试只在仓库 `.poc-data` 下创建临时映像，不影响 Beta 数据；若后续再次出现，集中收集子进程状态/挂载清理证据，不据单次结果推断 APFS 根因。
