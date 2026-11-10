@@ -1885,6 +1885,7 @@ private struct ConfirmedMemoryView: View {
     @State private var sourceHasOlderMessages = false
     @State private var sourceHistoryLoading = false
     @State private var sourceHistoryError = ""
+    @State private var sourceHistoryRequestID = UUID()
     @State private var historyMemory: LocalMemoryItem?
     @State private var sourceMemory: LocalMemoryItem?
     private let categories = ["fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"]
@@ -2013,6 +2014,8 @@ private struct ConfirmedMemoryView: View {
             }
         }
         .onChange(of: sourceConversationID) { _, conversationID in
+            sourceHistoryRequestID = UUID()
+            sourceHistoryLoading = false
             sourceMessageID = ""
             sourceHistoryError = ""
             guard !conversationID.isEmpty else {
@@ -2082,18 +2085,25 @@ private struct ConfirmedMemoryView: View {
     @MainActor
     private func loadSourceHistory(reset: Bool) async {
         guard !sourceHistoryLoading, !sourceConversationID.isEmpty else { return }
+        let requestID = sourceHistoryRequestID
         sourceHistoryLoading = true
-        defer { sourceHistoryLoading = false }
+        defer {
+            if sourceHistoryRequestID == requestID {
+                sourceHistoryLoading = false
+            }
+        }
         sourceHistoryError = ""
         do {
             let cursor = reset ? nil : sourceMessages.first?.id
             let page = try await model.memorySourceHistory(
                 conversationID: sourceConversationID, beforeMessageID: cursor
             )
-            guard page.conversationID == sourceConversationID else { return }
+            guard sourceHistoryRequestID == requestID,
+                  page.conversationID == sourceConversationID else { return }
             sourceMessages = reset ? page.messages : page.messages + sourceMessages
             sourceHasOlderMessages = page.hasMore
         } catch {
+            guard sourceHistoryRequestID == requestID else { return }
             sourceHistoryError = "无法读取来源会话：\(error.localizedDescription)"
         }
     }
