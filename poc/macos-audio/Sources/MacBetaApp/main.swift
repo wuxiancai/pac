@@ -1734,8 +1734,23 @@ private struct BackupExportView: View {
     @State private var password = ""
     @State private var isExporting = false
     @State private var isRestoring = false
+    @State private var isChoosingBackupFile = false
+    @State private var isChoosingDestination = false
     @State private var selectedBackup: URL?
     @State private var showingRestoreConfirmation = false
+    @State private var panelStatus = ""
+
+    private var statusText: String {
+        if model.isBackupRestoreAuthenticating { return "正在认证本机设备…" }
+        if isRestoring { return "正在恢复…" }
+        if isExporting { return "正在加密并保存备份…" }
+        return panelStatus.isEmpty ? model.backupStatus : panelStatus
+    }
+
+    private var exportButtonTitle: String {
+        if isChoosingDestination { return "正在打开保存面板…" }
+        return isExporting ? "正在备份…" : "选择位置并加密备份"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1745,15 +1760,16 @@ private struct BackupExportView: View {
             SecureField("备份口令", text: $password)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("backup-password-field")
-            Text(model.isBackupRestoreAuthenticating ? "正在认证本机设备…" : isRestoring ? "正在恢复…" : isExporting ? "正在加密并保存备份…" : model.backupStatus)
+            Text(statusText)
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("选择备份文件…") { chooseBackup() }
+                    .disabled(isChoosingBackupFile || isChoosingDestination || isExporting || isRestoring)
                 Text(selectedBackup?.lastPathComponent ?? "尚未选择备份")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 Button(isRestoring ? "正在恢复…" : "恢复此备份") { showingRestoreConfirmation = true }
-                    .disabled(password.isEmpty || selectedBackup == nil || isExporting || isRestoring || model.isStreaming)
+                    .disabled(password.isEmpty || selectedBackup == nil || isChoosingBackupFile || isChoosingDestination || isExporting || isRestoring || model.isStreaming)
                     .accessibilityIdentifier("backup-restore-confirm-button")
                 if model.isBackupRestoreAuthenticating {
                     Button("取消认证") { model.cancelBackupRestoreAuthentication() }
@@ -1762,16 +1778,16 @@ private struct BackupExportView: View {
             }
             HStack {
                 Button("完成") { dismiss() }
-                    .disabled(isExporting || isRestoring)
+                    .disabled(isChoosingBackupFile || isChoosingDestination || isExporting || isRestoring)
                 Spacer()
-                Button(isExporting ? "正在备份…" : "选择位置并加密备份") { chooseDestination() }
-                    .disabled(password.isEmpty || isExporting || isRestoring)
+                Button(exportButtonTitle) { chooseDestination() }
+                    .disabled(password.isEmpty || isChoosingBackupFile || isChoosingDestination || isExporting || isRestoring)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("backup-export-confirm-button")
             }
         }
         .padding(22)
-        .interactiveDismissDisabled(isExporting || isRestoring)
+        .interactiveDismissDisabled(isChoosingBackupFile || isChoosingDestination || isExporting || isRestoring)
         .alert("恢复加密备份？", isPresented: $showingRestoreConfirmation) {
             Button("取消", role: .cancel) {}
             Button("认证并恢复", role: .destructive) { restoreSelectedBackup() }
@@ -1786,14 +1802,23 @@ private struct BackupExportView: View {
         // NSSavePanel appends the allowed content type's extension.
         panel.nameFieldStringValue = "PersonalAssistant"
         panel.allowedContentTypes = [UTType(filenameExtension: "pacbackup") ?? .data]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        let replaceExisting = FileManager.default.fileExists(atPath: url.path)
-        let secret = password
-        password = ""
-        isExporting = true
-        Task {
-            await model.exportEncryptedBackup(to: url, password: secret, replaceExisting: replaceExisting)
-            isExporting = false
+        guard let parentWindow = NSApp.keyWindow ?? NSApp.mainWindow else {
+            panelStatus = "无法打开保存面板，请重试。"
+            return
+        }
+        panelStatus = ""
+        isChoosingDestination = true
+        panel.beginSheetModal(for: parentWindow) { response in
+            isChoosingDestination = false
+            guard response == .OK, let url = panel.url else { return }
+            let replaceExisting = FileManager.default.fileExists(atPath: url.path)
+            let secret = password
+            password = ""
+            isExporting = true
+            Task {
+                await model.exportEncryptedBackup(to: url, password: secret, replaceExisting: replaceExisting)
+                isExporting = false
+            }
         }
     }
 
@@ -1803,8 +1828,17 @@ private struct BackupExportView: View {
         panel.allowedContentTypes = [UTType(filenameExtension: "pacbackup") ?? .data]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        guard panel.runModal() == .OK else { return }
-        selectedBackup = panel.url
+        guard let parentWindow = NSApp.keyWindow ?? NSApp.mainWindow else {
+            panelStatus = "无法打开文件选择面板，请重试。"
+            return
+        }
+        panelStatus = ""
+        isChoosingBackupFile = true
+        panel.beginSheetModal(for: parentWindow) { response in
+            isChoosingBackupFile = false
+            guard response == .OK else { return }
+            selectedBackup = panel.url
+        }
     }
 
     private func restoreSelectedBackup() {

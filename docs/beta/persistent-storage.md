@@ -55,6 +55,8 @@
 4. 手动加密备份已接入认证 API 与 macOS UI：用户通过系统保存面板选择 `.pacbackup` 路径，输入每份独立口令后显式导出；口令不持久化，覆盖已有文件需保存面板确认。恢复前需确认并通过 macOS 设备认证；服务端验证容器口令、安装密钥指纹、SQLCipher 完整性/schema，创建当前数据库的私有本机 SQLCipher 预备份，再将内容在线复制到使用当前 Keychain 密钥加密的 staging DB 后切换；失败时从 rollback 文件还原。预备份放在 Application Support/PersonalAI/pre-restore，固定文件仅保留最近一份；校验并完成恢复切换后通过原子替换更新。失败时不会覆盖旧预备份。2026-11-10 子进程在恢复切换前/后硬退出后均可恢复旧库；POSIX 生命周期锁让打开的 store 持共享锁，恢复要求独占，并在启动独占恢复时清理专用 staging。新增同进程和独立进程持锁回归：其他 store/process 活跃时恢复 fail closed，旧库完整且临时文件清理。该自动化不代表物理断电/介质故障验收。GUI 导出一轮 274,726-byte 加密副本成功，随后恢复认证尝试停在“处理中”，未创建预备份、数据库 mtime 未变化，未进入切换；临时副本已删除。新 Beta 实测系统文件面板正常，旧实例未弹出面板的原因仍未判定。默认保存名双后缀已修复；恢复 UI 已将认证恢复与导出状态区分，防止“正在备份”误报恢复进度。Beta 包现包含并在构建时校验 `NSFaceIDUsageDescription`（用途说明根据 [Apple LocalAuthentication 文档](https://developer.apple.com/documentation/localauthentication/lacontext) 添加），但最新 Beta GUI 重试依旧无认证提示；独立系统认证 POC 也进入等待态，约 30 秒没有返回。因此配置缺失仅是一个真实打包缺口，未证明是本机认证停滞的根因。应用退出后临时备份已清理；未检查 Library 数据库，不推断本轮切换状态。LocalAuthentication 提示/回调仍待诊断。用户自选本地目录路径已在 GUI 实测：保存面板导航到 `/Users/wuxiancai/Documents` 并成功导出 274,726 bytes，文件核实后删除；此项不覆盖外接卷。恢复界面现可显式取消进行中的 LocalAuthentication 请求（通过使 LAContext 失效），认证阶段禁止关闭表单；GUI 取消后返回 LAError，但当前系统文字为英文。新增错误映射单测已通过，因 CUA 重开新包超时，中文映射暂未实机复核。认证提示/成功回调与恢复本身仍未验收，错误口令、断电/强制退出完整 GUI、Keychain 实机验证和 RTO 仍未完成。
 
 2026-11-10 本轮补充：Beta 备份表单临时口令已输入后，对 accessibility 导出按钮连续两次点击均未触发可见 NSSavePanel，口令已清空并关闭表单；无导出调用或新备份。此现象仍无法区分自动化点击未触发 action 与系统面板呈现问题，不推翻先前成功导出证据；下次先用可观察的键盘/人工点击确认 action。
+
+2026-11-10 面板改造：保存和打开 `NSSavePanel`/`NSOpenPanel` 改用异步窗口 sheet，以避免同步模态调用阻塞 SwiftUI；取消保存选择时保留口令。Swift 86 项和 Beta 打包成功。新包 GUI 未能被 CUA 访问，故实际保存/打开面板仍待实机验收。
 5. 记忆来源跨会话选择/跳转的 GUI 实机验收；真实 macOS Keychain 与冻结/休眠/重启路径验收。
 6. 本机任务通知的真实系统授权、投递/过期行为及重启恢复验收；当前测试仅覆盖 stable identifier 与客户端/后端契约，不声称已验证系统投递。
 

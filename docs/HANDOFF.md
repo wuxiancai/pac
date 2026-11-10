@@ -1,5 +1,11 @@
 # 2026-11-10：B3 恢复认证可取消与中文终态
 
+# 2026-11-10：B3 文件面板改为异步 sheet
+
+- 为避免同步 `NSSavePanel.runModal()` 阻塞 SwiftUI 备份表单，将保存与打开面板改为附着当前窗口的 `beginSheetModal`；选择期间显示忙碌状态、禁用重复入口并禁止交互式关闭，取消不会清除备份口令。找不到父窗口时显示本机错误提示。
+- `swift test --package-path poc/macos-audio` → 86 passed；`poc/macos-audio/scripts/build_beta_app.sh` 成功；`git diff --check` 通过。
+- 新构建启动后 CUA 连续超时，进程仍在运行但未取得可访问性窗口；未能实机确认异步保存/打开面板。旧版实例中 accessibility 点击和 Tab/Return 均未触发保存面板，口令已清空并关闭表单，无导出或恢复。不能宣称修复已通过 GUI 验收；B3 继续开放。
+
 # 2026-11-10：B3 备份 NSSavePanel 重试未触发
 
 - 在当前已连接 Ollama 的 Beta 备份表单输入一次性合成口令后，通过 accessibility 按钮操作两次“选择位置并加密备份”，均未出现 NSSavePanel，界面无状态变化。随后清空口令并关闭表单。
