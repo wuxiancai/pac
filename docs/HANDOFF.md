@@ -55,6 +55,11 @@
 - 用 `poc/macos-audio/scripts/run_beta_app.sh` 重启到最新 Beta。GUI 实机显示工具栏“创建事件”入口，表单呈现标题、起止时间、地点、备注、同步披露和字段限制；输入合成标题后动态校验提示消失，清空标题后提示恢复。
 - 关闭未提交表单；没有点击“检查创建权限”，未触发 EventKit 系统权限，也未保存日历事件。该 GUI 冒烟只覆盖入口和表单校验，预览、授权、二次确认、写入及审计故障路径仍待实机验收。
 
+# 2026-11-10：B10 审计 API 认证与终态原因码回归
+
+- 扩展日历审计 API 回归：缺少 Bearer 凭据时返回 401；`FAILED/audit_finalization_failed` 被接受并仅写入固定 metadata；状态仍限制 reason code，事件内容不进入审计。
+- 验证：定向用例 1 passed；Ruff 与 `mypy pac_poc/beta_api.py` 通过；后端全量 347 passed，1 条既有 Starlette/httpx 弃用警告。
+
 # 2026-11-10：模型预设旧格式迁移
 
 - `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。

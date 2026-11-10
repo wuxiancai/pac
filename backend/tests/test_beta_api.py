@@ -993,6 +993,12 @@ def test_calendar_event_audit_is_metadata_only_and_status_scoped(tmp_path: Path)
     trace_id = str(uuid4())
     resource_id = str(uuid4())
     with TestClient(app) as client:
+        unauthenticated = client.post(
+            "/security-audit/calendar-event",
+            headers={"host": "127.0.0.1"},
+            json={"trace_id": trace_id, "resource_id": resource_id,
+                  "decision": "ATTEMPTED", "reason_code": "user_approved"},
+        )
         denied = client.post(
             "/security-audit/calendar-event",
             headers=headers,
@@ -1011,13 +1017,22 @@ def test_calendar_event_audit_is_metadata_only_and_status_scoped(tmp_path: Path)
             json={"trace_id": trace_id, "resource_id": resource_id,
                   "decision": "SUCCEEDED", "reason_code": "event_created"},
         )
+        failed = client.post(
+            "/security-audit/calendar-event",
+            headers=headers,
+            json={"trace_id": trace_id, "resource_id": resource_id,
+                  "decision": "FAILED", "reason_code": "audit_finalization_failed"},
+        )
         usage = client.get("/usage", headers=headers)
 
+    assert unauthenticated.status_code == 401
     assert denied.status_code == 422
     assert attempted.status_code == 201 and attempted.json() == {"recorded": True}
     assert succeeded.status_code == 201
+    assert failed.status_code == 201
     events = usage.json()["audit_events"]
-    assert [event["decision"] for event in events[:2]] == ["SUCCEEDED", "ATTEMPTED"]
+    assert [event["decision"] for event in events[:3]] == ["FAILED", "SUCCEEDED", "ATTEMPTED"]
+    assert events[0]["reason_code"] == "audit_finalization_failed"
     assert all(event["action"] == "calendar_event_create" for event in events)
     assert all(event["provider_id"] == "eventkit" for event in events)
     assert all(event["data_sensitivity"] == "L2" for event in events)
