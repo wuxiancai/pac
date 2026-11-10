@@ -1,3 +1,10 @@
+# 2026-11-10：B3 LocalAuthentication 用途声明修正与对照复测
+
+- 对照 Apple LocalAuthentication 文档后发现 Beta 包缺少 `NSFaceIDUsageDescription`。该文档说明生物识别应用需要此 Info.plist 键，否则授权请求可能失败；已在 `build_beta_app.sh` 加入中文用途说明，并让打包时 `PlistBuddy` 校验该字段。`build_beta_app.sh` / `run_beta_app.sh` 成功，实际生成的 Info.plist 已读回该值。
+- 新包再次 GUI 导出并选中 274,726-byte 合成备份，确认恢复后依旧没有可见认证提示，状态停在“正在认证并恢复…”。独立 `backend-lifecycle-poc` 显式认证按钮对照也进入“正在等待系统认证…”且约 30 秒未变化；该 POC bundle 没有此用途键。因此缺少该键虽是应修复的包配置，但不足以解释两种构建均未完成的现象。`log show` 窄查询未提供 LocalAuthentication 回调/错误证据，根因继续待判定。
+- 关闭 Beta 与 POC；进程查询确认无 Beta/backend/POC 进程。精确清理并验证删除本轮两份 `.poc-data/PAC-B3-*.pacbackup` 临时文件（各 274,726 bytes）。未检查 Library 中数据库、未声称恢复成功；未读写 Keychain、未发 Provider 请求、未启动麦克风。
+- 官方参考：[LAContext](https://developer.apple.com/documentation/localauthentication/lacontext)。B3 系统认证/恢复仍未验收；后续优先查系统认证代理/错误域与 Swift async bridge 的真实行为，再决定是否更换实现。
+
 # 2026-11-10：B3 新构建恢复认证实机复测
 
 - `poc/macos-audio/scripts/build_beta_app.sh` 成功生成最新 `.app`，`run_beta_app.sh` 启动后连接 Ollama 正常。用一次性口令 GUI 导出合成备份，保存面板默认名为单后缀，文件大小 274,726 bytes；重新选择同一文件后恢复按钮可用。

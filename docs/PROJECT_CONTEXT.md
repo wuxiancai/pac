@@ -1,5 +1,6 @@
 # 项目上下文
 
+- 2026-11-10 B3：Beta 打包新增并校验 Apple 要求的 `NSFaceIDUsageDescription`，但重新 GUI 恢复及独立 LocalAuthentication POC 仍卡在认证等待；因此仅缺少此键不足以解释现象。两份合成备份已删除，应用进程已退出，未检查 Library 数据库或宣称恢复成功。后续调查认证代理/回调与 async bridge，详见最新 HANDOFF。
 - 2026-11-10 B3 最新包实机复测：可导出并选择 274,726-byte 合成备份；点恢复后正确显示“正在认证并恢复…”，但未见 LocalAuthentication 提示，进程日志无可用记录。退出 Beta 后确认进程已停并清理备份；未检查 Library 数据库或宣称恢复成功。认证提示/回调仍需调查，见最新 HANDOFF。
 - 2026-11-10 B3 恢复 UI 新增独立进度状态，认证/恢复与备份导出分别显示并互斥禁用；Swift 84 项与 Beta target build 通过。此修正不解释或解决上轮 LocalAuthentication 未返回的问题，实机恢复验收仍开放，详见 `docs/HANDOFF.md`。
 
