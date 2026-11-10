@@ -17,9 +17,14 @@ def test_embedding_report_records_real_local_run_without_claiming_product_accept
         "851,804,160 bytes",
         "1.95 秒",
         "合成",
-        "未选定",
+        "产品 Embedding 型号",
         "local_files_only",
         "HF_HUB_OFFLINE",
+        "D-014",
+        "23/24",
+        "24/24",
+        "人工标注",
+        "Embedding 仍保持产品关闭",
     ):
         assert required in report
 

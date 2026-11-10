@@ -1455,3 +1455,10 @@
 - 按用户决策改为 `Application Support/PersonalAI/pre-restore/pre-restore.sqlcipher` 固定路径。先在受限目录生成并验证临时 SQLCipher 快照；仅在恢复库成功切换、重新打开后原子替换旧副本。恢复失败路径仍保留既有预备份。
 - `tests/test_backup.py` 10 passed；连续两次恢复验证只有一个 `.sqlcipher` 文件，且新副本包含最新恢复前数据。Ruff、`mypy pac_poc/persistence.py` 通过。后端全量 326 passed，1 条既有 Starlette/httpx 弃用警告。断电/强制终止实机验证仍未完成。
 - 已更新 D-006、B3 队列及持久化工作包报告。
+
+
+# 2026-11-10：D-014 离线候选检索扩展
+
+- 用户已确认先做离线候选评测，再决定是否产品启用。本轮扩展 `scripts/run_local_embedding_eval.py`：12 条合成中英记忆、24 条中英改写查询，输出 top-1/top-3 及语言分组统计；评测脚本仅在推理成功时返回成功，不以人为 100% 命中设门槛。
+- 在 `UV_OFFLINE=1`、`HF_HUB_OFFLINE=1`、`TRANSFORMERS_OFFLINE=1` 下三次独立运行均为 top-1 23/24、top-3 24/24；中文 12/12、英文 11/12。唯一首位错误为英文工作地点查询被工作时间记忆抢先，目标记忆保持在 top-3。首轮 1.25 秒，observed maximum RSS 881,983,488 bytes；只记录这一轮资源观察。未下载模型、未读取用户数据。
+- 修改了候选评测脚本及 `phase0-local-embedding.md`、追踪矩阵、决策/任务/项目上下文。此结果揭示语义邻近条目的错排，仍不足以决定产品启用；Embedding 保持关闭，后续应扩充经标注合成语料并对照 FTS。
