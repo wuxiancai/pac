@@ -65,6 +65,7 @@
 
 ### 阶段 6 本机门禁复核（2026-11-10，仍开放）
 
+- 当前提交 `000f341`：后端 all-extras/all-groups 347 passed（1 条既有弃用警告）；Swift 94 passed；Beta target build、Ruff、CI mypy、`uv lock --check`、compileall、tracked-file secret scan 全通过。远端 Actions、Provider、麦克风、真实恢复认证与 macOS 14 runtime 未验；阶段 6 继续开放。命令及边界见最新 `docs/HANDOFF.md`。
 - 最新基线 `58c771d`：后端 all-extras/all-groups 347 passed（1 条既有 Starlette/httpx 弃用警告），Swift 84 passed；Ruff、CI mypy、`uv lock --check`、compileall、tracked-file detect-secrets、Beta target、`.app` 打包和 `NSFaceIDUsageDescription` plist 校验均通过。无远端 Actions/Provider/麦克风运行；系统认证及恢复仍未验。
 - 在代码基线 `a21ec3d` 复核：后端 all-extras/all-groups pytest 347 passed（1 条既有弃用警告），Swift 83 passed；Ruff、CI mypy、`uv lock --check`、Python compileall、tracked-file detect-secrets 和 Beta target build 全部通过。
 - 2026-11-10 完成一条合成 EventKit 事件创建及成功审计 GUI 验收。远端 GitHub Actions、真实 Provider、麦克风、备份恢复和其他 GUI/系统门禁仍未齐，不能关闭阶段 6。

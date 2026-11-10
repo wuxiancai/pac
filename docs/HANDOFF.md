@@ -1,3 +1,9 @@
+# 2026-11-10：阶段 6 当前提交本机 CI 等价门禁复核
+
+- 对当前代码提交 `000f341` 对照 `.github/workflows/ci.yml` 重跑本机门禁：后端 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 347 passed，1 条既有 Starlette/httpx 弃用警告；`swift test` → 94 passed；`swift build --product personal-assistant-beta` 成功。
+- 静态门禁通过：`uv run --locked ruff check pac_poc tests`、`uv run --locked mypy`、`uv lock --check`、`uv run --locked python -m compileall -q pac_poc scripts tests`、tracked-file `detect-secrets-hook --baseline .secrets.baseline`。各命令均从仓库 `backend/` 或仓库根目录按 CI 目标路径执行。
+- 该轮覆盖为本机 CI 等价检查；没有触发远端 GitHub Actions、云 Provider、麦克风、系统认证/恢复或最低 macOS 14 实机。阶段 6 及相关 GUI/外部验收继续开放。
+
 # 2026-11-10：B3 恢复认证取消竞态保护
 
 - 修复用户取消本机认证与 LocalAuthentication 成功回调并发时，迟到成功仍可能继续调用恢复 API 的竞态。认证尝试使用一次性门闩；只有当前未取消尝试能认领认证结果并进入恢复，旧尝试或已取消尝试不能继续。取消时立即使尝试失效、显示“本机认证已取消，未开始恢复”，并调用 `LAContext.invalidate()`。

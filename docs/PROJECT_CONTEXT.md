@@ -1,5 +1,6 @@
 # 项目上下文
 
+- 2026-11-10 阶段 6 当前提交 `000f341` 本机 CI 等价门禁通过：后端 347 passed（1 条既有 Starlette/httpx 弃用警告）、Swift 94 passed、Beta target build、Ruff、CI mypy、锁文件、compileall、tracked-file secret scan 通过。远端 Actions、Provider、麦克风、系统恢复与 macOS 14 实机未验。详见最新 HANDOFF。
 - 2026-11-10 B3 修复认证取消与迟到成功回调的竞态：已取消或被新尝试替代的本机认证结果不能调用恢复 API；取消状态立即明确显示未开始恢复。Swift 94 项通过，Beta `.app` 构建通过。未做真实认证/恢复 GUI；详见最新 HANDOFF。
 - 2026-11-10 B3 数据库 Keychain 生命周期新增 5 项 mock 回归，覆盖已存键只读、首次设备专用键创建、重复创建竞争取胜者以及读取/随机数/写入失败关闭；系统 Keychain 接口与数据未在本轮操作。Swift 92 项通过，Beta build 成功。详见 HANDOFF。
 - 2026-11-10 数据库 Keychain 错误现有中文诊断：分别报告无效身份/存储密钥/随机生成/Keychain 读写状态，OSStatus 显示数值；无效存储密钥不会自动换钥。Swift 87 项、Beta 构建通过。此前启动时一次 `DatabaseKeychainError error 1` 经手动重试恢复，原因仍未判定，详见 HANDOFF。
