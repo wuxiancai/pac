@@ -1,3 +1,9 @@
+# 2026-11-10：B3 备份恢复进度状态文案修正
+
+- 追查上轮 GUI 恢复停滞路径：恢复异步任务复用了导出状态，按钮显示“处理中…/正在备份…”，表单状态文本在操作结束前也没有进度提示。该 UI 状态混淆已确认；LocalAuthentication 未返回的原因仍未知，不能据此认定修复认证问题。
+- 新增独立恢复中状态：恢复期间显示“正在认证并恢复…/正在恢复…”，导出期间显示“正在加密并保存备份…/正在备份…”，并互斥禁用两种操作。认证和服务端恢复逻辑未改。
+- `swift test --package-path poc/macos-audio` → 84 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。设备认证、错误口令和恢复完整 GUI 结果仍待实机验收。
+
 # 2026-11-10：B3 加密备份 GUI 恢复尝试与保存名修正
 
 - 先在已运行约 85 分钟的 Beta 中测试，保存/打开面板按钮没有显示系统面板；旧实例正常退出后，按 `poc/macos-audio/scripts/run_beta_app.sh` 重建启动，TXT 选择器和备份 NSSavePanel 均能正常打开。旧实例状态与失败相关，但具体根因未证实。

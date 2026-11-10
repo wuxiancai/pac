@@ -1714,6 +1714,7 @@ private struct BackupExportView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var password = ""
     @State private var isExporting = false
+    @State private var isRestoring = false
     @State private var selectedBackup: URL?
     @State private var showingRestoreConfirmation = false
 
@@ -1725,21 +1726,22 @@ private struct BackupExportView: View {
             SecureField("备份口令", text: $password)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("backup-password-field")
-            Text(model.backupStatus).font(.caption).foregroundStyle(.secondary)
+            Text(isRestoring ? "正在认证并恢复…" : isExporting ? "正在加密并保存备份…" : model.backupStatus)
+                .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("选择备份文件…") { chooseBackup() }
                 Text(selectedBackup?.lastPathComponent ?? "尚未选择备份")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
-                Button(isExporting ? "处理中…" : "恢复此备份") { showingRestoreConfirmation = true }
-                    .disabled(password.isEmpty || selectedBackup == nil || isExporting || model.isStreaming)
+                Button(isRestoring ? "正在恢复…" : "恢复此备份") { showingRestoreConfirmation = true }
+                    .disabled(password.isEmpty || selectedBackup == nil || isExporting || isRestoring || model.isStreaming)
                     .accessibilityIdentifier("backup-restore-confirm-button")
             }
             HStack {
                 Button("完成") { dismiss() }
                 Spacer()
                 Button(isExporting ? "正在备份…" : "选择位置并加密备份") { chooseDestination() }
-                    .disabled(password.isEmpty || isExporting)
+                    .disabled(password.isEmpty || isExporting || isRestoring)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("backup-export-confirm-button")
             }
@@ -1784,10 +1786,10 @@ private struct BackupExportView: View {
         guard let selectedBackup else { return }
         let secret = password
         password = ""
-        isExporting = true
+        isRestoring = true
         Task {
             await model.restoreEncryptedBackup(from: selectedBackup, password: secret)
-            isExporting = false
+            isRestoring = false
         }
     }
 }
