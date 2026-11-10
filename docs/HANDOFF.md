@@ -1,3 +1,8 @@
+# 2026-11-11：阶段 6 远端 CI 与 macOS 14 部署目标通过
+
+- 在提交 `dc36dda` 上，Actions run `42926997195` 两个 job 全部通过。主 job 后端 348 passed、Swift 98 passed；Ruff、CI mypy、依赖锁、tracked-file secret scan、Python compileall 与 Beta `.app` build 均成功。最低部署目标 job 在 macOS 15 runner 上按 macOS 14 deployment target 运行 Swift 98 项并通过 `.app` 校验。
+- 这是最低部署目标构建/测试证据，不是 macOS 14 真机 runtime。真实系统权限、Keychain、通知投递、恢复、签名/分发、Provider 计费和其他 GUI 门禁仍在阶段 6 清单中。
+
 # 2026-11-11：提醒安排失败现在反馈并清除旧提醒
 
 - 修复本机通知中心添加请求失败被 `try?` 静默忽略的问题：提醒协调器现在返回失败数；Beta 任务页明确显示有多少提醒未安排，同时说明任务仍保存在本机。单条安排失败时撤销该任务同 ID 的旧请求，避免旧时间提醒继续触发；PAC 以外通知不受影响。
