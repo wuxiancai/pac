@@ -1,5 +1,6 @@
 # 项目上下文
 
+- 2026-11-10 B3 异步系统面板 GUI 验收通过：为 SwiftUI 备份 sheet 捕获实际宿主 `NSWindow` 后，NSSavePanel/NSOpenPanel 均正常出现；临时加密备份 274,726 bytes 保存、重新选择成功，取消保存后口令保留。已清口令并删除临时文件；未恢复数据。新包首启一次 `DatabaseKeychainError error 1`，重试连接成功，原因待查。详见最新 HANDOFF。
 - 2026-11-10 B3 文件面板实现改用附着窗口的异步 `beginSheetModal`，选择期间禁用重复操作并禁止关窗。Swift 86 项通过、Beta 包构建成功；新包 GUI 因 CUA 超时未验收，现有无面板复现仍未判定，不能宣称问题已解决。详见最新 HANDOFF。
 - 2026-11-10 B3 备份面板复测：在 Beta 表单输入临时口令后，accessibility 点击导出按钮两次均未出现 NSSavePanel；口令已清空并关闭表单，无路径选择、导出 API 调用或新文件。原因未判定，不能归因到按钮代码或系统面板。既有成功导出证据不受影响，详见最新 HANDOFF。
 - 2026-11-10 PDF 隔离候选复核：本机 `launchd.plist(5)` 虽提供 `ResidentSetSize` 资源项，但文档语义是在内存紧张时优先从超出申报 RSS 的进程回收内存；没有证明 worker 超限会确定性拒绝/终止，也未对独立解析 worker 实测。故不作为硬内存隔离证据，PDF 保持禁用。详见 `docs/beta/file-import.md`。

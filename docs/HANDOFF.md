@@ -1,5 +1,12 @@
 # 2026-11-10：B3 恢复认证可取消与中文终态
 
+# 2026-11-10：B3 异步文件面板宿主窗口修复及 GUI 验收
+
+- 前次异步面板改造显示“无法打开保存面板”：SwiftUI 备份 sheet 中 `NSApp.keyWindow` 与 `NSApp.mainWindow` 均为空。现加 `NSViewRepresentable` 捕获实际承载 sheet 的 `NSWindow`，保存/打开面板均附着该窗口；没有宿主窗口时仍失败关闭并显示提示。
+- `swift test --package-path poc/macos-audio` → 86 passed；`poc/macos-audio/scripts/run_beta_app.sh` 构建并启动成功。GUI 实测 NSSavePanel 打开于 Documents，默认 `.pacbackup` 单后缀；保存 `/Users/wuxiancai/Documents/PAC-B3-AsyncPanel-20261110.pacbackup` 后状态显示成功，文件核验为 274,726 bytes。NSOpenPanel 能列出并选择此文件，表单文件名随选择更新；另一次打开 NSSavePanel 后取消，口令仍保留。
+- 清空口令、关闭表单，并精确删除临时备份、核实路径已不存在。未点击恢复或调用恢复 API；未读取/改动 Keychain、Provider 或麦克风。
+- Beta 新实例首启曾显示 `DatabaseKeychainError error 1` 且本机服务未连接；点击“重试连接”后状态恢复为 Ollama 已连接。当前证据只证明本次重试恢复，启动失败原因未判定，作为后续启动稳健性待查项。
+
 # 2026-11-10：阶段 0 B5 文件导入追踪状态校正
 
 - 复核 `docs/beta/file-import.md` 与 `docs/TASKS.md` 后，修正阶段 0 追踪矩阵两行陈旧状态：TXT/Markdown 单个 85-byte 合成 marker 文件的聊天引用 GUI 验收已完成，文件选择、暂存和移除也已实测。

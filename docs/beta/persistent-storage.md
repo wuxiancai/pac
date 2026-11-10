@@ -57,6 +57,8 @@
 2026-11-10 本轮补充：Beta 备份表单临时口令已输入后，对 accessibility 导出按钮连续两次点击均未触发可见 NSSavePanel，口令已清空并关闭表单；无导出调用或新备份。此现象仍无法区分自动化点击未触发 action 与系统面板呈现问题，不推翻先前成功导出证据；下次先用可观察的键盘/人工点击确认 action。
 
 2026-11-10 面板改造：保存和打开 `NSSavePanel`/`NSOpenPanel` 改用异步窗口 sheet，以避免同步模态调用阻塞 SwiftUI；取消保存选择时保留口令。Swift 86 项和 Beta 打包成功。新包 GUI 未能被 CUA 访问，故实际保存/打开面板仍待实机验收。
+
+2026-11-10 面板根因与 GUI 验收：备份 sheet 中 `NSApp.keyWindow/mainWindow` 都为空，导致前次改造提示无法打开面板。改为通过 `NSViewRepresentable` 捕获 sheet 实际 `NSWindow` 并传给异步面板后，GUI 保存和打开均成功；文件名 `PAC-B3-AsyncPanel-20261110.pacbackup`，274,726 bytes。另验证取消保存保留口令。随后清空口令并删除临时文件；未执行恢复。新应用首启 Keychain 数据库密钥错误一次，点击重试后本机服务连接成功，原因未判定。
 5. 记忆来源跨会话选择/跳转的 GUI 实机验收；真实 macOS Keychain 与冻结/休眠/重启路径验收。
 6. 本机任务通知的真实系统授权、投递/过期行为及重启恢复验收；当前测试仅覆盖 stable identifier 与客户端/后端契约，不声称已验证系统投递。
 

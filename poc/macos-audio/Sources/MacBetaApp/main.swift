@@ -1731,6 +1731,7 @@ private struct BetaChatView: View {
 private struct BackupExportView: View {
     @Bindable var model: BetaChatModel
     @Environment(\.dismiss) private var dismiss
+    @State private var hostWindow: NSWindow?
     @State private var password = ""
     @State private var isExporting = false
     @State private var isRestoring = false
@@ -1787,6 +1788,13 @@ private struct BackupExportView: View {
             }
         }
         .padding(22)
+        .background {
+            WindowCapture { window in
+                guard let window, hostWindow !== window else { return }
+                hostWindow = window
+            }
+            .frame(width: 0, height: 0)
+        }
         .interactiveDismissDisabled(isChoosingBackupFile || isChoosingDestination || isExporting || isRestoring)
         .alert("恢复加密备份？", isPresented: $showingRestoreConfirmation) {
             Button("取消", role: .cancel) {}
@@ -1802,7 +1810,7 @@ private struct BackupExportView: View {
         // NSSavePanel appends the allowed content type's extension.
         panel.nameFieldStringValue = "PersonalAssistant"
         panel.allowedContentTypes = [UTType(filenameExtension: "pacbackup") ?? .data]
-        guard let parentWindow = NSApp.keyWindow ?? NSApp.mainWindow else {
+        guard let parentWindow = hostWindow else {
             panelStatus = "无法打开保存面板，请重试。"
             return
         }
@@ -1828,7 +1836,7 @@ private struct BackupExportView: View {
         panel.allowedContentTypes = [UTType(filenameExtension: "pacbackup") ?? .data]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        guard let parentWindow = NSApp.keyWindow ?? NSApp.mainWindow else {
+        guard let parentWindow = hostWindow else {
             panelStatus = "无法打开文件选择面板，请重试。"
             return
         }
@@ -1850,6 +1858,34 @@ private struct BackupExportView: View {
             await model.restoreEncryptedBackup(from: selectedBackup, password: secret)
             isRestoring = false
         }
+    }
+}
+
+@available(macOS 14.0, *)
+private struct WindowCapture: NSViewRepresentable {
+    var onWindowChange: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> WindowCaptureView {
+        let view = WindowCaptureView()
+        view.onWindowChange = onWindowChange
+        return view
+    }
+
+    func updateNSView(_ view: WindowCaptureView, context: Context) {
+        view.onWindowChange = onWindowChange
+        if view.window != nil {
+            onWindowChange(view.window)
+        }
+    }
+}
+
+@available(macOS 14.0, *)
+private final class WindowCaptureView: NSView {
+    var onWindowChange: ((NSWindow?) -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        onWindowChange?(window)
     }
 }
 
