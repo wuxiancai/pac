@@ -1,3 +1,9 @@
+# 2026-11-11：恢复认证增加 60 秒失败关闭 watchdog
+
+- 既有 GUI 观察显示恢复认证可长时间停留等待，根因未知。现在 `AuthenticationAttemptGate` 可为指定尝试设置超时；Beta 恢复流程 60 秒未返回时使门闩失效、调用 `LAContext.invalidate()`、退出认证忙碌态并显示“本机认证等待超时，未开始恢复。”迟到的认证成功/错误回调因无法 claim 而不能调用恢复 API；正常成功或用户取消会取消 watchdog。
+- 新增两项 Swift 回归验证 watchdog 到期后不能 claim，以及认证先成功会取消 watchdog。`swift test --package-path poc/macos-audio` → 96 passed；Beta target 编译成功。此前第一次编译因共享 Package target 默认部署版本低于 Task API 产生 availability 错误；将认证门闩与相关测试明确标注 macOS 14 后，全量通过。构建未触发真实 LocalAuthentication 或恢复 API。
+- 限制：该改动只确保界面不会无限显示处理中并拒绝迟到结果，不证明系统提示会出现，也不判定原无回调根因。真实认证、错误口令、恢复 GUI 和数据库切换验收仍待完成。
+
 # 2026-11-11：强化最低 macOS Beta 产物验证
 
 - `build_beta_app.sh` 将最低系统版本提升为单一变量，并在构建时断言最终 `Info.plist` 的 `LSMinimumSystemVersion` 精确为 `14.0`。GitHub Actions 的 `macos-14` job 改为运行完整 `.app` 打包脚本，连同现有 Bundle ID、Face ID 用途键和 codesign 验证一起检查实际 Beta bundle。

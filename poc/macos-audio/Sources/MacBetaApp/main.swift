@@ -712,9 +712,17 @@ final class BetaChatModel: CalendarEventAuditRecording {
 
     func restoreEncryptedBackup(from url: URL, password: String) async {
         invalidateHistoryRequests()
-        let attempt = restoreAuthenticationGate.begin()
-        activeRestoreAuthenticationAttempt = attempt
         let authorizer = TouchIDAuthorizer()
+        let attempt = restoreAuthenticationGate.begin(timeout: .seconds(60)) {
+            [weak self, weak authorizer] in
+            guard let self else { return }
+            self.activeRestoreAuthenticationAttempt = nil
+            self.activeRestoreAuthorizer = nil
+            self.isBackupRestoreAuthenticating = false
+            self.backupStatus = "本机认证等待超时，未开始恢复。"
+            authorizer?.cancel()
+        }
+        activeRestoreAuthenticationAttempt = attempt
         activeRestoreAuthorizer = authorizer
         isBackupRestoreAuthenticating = true
         do {
