@@ -1,3 +1,9 @@
+# 2026-11-10：本地持久化范围决定
+
+- 用户选择本地持久化聊天、任务与已确认记忆。已将 D-003、D-014 更新为部分确认；保留期限/删除语义、Embedding、加密与密钥管理、备份参数、导出格式仍未决定。
+- 核对现有 SQLCipher POC：ARM64/Python 3.12、FTS5、错误密钥拒绝、WAL、加密备份/恢复、并发写入与磁盘耗尽均有本机证据；但无正式 app 数据模型、Keychain 密钥生命周期/轮换、发行物 notices、真实负载性能、断电与正式恢复流程，不能直接视为产品加密决策已完成。见 `docs/poc/phase0-failure-recovery.md` 与 `docs/poc/phase0-traceability.md`。
+- 同步 `docs/DECISIONS.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。在保留策略、加密/密钥方案明确前，不开始写入正式聊天/任务/记忆数据库；Beta 继续仅进程内数据。
+
 # 2026-11-10：路线扩展至 V1.1/V2/V3
 
 - 用户明确要求重开决策并推进 V2/V3。按规格书 §13 将 V1.1（记忆中心/导出恢复优化）、V2（任务状态机、只读日历/待办、受控通知）、V3（固定专业 Agent、多 Agent、审批后的外部写操作与 Skills）纳入目标路线。
