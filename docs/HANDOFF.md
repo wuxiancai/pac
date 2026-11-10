@@ -1251,3 +1251,9 @@
 - 状态转换现在保持 `updated_at` 不早于前一状态时间；UsageRecord 的完成时间直接使用终态 run 时间戳，run 查询与 Usage ledger 保持一致。
 - 回归模拟状态转换时钟从 100 回拨到 90/80，并将 API 完成时钟模拟为 0；终态时间不倒退，失败请求仍能写入 `completed_at >= started_at` 的 unknown usage 记录。定向 5 passed；Ruff、mypy 通过；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：281 passed、1 条既有 Starlette/httpx 弃用警告。
 - 已更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。没有真实 Provider/Keychain/麦克风操作。
+
+# 2026-11-10：B3 Keychain 数据库密钥组件
+
+- 新增 `DatabaseKeychainStore`：用 `SecRandomCopyBytes` 生成 32-byte 密钥，存入专用 generic-password 项；使用 `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`，不要求每次启动 Touch ID。若并发首次启动导致重复项，读取胜出的既存密钥，不覆盖，避免数据库密钥分叉。
+- 验证：`swift test --package-path poc/macos-audio --filter databaseKeychainStoreUsesStableNonemptyIdentity` 通过，Beta target 也在该命令中成功编译。该测试不访问真实 Keychain；尚未做实际 Keychain ACL/锁屏/重启验收。
+- 尚未接入 app/backend 启动或 SQLCipher store；数据库密钥当前仍未流经进程边界。下一步使用受控私有管道设计接入，并验证关停/失败清理。
