@@ -163,7 +163,7 @@
 
 ### 非阻塞问题回修清单
 
-- **阶段 6 / macOS 15 CI Swift 6 并发编译**：`40c806f` 的最低部署目标 job 暴露 UserNotifications 非 Sendable 结果及 EventKit async 授权隔离错误。代码已改为值类型通知接口及 EventKit macOS 14 completion-handler 授权 API；本机 Swift 96 项和 Beta bundle 构建通过。修复提交后的远端 macOS 15/Xcode 16.4 CI 尚待确认，未通过前不记为最低部署目标 CI 完成。详见 `docs/HANDOFF.md`。
+- **阶段 6 / macOS 15 CI Swift 6 并发编译**：`40c806f` 的最低部署目标 job 暴露 UserNotifications、EventKit 的非 Sendable/隔离错误；`0aea258` 后又发现通知授权和 LocalAuthentication async 入口同类问题，现均改用 callback API 与 checked continuation。本机 Swift 96 项和 Beta bundle 构建通过；修复提交远端 macOS 15/Xcode 16.4 CI 尚待确认。详见 `docs/HANDOFF.md`。
 
 - **B1 / Ollama 取消后紧接请求变慢**：曾观察到一轮长流取消后短请求延迟明显增加；本机版本、模型、时序和上游行为都可能影响结果，当前根因未证实。2026-11-10 同机复测中默认 thinking 请求延迟波动较大，无法归因；显式 `think:false` 下，短句基线 1.80 秒、长流取消后短句 1.31 秒，未复现取消后变慢。停止提示已说明本机可能仍在收尾。此项不阻塞聊天主闭环；若后续默认配置下仍可稳定复现，再集中排查。详见 `beta/macOS-beta-chat.md`。
 - **阶段 0 SQLCipher APFS-128 临时映像 POC 偶发失败**：2026-11-09 全量回归中一轮返回通用 `RuntimeError`，紧接的同用例复跑通过，随后全量通过；2026-11-10 一轮全量回归在 `backup-copy` 场景失败，子进程返回 `{"status":"error","error_type":"OSError"}`，随后目标用例单独复跑通过、全量 265 项也通过，原因未判定。该测试只在仓库 `.poc-data` 下创建临时映像，不影响 Beta 数据；若后续再次出现，集中收集子进程状态/挂载清理证据，不据单次结果推断 APFS 根因。

@@ -21,10 +21,12 @@ private final class LAContextAuthenticationEvaluator: DeviceAuthenticationEvalua
     }
 
     func evaluate(policy: LAPolicy, reason: String) async throws {
-        let authenticated = try await context.evaluatePolicy(
-            policy,
-            localizedReason: reason
-        )
+        let authenticated = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
+            context.evaluatePolicy(policy, localizedReason: reason) { authenticated, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: authenticated) }
+            }
+        }
         guard authenticated else {
             throw SensitiveActionAuthorizationError.authenticationUnavailable
         }

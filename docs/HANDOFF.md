@@ -1,8 +1,14 @@
+# 2026-11-11：补齐 LocalAuthentication 与通知回调并发边界
+
+- macOS 15 job 对 `0aea258` 仍报告两个 Swift 6 并发错误：UserNotifications 的授权 async 入口和 `LAContext.evaluatePolicy` async 入口将主 actor 隔离对象送入非隔离 SDK 方法。已改为对应 completion-handler API，并在主 actor 服务中通过 checked continuation 返回布尔值；不改授权策略、不做系统认证实测。
+- 本机 `swift test --package-path poc/macos-audio` → 96 项通过；`poc/macos-audio/scripts/build_beta_app.sh` 成功；`git diff --check` 通过。修复提交后的远端验证尚待运行。
+- 同一 Actions run 常规 job 因既有 `test_bounded_disk_image_exhaustion_preserves_encrypted_data_and_backup[APFS-128]` 子进程 `CalledProcessError` 失败，其他 346 项通过。故障阶段未从安全摘要中暴露；待后续隔离复跑，不据此推定原因。
+
 # 2026-11-11：修复 macOS 15 SDK 下 Swift 6 并发编译
 
 - Actions run `42921606051` 的 macOS 15 job 成功分配 runner，但 Swift 编译因 UserNotifications 的非 Sendable 对象跨 actor，以及 EventKit async 授权方法接收主 actor 隔离 `EKEventStore` 而失败；同一 run 的常规 CI job 全部成功（Python 347、Swift 96、Beta build 等）。
 - 通知适配器现只在测试缝中传递标识、标题和日期值；系统对象在适配器内部创建/读取，待处理请求回调直接提取 `[String]`。EventKit 授权改用 macOS 14 专用 completion-handler API，避免将 EventKit store 传入非隔离 async API。没有使用 `@unchecked Sendable` 或屏蔽并发诊断。
-- 验证：`swift test --package-path poc/macos-audio` → 96 项通过；`poc/macos-audio/scripts/build_beta_app.sh` 成功；`git diff --check` 通过。待提交推送后取得 macOS 15/Xcode 16.4 远端回归结果。该验证不覆盖真实系统授权弹窗或通知投递。
+- 验证：`swift test --package-path poc/macos-audio` → 96 项通过；`poc/macos-audio/scripts/build_beta_app.sh` 成功；`git diff --check` 通过。提交 `0aea258` 的 macOS 15/Xcode 16.4 编译继续暴露 `LAContext` 和通知授权两个同类入口，已在上方单独记录跟进。该验证不覆盖真实系统授权弹窗或通知投递。
 
 # 2026-11-11：替换已退役的 macOS 14 Actions runner
 

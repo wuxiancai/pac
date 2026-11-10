@@ -21,7 +21,12 @@ private final class SystemTaskReminderNotificationCenter: TaskReminderNotificati
     }
 
     func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
-        try await center.requestAuthorization(options: options)
+        try await withCheckedThrowingContinuation { continuation in
+            center.requestAuthorization(options: options) { granted, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: granted) }
+            }
+        }
     }
 
     func authorizationStatus() async -> UNAuthorizationStatus {
