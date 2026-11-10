@@ -11,6 +11,12 @@
 - 验证：`swift test --package-path poc/macos-audio --filter CalendarEventCreationServiceTests` → 4 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。未触发系统权限弹窗或真实事件写入。
 - 下一段接审计 API Swift 客户端，再做精确预览/逐次确认 UI 和 Info.plist 声明；仍需保证前置 ATTEMPTED 失败关闭，写后结果审计不重试事件。
 
+# 2026-11-10：B10 Swift 审计客户端
+
+- `LocalAPIClient.recordCalendarEventAudit` 已接认证端点，状态和原因码使用固定枚举；发送 trace/resource UUID 和状态码，不包含标题、时间、地点、备注。非 201（包括 SQLCipher 审计不可用 503）直接失败，调用 UI 必须在写入前阻断。
+- 验证：两项窄回归通过，覆盖请求路径/认证/四字段 metadata-only payload，以及 503 失败关闭。未执行 EventKit 写入。
+- 下一段实现手填日历事件 UI：系统授权准备、预览、逐次确认、ATTEMPTED→EventKit→SUCCEEDED/FAILED 与最终审计失败提示，并加 write-only purpose string。
+
 # 2026-11-10：模型预设旧格式迁移
 
 - `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。

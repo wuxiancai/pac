@@ -47,7 +47,7 @@
 
 - 范围按 D-022：用户手动填写单个事件，预览后逐次确认，写入 macOS 当前默认日历；EventKit write-only；无 Agent 自动调用、提醒事项写入、重复、邀请、修改/删除或后台执行。
 - 先行段已新增认证 `/security-audit/calendar-event`，只接受受限决策/原因码，并在 SQLCipher 中记录 metadata-only 的 `ATTEMPTED/SUCCEEDED/FAILED`（敏感级别 L2），不接收标题/时间/备注。
-- 审计 API 窄回归通过；Ruff/mypy 通过，后端全量 347 passed（1 条既有弃用警告）。EventKit 创建服务已实现 write-only 授权请求、默认日历检查、草稿字段边界和显式确认后调用的保存入口；4 项自动回归通过且不触碰真实日历。Beta UI、写入前/后审计客户端闭环、Info.plist 写权限说明、实机授权和成功路径仍未完成/验证。详见 `docs/HANDOFF.md`。
+- 审计 API 窄回归通过；Ruff/mypy 通过，后端全量 347 passed（1 条既有弃用警告）。EventKit 创建服务已实现 write-only 授权请求、默认日历检查、草稿字段边界和显式确认后调用的保存入口；4 项自动回归通过且不触碰真实日历。Swift 审计客户端已接入 metadata-only 请求，2 项窄回归验证成功记录及 503 失败关闭。Beta UI 闭环、Info.plist 写权限说明、实机授权和成功路径仍未完成/验证。详见 `docs/HANDOFF.md`。
 
 ## 阶段 0 证据状态（已结束；延期项保留原状态）
 

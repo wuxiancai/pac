@@ -71,6 +71,41 @@ public enum LocalChatRunStatus: String, Decodable, Sendable {
     }
 }
 
+public enum CalendarEventAuditDecision: String, Codable, Sendable {
+    case attempted = "ATTEMPTED"
+    case succeeded = "SUCCEEDED"
+    case failed = "FAILED"
+    case cancelled = "CANCELLED"
+    case denied = "DENIED"
+}
+
+public enum CalendarEventAuditReason: String, Codable, Sendable {
+    case userApproved = "user_approved"
+    case eventCreated = "event_created"
+    case eventCreationFailed = "event_creation_failed"
+    case auditFinalizationFailed = "audit_finalization_failed"
+    case userCancelled = "user_cancelled"
+    case permissionDenied = "permission_denied"
+}
+
+private struct CalendarEventAuditPayload: Encodable {
+    let traceID: UUID
+    let resourceID: UUID
+    let decision: CalendarEventAuditDecision
+    let reasonCode: CalendarEventAuditReason
+
+    enum CodingKeys: String, CodingKey {
+        case traceID = "trace_id"
+        case resourceID = "resource_id"
+        case decision
+        case reasonCode = "reason_code"
+    }
+}
+
+private struct CalendarEventAuditResponse: Decodable {
+    let recorded: Bool
+}
+
 public enum LocalChatStreamItem: Sendable {
     case runID(String)
     case delta(String)
@@ -496,6 +531,39 @@ public final class LocalAPIClient: @unchecked Sendable {
             throw LocalAPIClientError.invalidResponse
         }
         return value.status == "ok"
+    }
+
+    public func recordCalendarEventAudit(
+        traceID: UUID,
+        resourceID: UUID,
+        decision: CalendarEventAuditDecision,
+        reason: CalendarEventAuditReason
+    ) async throws {
+        guard let url = URL(string: "/security-audit/calendar-event", relativeTo: baseURL)?.absoluteURL else {
+            throw LocalAPIClientError.invalidEndpoint
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = try JSONEncoder().encode(CalendarEventAuditPayload(
+            traceID: traceID,
+            resourceID: resourceID,
+            decision: decision,
+            reasonCode: reason
+        ))
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard httpResponse.statusCode == 201 else {
+            throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+        guard let result = try? JSONDecoder().decode(CalendarEventAuditResponse.self, from: data), result.recorded else {
+            throw LocalAPIClientError.invalidResponse
+        }
     }
 
     public func transcribeVoice(pcm16LE: Data) async throws -> String {

@@ -21,6 +21,37 @@ private final class ErrorResponseURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class CalendarAuditURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        var payload = request.httpBody
+        if payload == nil, let stream = request.httpBodyStream {
+            stream.open()
+            var bytes = [UInt8](repeating: 0, count: 4_096)
+            var collected = Data()
+            while stream.hasBytesAvailable {
+                let count = stream.read(&bytes, maxLength: bytes.count)
+                if count <= 0 { break }
+                collected.append(bytes, count: count)
+            }
+            stream.close()
+            payload = collected
+        }
+        ModelCapabilityRequestCapture.shared.record(request, body: payload)
+        let response = HTTPURLResponse(
+            url: request.url!, statusCode: 201, httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"recorded":true}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 private final class SSEErrorURLProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -321,10 +352,12 @@ private final class ModelCapabilityRequestCapture: @unchecked Sendable {
     static let shared = ModelCapabilityRequestCapture()
     private let lock = NSLock()
     private var storedRequest: URLRequest?
+    private var storedBody: Data?
 
-    func record(_ request: URLRequest) {
+    func record(_ request: URLRequest, body: Data? = nil) {
         lock.lock()
         storedRequest = request
+        storedBody = body ?? request.httpBody
         lock.unlock()
     }
 
@@ -334,6 +367,14 @@ private final class ModelCapabilityRequestCapture: @unchecked Sendable {
         let request = storedRequest
         storedRequest = nil
         return request
+    }
+
+    func takeBody() -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        let body = storedBody
+        storedBody = nil
+        return body
     }
 }
 
@@ -406,6 +447,54 @@ private final class MismatchedModelCapabilityURLProtocol: URLProtocol {
     #expect(request.url?.absoluteString == "http://127.0.0.1:43127/health")
     #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer ephemeral-test-token")
     #expect(request.value(forHTTPHeaderField: "Origin") == nil)
+}
+
+@available(macOS 12.0, *)
+@Test func localAPIClientRecordsCalendarAuditWithoutEventDetails() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [CalendarAuditURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43132")!,
+        token: "ephemeral-calendar-audit-token",
+        sessionConfiguration: configuration
+    )
+    let traceID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+    let resourceID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
+
+    try await client.recordCalendarEventAudit(
+        traceID: traceID, resourceID: resourceID,
+        decision: .attempted, reason: .userApproved
+    )
+
+    let request = ModelCapabilityRequestCapture.shared.take()
+    #expect(request?.url?.path == "/security-audit/calendar-event")
+    #expect(request?.httpMethod == "POST")
+    #expect(request?.value(forHTTPHeaderField: "Authorization") == "Bearer ephemeral-calendar-audit-token")
+    let payload = try #require(ModelCapabilityRequestCapture.shared.takeBody())
+    let json = try #require(JSONSerialization.jsonObject(with: payload) as? [String: String])
+    #expect(json["trace_id"] == traceID.uuidString)
+    #expect(json["resource_id"] == resourceID.uuidString)
+    #expect(json["decision"] == "ATTEMPTED")
+    #expect(json["reason_code"] == "user_approved")
+    #expect(json.count == 4)
+}
+
+@available(macOS 12.0, *)
+@Test func localAPIClientFailsCalendarAuditClosedOnStorageError() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ErrorResponseURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43133")!,
+        token: "ephemeral-calendar-audit-token",
+        sessionConfiguration: configuration
+    )
+
+    await #expect(throws: LocalAPIClientError.requestFailed(statusCode: 503)) {
+        try await client.recordCalendarEventAudit(
+            traceID: UUID(), resourceID: UUID(),
+            decision: .attempted, reason: .userApproved
+        )
+    }
 }
 
 @available(macOS 12.0, *)
