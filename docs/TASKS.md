@@ -69,9 +69,9 @@
 
 ### 阶段 6 门禁复核（2026-11-11，仍开放）
 
-- 最低系统自动覆盖：SwiftPM 明确声明 `.macOS(.v14)`，独立 GitHub job 在当前受支持的 `macos-15` runner 上执行 `swift test` 与 Beta `.app` 打包脚本；打包脚本校验 `LSMinimumSystemVersion=14.0`、Bundle ID、Face ID 用途键与签名。首次 run `42920718612` 的 macOS 14 job 因镜像于 2026-11-02 退役而无法分配；主 job 已通过 Python 347、Swift 96、Ruff、mypy、lock、secret scan、compileall 与 Beta build。修正后的 macOS 15 job 待远端验证。deployment-target 构建不代替真实 macOS 14 设备 GUI/Keychain/通知/恢复验收。
+- 最低系统自动覆盖：SwiftPM 明确声明 `.macOS(.v14)`，独立 GitHub job 在当前受支持的 `macos-15` runner 上执行 `swift test` 与 Beta `.app` 打包脚本；打包脚本校验 `LSMinimumSystemVersion=14.0`、Bundle ID、Face ID 用途键与签名。Actions run `42924078724` 已通过：Python 347、Swift 96、Ruff、mypy、lock、secret scan、compileall 与 Beta build 全绿，macOS 15 job 另通过 Swift 96 与 `.app` 校验。首次 run `42920718612` 的 macOS 14 job 因镜像于 2026-11-02 退役而无法分配。deployment-target 构建不代替真实 macOS 14 设备 GUI/Keychain/通知/恢复验收。
 
-- 当前提交 `000f341`：后端 all-extras/all-groups 347 passed（1 条既有弃用警告）；Swift 94 passed；Beta target build、Ruff、CI mypy、`uv lock --check`、compileall、tracked-file secret scan 全通过。远端 Actions、Provider、麦克风、真实恢复认证与 macOS 14 runtime 未验；阶段 6 继续开放。命令及边界见最新 `docs/HANDOFF.md`。
+- 当前提交 `1b94ef3`：Actions run `42924078724` 主 job 与最低部署目标 job 全部通过。阶段 6 仍开放：Provider 真实计费、麦克风、真实恢复认证、真实 macOS 14 runtime、签名/分发与其他系统/GUI 门禁未齐。详见最新 `docs/HANDOFF.md`。
 - 用户授权后已将当时领先远端的 319 个提交推送；随后修正 workflow 未定义的 `phase0-security` extra 并推送 `541ad6a`。run `42836663902` attempt 2 全部门禁通过：Python 347、Swift 94、lint/typecheck/secret scan/lock/compileall/Beta build 成功。attempt 1 的 APFS-128 用例间歇失败，隔离重跑和远端 attempt 2 通过，原因未判定。阶段 6 其他系统/产品验收仍开放。
 - 最新基线 `58c771d`：后端 all-extras/all-groups 347 passed（1 条既有 Starlette/httpx 弃用警告），Swift 84 passed；Ruff、CI mypy、`uv lock --check`、compileall、tracked-file detect-secrets、Beta target、`.app` 打包和 `NSFaceIDUsageDescription` plist 校验均通过。无远端 Actions/Provider/麦克风运行；系统认证及恢复仍未验。
 - 在代码基线 `a21ec3d` 复核：后端 all-extras/all-groups pytest 347 passed（1 条既有弃用警告），Swift 83 passed；Ruff、CI mypy、`uv lock --check`、Python compileall、tracked-file detect-secrets 和 Beta target build 全部通过。
@@ -162,9 +162,6 @@
 阶段 1 当前决策允许的工程底座已完成并有 CI 门禁；SQLCipher 产品数据库与迁移已用于当前 Beta。D-005 跨实例原子月预算请求门已实现，真实 Provider 端到端计费核对仍待验收；其余安全操作审计、PDF 产品导入和产品 Embedding 仍未启用，按追踪矩阵触发点排期。TXT/Markdown 导入在 B5 增量实现中，不代表完整文件导入验收。完整阶段状态以追踪矩阵 §6 为准。
 
 ### 非阻塞问题回修清单
-
-- **阶段 6 / 最低部署目标 CI**：UserNotifications、EventKit、LocalAuthentication 并发边界已改用 callback API 与 checked continuation。本机 Swift 96 项和 Beta bundle 构建通过。最低 macOS job 随后暴露缺少 Python runtime fixture，workflow 已补入锁定 uv 环境安装；新 run 待确认。常规 CI 的 APFS-128 ENOSPC POC 在远端重复偶发失败，隔离本机复跑通过，根因未判定，不影响 Beta 主线。详见 `docs/HANDOFF.md`。
-- **阶段 6 / 最低部署目标 CI**：UserNotifications、EventKit、LocalAuthentication 并发边界和 Python runtime fixture 已修正；最新 Swift run 中 95/96 通过，唯一失败为启动锁回归的 2 秒子进程标记等待竞态。测试现等待至 10 秒，并在 fixture 未启动时不继续执行停止断言。更新提交的 macOS 15/Xcode 16.4 CI 尚待确认。APFS-128 ENOSPC POC 远端重复偶发失败、隔离本机复跑通过，根因未判定且不影响 Beta 主线。详见 `docs/HANDOFF.md`。
 
 - **B1 / Ollama 取消后紧接请求变慢**：曾观察到一轮长流取消后短请求延迟明显增加；本机版本、模型、时序和上游行为都可能影响结果，当前根因未证实。2026-11-10 同机复测中默认 thinking 请求延迟波动较大，无法归因；显式 `think:false` 下，短句基线 1.80 秒、长流取消后短句 1.31 秒，未复现取消后变慢。停止提示已说明本机可能仍在收尾。此项不阻塞聊天主闭环；若后续默认配置下仍可稳定复现，再集中排查。详见 `beta/macOS-beta-chat.md`。
 - **阶段 0 SQLCipher APFS-128 临时映像 POC 偶发失败**：2026-11-09 全量回归中一轮返回通用 `RuntimeError`，紧接的同用例复跑通过，随后全量通过；2026-11-10 一轮全量回归在 `backup-copy` 场景失败，子进程返回 `{"status":"error","error_type":"OSError"}`，随后目标用例单独复跑通过、全量 265 项也通过，原因未判定。该测试只在仓库 `.poc-data` 下创建临时映像，不影响 Beta 数据；若后续再次出现，集中收集子进程状态/挂载清理证据，不据单次结果推断 APFS 根因。

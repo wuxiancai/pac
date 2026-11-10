@@ -108,6 +108,8 @@
 
 ## 架构和安全边界
 
+- 2026-11-11 阶段 6 CI 更新：Actions run `42924078724` 在 macos-26 常规 runner 和 macos-15 最低目标 runner 全部通过（Python 347、Swift 96；最低目标 `.app` 版本校验通过）。SwiftPM 部署目标为 macOS 14。该结果不等同于真实 macOS 14 设备 GUI/权限/Keychain/通知/备份恢复验收；阶段 6 仍开放。远端 APFS-128 ENOSPC POC 曾间歇失败、同一最终 run 和本机隔离复跑通过，原因未判定。
+
 - UI 通过本机 Loopback API 与后端通信；服务由 Swift supervisor 固定启动，不经任意 shell 命令。
 - Model Gateway 使用 Adapter 和精确 Provider/Model capability registry；未知能力默认不支持。
 - 本地优先。远端模型调用必须在发送前通过 Consent Manager 与 Policy Engine；凭据来自 Keychain。Beta 中用户选择云端模型是持续授权，后端仍为每一条请求生成精确 Provider/model/region/Data Level 的短时 grant；用户可切回本地停止云出站。L3 拦截和无自动 fallback 保留。阶段 0 的 DeepSeek/OpenRouter POC 脚本仍采用每次请求单独交互确认；两家各有用户确认后的合成文本真实请求成功记录，同一 Gateway 顺序跨 Provider 路由已真实通过一次。远端 HTTP 401 会提示凭据认证失败，Keychain 缺失与认证拒绝分开提示，错误响应正文不保留。无 Consent 的真实 HTTPX 检查在两家均于 Adapter 前拒绝、credential reads=0，PID 级 `lsof` 观察无活动网络 socket；全系统包捕获的 TCP/443 流量因未按进程过滤不作归因。

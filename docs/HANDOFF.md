@@ -1,3 +1,10 @@
+# 2026-11-11：最低 macOS 部署目标与常规 CI 通过
+
+- 提交 `1b94ef3` 的 Actions run `42924078724` 两个 job 全部成功。主 job：Python 347 passed（1 条既有 Starlette/httpx 弃用警告）、Swift 96 passed、Ruff、mypy、lock、secret scan、compileall 和 Beta build 均通过。macOS 15/Xcode 16.4 job：锁定 Python 环境安装、Swift 96 项和 Beta `.app` 最低版本校验全部通过；SwiftPM 部署目标为 macOS 14。
+- 整个修复链包括：GitHub macOS 14 runner 退役后改为 macOS 15 构建 macOS 14 deployment target；callback API 消除 Swift 6 对 UserNotifications/EventKit/LocalAuthentication 的隔离错误；最低版本 job 安装 Python 测试 runtime；启动并发回归等待子进程启动标记最多 10 秒并失败时提前退出。
+- 前两次主 job 的 APFS-128 disk image 测试出现摘要为 `CalledProcessError`/`RuntimeError` 的子进程失败；本机隔离复跑通过，最终 `42924078724` 全量通过。根因未判定，保留历史观察，不再作为当前 CI 阻塞项。
+- 最终验证提交：`1b94ef3`。工作区干净，分支与 `origin/main` 同步。此 CI 成果只覆盖 macOS 15 runner 上 macOS 14 deployment target 的编译/打包门禁，不代替真实 macOS 14 设备安装和 GUI/权限/Keychain 验收。项目其他开放阶段继续按 TASKS 逐项推进。
+
 # 2026-11-11：稳定后端启动并发回归的等待条件
 
 - `4d2ca9d` 的 macOS 15/Xcode 16.4 job 已具备 `.venv`，Swift 96 项中仅 `supervisorStopWaitsForAnInFlightStartup` 失败：runner 两秒内未生成子进程标记，测试仍继续调用 stop，可能在 detached startup 取得生命周期锁前先调用 stop。其他 95 项通过。
