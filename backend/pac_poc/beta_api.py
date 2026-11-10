@@ -228,6 +228,9 @@ class StreamChatRequest(BaseModel):
     confirmed_for_this_request: bool = False
     import_ids: list[UUID] = Field(default_factory=list, max_length=4)
     conversation_id: UUID | None = None
+    assistant_key: Literal[
+        "main_assistant", "project_assistant", "meeting_assistant", "task_planner"
+    ] = "main_assistant"
 
 
 class BetaVoiceTranscriber(Protocol):
@@ -1075,6 +1078,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             purpose=purpose,
             data_level=data_level,
             source=source,
+            assistant_key=payload.assistant_key,
             documents=imported_documents,
         )
         orchestrator = MainAssistantOrchestrator(

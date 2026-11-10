@@ -61,6 +61,28 @@ def test_beta_app_factory_and_error_envelope_do_not_echo_invalid_request_values(
     asyncio.run(run())
 
 
+def test_chat_rejects_unregistered_assistant_profile() -> None:
+    async def run() -> None:
+        app = create_beta_app(
+            dependencies=BetaAPIDependencies(session=LocalAPISession(token="profile-token"))
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            response = await client.post(
+                "/chat/stream",
+                headers={"authorization": "Bearer profile-token"},
+                json={
+                    "messages": [{"role": "user", "content": "hello"}],
+                    "assistant_key": "arbitrary_agent",
+                },
+            )
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "validation_error"
+
+    asyncio.run(run())
+
+
 def test_beta_api_settings_only_allow_restrictive_valid_limits() -> None:
     settings = BetaAPISettings(max_context_chars=12_000, max_voice_pcm_bytes=320_000)
     assert settings.max_voice_seconds == 10

@@ -1382,3 +1382,10 @@
 - 用户接受 EventKit 完整日历访问；应用只在用户点击“授权并读取”时请求权限，只读未来 30 天事件标题、时间和日历名称；不会创建/修改/删除事件、持久化事件或发送给 Provider。拒绝后显示系统设置指引。Info.plist 加入 `NSCalendarsFullAccessUsageDescription`。提醒事项需要另一项权限，仍未启用。用户同时确定 V2 三个固定专业助理：项目、会议和任务规划。
 - Swift 全量 56 项通过，含两个 mock 权限/日期范围/排序回归；Beta app 构建成功。尚未真实触发权限弹窗，也未实际读取个人日历数据。
 - Apple EventKit 文档说明平台不提供只读日历授权，读取事件需要 full access：[Accessing the event store](https://developer.apple.com/documentation/eventkit/accessing-the-event-store)。
+
+# 2026-11-10：V2 固定助理角色首批实现
+
+- 用户选择项目助理、会议助理、任务规划助理。macOS Beta 角色菜单保存所选键并逐轮随聊天请求发送；后端请求 schema 与 RunRegistry 接受封闭的四个键，固定 profile registry 插入角色指导。主助理默认行为不变；不带工具、后台执行、团队 Agent、自动日历访问或外部写操作。
+- 新增后端三角色上下文回归、API 任意 profile 拒绝回归与 Swift 请求序列化断言。验证：后端 all-extras/all-groups 全量 318 passed（1 条既有 Starlette/httpx 弃用警告）；Swift 全量 56 passed；Beta product build 成功；Ruff 与变更 Python 模块 mypy 通过。全包 mypy 仍报未改动的 `pac_poc/concurrent_probe.py` 两个泛型类型错误（第 48、57 行）。`git diff --check` 通过。
+- 完成提交后继续 V2/V3 剩余工作；真实桌面角色切换/回复行为仍待 GUI 验收。
+- B7 自动化实现完成。接下来继续收敛 V2 状态机/通知与 V3 Skills、协作等按决策允许的主干项；未决且不阻断的能力继续记录门禁，不把范围假设为已授权。

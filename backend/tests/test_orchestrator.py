@@ -59,6 +59,32 @@ def test_main_assistant_orchestrator_builds_ephemeral_gateway_request() -> None:
     assert gateway.request.messages == [{"role": "user", "content": "hello"}]
 
 
+@pytest.mark.parametrize(
+    ("assistant_key", "expected_phrase"),
+    [
+        ("project_assistant", "里程碑"),
+        ("meeting_assistant", "会议记录"),
+        ("task_planner", "优先级"),
+    ],
+)
+def test_fixed_assistant_profiles_add_role_context(
+    assistant_key: str, expected_phrase: str
+) -> None:
+    gateway = RecordingGateway()
+    orchestrator = MainAssistantOrchestrator(gateway)  # type: ignore[arg-type]
+    request = orchestrator.prepare_request(
+        ConversationTurn(
+            messages=({"role": "user", "content": "帮我规划"},),
+            provider="ollama",
+            model="local-model",
+            assistant_key=assistant_key,
+        )
+    )
+    assert request.messages[0]["role"] == "system"
+    assert expected_phrase in request.messages[0]["content"]
+    assert request.messages[-1] == {"role": "user", "content": "帮我规划"}
+
+
 def test_imported_prompt_injection_stays_untrusted_user_data_without_tools() -> None:
     gateway = RecordingGateway()
     orchestrator = MainAssistantOrchestrator(gateway)  # type: ignore[arg-type]

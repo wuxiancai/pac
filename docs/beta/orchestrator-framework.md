@@ -1,6 +1,12 @@
-# 单助理编排框架
+# 对话编排与固定助理角色
 
 更新日期：2026-11-10
+
+## 固定角色（V2 首批）
+
+认证 `/chat/stream` 接受 `assistant_key`：`main_assistant`（默认）、`project_assistant`、`meeting_assistant`、`task_planner`。macOS Beta 显示角色菜单并将用户选择保存到 UserDefaults；每轮请求显式带角色键。后端白名单之外的值由请求模型拒绝，运行时 registry 也拒绝未启用键。
+
+三个专业角色使用代码内固定 system 指导，分别面向项目目标/里程碑/依赖/风险、会议议程与用户提供记录的决策/行动项、任务拆解/优先级/期限。指导明确不声称已执行外部操作；会议角色不会隐式访问日历。没有工具、后台 Agent、团队协作或外部写操作。`main_assistant` 不增加角色提示，保留既有上下文路径。角色是请求级模式，不改变聊天/任务持久化结构，也不自动读取记忆。
 
 ## 当前结构
 
@@ -8,7 +14,7 @@
 
 1. `ConversationTurn` 承载一次请求的消息、Provider、模型和授权元数据；对象只在请求生命周期内存在。
 2. `PassThroughContextBuilder` 只使用调用方明确提交的消息和用户主动导入的文本资料，不读取任意路径、数据库或记忆。
-3. `MainAssistantOrchestrator` 只接受 `main_assistant`，构造 `LocalModelRequest` 并把流交给项目自有 `ModelGateway`。
+3. `MainAssistantOrchestrator` 只接受四个封闭固定 profile，构造 `LocalModelRequest` 并把流交给项目自有 `ModelGateway`。
 4. FastAPI `/chat/stream` 仍负责本机认证、输入大小/L3 检查、云端 Consent/Policy 组合、SSE keep-alive 和面向 UI 的错误映射。
 5. `RunRegistry` 为每次对话创建 UUID 和 `CREATED → RUNNING → COMPLETED/FAILED/CANCELLED` 状态；仅保留有界进程内元数据，不记录消息、生成内容或凭据。SSE 响应头 `X-PAC-Run-ID` 和完成事件提供 ID，认证的 `GET /chat/runs/{run_id}` 查询状态。macOS 客户端读取 run ID、正常结束/失败时查询终态，并在用户停止或切换模型后短暂轮询。
 6. `ConversationTurn.required_capabilities` 可声明本轮必需能力；Orchestrator 用精确 `(provider, model)` 的 `ModelCapabilityRegistry` 在构造 Gateway 请求前逐项校验。未知、不支持或受限能力均拒绝。现有基础文本流未声明额外能力，所以用户自选的本机模型和既有 Provider 路由不受新证据门槛影响；这是为后续工具、多模态等扩展预置的安全接缝。

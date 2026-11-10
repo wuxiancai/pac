@@ -842,7 +842,8 @@ public final class LocalAPIClient: @unchecked Sendable {
         model: String = "qwen3.5:0.8b",
         confirmedForThisRequest: Bool = false,
         importedDocumentIDs: [String] = [],
-        conversationID: String? = nil
+        conversationID: String? = nil,
+        assistantKey: String = "main_assistant"
     ) -> AsyncThrowingStream<LocalChatStreamItem, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -861,7 +862,8 @@ public final class LocalAPIClient: @unchecked Sendable {
                         model: model,
                         confirmedForThisRequest: confirmedForThisRequest,
                         importIDs: importedDocumentIDs,
-                        conversationID: conversationID
+                        conversationID: conversationID,
+                        assistantKey: assistantKey
                     ))
                     let (bytes, response) = try await session.bytes(for: request)
                     guard let httpResponse = response as? HTTPURLResponse else {
@@ -922,6 +924,7 @@ private struct ChatRequest: Encodable {
     let confirmedForThisRequest: Bool
     let importIDs: [String]
     let conversationID: String?
+    let assistantKey: String
 
     enum CodingKeys: String, CodingKey {
         case messages
@@ -930,6 +933,7 @@ private struct ChatRequest: Encodable {
         case confirmedForThisRequest = "confirmed_for_this_request"
         case importIDs = "import_ids"
         case conversationID = "conversation_id"
+        case assistantKey = "assistant_key"
     }
 }
 

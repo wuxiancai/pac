@@ -23,6 +23,21 @@ from .security_poc import DataLevel
 
 
 MAIN_ASSISTANT = "main_assistant"
+ASSISTANT_PROFILES: dict[str, str] = {
+    "project_assistant": (
+        "你是项目助理。帮助用户梳理目标、里程碑、依赖、风险与进度；明确区分已知事实和假设。"
+        "你只能提供建议，不得声称已执行外部操作或更改项目状态。"
+    ),
+    "meeting_assistant": (
+        "你是会议助理。帮助用户准备议程，并基于用户提供的会议记录整理讨论、决策和行动项；"
+        "不得自行读取日历或声称已创建、修改会议。"
+    ),
+    "task_planner": (
+        "你是任务规划助理。帮助用户把目标拆成清晰步骤、优先级和可选期限；"
+        "不得声称已执行任务、安排后台工作或更改任务状态。"
+    ),
+}
+ENABLED_ASSISTANT_KEYS = frozenset({MAIN_ASSISTANT, *ASSISTANT_PROFILES})
 
 
 class RunStatus(StrEnum):
@@ -59,7 +74,7 @@ class RunRegistry:
         self._lock = Lock()
 
     def create(self, assistant_key: str = MAIN_ASSISTANT) -> RunSnapshot:
-        if assistant_key != MAIN_ASSISTANT:
+        if assistant_key not in ENABLED_ASSISTANT_KEYS:
             raise AssistantNotFound(f"assistant is not enabled: {assistant_key}")
         with self._lock:
             # Timestamp at the same linearization point as insertion so concurrent
@@ -169,16 +184,20 @@ class MainAssistantOrchestrator:
         self._capability_registry = capability_registry
 
     def prepare_request(self, turn: ConversationTurn) -> LocalModelRequest:
-        if turn.assistant_key != MAIN_ASSISTANT:
+        if turn.assistant_key not in ENABLED_ASSISTANT_KEYS:
             raise AssistantNotFound(f"assistant is not enabled: {turn.assistant_key}")
         for capability in turn.required_capabilities:
             if self._capability_registry is None:
                 raise CapabilityNotVerified(capability, state=CapabilityState.UNKNOWN)
             self._capability_registry.require(turn.provider, turn.model, capability)
+        messages = list(self._context_builder.build(turn))
+        profile = ASSISTANT_PROFILES.get(turn.assistant_key)
+        if profile is not None:
+            messages.insert(0, {"role": "system", "content": profile})
         return LocalModelRequest(
             provider=turn.provider,
             model=turn.model,
-            messages=self._context_builder.build(turn),
+            messages=messages,
             region=turn.region,
             purpose=turn.purpose,
             data_level=turn.data_level,

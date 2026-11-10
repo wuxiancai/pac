@@ -151,6 +151,18 @@ final class BetaChatModel {
             if oldValue != cloudProvider { modelSelectionDidChange() }
         }
     }
+    var assistantKey: String {
+        didSet { defaults.set(assistantKey, forKey: "beta.assistant.key") }
+    }
+    let assistantProfiles: [(key: String, title: String)] = [
+        ("main_assistant", "总助理"),
+        ("project_assistant", "项目助理"),
+        ("meeting_assistant", "会议助理"),
+        ("task_planner", "任务规划"),
+    ]
+    var selectedAssistantTitle: String {
+        assistantProfiles.first(where: { $0.key == assistantKey })?.title ?? "总助理"
+    }
 
     var isStreaming: Bool { activeRequest != nil }
     var performanceSummary: String {
@@ -186,6 +198,9 @@ final class BetaChatModel {
         cloudProvider = CloudProvider(
             rawValue: defaults.string(forKey: "beta.model.cloud-provider") ?? "qwen-app"
         ) ?? .qwenApp
+        let savedAssistant = defaults.string(forKey: "beta.assistant.key") ?? "main_assistant"
+        assistantKey = ["main_assistant", "project_assistant", "meeting_assistant", "task_planner"].contains(savedAssistant)
+            ? savedAssistant : "main_assistant"
         supervisor = LocalBackendSupervisor(
             pythonExecutableURL: configuration.pythonExecutableURL,
             backendDirectoryURL: configuration.backendDirectoryURL
@@ -274,6 +289,7 @@ final class BetaChatModel {
         let confirmedForThisRequest = usesCloud
         let importedDocumentIDs = importedTextFiles.map(\.importID)
         let activeConversationID = conversationID
+        let selectedAssistantKey = assistantKey
         let requestID = UUID()
         activeRequestID = requestID
         latestRunID = nil
@@ -288,7 +304,8 @@ final class BetaChatModel {
                     model: modelID,
                     confirmedForThisRequest: confirmedForThisRequest,
                     importedDocumentIDs: importedDocumentIDs,
-                    conversationID: activeConversationID
+                    conversationID: activeConversationID,
+                    assistantKey: selectedAssistantKey
                 ) {
                     guard let self else { return }
                     guard self.activeRequestID == requestID else { return }
@@ -1039,6 +1056,23 @@ private struct BetaChatView: View {
                     Label("模型设置", systemImage: "gearshape")
                 }
                 .accessibilityIdentifier("model-settings-button")
+                Menu {
+                    ForEach(model.assistantProfiles, id: \.key) { profile in
+                        Button {
+                            model.assistantKey = profile.key
+                        } label: {
+                            if model.assistantKey == profile.key {
+                                Label(profile.title, systemImage: "checkmark")
+                            } else {
+                                Text(profile.title)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(model.selectedAssistantTitle, systemImage: "person.crop.circle")
+                }
+                .disabled(model.isStreaming)
+                .accessibilityIdentifier("assistant-profile-menu")
                 Menu {
                     ForEach(model.conversations) { conversation in
                         Button {

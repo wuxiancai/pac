@@ -397,7 +397,8 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     for try await _ in client.streamChat(
         messages: [LocalChatMessage(id: "33333333-3333-4333-8333-333333333333", role: "user", content: "Summarize the attached notes")],
         importedDocumentIDs: ["11111111-1111-4111-8111-111111111111"],
-        conversationID: "22222222-2222-4222-8222-222222222222"
+        conversationID: "22222222-2222-4222-8222-222222222222",
+        assistantKey: "task_planner"
     ) {}
 
     let captured = try #require(ChatRequestCapture.shared.take())
@@ -408,6 +409,7 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     let payload = try #require(object as? [String: Any])
     #expect(payload["import_ids"] as? [String] == ["11111111-1111-4111-8111-111111111111"])
     #expect(payload["conversation_id"] as? String == "22222222-2222-4222-8222-222222222222")
+    #expect(payload["assistant_key"] as? String == "task_planner")
     #expect(payload["messages"] != nil)
     let messages = try #require(payload["messages"] as? [[String: Any]])
     #expect(messages[0]["id"] == nil)
