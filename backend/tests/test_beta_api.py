@@ -630,8 +630,13 @@ def test_chat_http_disconnect_marks_run_cancelled_and_closes_upstream() -> None:
         response_headers: list[tuple[bytes, bytes]] = []
 
         class BlockingLocalAdapter(StubLocalAdapter):
+            def __init__(self) -> None:
+                super().__init__()
+                self.calls = 0
+
             async def stream(self, request: LocalModelRequest):
                 self.request = request
+                self.calls += 1
                 upstream_started.set()
                 try:
                     await asyncio.Event().wait()
@@ -639,14 +644,16 @@ def test_chat_http_disconnect_marks_run_cancelled_and_closes_upstream() -> None:
                 finally:
                     upstream_closed.set()
 
+        adapter = BlockingLocalAdapter()
         app = create_beta_api(
             session=LocalAPISession(token="test-token"),
             gateway=ModelGateway(
-                adapters={"ollama": BlockingLocalAdapter()}, policy=LocalOnlyPolicy()
+                adapters={"ollama": adapter}, policy=LocalOnlyPolicy()
             ),
         )
         body = json.dumps({
-            "messages": [{"role": "user", "content": "synthetic disconnect test"}]
+            "messages": [{"role": "user", "content": "synthetic disconnect test"}],
+            "collaborator_keys": ["project_assistant", "meeting_assistant"],
         }).encode()
         request_delivered = False
 
@@ -703,6 +710,7 @@ def test_chat_http_disconnect_marks_run_cancelled_and_closes_upstream() -> None:
         assert record["run_id"] == run_id
         assert record["status"] == "cancelled"
         assert upstream_closed.is_set()
+        assert adapter.calls == 1
 
     asyncio.run(run())
 
