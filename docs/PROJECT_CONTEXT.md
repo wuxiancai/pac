@@ -1,7 +1,7 @@
 # 项目上下文
 
 - 2026-11-11 B3 恢复认证等待保护：系统认证若 60 秒未返回，Beta 使本次尝试失效、调用 `LAContext.invalidate()`、恢复可见 UI 并明确“未开始恢复”；迟到成功仍受一次性门闩拒绝。新增 timeout 触发与成功认领取消 timeout 的 Swift 回归。此改动避免无限等待，但不解释此前系统认证不弹窗/不回调的原因，也未实机完成恢复。
-- 2026-11-11 阶段 6 最低系统 CI：GitHub Actions `macos-14` job 运行 Swift 全量测试并调用正式 Beta `.app` 打包脚本；脚本对 Bundle ID、`LSMinimumSystemVersion=14.0`、Face ID 用途键及代码签名作构建期校验。当前本机无法代替 GitHub macOS 14 runner 实测，需等待此提交对应 Actions 结果；runner 构建不等同于真实设备 GUI、Keychain、通知或恢复验收。
+- 2026-11-11 阶段 6 deployment target CI：SwiftPM package 正式声明 macOS 14 minimum；GitHub Actions 在 macOS 15 runner 上执行 Swift 全量测试并调用 Beta `.app` 打包脚本，脚本校验 `LSMinimumSystemVersion=14.0`、Bundle ID、Face ID 用途键与签名。首次 run `42920718612` 的主 job 已成功（Python 347、Swift 96、静态/依赖门禁与 Beta target build 通过），唯 macos-14 job 因镜像退役无法分配；macOS 15 修正版待远端重跑。该路径验证 deployment-target 编译，不等同于真实 macOS 14 runtime、GUI、Keychain、通知或恢复验收。
 - 2026-11-10 Keychain 重复授权提示：Beta 原来把未重签名的 SwiftPM binary 装入 bundle，ad-hoc identifier 是哈希且 designated requirement 为 cdhash。构建脚本现可按 Bundle ID 重签/校验 bundle，并支持 `PAC_BETA_SIGNING_IDENTITY`。默认签名仍 ad-hoc、无 Team ID，不能保证授权持久；稳定签名和用户本人首次授权/重启验收待完成。用户密码未写入项目；建议自行更换已在对话暴露的系统密码。详见最新 HANDOFF。
 - 2026-11-10 远端 Actions run `42836663902` attempt 2 在当前提交 `541ad6a` 全部通过：后端 347、Swift 94、静态/依赖门禁和 Beta build 成功。attempt 1 的 APFS-128 ENOSPC POC 曾间歇返回通用 RuntimeError；本机窄重跑通过，根因未判定。详见最新 HANDOFF。
 - 2026-11-10 当前 GitHub Actions run `42836277748` 首步因无效 `phase0-security` extra 失败；该依赖实际位于 `dev` group。工作流参数已修正，本机精确复跑 `uv sync --locked --extra phase0-embedding --extra phase4-pdf-poc --group dev` 成功；修复待提交并重触发远端全门禁。

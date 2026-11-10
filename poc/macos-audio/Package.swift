@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MacAudioPOC",
+    platforms: [.macOS(.v14)],
     products: [
         .library(name: "MacAudioPOC", targets: ["MacAudioPOC"]),
         .executable(name: "tts-interrupt-poc", targets: ["TTSInterruptPOC"]),

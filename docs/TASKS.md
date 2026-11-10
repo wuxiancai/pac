@@ -67,9 +67,9 @@
 - 先行段已新增认证 `/security-audit/calendar-event`，只接受受限决策/原因码，并在 SQLCipher 中记录 metadata-only 的 `ATTEMPTED/SUCCEEDED/FAILED`（敏感级别 L2），不接收标题/时间/备注。自动回归覆盖无认证拒绝、`audit_finalization_failed` 终态原因码和事件详情不入审计。
 - 审计 API 窄回归通过；Ruff/mypy 通过，后端全量 347 passed（1 条既有弃用警告）。EventKit 创建服务/协调器现有 8 项自动回归，覆盖权限准备不写入、校验先于审计、审批审计失败关闭、写入失败记 FAILED、成功结果审计失败不重试，且同一表单服务已成功写入后拒绝再次创建。Swift 审计客户端另有 2 项窄回归覆盖 metadata-only 与 503 失败关闭。Beta 独立创建入口现有手填字段、默认日历同步披露、权限检查、确切预览和逐次二次确认；协调器统一执行 ATTEMPTED→EventKit→SUCCEEDED/FAILED。预览使用与保存一致的规范化值，时间显示精度对齐分钟。Swift 全量 83 passed，Beta target 与 `.app` 打包成功。2026-11-10 GUI 已显示创建入口/表单/必填校验；随后经用户明确授权的实机验收创建一条合成事件，UI 显示“事件已创建，成功状态已写入加密审计”：标题 `PAC 合成日历审批验收（可手动删除）`，时间 2026-11-10 20:56–21:56（Asia/Shanghai），地点 `PAC 本机 Beta 验收`，备注标明合成事件并请测试后手动删除。确认了本次系统授权下从精确预览确认到成功写入及成功审计的 GUI 闭环；未另行读取日历。首次授权/拒绝分支及审计/写入故障 GUI 路径仍待验收。该事件若需移除请在日历应用中手动删除。详见 `docs/HANDOFF.md`。
 
-### 阶段 6 本机门禁复核（2026-11-10，仍开放）
+### 阶段 6 门禁复核（2026-11-11，仍开放）
 
-- 最低系统自动覆盖：主 CI 运行于 `macos-26`，另有独立 `macos-14` job 执行 `swift test` 并运行 Beta `.app` 打包脚本。打包脚本校验 Bundle ID、`LSMinimumSystemVersion=14.0`、Face ID 用途键与签名；本机打包验证通过，GitHub `macos-14` runner 结果需等待推送后确认。仍需真实 macOS 14 设备验收 GUI/Keychain/通知/恢复。
+- 最低系统自动覆盖：SwiftPM 明确声明 `.macOS(.v14)`，独立 GitHub job 在当前受支持的 `macos-15` runner 上执行 `swift test` 与 Beta `.app` 打包脚本；打包脚本校验 `LSMinimumSystemVersion=14.0`、Bundle ID、Face ID 用途键与签名。首次 run `42920718612` 的 macOS 14 job 因镜像于 2026-11-02 退役而无法分配；主 job 已通过 Python 347、Swift 96、Ruff、mypy、lock、secret scan、compileall 与 Beta build。修正后的 macOS 15 job 待远端验证。deployment-target 构建不代替真实 macOS 14 设备 GUI/Keychain/通知/恢复验收。
 
 - 当前提交 `000f341`：后端 all-extras/all-groups 347 passed（1 条既有弃用警告）；Swift 94 passed；Beta target build、Ruff、CI mypy、`uv lock --check`、compileall、tracked-file secret scan 全通过。远端 Actions、Provider、麦克风、真实恢复认证与 macOS 14 runtime 未验；阶段 6 继续开放。命令及边界见最新 `docs/HANDOFF.md`。
 - 用户授权后已将当时领先远端的 319 个提交推送；随后修正 workflow 未定义的 `phase0-security` extra 并推送 `541ad6a`。run `42836663902` attempt 2 全部门禁通过：Python 347、Swift 94、lint/typecheck/secret scan/lock/compileall/Beta build 成功。attempt 1 的 APFS-128 用例间歇失败，隔离重跑和远端 attempt 2 通过，原因未判定。阶段 6 其他系统/产品验收仍开放。

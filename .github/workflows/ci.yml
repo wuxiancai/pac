@@ -65,16 +65,16 @@ jobs:
         run: swift build --product personal-assistant-beta
 
   minimum-macos:
-    name: Minimum macOS 14 build and Swift tests
-    runs-on: macos-14
+    name: macOS 14 deployment target on macOS 15
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
 
-      - name: Run Swift tests on minimum macOS
+      - name: Run Swift tests with macOS 14 deployment target
         working-directory: poc/macos-audio
         run: swift test
 
-      - name: Build and validate macOS Beta app on minimum macOS
+      - name: Build and validate macOS Beta app with minimum deployment target
         run: poc/macos-audio/scripts/build_beta_app.sh

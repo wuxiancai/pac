@@ -1,20 +1,22 @@
+# 2026-11-11：替换已退役的 macOS 14 Actions runner
+
+- 提交 `140e69f` 触发 Actions run `42920718612`。新增 job 的 `runs-on: macos-14` 在 runner 分配阶段立即失败，诊断为 `macos-14-arm64-us-default` 不受支持。复核 GitHub 第一方 runner images 公告，macOS 14 Actions 镜像已于 2026-11-02 全面退役（[官方退役公告](https://github.com/actions/runner-images/issues/13518)）。这是 runner 配置错误，不是 Swift 测试/打包失败。主 job 已成功完成：Python 347 passed（1 条既有警告）、Swift 96 passed、Ruff、mypy、lock、secret scan、compileall 和 Beta target build 全通过。
+- 修正方案已在工作树实现：SwiftPM package 明确声明最低平台 `.macOS(.v14)`，job 改用受支持的 `macos-15` runner 运行全量 Swift 测试和 Beta `.app` 打包/签名校验。此证据验证 macOS 14 deployment-target 构建，不宣称 macOS 14 runtime 通过。本机 `swift test --package-path poc/macos-audio` → 96 passed；`build_beta_app.sh` 成功，产物 plist 为 14.0 且 codesign 验证通过。修正仍待提交推送及新 run。
+
 # 2026-11-11：恢复认证增加 60 秒失败关闭 watchdog
 
 - 既有 GUI 观察显示恢复认证可长时间停留等待，根因未知。现在 `AuthenticationAttemptGate` 可为指定尝试设置超时；Beta 恢复流程 60 秒未返回时使门闩失效、调用 `LAContext.invalidate()`、退出认证忙碌态并显示“本机认证等待超时，未开始恢复。”迟到的认证成功/错误回调因无法 claim 而不能调用恢复 API；正常成功或用户取消会取消 watchdog。
 - 新增两项 Swift 回归验证 watchdog 到期后不能 claim，以及认证先成功会取消 watchdog。`swift test --package-path poc/macos-audio` → 96 passed；Beta target 编译成功。此前第一次编译因共享 Package target 默认部署版本低于 Task API 产生 availability 错误；将认证门闩与相关测试明确标注 macOS 14 后，全量通过。构建未触发真实 LocalAuthentication 或恢复 API。
 - 限制：该改动只确保界面不会无限显示处理中并拒绝迟到结果，不证明系统提示会出现，也不判定原无回调根因。真实认证、错误口令、恢复 GUI 和数据库切换验收仍待完成。
 
-# 2026-11-11：强化最低 macOS Beta 产物验证
+# 2026-11-11：最低 macOS Beta 产物校验（runner 修正前）
 
-- `build_beta_app.sh` 将最低系统版本提升为单一变量，并在构建时断言最终 `Info.plist` 的 `LSMinimumSystemVersion` 精确为 `14.0`。GitHub Actions 的 `macos-14` job 改为运行完整 `.app` 打包脚本，连同现有 Bundle ID、Face ID 用途键和 codesign 验证一起检查实际 Beta bundle。
-- 本机验证：`poc/macos-audio/scripts/build_beta_app.sh` 成功，最终 plist 读回 `14.0`，`codesign --verify --deep --strict` 通过；`sh -n poc/macos-audio/scripts/build_beta_app.sh`、工作流 YAML 解析及 `git diff --check` 通过。该构建运行于 macOS 26.5.1；不是 macOS 14 实机证据。GitHub job 尚未运行。
-- 变更单独提交；后续推送后检查 macos-14 Actions job，再按结果更新阶段 6 状态。B3 真实认证/恢复、Keychain 稳定签名和 GUI 验收仍开放。
+- `build_beta_app.sh` 将最低系统版本提升为单一变量，并在构建时断言最终 `Info.plist` 的 `LSMinimumSystemVersion` 精确为 `14.0`。原计划把 macos-14 runner job 改为运行完整 `.app` 打包，但该 runner 已退役；实际替代方案见本文件上方记录。
+- 本机验证：`poc/macos-audio/scripts/build_beta_app.sh` 成功，最终 plist 读回 `14.0`，`codesign --verify --deep --strict` 通过；`sh -n poc/macos-audio/scripts/build_beta_app.sh`、工作流 YAML 解析及 `git diff --check` 通过。这是 macOS 26.5.1 上的 bundle 验证，不代替真实 macOS 14 GUI、Keychain、通知和备份恢复验收。
 
-# 2026-11-10：增加最低 macOS 14 CI 构建门禁
+# 2026-11-10：最低 macOS CI 初始方案（已由退役公告取代）
 
-- 当前 GitHub Actions 主 job 固定运行 `macos-26`，不能为 Beta 声明的最低版本 `macOS 14.0` 提供编译/运行环境覆盖。按官方 runner 文档确认 `macos-14` 可作为 GitHub-hosted runner 标签后，新增独立 `minimum-macos` job，运行 `swift test` 和 `swift build --product personal-assistant-beta`；保持现有完整 Python/Swift CI 在 `macos-26`。
-- 本地检查：Ruby Psych YAML parse 成功；`git diff --check` 通过。尚未触发远端 Actions，因此 `macos-14` job 结果待提交后取得；runner 编译/测试成功也不代替真实 macOS 14 GUI、Keychain、通知和备份恢复验收。
-- 变更提交后应核对对应 Actions 两个 job 的结论，并更新本交接、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。阶段 6 继续开放。
+- 原拟使用 `macos-14` runner；提交 `140e69f` 实测后确认 GitHub 已退役该镜像，不能用于 Actions。替代方案与实际 run 结果见本文件上方 2026-11-11 记录。
 
 # 2026-11-10：排查 Beta 每次启动的 Keychain 系统授权提示
 
