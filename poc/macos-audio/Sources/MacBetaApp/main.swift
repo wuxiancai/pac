@@ -1284,6 +1284,7 @@ private struct BetaChatView: View {
                 } label: {
                     Label("新对话", systemImage: "plus.bubble")
                 }
+                .keyboardShortcut("n", modifiers: .command)
                 .disabled(model.isStreaming)
                 .accessibilityIdentifier("new-conversation-button")
                 Button {

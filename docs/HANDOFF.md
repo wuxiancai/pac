@@ -1,3 +1,9 @@
+# 2026-11-10：V1.1 新对话快捷指令
+
+- 聊天页“新对话”按钮现支持 macOS `⌘N`。快捷键复用现有 `createConversation()` 流程，仍遵守生成中禁用规则。
+- 验证：`swift test --package-path poc/macos-audio` → 68 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。未实机点验快捷键。
+- GUI 快捷键实机点验待做；其余未完成阶段/门禁以 `docs/TASKS.md` 为准。交接前提醒维护 `docs/HANDOFF.md`。
+
 # 2026-11-10：SQLCipher 加密备份导出核心
 
 - `EncryptedApplicationStore.export_encrypted_backup()` 使用 SQLCipher Online Backup API 从运行库生成口令密钥加密的临时数据库，关闭并执行 `PRAGMA integrity_check`/schema version 验证后写入版本化容器。来源连接仍由 SQLAlchemy pool 管理；临时 DB 与 WAL/SHM/journal 文件均清理，用户目标通过同目录 0600 staging + fsync + 原子替换交付。
