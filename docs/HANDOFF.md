@@ -1,3 +1,10 @@
+# 2026-11-10：阶段 6 最新 CI 等价门禁（代码提交 58c771d）
+
+- 后端 all-extras/all-groups：`cd backend && UV_OFFLINE=1 UV_CACHE_DIR=../.poc-data/uv-cache TMPDIR=../.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 347 passed，1 条既有 Starlette/httpx 弃用警告。
+- 静态门禁：`uv run --locked ruff check pac_poc tests scripts`、`uv run --locked mypy`、`uv lock --check`、`uv run --locked python -m compileall -q pac_poc scripts tests` 均通过；tracked-file `detect-secrets-hook --baseline .secrets.baseline` 通过。
+- Swift：`swift test --package-path poc/macos-audio` → 84 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 与 `poc/macos-audio/scripts/build_beta_app.sh` 均成功。构建脚本含 `NSFaceIDUsageDescription` 键断言，实际 Info.plist 读回中文用途说明。
+- 本地 CI 等价门禁均通过；未触发远端 GitHub Actions、远端 Provider 或麦克风。LocalAuthentication GUI 实机认证仍停滞，macOS 14 runtime、正式签名/安装、B1/B3/B5/B6/B9/B10 其余门禁未关闭，阶段 6 保持开放。
+
 # 2026-11-10：B3 LocalAuthentication 用途声明修正与对照复测
 
 - 对照 Apple LocalAuthentication 文档后发现 Beta 包缺少 `NSFaceIDUsageDescription`。该文档说明生物识别应用需要此 Info.plist 键，否则授权请求可能失败；已在 `build_beta_app.sh` 加入中文用途说明，并让打包时 `PlistBuddy` 校验该字段。`build_beta_app.sh` / `run_beta_app.sh` 成功，实际生成的 Info.plist 已读回该值。
