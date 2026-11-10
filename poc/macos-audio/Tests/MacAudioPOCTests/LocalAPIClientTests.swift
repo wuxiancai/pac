@@ -102,6 +102,49 @@ private final class ImportResponseURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class ImportNetworkProbe: @unchecked Sendable {
+    static let shared = ImportNetworkProbe()
+    private let lock = NSLock()
+    private var requestCount = 0
+
+    func reset() {
+        lock.lock()
+        requestCount = 0
+        lock.unlock()
+    }
+
+    func recordRequest() {
+        lock.lock()
+        requestCount += 1
+        lock.unlock()
+    }
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return requestCount
+    }
+}
+
+private final class ImportRejectProbeURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        ImportNetworkProbe.shared.recordRequest()
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 503,
+            httpVersion: "HTTP/1.1",
+            headerFields: nil
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 private final class ChatRequestCapture: @unchecked Sendable {
     static let shared = ChatRequestCapture()
     private let lock = NSLock()
@@ -282,9 +325,9 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
 
 @available(macOS 12.0, *)
 @Test func selectedTextImportRejectsPDFAndOversizedFilesBeforeNetwork() async throws {
-    _ = ImportRequestCapture.shared.take()
+    ImportNetworkProbe.shared.reset()
     let configuration = URLSessionConfiguration.ephemeral
-    configuration.protocolClasses = [ImportResponseURLProtocol.self]
+    configuration.protocolClasses = [ImportRejectProbeURLProtocol.self]
     let client = try LocalAPIClient(
         baseURL: URL(string: "http://127.0.0.1:43127")!,
         token: "test-token",
@@ -306,7 +349,7 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     } catch let error as LocalAPIClientError {
         #expect(error == .invalidResponse)
     }
-    #expect(ImportRequestCapture.shared.take() == nil)
+    #expect(ImportNetworkProbe.shared.count == 0)
 }
 
 @Test func localChatRunStatusDecodesBackendLifecycleValues() throws {

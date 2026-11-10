@@ -1,3 +1,9 @@
+# 2026-11-10：阶段 6 当前 HEAD 本机 CI 等价复核
+
+- 对照 `.github/workflows/ci.yml`，在当前源码复核依赖锁、Ruff、mypy、tracked-file `detect-secrets-hook`、Python compileall、Python/Swift 全量测试和 Beta 产品构建。
+- 结果：`uv lock --check`、Ruff、mypy、secret scan、compileall 通过；后端全量 → 282 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 → 44 passed；`swift build --product personal-assistant-beta` 通过。Swift 首次运行暴露两个导入 URLProtocol 用例共享静态捕获器的并行竞态；现为“拒绝请求不触网”路径使用独立探针，修复后全量复跑通过。
+- 该门禁结果仅为本机等价验证；远端 GitHub Actions 未运行。同步阶段 6 与 B5 文档；未访问 Provider、Keychain、麦克风或 GUI。
+
 # 2026-11-10：B5 附件上下文超限前置拒绝
 
 - 文件导入接口原先会先把附件 JSON 组装进 Model Gateway 请求，再检查最终 40,000 字符上下文上限。现增加轻量字符数下限预检：消息字符数加附件原文字符数已超限时，编排前直接返回 413；可能因 JSON 转义或固定指引超限的请求仍由原精确检查拒绝。
