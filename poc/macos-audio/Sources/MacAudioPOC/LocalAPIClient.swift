@@ -481,7 +481,7 @@ public struct LocalMonthlyCloudBudget: Decodable, Sendable {
 
 /// Minimal native client for the authenticated, loopback-only POC health endpoint.
 @available(macOS 12.0, *)
-public final class LocalAPIClient: @unchecked Sendable {
+public final class LocalAPIClient: @unchecked Sendable, CalendarEventAuditRecording {
     public static let maximumChatMessages = 20
     private let baseURL: URL
     private let token: String

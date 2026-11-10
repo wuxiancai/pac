@@ -80,7 +80,7 @@ struct PersonalAssistantBetaApp: App {
 @available(macOS 14.0, *)
 @MainActor
 @Observable
-final class BetaChatModel {
+final class BetaChatModel: CalendarEventAuditRecording {
     private let supervisor: LocalBackendSupervisor
     private var client: LocalAPIClient?
     private var activeRequest: Task<Void, Never>?
@@ -1942,45 +1942,21 @@ private struct CalendarEventCreationView: View {
         guard !isCreating, service.isReadyToCreate else { return }
         isCreating = true
         defer { isCreating = false }
-        let traceID = UUID()
-        let resourceID = UUID()
-        do {
-            try await model.recordCalendarEventAudit(
-                traceID: traceID, resourceID: resourceID,
-                decision: .attempted, reason: .userApproved
-            )
-        } catch {
-            service.invalidateReadiness()
+        let coordinator = CalendarEventApprovalCoordinator(audit: model, eventCreation: service)
+        switch await coordinator.createAfterExplicitApproval(draft) {
+        case .blockedByAudit:
             status = "加密审批审计不可用；事件未写入日历。"
-            return
-        }
-
-        do {
-            try service.createApprovedEvent(draft)
-        } catch {
-            do {
-                try await model.recordCalendarEventAudit(
-                    traceID: traceID, resourceID: resourceID,
-                    decision: .failed, reason: .eventCreationFailed
-                )
+        case .eventCreationFailed(let auditRecorded):
+            if auditRecorded {
                 status = "日历未能创建事件；失败状态已写入审计。请检查内容或权限后再决定是否重试。"
-            } catch {
+            } else {
                 status = "日历未能创建事件，且失败审计未能保存。请勿假定事件已创建。"
             }
-            service.invalidateReadiness()
-            return
-        }
-
-        do {
-            try await model.recordCalendarEventAudit(
-                traceID: traceID, resourceID: resourceID,
-                decision: .succeeded, reason: .eventCreated
-            )
+        case .eventCreated(auditRecorded: true):
             status = "事件已创建，成功状态已写入加密审计。"
-        } catch {
+        case .eventCreated(auditRecorded: false):
             status = "事件已创建，但最终审计未能保存。为避免重复事件，请勿再次提交。"
         }
-        service.invalidateReadiness()
     }
 }
 

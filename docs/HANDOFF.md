@@ -23,6 +23,12 @@
 - 验证：`swift test --package-path poc/macos-audio` → 79 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功；`poc/macos-audio/scripts/build_beta_app.sh` 成功生成 `.poc-data/personal-assistant-beta.app`。一次并发全量回归发现两个测试共用 request capture 导致竞争；改为独立 capture 后全量重跑通过。
 - 未运行 App 触发系统授权，也未创建真实事件。实机首次授权/拒绝、成功创建、前置审计故障阻断和最终审计故障提示仍待验收；B10 保持 IN PROGRESS。
 
+# 2026-11-10：B10 审批顺序协调器
+
+- 将关键审批次序从 SwiftUI 回调抽取到 `CalendarEventApprovalCoordinator`：先写 ATTEMPTED，只有成功才调用 EventKit；写入失败后尽力记 FAILED；写入成功后记 SUCCEEDED。每种完成路径都会撤销服务的可写就绪态；前置审计失败返回阻断，最终审计失败返回“已创建但审计未完成”，不重试事件。
+- 新增三项自动回归，验证审批审计失败时保存次数为 0、EventKit 失败时产生 ATTEMPTED/FAILED、成功但终态审计失败时只保存一次并准确返回。B10 服务/协调器窄回归共 7 passed；Beta target build 成功。完整 Swift 回归在提交前复跑。
+- 该协调器测试为 fake 审计和 fake EventKit，不代表 macOS 权限/日历真实写入已验收。
+
 # 2026-11-10：模型预设旧格式迁移
 
 - `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。

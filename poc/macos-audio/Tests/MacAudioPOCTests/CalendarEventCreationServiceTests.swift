@@ -25,6 +25,28 @@ private final class FakeCalendarEventWriter: CalendarEventWriting {
 
 private enum TestWriterError: Error { case saveFailed }
 
+private actor FakeCalendarEventAudit: CalendarEventAuditRecording {
+    private var entries: [(CalendarEventAuditDecision, CalendarEventAuditReason)] = []
+    private let failedDecision: CalendarEventAuditDecision?
+
+    init(failedDecision: CalendarEventAuditDecision? = nil) {
+        self.failedDecision = failedDecision
+    }
+
+    func recordCalendarEventAudit(
+        traceID: UUID,
+        resourceID: UUID,
+        decision: CalendarEventAuditDecision,
+        reason: CalendarEventAuditReason
+    ) async throws {
+        entries.append((decision, reason))
+        if decision == failedDecision { throw TestWriterError.saveFailed }
+    }
+
+    func decisions() -> [CalendarEventAuditDecision] { entries.map(\.0) }
+    func reasons() -> [CalendarEventAuditReason] { entries.map(\.1) }
+}
+
 @available(macOS 14.0, *)
 @Test @MainActor func calendarCreationPreparationRequestsPermissionButNeverWrites() async {
     let writer = FakeCalendarEventWriter()
@@ -88,4 +110,64 @@ private enum TestWriterError: Error { case saveFailed }
         try service.createApprovedEvent(CalendarEventDraft(title: "Planning", startDate: start, endDate: start.addingTimeInterval(60)))
     }
     #expect(writer.saves.isEmpty)
+}
+
+
+@available(macOS 14.0, *)
+@Test @MainActor func calendarApprovalBlocksEventWriteWhenAttemptAuditFails() async {
+    let writer = FakeCalendarEventWriter()
+    writer.authorization = .writeOnly
+    let service = CalendarEventCreationService(writer: writer)
+    #expect(await service.prepareForEventCreation())
+    let audit = FakeCalendarEventAudit(failedDecision: .attempted)
+    let coordinator = CalendarEventApprovalCoordinator(audit: audit, eventCreation: service)
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    let outcome = await coordinator.createAfterExplicitApproval(
+        CalendarEventDraft(title: "Planning", startDate: start, endDate: start.addingTimeInterval(60))
+    )
+
+    #expect(outcome == .blockedByAudit)
+    #expect(writer.saves.isEmpty)
+    #expect(!service.isReadyToCreate)
+    #expect(await audit.decisions() == [.attempted])
+}
+
+@available(macOS 14.0, *)
+@Test @MainActor func calendarApprovalWritesFailedOutcomeAfterEventKitFailure() async {
+    let writer = FakeCalendarEventWriter()
+    writer.authorization = .writeOnly
+    writer.shouldThrowOnSave = true
+    let service = CalendarEventCreationService(writer: writer)
+    #expect(await service.prepareForEventCreation())
+    let audit = FakeCalendarEventAudit()
+    let coordinator = CalendarEventApprovalCoordinator(audit: audit, eventCreation: service)
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    let outcome = await coordinator.createAfterExplicitApproval(
+        CalendarEventDraft(title: "Planning", startDate: start, endDate: start.addingTimeInterval(60))
+    )
+
+    #expect(outcome == .eventCreationFailed(auditRecorded: true))
+    #expect(await audit.decisions() == [.attempted, .failed])
+    #expect(await audit.reasons() == [.userApproved, .eventCreationFailed])
+}
+
+@available(macOS 14.0, *)
+@Test @MainActor func calendarApprovalDoesNotRetryEventWhenFinalAuditFails() async {
+    let writer = FakeCalendarEventWriter()
+    writer.authorization = .writeOnly
+    let service = CalendarEventCreationService(writer: writer)
+    #expect(await service.prepareForEventCreation())
+    let audit = FakeCalendarEventAudit(failedDecision: .succeeded)
+    let coordinator = CalendarEventApprovalCoordinator(audit: audit, eventCreation: service)
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    let outcome = await coordinator.createAfterExplicitApproval(
+        CalendarEventDraft(title: "Planning", startDate: start, endDate: start.addingTimeInterval(60))
+    )
+
+    #expect(outcome == .eventCreated(auditRecorded: false))
+    #expect(writer.saves.count == 1)
+    #expect(await audit.decisions() == [.attempted, .succeeded])
 }
