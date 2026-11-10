@@ -1,3 +1,9 @@
+# 2026-11-10：B5 附件上下文超限前置拒绝
+
+- 文件导入接口原先会先把附件 JSON 组装进 Model Gateway 请求，再检查最终 40,000 字符上下文上限。现增加轻量字符数下限预检：消息字符数加附件原文字符数已超限时，编排前直接返回 413；可能因 JSON 转义或固定指引超限的请求仍由原精确检查拒绝。
+- 回归用 100,000 字符合法 TXT，并将 Orchestrator 替换为构造即报错的哨兵，确认请求在序列化前被拒绝。窄回归 2 passed；Ruff 与 mypy 通过；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 282 passed，1 条既有 Starlette/httpx 弃用警告。
+- 未增加附件上限、未更改 PDF 禁用状态；未访问 Provider、Keychain、麦克风或 GUI。同步 `docs/beta/file-import.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。
+
 # 2026-11-10：B5 聊天资料 ID 客户端契约回归
 
 - 新增 Swift URLProtocol 回归，捕获认证 loopback `/chat/stream` 请求并验证 `import_ids` 已序列化。

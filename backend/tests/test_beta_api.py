@@ -500,6 +500,39 @@ def test_untrusted_document_framing_counts_against_the_context_limit() -> None:
     asyncio.run(run())
 
 
+def test_oversized_import_is_rejected_before_orchestrator_serialization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class UnexpectedOrchestrator:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            raise AssertionError("oversized imported text reached context serialization")
+
+    monkeypatch.setattr(beta_api_module, "MainAssistantOrchestrator", UnexpectedOrchestrator)
+
+    async def run() -> None:
+        app = create_beta_api(session=LocalAPISession(token="test-token"))
+        headers = {"authorization": "Bearer test-token", "content-type": "application/octet-stream"}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            imported = await client.post(
+                "/imports/text?filename=large.txt", headers=headers, content=b"x" * 100_000
+            )
+            response = await client.post(
+                "/chat/stream",
+                headers={"authorization": "Bearer test-token"},
+                json={
+                    "import_ids": [imported.json()["import_id"]],
+                    "messages": [{"role": "user", "content": "Summarize"}],
+                },
+            )
+
+        assert imported.status_code == 201
+        assert response.status_code == 413
+
+    asyncio.run(run())
+
+
 def test_beta_chat_stream_sends_keepalives_without_exposing_thinking() -> None:
     async def run() -> None:
         adapter = DelayedLocalAdapter()

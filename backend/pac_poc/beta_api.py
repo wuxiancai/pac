@@ -662,6 +662,11 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="selected file is no longer available") from exc
+        # Reject obviously oversized contexts before ContextBuilder JSON-encodes
+        # potentially multi-megabyte documents. Escaping and framing can only
+        # increase the final size, which is still checked after request building.
+        if total_chars + sum(item.character_count for item in imported_documents) > settings.max_context_chars:
+            raise HTTPException(status_code=413, detail="conversation context is too long")
         messages = [{"role": item.role, "content": item.content} for item in payload.messages]
         selected_gateway = gateway_for(payload)
         if payload.provider in CLOUD_PROVIDERS:
