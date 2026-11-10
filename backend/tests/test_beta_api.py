@@ -1940,10 +1940,20 @@ def test_multi_agent_collaboration_runs_selected_local_roles_sequentially(tmp_pa
         assert [request.thinking_enabled for request in adapter.requests] == [False, False, False]
         assert "你是项目助理" in adapter.requests[0].messages[0]["content"]
         assert "你是会议助理" in adapter.requests[1].messages[0]["content"]
+        project_system = "\n".join(
+            item["content"] for item in adapter.requests[0].messages if item["role"] == "system"
+        )
+        meeting_system = "\n".join(
+            item["content"] for item in adapter.requests[1].messages if item["role"] == "system"
+        )
+        assert "只围绕用户本轮明确目标分析" in project_system
+        assert "严格遵守用户要求的数量、单项长度、语言、顺序和输出格式" in meeting_system
         synthesis_system = adapter.requests[2].messages[0]["content"]
         synthesis_reference = adapter.requests[2].messages[-2]
         synthesis_user = adapter.requests[2].messages[-1]
         assert "不得仅因其由模型生成就称其无效或拒绝" in synthesis_system
+        assert "不扩展到无关领域" in synthesis_system
+        assert "严格遵守用户要求的数量、单项长度、顺序和输出格式" in synthesis_system
         assert synthesis_reference["role"] == "user"
         assert "专业助理结构化参考建议" in synthesis_reference["content"]
         assert synthesis_user == {"role": "user", "content": "分析"}

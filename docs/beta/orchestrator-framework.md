@@ -83,8 +83,11 @@ macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的
 
 - Ollama 官方 `/api/chat` 支持请求级 `think` 布尔字段；关闭时请求不输出 thinking，参考 [Ollama Thinking API](https://github.com/ollama/ollama/blob/main/docs/capabilities/thinking.mdx)。Beta 仅为多 Agent 专业角色和总助理综合请求传 `think:false`，普通单助理请求省略该字段，保持模型默认行为。
 - 综合请求将专业角色结果作为前置参考消息，并把原始用户请求保留为最后一条消息；system guidance 要求直接回答、遵守语言/格式/篇幅，并把注入指令仅作为内容过滤对象，不因模型来源而整体拒绝。
+- 2026-11-10 新增专业角色约束：每位被选角色只围绕用户本轮目标给出相关、具体建议，并遵守数量、长度、语言、顺序和格式；综合层重复强调这些约束且禁止扩展到无关领域。API 自动回归确认每个本机角色请求和汇总请求均包含该指令；定向协作测试 1 passed，Ruff 与 `mypy pac_poc/beta_api.py` 通过。
 - 自动化：定向 `tests/test_beta_api.py tests/test_local_model_gateway.py tests/test_orchestrator.py` → 69 passed；Ruff 与三个修改后端模块 mypy 通过；后端 all-extras/all-groups 全量 → 325 passed，1 条既有 Starlette/httpx 弃用警告。
 - GUI：本机 `qwen3.5:0.8b` 首次默认 thinking 请求两分钟后仍无第一角色正文，停止后 UI 正确显示取消；应用 `think:false` 后双角色、汇总流程在约十几秒内完成。第一次汇总只讨论“信任边界”并拒绝回答；调整建议与原请求顺序后，复测直接给出议题建议。仍观察到小模型没有严格遵守用户要求的字数上限，单样本不构成质量承诺。验收只访问 Ollama loopback，无云端请求、无麦克风采集。合成验收聊天保留在本机 SQLCipher 历史，没有删除。
+- 2026-11-10 强化提示后的 GUI 样本：项目/会议角色处理“校园图书馆读书周准备”，两角色正文仍超过 12 字约束；总助理综合给出 3 条编号、均不超过 12 字且与目标相关的准备建议。与提示调整前“无编号且偏题”的样本相比，该题综合格式与相关性改善；单样本不能证明稳定质量，B9 继续开放。构建版本经 `run_beta_app.sh` 启动，状态栏确认 Ollama/qwen3.5:0.8b；无云端请求或麦克风采集。
+- 后端全量当前复跑 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 346 passed、1 条既有弃用警告；首次复跑有 1 项阶段追踪文档断言失败，补齐独立 POC 崩溃 staging 状态描述后复跑通过。
 
 2026-11-10 UsageLedger token 状态校验补强：`unknown` 记录必须不含 token 数；`actual`/`estimated` 记录必须至少含输入或输出 token 数，防止 `/usage` 返回互相矛盾的状态和数值。定向回归 `tests/test_usage.py tests/test_beta_api.py` → 46 passed；完整后端回归 → 267 passed、1 条既有 Starlette/httpx 弃用警告；`ruff check pac_poc/usage.py tests/test_usage.py` 与 `mypy pac_poc/usage.py` 均通过。该校验只约束内存用量记录一致性，不估算费用、不持久化、不改变预算策略。
 

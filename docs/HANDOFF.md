@@ -1616,3 +1616,11 @@
 - 更新任务提醒授权状态处理：用户拒绝授权或系统授权失效时，应用关闭提醒偏好并删除 `pac.task.*` 待发请求；不会切换远端通知。显式关闭提醒沿用同一清理流程。
 - 给通知中心增加可注入接口；fake center 自动回归验证授权拒绝和系统撤销都只清理 PAC 通知，不影响其他应用请求。
 - 验证：`swift test --package-path poc/macos-audio` → 62 项通过，Beta target 编译成功。权限请求没有在本轮触发；系统设置撤销后的真实行为仍需 GUI 验收。
+
+### 2026-11-10：B9 协作输出约束迭代
+
+- 根据“素食窗口准备”样本出现偏题建议和超长综合，专业角色提示现明确目标相关性、可执行性与用户要求的数量/长度/语言/顺序/格式；综合层重复约束并禁止扩展到无关领域。API 回归确认所选两个角色和综合调用都携带指令。
+- 验证：定向 `tests/test_beta_api.py -k multi_agent_collaboration_runs_selected_local_roles_sequentially` → 1 passed；`ruff check pac_poc/beta_api.py tests/test_beta_api.py`、`mypy pac_poc/beta_api.py` 通过；后端全量 346 passed、1 条既有弃用警告。
+- 新 GUI 样本使用本机 `qwen3.5:0.8b`，对校园图书馆读书周准备题：两角色输出仍有超长内容，但综合结论为三条编号、逐条不超过 12 字且聚焦读书周准备。与改提示前的无编号偏题综合相比，此样本改善；不证明普遍或稳定质量。聊天仅发往 Ollama loopback，保存在本机加密历史。
+- 全量测试首跑还发现追踪矩阵缺少“POC 独立脚本崩溃 staging 生命周期仍待跟踪”字样，与契约测试不同步。已在 `phase0-traceability.md` 补足并复跑全量通过；Beta 产品 staging 清理证据与 POC 证据继续分开。
+- 尚未对强化提示版本做多题 GUI 质量采样；B9 保持 IN PROGRESS。
