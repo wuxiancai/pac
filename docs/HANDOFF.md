@@ -1,3 +1,10 @@
+# 2026-11-10：D-006 备份口令格式决策补充
+
+- 用户确认 scrypt 参数 N=32768、r=8、p=1；每个文件生成独立 16-byte random salt，派生 32-byte SQLCipher 备份密钥。不保存口令，不支持跨 Mac 恢复；恢复后要使用当前 Mac Keychain 数据库密钥重新加密。
+- 在 Beta Python venv 中用标准库 `hashlib.scrypt` 试算成功，耗时约 64 ms；系统自带 Python 不一定构建出 `hashlib.scrypt`，产品服务必须使用仓库/应用 venv。
+- D-006 仍部分确认：RTO、备份副本数量/删除规则、损坏/中断回滚、预备份保存位置和生命周期仍待设计/验收。
+- 参考：[Python hashlib.scrypt 文档](https://docs.python.org/3/library/hashlib.html#hashlib.scrypt)、[RFC 7914](https://www.rfc-editor.org/rfc/rfc7914.html)。
+
 # 2026-11-10：B3/V1.1 会话重命名与记忆中心进展
 
 - 本机会话已可手动重命名；认证 API、持久层与 SwiftUI 操作均通过回归。相关提交：`d67817b`。
