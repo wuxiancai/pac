@@ -8,6 +8,7 @@
 
 ## 当前状态
 
+- 2026-11-10 B3 恢复验收再次尝试未成功：Beta 加密备份表单的导出按钮未打开 NSSavePanel；临时口令已清空，无本轮备份文件，未触发恢复。原因未判定，详见最新 `docs/HANDOFF.md`。
 - 2026-11-10 阶段 6 环境基线：全量本地回归运行于 macOS 26.5.1；Beta `LSMinimumSystemVersion=14.0`。当前 bundle 为 ad hoc 签名且无 Team ID，尚无 macOS 14 runtime、Developer ID/notarization 或正式安装器证据。详见最新 `docs/HANDOFF.md`。
 - 2026-11-10 在代码基线 `a21ec3d` 复跑阶段 6 本机等价门禁：后端 347 passed（1 条既有 Starlette/httpx 弃用警告）、Swift 84 项通过；Ruff、CI mypy、`uv lock --check`、compileall、tracked-file detect-secrets 与 Beta target build 通过。远端 Actions、Provider、麦克风、系统权限、备份恢复、macOS 14 runtime/安装器均未在本轮验收，阶段 6 仍开放。详见最新 `docs/HANDOFF.md`。
 - 2026-11-10 B3 备份 UI 只读复核：未选择文件时“恢复此备份”禁用；未输入口令、创建/读取备份或触发恢复。用户自选位置、错误口令、系统认证和中断恢复仍待验收，见 `docs/HANDOFF.md`。

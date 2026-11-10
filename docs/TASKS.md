@@ -64,6 +64,8 @@
 
 ## 当前执行顺序
 
+2026-11-10 B3 加密备份 GUI 重试：用一次性口令启用导出按钮后，accessibility 点击和坐标点击均未打开 NSSavePanel；临时口令已清空，`.poc-data` 未发现本轮备份文件。原因未判定，不能归因代码或自动化；再次验收先确认面板能打开，再继续备份/恢复。详见 `docs/HANDOFF.md`。
+
 2026-11-10 阶段 6 主机/包基线：当前回归运行于 macOS 26.5.1，Beta Info.plist 最低版本为 14.0；当前 bundle 为 ad hoc 签名、无 Team ID。未验证 macOS 14 runtime、Developer ID/notarization 或正式安装器，不能关闭发布门禁。详情见 `docs/HANDOFF.md`。
 
 2026-11-10 阶段 6 本机 CI 等价门禁复核（代码基线 `a21ec3d`）：后端 347 passed、1 条既有弃用警告；Swift 84 项通过；Ruff、CI mypy、锁文件、compileall、tracked-file secret scan 与 Beta target build 均通过。没有运行远端 Actions/Provider/麦克风/系统授权/备份恢复，因此阶段 6 仍开放。命令和边界见 `docs/HANDOFF.md`。

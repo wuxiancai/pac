@@ -1,3 +1,8 @@
+# 2026-11-10：B3 加密备份恢复 GUI 重试未能打开保存面板
+
+- 在 Beta“备份”页输入一次性测试口令并点击“选择位置并加密备份”，无 NSSavePanel/系统文件面板出现。随后分别用 accessibility 按钮和截图坐标重试，界面仍停留在原表单；没有选择路径、没有调用导出 API。按 `find .poc-data -maxdepth 2 -type f` 检查，未发现本轮命名的 B3/roundtrip 文件。
+- 已清空 secure field 并关闭表单；口令未写入文件或文档。当前原因未判定，既可能是 Beta 的面板呈现问题，也可能是桌面自动化输入限制。先前独立 GUI 导出成功记录仍有效，但本轮不能据此声称恢复预览/流程已验收。需要在下一次 Beta GUI 验收中复查按钮 action；在可选备份前不触发恢复。
+
 # 2026-11-10：阶段 6 主机与 Beta 包运行基线
 
 - 本机 `sw_vers` 显示 macOS 26.5.1（Build 25F80）；`.poc-data/personal-assistant-beta.app/Contents/Info.plist` 声明 `LSMinimumSystemVersion=14.0`。本轮 347 项 Python 与 84 项 Swift 自动回归运行于当前主机，不是 macOS 14 runtime 证据。
