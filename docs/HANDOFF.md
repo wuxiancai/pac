@@ -1,3 +1,10 @@
+# 2026-11-10：阶段 6 本机 CI 等价门禁复核（代码基线 a21ec3d）
+
+- 后端全量：在 `backend/` 执行 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`，结果 347 passed，1 条既有 Starlette/httpx 弃用警告。
+- Swift：`swift test --package-path poc/macos-audio` → 84 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。
+- 静态门禁均通过：`uv lock --check`、`uv run --locked ruff check pac_poc tests scripts`、`uv run --locked mypy`（CI 配置的 3 个源文件）、`python3 -m compileall -q pac_poc scripts tests`、tracked-file `detect-secrets-hook --baseline ../.secrets.baseline`。
+- 本轮没有代码变更；门禁复核后仅更新文档并提交。未运行远端 GitHub Actions、Provider、麦克风、系统授权或备份恢复；macOS 14 runtime、发布安装器和 B1/B3/B5/B6/B9/B10 剩余 GUI 验收仍开放，阶段 6 不关闭。
+
 # 2026-11-10：B3 备份恢复表单只读复核
 
 - 打开 Beta“备份”表单，确认当前显示“创建加密备份”，口令输入为空，“恢复此备份”按钮处于禁用状态，尚未选择备份文件。界面保留此前的 275 KB 导出成功提示；本轮没有新建文件、选择现有备份、输入口令或触发恢复。
