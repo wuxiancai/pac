@@ -5,6 +5,7 @@
 - 在 Beta“备份”表单使用临时一次性口令，将加密备份保存到仓库 `.poc-data/` 下的新合成文件。GUI 显示“已创建加密备份（275 KB）”；随后用文件系统确认文件大小 274,726 bytes、位于预期临时目录。
 - 已删除本轮创建的临时备份文件并验证不存在；关闭备份表单。未读取/覆盖已有备份、未执行恢复或系统认证；临时口令未写入文档。
 - 该冒烟仅验证导出 UI 至本机加密备份 API/文件保存成功。恢复 UI、用户自选外部位置、错误口令和恢复中断仍待 GUI 验收；B3 保持 IN PROGRESS。
+- 后续尝试重开保存面板以继续恢复预览时，导出按钮点击后表单无状态变化；改用坐标和长按点击仍未打开面板。未生成新文件（检查 `.poc-data` 无本次预览备份）、未触发恢复 API；关闭表单后没有残留口令。原因未判定，可能为桌面自动化/系统面板瞬态，下一次 B3 GUI 验收需重试。此前 275 KB 导出成功证据仍有效。
 
 - 代码基线 `a21ec3d`：在 `backend/` 执行 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 347 passed，1 条既有 Starlette/httpx 弃用警告；`uv lock --check`、`uv run --locked ruff check pac_poc tests scripts`、`uv run --locked mypy`、`python3 -m compileall -q pac_poc scripts tests`、tracked-file `detect-secrets-hook --baseline ../.secrets.baseline` 均通过。
 - `swift test --package-path poc/macos-audio` → 83 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。
