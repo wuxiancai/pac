@@ -1,3 +1,8 @@
+# 2026-11-10：模型预设 Provider 白名单
+
+- `LocalModelPresetStore` 保存前校验来源与固定 Provider ID：本地只接受 `ollama`，云端只接受当前三个固定 Provider；未知来源/服务商直接拒绝。这样 tampered/stale preference 不会成为路由输入。
+- 新增未知 Provider 拒绝回归；`swift test --package-path poc/macos-audio` → 72 passed，Beta target build 成功。
+
 # 2026-11-10：V1.1 本机模型预设
 
 - 模型设置支持保存、使用和删除命名预设；仅本机保存模型来源、Ollama 型号和固定云 Provider 标识，不存 Key。预设名称非空、最多 32 字且不区分大小写去重。云预设展示 Provider/型号/区域，并沿用现有 Keychain/预算/安全审计流程。

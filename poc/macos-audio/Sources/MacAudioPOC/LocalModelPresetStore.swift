@@ -43,9 +43,9 @@ public struct LocalModelPresetStore: Sendable {
         let localModel = rawLocalModel.trimmingCharacters(in: .whitespacesAndNewlines)
         let providerID = rawProviderID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.count <= 32,
-              sourceID == "local" || sourceID == "cloud",
+              (sourceID == "local" && providerID == "ollama")
+                  || (sourceID == "cloud" && ["qwen-app", "deepseek", "openrouter"].contains(providerID)),
               sourceID != "local" || !localModel.isEmpty,
-              sourceID != "cloud" || !providerID.isEmpty,
               !presets.contains(where: {
                   $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame
               })
