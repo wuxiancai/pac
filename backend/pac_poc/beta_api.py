@@ -7,10 +7,13 @@ import math
 import re
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from time import monotonic, time
 from typing import Any, Callable, Literal, Protocol
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -19,6 +22,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 
 from .backup import EncryptedBackupError
+from .budget import PRICE_VERSION, UnknownPublicPrice, estimate_chat_cost
 from .keychain_credentials import (
     CredentialProvider,
     CredentialUnavailable,
@@ -80,6 +84,9 @@ MAX_CHAT_REQUEST_BYTES = 512 * 1024
 MAX_VOICE_PCM_BYTES = 960_000  # 30 seconds of 16 kHz mono PCM16
 VOICE_STREAM_LOCK_WAIT_SECONDS = 2.0
 CHAT_STREAM_KEEPALIVE_SECONDS = 15.0
+MONTHLY_CLOUD_BUDGET_MICROS = 100_000_000
+MONTHLY_CLOUD_WARNING_MICROS = 80_000_000
+_BUDGET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 VOICE_MODEL_DIR = (
     Path(__file__).resolve().parent.parent
     / ".poc-data"
@@ -328,6 +335,14 @@ def _is_valid_local_model_name(value: str) -> bool:
     return all(char.isalnum() or char in "._:/-" for char in value)
 
 
+def _budget_month_key() -> str:
+    return datetime.now(_BUDGET_TIMEZONE).strftime("%Y-%m")
+
+
+def _amount_to_budget_micros(amount_cny: Decimal) -> int:
+    return int(amount_cny * Decimal(1_000_000))
+
+
 _L3_SECRET_PATTERN = re.compile(
     r"(?:sk-[A-Za-z0-9_-]{16,}|Bearer\s+[A-Za-z0-9._~-]{16,}|"
     r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)",
@@ -391,6 +406,8 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
     )
     run_registry = RunRegistry()
     usage_ledger = UsageLedger()
+    cloud_budget_lock = asyncio.Lock()
+    cloud_budget_write_failed = False
     imported_text = ImportedTextRegistry()
     import_request_lock = asyncio.Lock()
     voice_stream_lock = asyncio.Lock()
@@ -646,9 +663,29 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
 
     @router.get("/usage")
     async def get_usage(limit: int = Query(default=50, ge=1, le=100)) -> dict[str, object]:
+        budget_month = _budget_month_key()
+        if persistent_store is None:
+            budget = None
+        else:
+            try:
+                spent_micros = persistent_store.monthly_cloud_budget_micros(budget_month)
+            except (PersistentStoreError, ValueError):
+                raise HTTPException(status_code=503, detail="cloud budget summary is unavailable") from None
+            budget = {
+                "month": budget_month,
+                "estimated_spent_cny": spent_micros / 1_000_000,
+                "warning_threshold_cny": 80,
+                "limit_cny": 100,
+                "is_estimate": True,
+                "warning_reached": spent_micros >= MONTHLY_CLOUD_WARNING_MICROS,
+                "blocked": spent_micros >= MONTHLY_CLOUD_BUDGET_MICROS,
+                "price_version": PRICE_VERSION,
+            }
         return {
             "retention": "process_memory_only",
+            "budget_retention": "encrypted_monthly_aggregate",
             "summary": usage_ledger.summary(),
+            "budget": budget,
             "records": [
                 usage_record_to_dict(record)
                 for record in usage_ledger.list_records(limit=limit)
@@ -1150,14 +1187,58 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 if sum(len(item["content"]) for item in specialist_request.messages) > settings.max_context_chars:
                     raise HTTPException(status_code=413, detail="conversation context is too long")
                 collaboration_requests.append((assistant_key, specialist_request))
+        budget_lock_acquired = False
+        budget_month = _budget_month_key()
+        if payload.provider in CLOUD_PROVIDERS:
+            if persistent_store is None:
+                raise HTTPException(status_code=503, detail="cloud budget storage is unavailable")
+            if cloud_budget_write_failed:
+                raise HTTPException(status_code=503, detail="cloud budget accounting is unavailable")
+            await cloud_budget_lock.acquire()
+            budget_lock_acquired = True
+            try:
+                spent_micros = persistent_store.monthly_cloud_budget_micros(budget_month)
+                prompt_text = "\n".join(item["content"] for item in model_request.messages)
+                # Resolve the reviewed model/price before any Provider request.
+                request_reserve = estimate_chat_cost(
+                    provider=payload.provider,
+                    model=payload.model,
+                    prompt_text=prompt_text,
+                    completion_text="",
+                    # UTF-8 bytes provide a conservative token-count fallback for
+                    # this preflight; reserve the adapter's full output allowance.
+                    prompt_tokens=len(prompt_text.encode("utf-8")),
+                    completion_tokens=1024,
+                    cached_prompt_tokens=None,
+                )
+                reserve_micros = _amount_to_budget_micros(request_reserve.amount_cny)
+            except UnknownPublicPrice:
+                cloud_budget_lock.release()
+                raise HTTPException(
+                    status_code=503, detail="cloud budget price is unavailable; request blocked"
+                ) from None
+            except Exception:
+                cloud_budget_lock.release()
+                raise HTTPException(
+                    status_code=503, detail="cloud budget state is unavailable; request blocked"
+                ) from None
+            if spent_micros + reserve_micros >= MONTHLY_CLOUD_BUDGET_MICROS:
+                cloud_budget_lock.release()
+                raise HTTPException(
+                    status_code=429,
+                    detail="本月云端费用估算加本次请求预估已达到人民币 100 元预算上限，云端请求已拦截。",
+                )
         try:
             run = run_registry.create(MULTI_AGENT_ASSISTANT if collaboration_requests else turn.assistant_key)
             run_registry.transition(run.run_id, RunStatus.RUNNING)
         except RuntimeError as exc:
+            if budget_lock_acquired:
+                cloud_budget_lock.release()
             raise HTTPException(status_code=503, detail="too many active chat runs") from exc
         started_monotonic = monotonic()
 
         async def events() -> AsyncIterator[str]:
+            nonlocal cloud_budget_write_failed
             prompt_tokens: int | None = None
             completion_tokens: int | None = None
             cached_prompt_tokens: int | None = None
@@ -1371,6 +1452,31 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                         pass
                 if current is not None:
                     completed_at = current.updated_at
+                    if payload.provider in CLOUD_PROVIDERS and persistent_store is not None:
+                        try:
+                            prompt_text = "\n".join(
+                                item["content"] for item in model_request.messages
+                            )
+                            estimate = estimate_chat_cost(
+                                provider=payload.provider,
+                                model=payload.model,
+                                prompt_text=prompt_text,
+                                completion_text="".join(assistant_output),
+                                prompt_tokens=prompt_tokens,
+                                completion_tokens=completion_tokens,
+                                cached_prompt_tokens=cached_prompt_tokens,
+                                reported_cost=(
+                                    Decimal(str(cost_amount)) if cost_amount is not None else None
+                                ),
+                                reported_currency=cost_currency,
+                            )
+                            persistent_store.add_monthly_cloud_budget_estimate(
+                                budget_month,
+                                amount_micros=_amount_to_budget_micros(estimate.amount_cny),
+                                price_version=estimate.price_version,
+                            )
+                        except Exception:
+                            cloud_budget_write_failed = True
                     usage_ledger.record(
                         UsageRecord(
                             run_id=run.run_id,
@@ -1400,6 +1506,8 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                             ),
                         )
                     )
+                if budget_lock_acquired:
+                    cloud_budget_lock.release()
 
         return StreamingResponse(
             events(),

@@ -89,6 +89,7 @@ final class BetaChatModel {
     private(set) var importedTextFiles: [LocalImportedTextFile] = []
     private(set) var isImportingFiles = false
     private(set) var usageRecords: [LocalUsageRecord] = []
+    private(set) var cloudBudget: LocalMonthlyCloudBudget?
     private(set) var usageStatus = "尚未读取本机用量。"
     private(set) var isLoadingUsage = false
     private var lastAssistantResponseInterrupted = false
@@ -819,6 +820,7 @@ final class BetaChatModel {
         do {
             let snapshot = try await client.recentUsage()
             usageRecords = snapshot.records
+            cloudBudget = snapshot.budget
             usageStatus = snapshot.records.isEmpty
                 ? "此进程尚无聊天用量记录。记录仅保存在本机内存，退出后清空。"
                 : "显示最近 \(snapshot.records.count) 条记录；退出应用后记录清空。"
@@ -1706,7 +1708,14 @@ private struct UsageHistoryView: View {
                     .disabled(model.isLoadingUsage)
             }
             Text(model.usageStatus).font(.caption).foregroundStyle(.secondary)
-            Text("token 与费用只显示服务端实际返回值；未知时保留为空，不进行估算。")
+            if let budget = model.cloudBudget {
+                Text(budgetDescription(budget))
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(
+                        budget.blocked || budget.warningReached ? Color.orange : Color.secondary
+                    )
+            }
+            Text("单次费用只显示服务端明确返回值；月预算按版本化公开价估算，不代表账单实扣金额，且仅统计本功能启用后的本机记录。")
                 .font(.caption).foregroundStyle(.secondary)
             Divider()
             if model.usageRecords.isEmpty {
@@ -1751,6 +1760,17 @@ private struct UsageHistoryView: View {
         }
         let kind = record.costState == "actual" ? "实扣" : "估算"
         return "\(kind) \(amount.formatted()) \(currency)"
+    }
+
+    private func budgetDescription(_ budget: LocalMonthlyCloudBudget) -> String {
+        let amount = budget.estimatedSpentCNY.formatted(.number.precision(.fractionLength(4)))
+        if budget.blocked {
+            return "\(budget.month) 云端费用估算 ¥\(amount) / ¥100，已达到预算上限并拦截。"
+        }
+        if budget.warningReached {
+            return "\(budget.month) 云端费用估算 ¥\(amount) / ¥100，已达到 ¥80 提示线。"
+        }
+        return "\(budget.month) 云端费用估算 ¥\(amount) / ¥100（80 元提示线）。"
     }
 }
 

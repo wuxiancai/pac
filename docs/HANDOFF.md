@@ -1469,3 +1469,11 @@
 - 浏览并核对 DeepSeek 官方模型价目、Qwen3.8-Flash 北京价目、OpenRouter models API 中固定 DeepSeek Flash 的费率，以及 SAFE 2026-11-10 USD/CNY 中间价。实现 `pac_poc/budget.py`：价目版本 2026-11-10、USD/CNY 采用 6.72 向上取整快照；缓存 token 拆分定价，缺失 usage 按文本字符数估算 token；未知 Provider/model 与无效币种 fail closed。
 - 估算器窄回归 `tests/test_budget.py` 5 passed，Ruff 和 mypy 通过。该模块尚未接入云请求 Stream API、SQLCipher 月累计、80 元提示、100 元拦截或 UI，D-005 仍未完成。
 - 完整来源与价目数值记录在 `docs/beta/orchestrator-framework.md`，并更新 D-005 与任务清单。
+
+
+# 2026-11-10：D-005 月预算持久累计与请求门禁
+
+- 添加 SQLCipher migration `0004_monthly_cloud_budget`，按 Asia/Shanghai 自然月保存 CNY 估算 aggregate、请求数和价目版本。预算读取/更新通过 store 专属锁保护 SQLCipher 连接池，更新使用原子 upsert；16 个线程并发增量回归总额一致。
+- 云请求要求预算数据库、已登记价目和账本状态可用。单个 Beta 服务进程串行执行云请求；发送前检查已累计估算和本次预估（UTF-8 字节输入、1,024 输出 token 上限），两者触及 ¥100 即阻止请求。请求完成或失败后以 Provider 实际 usage/cost（有则用）或文本长度估算写入月度总额。无持久库、写账错误或未知价目 fail-closed。用量 API 和 Swift UI 展示估算累计、¥80 提示与 ¥100 已拦截状态，明确不等于账单实扣。
+- 测试开发时首次尝试 SQLCipher 多线程连接池回归导致原生段错误；在 store 内串行化预算连接使用后，针对回归通过。相关 Python 定向 71 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 334 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 60 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta`、Ruff 与 mypy 通过。
+- 未完成：当月功能启用前已产生的供应商账单无法回填，首次启用当月显示值可能低估；Budget lock 只覆盖单个 Beta 服务进程，不覆盖多个同时运行的进程；真实 Provider usage/cost E2E、预算 GUI 展示和每月价格快照更新/审查仍待验收。未发起真实云请求、未访问 Keychain。

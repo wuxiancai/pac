@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import sqlite3
 import stat
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -176,7 +177,7 @@ def test_store_reopens_and_migrations_are_idempotent(storage_root: Path) -> None
     try:
         with second.connection() as connection:
             assert connection.execute(text("SELECT count(*) FROM conversations")).scalar_one() == 1
-            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0003_local_skills"
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0004_monthly_cloud_budget"
     finally:
         second.close()
 
@@ -448,5 +449,29 @@ def test_long_conversation_history_pages_have_no_gaps_or_duplicates(storage_root
         assert len(collected) == 120
         assert len(set(collected)) == 120
         assert set(collected) == expected
+    finally:
+        store.close()
+
+
+def test_monthly_cloud_budget_is_encrypted_atomic_and_validated(storage_root: Path) -> None:
+    store = _store((storage_root / "cloud-budget.db").resolve())
+    store.open()
+    try:
+        assert store.monthly_cloud_budget_micros("2026-11") == 0
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            totals = list(pool.map(
+                lambda _: store.add_monthly_cloud_budget_estimate(
+                    "2026-11", amount_micros=125_000, price_version="2026-11-10"
+                ),
+                range(16),
+            ))
+        assert store.monthly_cloud_budget_micros("2026-11") == 2_000_000
+        assert max(totals) == 2_000_000
+        with pytest.raises(ValueError, match="YYYY-MM"):
+            store.monthly_cloud_budget_micros("2026-13")
+        with pytest.raises(ValueError, match="non-negative integer"):
+            store.add_monthly_cloud_budget_estimate(
+                "2026-11", amount_micros=-1, price_version="2026-11-10"
+            )
     finally:
         store.close()

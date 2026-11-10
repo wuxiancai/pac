@@ -31,6 +31,7 @@ from pac_poc.model_gateway import (
     LocalOnlyPolicy,
     ProviderStreamChunk,
 )
+from pac_poc.persistence import EncryptedApplicationStore
 from pac_poc.remote_providers import RemoteProviderError
 from pac_poc.security_poc import LocalAPISession
 
@@ -826,7 +827,12 @@ def test_chat_rejects_non_json_content_type_before_reading_body() -> None:
     asyncio.run(run())
 
 
-def test_cloud_chat_requires_one_time_consent_before_adapter_access() -> None:
+def test_cloud_chat_requires_one_time_consent_before_adapter_access(tmp_path: Path) -> None:
+    store = EncryptedApplicationStore(
+        path=(tmp_path / "cloud-budget-consent.db").resolve(), key=b"b" * 32
+    )
+    store.open()
+
     async def run() -> None:
         adapter = StubCloudAdapter()
         credentials = SpyCredentials()
@@ -834,6 +840,7 @@ def test_cloud_chat_requires_one_time_consent_before_adapter_access() -> None:
             session=LocalAPISession(token="test-token"),
             credentials=credentials,
             remote_adapters_override={"deepseek": adapter},
+            persistence_store=store,
         )
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
@@ -867,6 +874,7 @@ def test_cloud_chat_requires_one_time_consent_before_adapter_access() -> None:
                 headers=headers,
                 json={**body, "confirmed_for_this_request": True},
             )
+            usage = await client.get("/usage", headers=headers)
         assert allowed.status_code == 200
         assert '"delta": "云端回答"' in allowed.text
         assert adapter.calls == 1
@@ -877,8 +885,73 @@ def test_cloud_chat_requires_one_time_consent_before_adapter_access() -> None:
         assert adapter.request.purpose == "beta-interactive-chat"
         assert adapter.request.data_level.value == "L2"
         assert credentials.reads == 0
+        assert usage.json()["budget"]["is_estimate"] is True
+        assert usage.json()["budget"]["estimated_spent_cny"] > 0
 
     asyncio.run(run())
+    store.close()
+
+
+def test_cloud_budget_blocks_at_monthly_limit_before_adapter_access(tmp_path: Path) -> None:
+    store = EncryptedApplicationStore(
+        path=(tmp_path / "cloud-budget-limit.db").resolve(), key=b"l" * 32
+    )
+    store.open()
+    store.add_monthly_cloud_budget_estimate(
+        beta_api_module._budget_month_key(), amount_micros=100_000_000,
+        price_version="2026-11-10",
+    )
+    adapter = StubCloudAdapter()
+    app = create_beta_api(
+        session=LocalAPISession(token="budget-token"),
+        remote_adapters_override={"deepseek": adapter},
+        persistence_store=store,
+    )
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/stream",
+            headers={"authorization": "Bearer budget-token", "host": "127.0.0.1"},
+            json={
+                "provider": "deepseek",
+                "model": "deepseek-flash",
+                "confirmed_for_this_request": True,
+                "messages": [{"role": "user", "content": "synthetic budget limit"}],
+            },
+        )
+        usage = client.get(
+            "/usage", headers={"authorization": "Bearer budget-token", "host": "127.0.0.1"}
+        )
+    assert response.status_code == 429
+    assert "估算" in response.json()["detail"]
+    assert adapter.calls == 0
+    assert usage.json()["budget"]["blocked"] is True
+    assert usage.json()["budget"]["warning_reached"] is True
+    store.close()
+
+
+def test_cloud_request_fails_closed_without_encrypted_budget_storage() -> None:
+    adapter = StubCloudAdapter()
+    app = create_beta_api(
+        session=LocalAPISession(token="missing-budget-token"),
+        remote_adapters_override={"deepseek": adapter},
+    )
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/stream",
+            headers={
+                "authorization": "Bearer missing-budget-token",
+                "host": "127.0.0.1",
+            },
+            json={
+                "provider": "deepseek",
+                "model": "deepseek-flash",
+                "confirmed_for_this_request": True,
+                "messages": [{"role": "user", "content": "synthetic budget storage test"}],
+            },
+        )
+    assert response.status_code == 503
+    assert "budget storage" in response.json()["detail"]
+    assert adapter.calls == 0
 
 
 @pytest.mark.parametrize(
@@ -892,12 +965,17 @@ def test_cloud_chat_requires_one_time_consent_before_adapter_access() -> None:
     ],
 )
 def test_cloud_provider_errors_are_sanitized_and_never_fallback(
-    status_code: int, expected_message: str
+    status_code: int, expected_message: str, tmp_path: Path
 ) -> None:
     adapter = FailingCloudAdapter(status_code)
+    store = EncryptedApplicationStore(
+        path=(tmp_path / f"cloud-error-{status_code}.db").resolve(), key=b"e" * 32
+    )
+    store.open()
     app = create_beta_api(
         session=LocalAPISession(token="test-token"),
         remote_adapters_override={"deepseek": adapter},
+        persistence_store=store,
     )
     with TestClient(app) as client:
         response = client.post(
@@ -922,6 +1000,7 @@ def test_cloud_provider_errors_are_sanitized_and_never_fallback(
     assert "synthetic-provider-body-sentinel" not in response.text
     assert adapter.calls == 1
     assert run_status.json()["status"] == "failed"
+    store.close()
 
 
 def test_local_model_error_is_sanitized_and_recorded_as_unknown_usage(
@@ -992,12 +1071,18 @@ def test_local_transport_errors_use_local_recovery_guidance(
     assert "synthetic transport marker" not in response.text
 
 
-def test_qwen_application_route_is_available_with_exact_region_and_model() -> None:
+def test_qwen_application_route_is_available_with_exact_region_and_model(tmp_path: Path) -> None:
+    store = EncryptedApplicationStore(
+        path=(tmp_path / "qwen-budget.db").resolve(), key=b"q" * 32
+    )
+    store.open()
+
     async def run() -> None:
         adapter = StubCloudAdapter()
         app = create_beta_api(
             session=LocalAPISession(token="test-token"),
             remote_adapters_override={"qwen-app": adapter},
+            persistence_store=store,
         )
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
@@ -1020,6 +1105,7 @@ def test_qwen_application_route_is_available_with_exact_region_and_model() -> No
         assert adapter.request.data_level.value == "L2"
 
     asyncio.run(run())
+    store.close()
 
 
 def test_authenticated_voice_websocket_streams_partial_then_final() -> None:

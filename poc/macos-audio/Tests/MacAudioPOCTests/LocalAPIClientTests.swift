@@ -658,6 +658,22 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     #expect(cloudSnapshot.records[0].regionDisplayName == "china")
 }
 
+@Test func localUsageSnapshotDecodesExplicitEstimatedMonthlyCloudBudget() throws {
+    let body = """
+    {"records":[],"budget":{"month":"2026-11","estimated_spent_cny":80.25,"warning_threshold_cny":80,"limit_cny":100,"is_estimate":true,"warning_reached":true,"blocked":false,"price_version":"2026-11-10"}}
+    """
+    let snapshot = try JSONDecoder().decode(LocalUsageSnapshot.self, from: Data(body.utf8))
+
+    #expect(snapshot.records.isEmpty)
+    #expect(snapshot.budget?.month == "2026-11")
+    #expect(snapshot.budget?.estimatedSpentCNY == 80.25)
+    #expect(snapshot.budget?.warningThresholdCNY == 80)
+    #expect(snapshot.budget?.limitCNY == 100)
+    #expect(snapshot.budget?.isEstimate == true)
+    #expect(snapshot.budget?.warningReached == true)
+    #expect(snapshot.budget?.blocked == false)
+}
+
 @Test func voiceStreamUnavailableHasActionableLocalOnlyMessage() {
     let message = LocalAPIClientError.voiceStreamUnavailable(
         reason: "服务端测试错误"

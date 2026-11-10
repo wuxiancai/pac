@@ -14,7 +14,7 @@
 - `backend/pac_poc/migrations/` 提供随 wheel 打包的 Alembic 初始 migration。
 - migration `0003_local_skills` 在 SQLCipher store 内安装三个固定、只含提示文本的本机 Skills；读取接口不返回提示定义，不开放用户编辑或执行工具。聊天请求必须逐次提交登记的 skill keys。
 - 会话支持显式重命名，标题与更新时刻写入加密数据库。
-- schema 包含 conversations、turns、messages 与 FTS；任务状态表为后续 V2 使用；memory_items 仅接受用户确认的 claim，并有版本记录和 ACTIVE 条件 FTS。FTS 由触发器同步；会话删除通过外键级联。
+- schema 包含 conversations、turns、messages 与 FTS；`0004_monthly_cloud_budget` 在 SQLCipher 内只存逐月估算总额/请求数/价目版本，不保存对话内容；任务状态表为后续 V2 使用；memory_items 仅接受用户确认的 claim，并有版本记录和 ACTIVE 条件 FTS。FTS 由触发器同步；会话删除通过外键级联。
 - SQLAlchemy、Alembic、SQLCipher 已从可选 POC 依赖移入默认后端依赖。发行材料仍需包含 SQLCipher Community attribution/NOTICE。
 - `GET /memories/{id}/versions` 提供有界只读快照历史，UI 展示版本号、变更原因、时间、类别、主题和内容。
 - 任务可保存可选 `schedule_at`；`TaskReminderManager` 仅安排本机通知。系统授权需由用户点击开启，拒绝授权不会自动改走远端通知。

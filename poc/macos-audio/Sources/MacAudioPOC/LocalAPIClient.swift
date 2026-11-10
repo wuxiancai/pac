@@ -345,6 +345,26 @@ public struct LocalUsageRecord: Decodable, Identifiable, Sendable {
 
 public struct LocalUsageSnapshot: Decodable, Sendable {
     public let records: [LocalUsageRecord]
+    public let budget: LocalMonthlyCloudBudget?
+}
+
+public struct LocalMonthlyCloudBudget: Decodable, Sendable {
+    public let month: String
+    public let estimatedSpentCNY: Double
+    public let warningThresholdCNY: Double
+    public let limitCNY: Double
+    public let isEstimate: Bool
+    public let warningReached: Bool
+    public let blocked: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case month, blocked
+        case estimatedSpentCNY = "estimated_spent_cny"
+        case warningThresholdCNY = "warning_threshold_cny"
+        case limitCNY = "limit_cny"
+        case isEstimate = "is_estimate"
+        case warningReached = "warning_reached"
+    }
 }
 
 /// Minimal native client for the authenticated, loopback-only POC health endpoint.
@@ -809,7 +829,7 @@ public final class LocalAPIClient: @unchecked Sendable {
         guard let value = try? JSONDecoder().decode(UsageResponse.self, from: data) else {
             throw LocalAPIClientError.invalidResponse
         }
-        return LocalUsageSnapshot(records: value.records)
+        return LocalUsageSnapshot(records: value.records, budget: value.budget)
     }
 
     public func importSelectedText(data: Data, fileName: String) async throws -> LocalImportedTextFile {
@@ -1005,6 +1025,7 @@ private struct ChatRunStatusResponse: Decodable {
 
 private struct UsageResponse: Decodable {
     let records: [LocalUsageRecord]
+    let budget: LocalMonthlyCloudBudget?
 }
 
 public struct LocalAPIStreamError: Error, LocalizedError {

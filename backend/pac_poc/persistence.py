@@ -9,6 +9,7 @@ import stat
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from threading import Lock
 from uuid import uuid4
 
 import sqlcipher3.dbapi2 as sqlcipher
@@ -54,6 +55,7 @@ class EncryptedApplicationStore:
         self._key_hex = key.hex()
         self._engine: Engine | None = None
         self._restore_in_progress = False
+        self._cloud_budget_lock = Lock()
 
     @property
     def path(self) -> Path:
@@ -163,6 +165,49 @@ class EncryptedApplicationStore:
         if self._engine is None:
             raise PersistentStoreError("database is not open")
         return self._engine.connect()
+
+    def monthly_cloud_budget_micros(self, month_key: str) -> int:
+        """Return the encrypted monthly CNY estimate aggregate, or zero."""
+        _validate_budget_month_key(month_key)
+        engine = self._require_engine()
+        with self._cloud_budget_lock, engine.connect() as connection:
+            row = connection.execute(
+                text("SELECT estimated_micros_cny FROM monthly_cloud_budget WHERE month_key=:month"),
+                {"month": month_key},
+            ).first()
+        return int(row[0]) if row is not None else 0
+
+    def add_monthly_cloud_budget_estimate(
+        self, month_key: str, *, amount_micros: int, price_version: str
+    ) -> int:
+        """Atomically add a request estimate and return the updated monthly total."""
+        _validate_budget_month_key(month_key)
+        if type(amount_micros) is not int or amount_micros < 0:
+            raise ValueError("budget estimate must be a non-negative integer amount")
+        if not price_version or len(price_version) > 32:
+            raise ValueError("budget price version is invalid")
+        engine = self._require_engine()
+        with self._cloud_budget_lock:
+            with engine.begin() as connection:
+                connection.execute(text(
+                    "INSERT INTO monthly_cloud_budget "
+                    "(month_key, estimated_micros_cny, request_count, price_version, updated_at) "
+                    "VALUES (:month, :amount, 1, :version, :now) "
+                    "ON CONFLICT(month_key) DO UPDATE SET "
+                    "estimated_micros_cny = monthly_cloud_budget.estimated_micros_cny "
+                    "+ excluded.estimated_micros_cny, "
+                    "request_count = monthly_cloud_budget.request_count + 1, "
+                    "price_version = excluded.price_version, updated_at = excluded.updated_at"
+                ), {
+                    "month": month_key,
+                    "amount": amount_micros,
+                    "version": price_version,
+                    "now": _utc_timestamp(),
+                })
+                total = connection.execute(text(
+                    "SELECT estimated_micros_cny FROM monthly_cloud_budget WHERE month_key=:month"
+                ), {"month": month_key}).scalar_one()
+                return int(total)
 
     def _database_key_bytes(self) -> bytes:
         return bytes.fromhex(self._key_hex)
@@ -950,6 +995,18 @@ class EncryptedApplicationStore:
 
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _validate_budget_month_key(month_key: str) -> None:
+    if (
+        not isinstance(month_key, str)
+        or len(month_key) != 7
+        or month_key[4] != "-"
+        or not month_key[:4].isdigit()
+        or not month_key[5:].isdigit()
+        or not 1 <= int(month_key[5:]) <= 12
+    ):
+        raise ValueError("budget month must use YYYY-MM format")
 
 
 def _task_row(row) -> dict[str, object]:
