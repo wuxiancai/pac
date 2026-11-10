@@ -4,6 +4,7 @@ import LocalAuthentication
 protocol DeviceAuthenticationEvaluating: AnyObject {
     func canEvaluate(policy: LAPolicy) -> Bool
     func evaluate(policy: LAPolicy, reason: String) async throws
+    func invalidate()
 }
 
 @MainActor
@@ -28,6 +29,10 @@ private final class LAContextAuthenticationEvaluator: DeviceAuthenticationEvalua
             throw SensitiveActionAuthorizationError.authenticationUnavailable
         }
     }
+
+    func invalidate() {
+        context.invalidate()
+    }
 }
 
 @MainActor
@@ -39,6 +44,20 @@ public enum SensitiveActionAuthorizationError: Error {
     case authenticationUnavailable
     /// Kept for source compatibility with the earlier biometric-only POC.
     case touchIDUnavailable
+}
+
+public enum DeviceAuthenticationFailureMessage {
+    public static func localized(for error: Error) -> String? {
+        guard let error = error as? LAError else { return nil }
+        return switch error.code {
+        case .appCancel, .userCancel:
+            "本机认证已取消，未开始恢复。"
+        case .systemCancel:
+            "系统中断本机认证，未开始恢复。"
+        default:
+            nil
+        }
+    }
 }
 
 @MainActor
@@ -60,6 +79,10 @@ public final class TouchIDAuthorizer: SensitiveActionAuthorizing {
             throw SensitiveActionAuthorizationError.authenticationUnavailable
         }
         try await evaluator.evaluate(policy: Self.authenticationPolicy, reason: reason)
+    }
+
+    public func cancel() {
+        evaluator.invalidate()
     }
 }
 

@@ -1,3 +1,10 @@
+# 2026-11-10：B3 恢复认证可取消与中文终态
+
+- 追查恢复窗仍停在认证时发现，操作期间“完成”按钮可关窗而认证任务继续，用户离开后若认证迟到可能触发未观察到的恢复。现保留活动 `TouchIDAuthorizer`，新增“取消认证”按钮，通过 `LAContext.invalidate()` 取消正在进行的身份验证；认证/导出操作期间禁用“完成”和交互式关窗。取消由 LAContext 错误路径返回，尚未进入 LocalAPI restore 调用。
+- CUA 实机取消验证：点击“取消认证”后等待立即结束，界面从“正在认证本机设备…”恢复为失败状态，恢复按钮仍因口令已清空而禁用；显示系统英文 `Authentication canceled.`。这一轮没有调用恢复 API；275 KB 临时备份已精确删除。
+- 新增系统取消/用户取消/应用取消与系统中断到中文提示的映射，并添加 fake invalidation 与错误映射回归。`swift test --package-path poc/macos-audio` → 86 passed；Beta target build 与 `build_beta_app.sh` 均成功。最新中文映射的 UI 复核未完成：重启新包后 CUA 连续超时，PID 显示进程仍在，未见可用 AX 窗口；没有重试认证或修改数据。
+- 认证弹窗本身在 Beta 与独立 POC 中仍不可见，成功认证/恢复闭环未完成；取消闭环证明本机可通过显式取消安全退出等待，不等同于设备认证成功。
+
 # 2026-11-10：B3 用户自选备份保存目录 GUI 验收
 
 - 启动最新 Beta，在备份表单输入仅本轮使用的合成口令；通过保存面板快捷路径选择 `/Users/wuxiancai/Documents`，将备份命名为 `PAC-B3-UserLocation-20261110.pacbackup`。

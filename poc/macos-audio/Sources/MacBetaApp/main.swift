@@ -139,6 +139,8 @@ final class BetaChatModel: CalendarEventAuditRecording {
     private(set) var taskStatus = ""
     private(set) var taskNotificationStatus = "通知默认关闭。"
     private(set) var backupStatus = "备份口令仅用于本次导出，不会保存。"
+    private(set) var isBackupRestoreAuthenticating = false
+    private var activeRestoreAuthorizer: TouchIDAuthorizer?
     private let taskReminderManager = TaskReminderManager.shared
     private(set) var isRecordingVoice = false
     private(set) var isTranscribingVoice = false
@@ -708,8 +710,13 @@ final class BetaChatModel: CalendarEventAuditRecording {
 
     func restoreEncryptedBackup(from url: URL, password: String) async {
         invalidateHistoryRequests()
+        let authorizer = TouchIDAuthorizer()
+        activeRestoreAuthorizer = authorizer
+        isBackupRestoreAuthenticating = true
         do {
-            try await TouchIDAuthorizer().authorize(reason: "恢复本机加密数据")
+            try await authorizer.authorize(reason: "恢复本机加密数据")
+            activeRestoreAuthorizer = nil
+            isBackupRestoreAuthenticating = false
             guard let client else { backupStatus = "本机服务尚未就绪。"; return }
             let prebackupPath = try await client.restoreEncryptedBackup(sourcePath: url.path, password: password)
             backupStatus = "恢复完成。恢复前数据已保存在本机预备份：\(URL(fileURLWithPath: prebackupPath).lastPathComponent)"
@@ -724,8 +731,20 @@ final class BetaChatModel: CalendarEventAuditRecording {
             await refreshTasks()
             await refreshMemories()
         } catch {
-            backupStatus = "恢复失败：\(error.localizedDescription)"
+            activeRestoreAuthorizer = nil
+            isBackupRestoreAuthenticating = false
+            if let message = DeviceAuthenticationFailureMessage.localized(for: error) {
+                backupStatus = message
+            } else {
+                backupStatus = "恢复失败：\(error.localizedDescription)"
+            }
         }
+    }
+
+    func cancelBackupRestoreAuthentication() {
+        guard isBackupRestoreAuthenticating else { return }
+        backupStatus = "正在取消本机认证…"
+        activeRestoreAuthorizer?.cancel()
     }
 
     func refreshMemoryVersions(id: String) async {
@@ -1726,7 +1745,7 @@ private struct BackupExportView: View {
             SecureField("备份口令", text: $password)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("backup-password-field")
-            Text(isRestoring ? "正在认证并恢复…" : isExporting ? "正在加密并保存备份…" : model.backupStatus)
+            Text(model.isBackupRestoreAuthenticating ? "正在认证本机设备…" : isRestoring ? "正在恢复…" : isExporting ? "正在加密并保存备份…" : model.backupStatus)
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("选择备份文件…") { chooseBackup() }
@@ -1736,9 +1755,14 @@ private struct BackupExportView: View {
                 Button(isRestoring ? "正在恢复…" : "恢复此备份") { showingRestoreConfirmation = true }
                     .disabled(password.isEmpty || selectedBackup == nil || isExporting || isRestoring || model.isStreaming)
                     .accessibilityIdentifier("backup-restore-confirm-button")
+                if model.isBackupRestoreAuthenticating {
+                    Button("取消认证") { model.cancelBackupRestoreAuthentication() }
+                        .accessibilityIdentifier("backup-restore-cancel-button")
+                }
             }
             HStack {
                 Button("完成") { dismiss() }
+                    .disabled(isExporting || isRestoring)
                 Spacer()
                 Button(isExporting ? "正在备份…" : "选择位置并加密备份") { chooseDestination() }
                     .disabled(password.isEmpty || isExporting || isRestoring)
@@ -1747,6 +1771,7 @@ private struct BackupExportView: View {
             }
         }
         .padding(22)
+        .interactiveDismissDisabled(isExporting || isRestoring)
         .alert("恢复加密备份？", isPresented: $showingRestoreConfirmation) {
             Button("取消", role: .cancel) {}
             Button("认证并恢复", role: .destructive) { restoreSelectedBackup() }

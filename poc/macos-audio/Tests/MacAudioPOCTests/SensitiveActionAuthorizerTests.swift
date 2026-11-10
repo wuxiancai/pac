@@ -6,6 +6,7 @@ import Testing
 private final class FakeDeviceAuthenticationEvaluator: DeviceAuthenticationEvaluating {
     var isAvailable = true
     var shouldDeny = false
+    private(set) var wasInvalidated = false
     private(set) var evaluatedPolicy: LAPolicy?
     private(set) var evaluatedReason: String?
 
@@ -18,6 +19,10 @@ private final class FakeDeviceAuthenticationEvaluator: DeviceAuthenticationEvalu
         evaluatedPolicy = policy
         evaluatedReason = reason
         if shouldDeny { throw TestAuthenticationError.denied }
+    }
+
+    func invalidate() {
+        wasInvalidated = true
     }
 }
 
@@ -66,4 +71,30 @@ private enum TestAuthenticationError: Error {
         try await authorizer.authorize(reason: "备份恢复")
     }
     #expect(evaluator.evaluatedReason == "备份恢复")
+}
+
+@MainActor
+@Test func authorizerCanInvalidateAnActiveAuthenticationContext() {
+    let evaluator = FakeDeviceAuthenticationEvaluator()
+    let authorizer = TouchIDAuthorizer(evaluator: evaluator)
+
+    authorizer.cancel()
+
+    #expect(evaluator.wasInvalidated)
+}
+
+@Test func authenticationCancellationMessagesAreLocalizedAndFailClosed() {
+    #expect(
+        DeviceAuthenticationFailureMessage.localized(for: LAError(.appCancel))
+            == "本机认证已取消，未开始恢复。"
+    )
+    #expect(
+        DeviceAuthenticationFailureMessage.localized(for: LAError(.userCancel))
+            == "本机认证已取消，未开始恢复。"
+    )
+    #expect(
+        DeviceAuthenticationFailureMessage.localized(for: LAError(.systemCancel))
+            == "系统中断本机认证，未开始恢复。"
+    )
+    #expect(DeviceAuthenticationFailureMessage.localized(for: TestAuthenticationError.denied) == nil)
 }

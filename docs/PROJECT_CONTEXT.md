@@ -1,5 +1,6 @@
 # 项目上下文
 
+- 2026-11-10 B3 恢复认证现可由用户显式取消（`LAContext.invalidate()`）；认证/导出时禁用完成与交互式关窗。GUI 点击取消后立即退出等待、未启动恢复 API，但系统原始文案为英文；新中文错误映射有 86 项 Swift 回归覆盖。新包重新打开时 CUA 超时，映射暂未实机确认。LocalAuthentication 成功提示/恢复仍未验收，见最新 HANDOFF。
 - 2026-11-10 B3 GUI 已在 NSSavePanel 中选择 `/Users/wuxiancai/Documents` 成功导出 274,726-byte 合成备份，精确路径/大小核实后删除；这覆盖用户自选本地目录，不代表外接卷或恢复验收。测试后 Beta 已退出，详见最新 HANDOFF。
 - 2026-11-10 阶段 6 在 `58c771d` 复核本地 CI 等价门禁：Python 347 passed（1 条既有弃用警告）、Swift 84 passed、Ruff/mypy/lock/compileall/secret scan/Beta build/App 打包及 plist 用途键校验全部通过；远端 Actions、系统认证/恢复、macOS 14 runtime 和正式签名安装仍未验，阶段 6 开放。详见最新 HANDOFF。
 - 2026-11-10 B3：Beta 打包新增并校验 Apple 要求的 `NSFaceIDUsageDescription`，但重新 GUI 恢复及独立 LocalAuthentication POC 仍卡在认证等待；因此仅缺少此键不足以解释现象。两份合成备份已删除，应用进程已退出，未检查 Library 数据库或宣称恢复成功。后续调查认证代理/回调与 async bridge，详见最新 HANDOFF。
