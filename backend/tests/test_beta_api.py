@@ -1072,6 +1072,50 @@ def test_completed_task_and_security_audit_retention_cleanup_runs_periodically()
     asyncio.run(run())
 
 
+def test_database_key_app_factory_purges_expired_completed_tasks_on_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import text
+
+    database_path = tmp_path / "startup-retention.db"
+    monkeypatch.setattr(beta_api_module, "default_database_path", lambda: database_path)
+    seed_store = EncryptedApplicationStore(path=database_path, key=b"t" * 32)
+    seed_store.open()
+    now = datetime.now(timezone.utc)
+    with seed_store.connection() as connection, connection.begin():
+        for task_id, completed_at in (
+            ("startup-expired-task", now - timedelta(days=31)),
+            ("startup-recent-task", now - timedelta(days=29)),
+        ):
+            timestamp = completed_at.isoformat()
+            connection.execute(
+                text(
+                    "INSERT INTO tasks(id,title,status,priority,retry_count,idempotency_key,"
+                    "created_at,updated_at,started_at,completed_at) "
+                    "VALUES(:id,:id,'COMPLETED',0,0,:key,:time,:time,:time,:time)"
+                ),
+                {"id": task_id, "key": f"{task_id}-key", "time": timestamp},
+            )
+    seed_store.close()
+
+    app = create_beta_app(
+        dependencies=BetaAPIDependencies(
+            session=LocalAPISession(token="startup-retention-token"),
+            database_key=b"t" * 32,
+        )
+    )
+    with TestClient(app):
+        store = EncryptedApplicationStore(path=database_path, key=b"t" * 32)
+        store.open()
+        try:
+            remaining_ids = {task["id"] for task in store.list_tasks()}
+            assert remaining_ids == {"startup-recent-task"}
+        finally:
+            store.close()
+
+
 def test_database_key_app_starts_and_stops_audit_maintenance(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

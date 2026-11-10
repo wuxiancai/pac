@@ -1,3 +1,9 @@
+# 2026-11-11：补齐已完成任务启动与周期清理回归
+
+- 为 B3 任务保留新增 SQLCipher 应用打开路径回归：先在加密库构造 31 天和 29 天前的 COMPLETED 记录，再通过数据库密钥创建 Beta app；应用打开存储时自动删除超期项，保留近期项。既有受控 sleep 回归同时确认任务清理维护循环按 6 小时等待并触发清理；结合此前存储边界和认证任务 API 回归，覆盖了清理条件、启动、周期及列表读取四处触发路径。
+- 定向验证：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_beta_api.py -k 'database_key_app_factory_purges_expired_completed_tasks_on_open or completed_task_and_security_audit_retention_cleanup_runs_periodically'` → 2 passed、55 deselected；`ruff check tests/test_beta_api.py` 通过。后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 348 passed，1 条既有 Starlette/httpx 弃用警告（45.16 秒）。
+- 周期路径用受控时钟验证调度与调用，不等待真实六小时；不代表 macOS GUI/通知或真实长期运行验收。
+
 # 2026-11-11：验证任务读取 API 会执行 30 天清理
 
 - 在存储层边界回归之外，给认证 `GET /tasks` API 增加行为覆盖：请求返回前会调用过期任务清理；构造 31 天前 COMPLETED 与 29 天前 COMPLETED，另由 API 创建一条未完成任务，读取结果保留后两者并排除过期项，随后直接核实 SQLCipher 中过期记录已删除。
