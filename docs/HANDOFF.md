@@ -1508,3 +1508,9 @@
 
 - 长会话分页按钮按持久 message ID 保留顶部锚点，但新增消息自动滚动曾按数组 offset 查找，和行实际 ID 不一致。现统一由稳定 row ID 驱动 LazyVStack、分页锚点和新增消息自动滚动；临时流式行在持久化刷新前以当前数组索引作为临时 ID。
 - 验证：`swift test --package-path poc/macos-audio` → 60 passed，包含 Beta target 编译；人工 GUI 滚动/长会话压力验收仍待执行。首次并行运行时，BetaChatView 的 macOS 可用性标注被新行模型声明隔开，且源文件恰在编译期间更新，构建失败；恢复可用性标注后串行重跑通过。
+
+# 2026-11-10：D-014 离线 Embedding 与产品 FTS5 对照
+
+- `scripts/run_local_embedding_eval.py` 现把同一 12 条合成记忆同时送入 MiniLM 候选和临时 SQLCipher 产品 schema，并用当前产品 `search_memories()` FTS5 查询对照相同 24 条中英改写问题。临时数据库位于 `backend/.poc-data` 下并在评测结束后关闭删除；不读取真实记忆、不联网、不启用产品 Embedding。
+- 离线命令：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp HF_HOME=.poc-data/hf-home HF_HUB_CACHE=.poc-data/hf-home/hub XDG_CACHE_HOME=.poc-data/xdg-cache HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run --locked --extra phase0-embedding python scripts/run_local_embedding_eval.py`（工作目录 `backend/`）。本次 Embedding top-1 23/24、top-3 24/24；产品 FTS5 top-1/top-3 均 0/24。该集是专门构造的语义改写/跨语言挑战集，不是平衡真实语料；不能据此启用 Embedding。
+- 验证：相关后端窄回归 28 passed；后端全量 338 passed、1 条既有 Starlette/httpx 弃用警告；阶段追踪契约 9 passed；`ruff check pac_poc tests scripts/run_local_embedding_eval.py`、mypy 通过。尝试对整个 `scripts/` 目录运行 Ruff 时发现两个既有未触及脚本告警（`measure_concurrent_asr_llm_poc.py` 的未使用 `sys`、`measure_local_asr_poc.py` 的未使用 `audio_seconds`），因此只核验本次脚本及生产/测试目录。产品选型仍待平衡人工标注语料、重复资源测量和许可审查。

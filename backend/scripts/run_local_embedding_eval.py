@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from pac_poc.embedding_poc import FastEmbedCandidate, LocalEmbeddingSearch
+from pac_poc.persistence import EncryptedApplicationStore
 
 
 MODEL_ID = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -69,30 +71,56 @@ def main() -> int:
         allow_download=args.download_model,
     )
     search = LocalEmbeddingSearch(provider)
-    for content, source_id in MEMORIES:
-        search.add(content, source_id=source_id)
-
-    top1 = top3 = 0
+    top1 = top3 = fts_top1 = fts_top3 = 0
     language_counts = {"zh": [0, 0], "en": [0, 0]}
-    for query, expected_source, language in QUERIES:
-        matches = search.search(query, limit=3)
-        actual_source = matches[0].source_id if matches else "none"
-        is_top1 = actual_source == expected_source
-        is_top3 = any(match.source_id == expected_source for match in matches)
-        top1 += int(is_top1)
-        top3 += int(is_top3)
-        language_counts[language][0] += int(is_top1)
-        language_counts[language][1] += int(is_top3)
-        print(
-            f"lang={language} expected={expected_source} actual={actual_source} "
-            f"top1={str(is_top1).lower()} top3={str(is_top3).lower()}"
+    with TemporaryDirectory(prefix="embedding-eval-", dir=backend / ".poc-data") as temp_dir:
+        fts_store = EncryptedApplicationStore(
+            path=Path(temp_dir) / "synthetic-eval.db", key=b"E" * 32
         )
+        fts_store.open()
+        try:
+            source_by_memory_id: dict[str, str] = {}
+            for content, source_id in MEMORIES:
+                search.add(content, source_id=source_id)
+                row = fts_store.create_confirmed_memory(
+                    subject=source_id,
+                    content=content,
+                    category="fact",
+                )
+                source_by_memory_id[str(row["id"])] = source_id
 
+            for query, expected_source, language in QUERIES:
+                matches = search.search(query, limit=3)
+                actual_source = matches[0].source_id if matches else "none"
+                lexical_matches = fts_store.search_memories(query, limit=3)
+                lexical_sources = {
+                    source_by_memory_id[str(match["id"])] for match in lexical_matches
+                }
+                is_top1 = actual_source == expected_source
+                is_top3 = any(match.source_id == expected_source for match in matches)
+                is_fts_top1 = bool(lexical_matches) and (
+                    source_by_memory_id[str(lexical_matches[0]["id"])] == expected_source
+                )
+                is_fts_top3 = expected_source in lexical_sources
+                top1 += int(is_top1)
+                top3 += int(is_top3)
+                fts_top1 += int(is_fts_top1)
+                fts_top3 += int(is_fts_top3)
+                language_counts[language][0] += int(is_top1)
+                language_counts[language][1] += int(is_top3)
+                print(
+                    f"lang={language} expected={expected_source} actual={actual_source} "
+                    f"embedding_top1={str(is_top1).lower()} embedding_top3={str(is_top3).lower()} "
+                    f"fts_top1={str(is_fts_top1).lower()} fts_top3={str(is_fts_top3).lower()}"
+                )
+        finally:
+            fts_store.close()
     print(
         f"model={MODEL_ID} synthetic_memories={len(MEMORIES)} "
-        f"synthetic_queries={len(QUERIES)} top1={top1}/{len(QUERIES)} "
-        f"top3={top3}/{len(QUERIES)} zh_top1={language_counts['zh'][0]}/12 "
-        f"en_top1={language_counts['en'][0]}/12"
+        f"synthetic_queries={len(QUERIES)} embedding_top1={top1}/{len(QUERIES)} "
+        f"embedding_top3={top3}/{len(QUERIES)} fts_top1={fts_top1}/{len(QUERIES)} "
+        f"fts_top3={fts_top3}/{len(QUERIES)} zh_embedding_top1={language_counts['zh'][0]}/12 "
+        f"en_embedding_top1={language_counts['en'][0]}/12"
     )
     return 0
 
