@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import secrets
 import socket
 import sys
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -36,13 +38,30 @@ class LocalServiceSettings:
 
 
 def main() -> int:
-    return run_local_service()
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--database-key-stdin", action="store_true")
+    options = parser.parse_args()
+    database_key = _read_database_key() if options.database_key_stdin else None
+    if options.database_key_stdin and database_key is None:
+        return 1
+    return run_local_service(database_key=database_key)
+
+
+def _read_database_key() -> bytes | None:
+    line = sys.stdin.readline(66)
+    if len(line) != 65 or not line.endswith("\n"):
+        return None
+    encoded = line[:-1]
+    if re.fullmatch(r"[0-9a-f]{64}", encoded) is None:
+        return None
+    return bytes.fromhex(encoded)
 
 
 def run_local_service(
     *,
     settings: LocalServiceSettings = LocalServiceSettings(),
     app_factory: Callable[..., FastAPI] = create_beta_api,
+    database_key: bytes | None = None,
 ) -> int:
     """Compose and run the loopback API; settings and app construction are injectable."""
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -56,11 +75,15 @@ def run_local_service(
         # This random token is private to the owning app and is discarded when
         # the supervisor closes the process pipe, so the beta session follows
         # the process lifetime instead of the short POC demo timeout.
-        server = create_local_server(
-            session=LocalAPISession(token=token, expires_at=float("inf")),
-            port=port,
-            app_factory=app_factory,
-        )
+        session = LocalAPISession(token=token, expires_at=float("inf"))
+        if database_key is None:
+            server = create_local_server(session=session, port=port, app_factory=app_factory)
+        else:
+            server = create_local_server(
+                session=session,
+                port=port,
+                app_factory=lambda *, session: app_factory(session=session, database_key=database_key),
+            )
         server_thread = threading.Thread(
             target=server.run,
             kwargs={"sockets": [listener]},

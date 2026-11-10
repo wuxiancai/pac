@@ -114,3 +114,19 @@ def test_managed_local_service_stops_server_for_invalid_owner_command() -> None:
         for stream in (process.stdin, process.stdout, process.stderr):
             if stream is not None and not stream.closed:
                 stream.close()
+
+
+def test_database_key_reader_accepts_only_exact_32_byte_hex_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    from io import StringIO
+
+    from pac_poc.local_service import _read_database_key
+
+    expected = bytes(range(32))
+    monkeypatch.setattr(sys, "stdin", StringIO(expected.hex() + "\n"))
+    assert _read_database_key() == expected
+
+    monkeypatch.setattr(sys, "stdin", StringIO("not-a-key\n"))
+    assert _read_database_key() is None
+
+    monkeypatch.setattr(sys, "stdin", StringIO("00\n"))
+    assert _read_database_key() is None

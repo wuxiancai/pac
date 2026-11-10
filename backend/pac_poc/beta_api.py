@@ -36,6 +36,7 @@ from .imported_text import (
     ImportRejected,
     ImportedTextRegistry,
 )
+from .persistence import EncryptedApplicationStore, default_database_path
 from .orchestrator import (
     ConversationTurn,
     MainAssistantOrchestrator,
@@ -220,6 +221,7 @@ class BetaAPIDependencies:
     voice_transcriber: BetaVoiceTranscriber | None = None
     capability_registry: ModelCapabilityRegistry | None = None
     settings: BetaAPISettings = DEFAULT_BETA_API_SETTINGS
+    database_key: bytes | None = None
 
 
 CLOUD_PROVIDERS: dict[str, RemoteProviderConfig] = {
@@ -248,6 +250,7 @@ def create_beta_api(
     remote_adapters_override: Mapping[str, LocalProviderAdapter] | None = None,
     voice_transcriber_override: BetaVoiceTranscriber | None = None,
     settings: BetaAPISettings = DEFAULT_BETA_API_SETTINGS,
+    database_key: bytes | None = None,
 ) -> FastAPI:
     """Compatibility composition root for the injected beta app factory."""
     return create_beta_app(dependencies=BetaAPIDependencies(
@@ -257,6 +260,7 @@ def create_beta_api(
         remote_adapters=remote_adapters_override,
         voice_transcriber=voice_transcriber_override,
         settings=settings,
+        database_key=database_key,
     ))
 
 
@@ -268,6 +272,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
     remote_adapters_override = dependencies.remote_adapters
     voice_transcriber_override = dependencies.voice_transcriber
     settings = dependencies.settings
+    persistent_store: EncryptedApplicationStore | None = None
     capability_registry = (
         dependencies.capability_registry
         if dependencies.capability_registry is not None
@@ -834,4 +839,10 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         )
 
     app.include_router(router)
+    if dependencies.database_key is not None:
+        persistent_store = EncryptedApplicationStore(
+            path=default_database_path(), key=dependencies.database_key
+        )
+        persistent_store.open()
+        app.router.on_shutdown.append(persistent_store.close)
     return app

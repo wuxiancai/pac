@@ -10,6 +10,7 @@ public enum LocalBackendSupervisorError: Error, Equatable {
     case alreadyRunning
     case backendRuntimeUnavailable
     case launchFailed
+    case databaseKeyDeliveryFailed
     case startupTimedOut
     case invalidHandshake
     case shutdownTimedOut
@@ -48,7 +49,7 @@ public final class LocalBackendSupervisor: @unchecked Sendable {
         return process?.isRunning ?? false
     }
 
-    public func start() throws -> LocalBackendHandshake {
+    public func start(databaseKey: Data? = nil) throws -> LocalBackendHandshake {
         lifecycleLock.lock()
         defer { lifecycleLock.unlock() }
         if let process {
@@ -65,11 +66,17 @@ public final class LocalBackendSupervisor: @unchecked Sendable {
             throw LocalBackendSupervisorError.backendRuntimeUnavailable
         }
 
+        if let databaseKey, databaseKey.count != DatabaseKeychainStore.keyLength {
+            throw LocalBackendSupervisorError.databaseKeyDeliveryFailed
+        }
         let child = Process()
         let childInput = Pipe()
         let childOutput = Pipe()
         child.executableURL = pythonExecutableURL
         child.arguments = ["-m", "pac_poc.local_service"]
+        if databaseKey != nil {
+            child.arguments?.append("--database-key-stdin")
+        }
         child.currentDirectoryURL = backendDirectoryURL
         child.environment = [
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
@@ -91,6 +98,16 @@ public final class LocalBackendSupervisor: @unchecked Sendable {
         }
         childInput.fileHandleForReading.closeFile()
         childOutput.fileHandleForWriting.closeFile()
+        if let databaseKey {
+            do {
+                try childInput.fileHandleForWriting.write(contentsOf: Data(databaseKey.hexadecimal.utf8) + Data([0x0A]))
+            } catch {
+                childInput.fileHandleForWriting.closeFile()
+                Self.stopUnreadyProcess(child, timeout: shutdownTimeout)
+                childOutput.fileHandleForReading.closeFile()
+                throw LocalBackendSupervisorError.databaseKeyDeliveryFailed
+            }
+        }
 
         do {
             let line = try Self.readLine(
@@ -193,4 +210,8 @@ public final class LocalBackendSupervisor: @unchecked Sendable {
             _ = waitForExit(process, timeout: 1)
         }
     }
+}
+
+private extension Data {
+    var hexadecimal: String { map { String(format: "%02x", $0) }.joined() }
 }

@@ -202,3 +202,20 @@ private func startAndReleaseSupervisor(
     weakBox.value = supervisor
     return try supervisor.start()
 }
+
+@available(macOS 12.0, *)
+@Test func supervisorDeliversDatabaseKeyOnlyThroughPrivateStandardInput() throws {
+    let handshake = #"{"base_url":"http://127.0.0.1:49152","token":"01234567890123456789012345678901"}"#
+    let expectedKey = Data((0..<32).map(UInt8.init))
+    let expectedHex = expectedKey.map { String(format: "%02x", $0) }.joined()
+    let source = "import sys\nkey=sys.stdin.readline().strip()\nassert key == '\(expectedHex)'\nprint('''\(handshake)''', flush=True)\nsys.stdin.read()\n"
+    let (python, fixtureDirectory) = try localBackendFixture(moduleSource: source)
+    defer { try? FileManager.default.removeItem(at: fixtureDirectory) }
+    let supervisor = LocalBackendSupervisor(
+        pythonExecutableURL: python,
+        backendDirectoryURL: fixtureDirectory
+    )
+
+    _ = try supervisor.start(databaseKey: expectedKey)
+    try supervisor.stop()
+}

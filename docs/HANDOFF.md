@@ -1257,3 +1257,9 @@
 - 新增 `DatabaseKeychainStore`：用 `SecRandomCopyBytes` 生成 32-byte 密钥，存入专用 generic-password 项；使用 `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`，不要求每次启动 Touch ID。若并发首次启动导致重复项，读取胜出的既存密钥，不覆盖，避免数据库密钥分叉。
 - 验证：`swift test --package-path poc/macos-audio --filter databaseKeychainStoreUsesStableNonemptyIdentity` 通过，Beta target 也在该命令中成功编译。该测试不访问真实 Keychain；尚未做实际 Keychain ACL/锁屏/重启验收。
 - 尚未接入 app/backend 启动或 SQLCipher store；数据库密钥当前仍未流经进程边界。下一步使用受控私有管道设计接入，并验证关停/失败清理。
+
+# 2026-11-10：B3 SQLCipher 启动初始化与密钥进程通道
+
+- Beta 启动现从 `DatabaseKeychainStore` 取得 32-byte 数据库密钥，`LocalBackendSupervisor` 通过私有标准输入向固定 Python 服务发送一次性 hex 行；密钥不进入 argv、环境变量、握手或日志。后端只在 `--database-key-stdin` 模式解析精确长度密钥，并用该密钥打开默认 SQLCipher store，FastAPI shutdown 时关闭连接池。
+- 新增传递协议回归（Swift）及后端 stdin 精确长度/格式解析回归。验证：定向后端生命周期+持久化 19 passed；最终后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 292 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 46 passed；Ruff、mypy、`uv lock --check` 通过。
+- 当前产品启动会创建/迁移加密数据库，但聊天、任务、记忆 CRUD 尚未接入，所以消息内容仍不持久化。没有实际启动 Beta 或读写真实 Keychain/用户数据；真实 Keychain ACL/锁屏、重启、密钥丢失/轮换及 GUI 验收待后续。

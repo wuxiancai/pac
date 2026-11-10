@@ -184,7 +184,10 @@ final class BetaChatModel {
         defer { isStarting = false }
         let backendSupervisor = supervisor
         do {
-            let handshake = try await Task.detached { try backendSupervisor.start() }.value
+            let databaseKey = try DatabaseKeychainStore().loadOrCreateKey()
+            let handshake = try await Task.detached {
+                try backendSupervisor.start(databaseKey: databaseKey)
+            }.value
             let localClient = try LocalAPIClient(baseURL: handshake.baseURL, token: handshake.token)
             guard try await localClient.health() else { throw LocalAPIClientError.invalidResponse }
             client = localClient
@@ -200,6 +203,8 @@ final class BetaChatModel {
                     status = "找不到本机 Python 或服务代码。请检查虚拟环境，再重试。"
                 case .launchFailed:
                     status = "本机服务进程无法启动。请检查 Python 环境，再重试。"
+                case .databaseKeyDeliveryFailed:
+                    status = "本机加密数据密钥无法安全交给服务进程，未启动服务。"
                 case .startupTimedOut:
                     status = "本机服务启动超时。请检查依赖和端口占用，再重试。"
                 case .invalidHandshake:
