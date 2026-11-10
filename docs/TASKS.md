@@ -66,7 +66,7 @@
 
 2026-11-10 阶段 6 代码提交 `35d6644` 本机 CI 等价门禁：`uv lock --check`、Ruff、CI mypy、tracked-file `detect-secrets-hook`、compileall、后端全量 346 passed、Swift 全量 68 passed 和 `personal-assistant-beta` 构建均通过（后端仅 1 条既有 Starlette/httpx 弃用警告）。远端 Actions 未运行，阶段 6 仍开放。
 
-2026-11-10 V1.1 快捷指令：聊天页“新对话”按钮增加 macOS `⌘N`；`⌘L` 聚焦消息输入框，不发送、不启动语音。快捷键复用既有会话创建逻辑和 SwiftUI FocusState；Swift 全量回归与 Beta target build 结果记录于 `docs/HANDOFF.md`，GUI 实机点验仍待完成。
+2026-11-10 V1.1 快捷指令：聊天页“新对话”按钮增加 macOS `⌘N`；`⌘L` 聚焦消息输入框，不发送、不启动语音。快捷键复用既有会话创建逻辑和 SwiftUI FocusState；Swift 全量回归与 Beta target build 通过。GUI 实测 `⌘L` 将焦点移至消息输入框；`⌘N` 显示“已创建新会话”并打开空会话，未发送消息或启动语音。
 
 2026-11-10 V1.1 本机朗读语速预设：模型设置提供较慢/标准/较快三档，保存在本机，只用于本机语音合成。SpeechEngine 传递速率有自动回归；GUI 及真实声学体验验收待完成，详见 `docs/HANDOFF.md`。
 
