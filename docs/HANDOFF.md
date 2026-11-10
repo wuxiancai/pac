@@ -1417,3 +1417,9 @@
 - 聊天输入栏增加每轮协作角色选择；至少两个角色、最多三个。选择协作角色时客户端要求 Ollama，本轮由主助理汇总。后端在访问网关前拒绝云 Provider、少于两个/重复角色和非主助理汇总请求；按选择顺序执行固定角色，再把不可信 JSON 结果交给主助理。每个角色最多输出 4,000 字，超出或汇总上下文超限时停止并记录失败；所有中间输出只存在本次请求内存，并在同一最终回复中显示/持久化。
 - 验证：`tests/test_beta_api.py tests/test_orchestrator.py` 59 passed；针对协作成功、输出上限失败和 HTTP 断连的 API 回归 3 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` 323 passed、1 条既有 Starlette/httpx 弃用警告；Swift `swift test --package-path poc/macos-audio` 59 passed；Beta product build、Ruff、变更模块 mypy、`git diff --check` 通过。未进行真实 Ollama 多 Agent 质量或 GUI 验收。
 - 后续：GUI 交互和真实 Ollama 答复质量需要本机 Beta 验收；完成前不启用云端、后台、跨会话记忆、工具或外部写。
+
+# 2026-11-10：恢复 V3 多 Agent GUI 验收
+
+- 按最新交接启动 `./poc/macos-audio/scripts/run_beta_app.sh`；构建成功。测试版窗口正常连接本机服务，当前模型显示 `ollama / qwen3.5:0.8b`。协作菜单中的“项目助理”“会议助理”“任务规划”均可见；同时选中项目助理与会议助理后按钮显示“协作 2”，确认最少两角色的界面选择路径可用。
+- 未发送聊天消息：发送会把验收内容持久化到用户 SQLCipher 历史。真实多 Agent Ollama 答复、逐角色结果与汇总呈现因此仍未验收。测试版当前输入框仍选中项目助理和会议助理；下一步可先取消这两个选择，或在用户明确提供可写入的测试会话/验收短句后完成实际发送验收。
+- 本次仅做 GUI 只读观察与角色选择，无代码改动、无测试运行、无麦克风或云 Provider 请求。既有自动回归结果仍以本节之前的报告为准。
