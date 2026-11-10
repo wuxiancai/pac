@@ -1,3 +1,9 @@
+# 2026-11-10：B1 Ollama 本机恢复路径 GUI 验收
+
+- 在显示“本机服务已连接；当前模型：ollama / qwen3.5:0.8b”的本机 Beta 中发送合成短请求 `PAC-OLLAMA-RECOVERY-TEST-20261110：请只回复 PAC-OLLAMA-RECOVERED`。本轮状态显示 Ollama / qwen3.5:0.8b，run `b0f340d1` 已完成，回复为 `PAC-OLLAMA-RECOVERED`。
+- 本机 Ollama 成功路径恢复确认；无云 Provider 请求、无麦克风采集。该消息保留在本机 SQLCipher 会话历史。
+- 云 API 错误 UI、主动停止/重启 Ollama 后的连接恢复仍待验收；B1 保持开放。
+
 # 2026-11-10：B3 已保存记忆来源跳转与合成数据清理
 
 - 在 Beta 记忆中心打开合成记忆来源详情后，点击“在对话中查看”，回到其来源会话；主界面显示对应会话提示，来源用户消息可见并定位在聊天内容顶部。
