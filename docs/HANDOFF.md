@@ -1548,3 +1548,9 @@
 - 在已运行的 Beta 中分别打开“日历”和“提醒事项”面板并点击“授权并读取”。日历面板成功显示未来 30 天 2 项；提醒事项面板成功显示未来 30 天没有未完成事项。两面板均明确只读边界，操作后正常关闭回聊天界面。
 - 本轮未出现新的 macOS 授权弹窗，故仅证明当前授权状态下真实 EventKit 查询、展示路径可用；首次授权与拒绝路径仍待验收。未修改、创建、删除、持久化或发送任何日历/提醒内容，也未访问 Keychain、Provider 或麦克风。
 - 已更新 `docs/TASKS.md`、`docs/PROJECT_CONTEXT.md` 与 `docs/beta/persistent-storage.md`；B6 继续 IN PROGRESS。
+
+### 2026-11-10：B1 本机模型失败路径 GUI 验收
+
+- 在新建本机会话临时选择不存在的 Ollama 模型 `pac-test-model-not-installed`，发送合成短句后，GUI 显示明确的本机模型/安装检查提示，本轮 run 标为失败；Provider 保持 Ollama，没有云 fallback。之后恢复原模型 `qwen3.5:0.8b`，界面显示本机服务已连接、当前模型已恢复。
+- 测试短句和失败状态保留在新建 SQLCipher 会话；没有删除用户数据。没有发送云请求、读取 Keychain 或采集麦克风。仍需真实验证 Ollama 停止/恢复、读超时和云 API 错误 UI。
+- 已更新 `docs/beta/macOS-beta-chat.md`、`docs/TASKS.md` 与 `docs/PROJECT_CONTEXT.md`。
