@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-- 2026-11-10 V3 D-022 范围已由用户确认：首个外部写只支持逐次审批创建一个事件到 macOS 默认日历。受认证、metadata-only 的 SQLCipher 审计 API 与 EventKit write-only 创建服务已实现；Beta 确认 UI 与前后审计客户端闭环尚未接通，当前 UI 不会写日历。详见 `docs/TASKS.md` 与最新 `docs/HANDOFF.md`。
+- 2026-11-10 V3 D-022 范围已由用户确认：首个外部写只支持逐次审批创建一个事件到 macOS 默认日历。受认证、metadata-only 的 SQLCipher 审计 API、EventKit write-only 创建服务、Swift 审计客户端和逐次确认 UI 已实现；自动测试与打包通过。真实系统授权及日历创建尚未实机验收。详见 `docs/TASKS.md` 与最新 `docs/HANDOFF.md`。
 - 2026-11-10 V1.1 模型预设：可在本机命名保存/应用/删除模型来源、型号和白名单 Provider 选择，兼容早期 UserDefaults 预设格式；不包含凭据，云预设继续使用既有安全/预算/审计边界。GUI 验收状态见 `docs/HANDOFF.md`。
 - 2026-11-10 V1.1 本机朗读预设：模型设置新增较慢/标准/较快三档，默认系统标准值并保存在本机，仅传给本机 TTS；GUI/声学体验待验收，见 `docs/HANDOFF.md`。
 - 2026-11-10 V1.1 快捷指令：聊天页“新对话”支持 `⌘N`，`⌘L` 聚焦消息输入，发送沿用既有 `⌘↩`。自动化/构建结果和 GUI 实机点验状态见 `docs/HANDOFF.md`。

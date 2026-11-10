@@ -94,6 +94,10 @@ public final class CalendarEventCreationService {
         self.writer = writer
     }
 
+    public func invalidateReadiness() {
+        isReadyToCreate = false
+    }
+
     /// Requests write access only after the user explicitly starts the creation flow.
     /// This method never saves an event.
     public func prepareForEventCreation() async -> Bool {

@@ -165,4 +165,4 @@ swift test --package-path poc/macos-audio
 ### 2026-11-10 V3 日历事件逐次审批范围
 
 - 用户指定第一个外部写入只创建一个非重复事件到 macOS 默认日历。用户手动填事件、确认预览后逐次批准；多 Agent 与 Skills 不能触发 EventKit 写入。目标日历可能由 macOS 账户同步，UI 必须清楚披露。
-- B10 已增加认证审计 API，按固定路由/原因码把 `ATTEMPTED` 和终态写入 SQLCipher；请求体不含标题、时间等事件内容。EventKit write-only 创建服务现可请求授权、检查默认日历并在调用方确认后保存经过边界校验的单个事件；服务自动回归不访问真实日历。UI 仍必须在保存前成功记录 `ATTEMPTED`，保存后记录 `SUCCEEDED`/`FAILED`，并在前置审计失败时阻止写入。确认 UI 和审计客户端闭环尚未实现；D-022 与工作证据见 `docs/DECISIONS.md`、`docs/HANDOFF.md`。
+- B10 已增加认证审计 API，按固定路由/原因码把 `ATTEMPTED` 和终态写入 SQLCipher；请求体不含标题、时间等事件内容。EventKit write-only 创建服务、metadata-only Swift 审计客户端和独立确认 UI 已接通：成功写入前必须记录 `ATTEMPTED`，保存后记录 `SUCCEEDED`/`FAILED`，前置审计失败阻止写入，最终审计失败显示提示且不重试。服务自动回归不访问真实日历；真实权限与创建闭环尚未实机验收。D-022 与证据见 `docs/DECISIONS.md`、`docs/HANDOFF.md`。

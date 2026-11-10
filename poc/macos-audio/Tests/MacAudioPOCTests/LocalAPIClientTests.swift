@@ -39,7 +39,7 @@ private final class CalendarAuditURLProtocol: URLProtocol {
             stream.close()
             payload = collected
         }
-        ModelCapabilityRequestCapture.shared.record(request, body: payload)
+        CalendarAuditRequestCapture.shared.record(request, body: payload)
         let response = HTTPURLResponse(
             url: request.url!, statusCode: 201, httpVersion: "HTTP/1.1",
             headerFields: ["Content-Type": "application/json"]
@@ -378,6 +378,29 @@ private final class ModelCapabilityRequestCapture: @unchecked Sendable {
     }
 }
 
+private final class CalendarAuditRequestCapture: @unchecked Sendable {
+    static let shared = CalendarAuditRequestCapture()
+    private let lock = NSLock()
+    private var storedRequest: URLRequest?
+    private var storedBody: Data?
+
+    func record(_ request: URLRequest, body: Data?) {
+        lock.lock()
+        storedRequest = request
+        storedBody = body
+        lock.unlock()
+    }
+
+    func take() -> (URLRequest?, Data?) {
+        lock.lock()
+        defer { lock.unlock() }
+        let result = (storedRequest, storedBody)
+        storedRequest = nil
+        storedBody = nil
+        return result
+    }
+}
+
 private final class ModelCapabilityURLProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -466,12 +489,12 @@ private final class MismatchedModelCapabilityURLProtocol: URLProtocol {
         decision: .attempted, reason: .userApproved
     )
 
-    let request = ModelCapabilityRequestCapture.shared.take()
+    let (request, payload) = CalendarAuditRequestCapture.shared.take()
     #expect(request?.url?.path == "/security-audit/calendar-event")
     #expect(request?.httpMethod == "POST")
     #expect(request?.value(forHTTPHeaderField: "Authorization") == "Bearer ephemeral-calendar-audit-token")
-    let payload = try #require(ModelCapabilityRequestCapture.shared.takeBody())
-    let json = try #require(JSONSerialization.jsonObject(with: payload) as? [String: String])
+    let body = try #require(payload)
+    let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
     #expect(json["trace_id"] == traceID.uuidString)
     #expect(json["resource_id"] == resourceID.uuidString)
     #expect(json["decision"] == "ATTEMPTED")

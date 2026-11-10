@@ -15,7 +15,13 @@
 
 - `LocalAPIClient.recordCalendarEventAudit` 已接认证端点，状态和原因码使用固定枚举；发送 trace/resource UUID 和状态码，不包含标题、时间、地点、备注。非 201（包括 SQLCipher 审计不可用 503）直接失败，调用 UI 必须在写入前阻断。
 - 验证：两项窄回归通过，覆盖请求路径/认证/四字段 metadata-only payload，以及 503 失败关闭。未执行 EventKit 写入。
-- 下一段实现手填日历事件 UI：系统授权准备、预览、逐次确认、ATTEMPTED→EventKit→SUCCEEDED/FAILED 与最终审计失败提示，并加 write-only purpose string。
+- 后续已由下方“B10 日历创建审批 UI”交付；继续实机验收权限、事件和审计故障路径。
+
+# 2026-11-10：B10 日历创建审批 UI
+
+- Beta 聊天工具栏新增独立“创建事件”入口，表单由用户输入标题/起止时间/可选地点备注，说明默认日历可能同步。显式检查权限时只申请/检查权限；展示完整预览和第二次确认。确认动作先向 SQLCipher 审计 API 写 `ATTEMPTED`，失败则阻止 EventKit；再写事件并记录 `SUCCEEDED`/`FAILED`。最终审计失败时提示事件结果并禁止自动重试。读日历面板文案现明确其自身保持只读。Info.plist 同时声明 write-only purpose string，并更新 full-access 说明。
+- 验证：`swift test --package-path poc/macos-audio` → 79 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功；`poc/macos-audio/scripts/build_beta_app.sh` 成功生成 `.poc-data/personal-assistant-beta.app`。一次并发全量回归发现两个测试共用 request capture 导致竞争；改为独立 capture 后全量重跑通过。
+- 未运行 App 触发系统授权，也未创建真实事件。实机首次授权/拒绝、成功创建、前置审计故障阻断和最终审计故障提示仍待验收；B10 保持 IN PROGRESS。
 
 # 2026-11-10：模型预设旧格式迁移
 

@@ -900,6 +900,19 @@ final class BetaChatModel {
         }
     }
 
+    func recordCalendarEventAudit(
+        traceID: UUID,
+        resourceID: UUID,
+        decision: CalendarEventAuditDecision,
+        reason: CalendarEventAuditReason
+    ) async throws {
+        guard let client else { throw LocalAPIClientError.invalidResponse }
+        try await client.recordCalendarEventAudit(
+            traceID: traceID, resourceID: resourceID,
+            decision: decision, reason: reason
+        )
+    }
+
     func refreshModelCapabilities() async {
         guard let client else {
             modelCapabilityStatus = "本机服务尚未就绪，无法查询型号能力。"
@@ -1249,6 +1262,7 @@ private struct BetaChatView: View {
     @State private var showingUsage = false
     @State private var showingBackup = false
     @State private var showingCalendar = false
+    @State private var showingCalendarEventCreation = false
     @State private var showingReminders = false
     @State private var showingDeleteChatConfirmation = false
     @State private var showingTasks = false
@@ -1370,6 +1384,10 @@ private struct BetaChatView: View {
                     Label("日历", systemImage: "calendar")
                 }
                 .accessibilityIdentifier("calendar-read-only-button")
+                Button { showingCalendarEventCreation = true } label: {
+                    Label("创建事件", systemImage: "calendar.badge.plus")
+                }
+                .accessibilityIdentifier("calendar-event-create-button")
                 Button { showingReminders = true } label: {
                     Label("提醒事项", systemImage: "checklist")
                 }
@@ -1646,6 +1664,10 @@ private struct BetaChatView: View {
             CalendarReadOnlyView()
                 .frame(minWidth: 520, minHeight: 420)
         }
+        .sheet(isPresented: $showingCalendarEventCreation) {
+            CalendarEventCreationView(model: model)
+                .frame(minWidth: 520, minHeight: 620)
+        }
         .sheet(isPresented: $showingReminders) {
             CalendarRemindersReadOnlyView()
                 .frame(minWidth: 520, minHeight: 420)
@@ -1788,7 +1810,7 @@ private struct CalendarReadOnlyView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("本机日历（只读）").font(.title2.bold())
-            Text("系统需要授予日历完整访问权限才能读取；应用只查询未来 30 天的事件，不会创建、修改或删除事件，也不会保存或发送日历内容。")
+            Text("系统需要授予日历完整访问权限才能读取；此面板只查询未来 30 天的事件，不修改、创建或删除日历内容，也不会保存或发送日历内容。创建事件位于独立入口，并且每次都需确认。")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Text(service.status).font(.caption).foregroundStyle(.secondary)
@@ -1819,6 +1841,146 @@ private struct CalendarReadOnlyView: View {
             }
         }
         .padding(18)
+    }
+}
+
+@available(macOS 14.0, *)
+private struct CalendarEventCreationView: View {
+    let model: BetaChatModel
+    @State private var service = CalendarEventCreationService()
+    @Environment(\.dismiss) private var dismiss
+    @State private var title = ""
+    @State private var startDate = Date().addingTimeInterval(3_600)
+    @State private var endDate = Date().addingTimeInterval(7_200)
+    @State private var location = ""
+    @State private var notes = ""
+    @State private var isCheckingPermission = false
+    @State private var isCreating = false
+    @State private var showingConfirmation = false
+    @State private var status = "填写事件后检查日历创建权限；检查不会创建事件。"
+
+    private var draft: CalendarEventDraft {
+        CalendarEventDraft(
+            title: title,
+            startDate: startDate,
+            endDate: endDate,
+            location: location,
+            notes: notes
+        )
+    }
+
+    private var preview: String {
+        "标题：\(title.trimmingCharacters(in: .whitespacesAndNewlines))\n开始：\(startDate.formatted(date: .long, time: .shortened))\n结束：\(endDate.formatted(date: .long, time: .shortened))\n地点：\(location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "（无）" : location)\n备注：\(notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "（无）" : notes)\n目标：macOS 当前默认日历（该账户可能会同步此事件）"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("创建日历事件").font(.title2.bold())
+            Text("只创建一个非重复事件，不添加邀请或提醒。事件写入 macOS 当前默认日历；日历账户可能会将其同步到其他设备。")
+                .font(.caption).foregroundStyle(.secondary)
+            Form {
+                TextField("标题", text: $title)
+                    .accessibilityIdentifier("calendar-event-title-field")
+                DatePicker("开始", selection: $startDate)
+                DatePicker("结束", selection: $endDate)
+                TextField("地点（可选）", text: $location)
+                TextField("备注（可选）", text: $notes, axis: .vertical)
+                    .lineLimit(2...5)
+            }
+            HStack {
+                Text(status).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(isCheckingPermission ? "正在检查…" : "检查创建权限") {
+                    isCheckingPermission = true
+                    Task {
+                        let ready = await service.prepareForEventCreation()
+                        status = service.status
+                        if ready && !model.isBackendConnected {
+                            service.invalidateReadiness()
+                            status = "本机审计服务不可用；连接恢复前不能创建事件。"
+                        }
+                        isCheckingPermission = false
+                    }
+                }
+                .disabled(isCheckingPermission || isCreating)
+                .accessibilityIdentifier("calendar-event-check-permission-button")
+            }
+            if service.isReadyToCreate && model.isBackendConnected {
+                Text("确认预览\n\(preview)")
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("calendar-event-preview")
+                Button("预览并确认创建…") { showingConfirmation = true }
+                    .disabled(isCreating)
+                    .accessibilityIdentifier("calendar-event-review-button")
+            }
+            Spacer(minLength: 0)
+            HStack {
+                Spacer()
+                Button("完成") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(18)
+        .confirmationDialog(
+            "确认创建此日历事件？",
+            isPresented: $showingConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("确认并创建", role: .destructive) {
+                Task { await createAfterConfirmation() }
+            }
+            .accessibilityIdentifier("calendar-event-confirm-create-button")
+            Button("返回修改", role: .cancel) {}
+        } message: {
+            Text(preview)
+        }
+    }
+
+    @MainActor
+    private func createAfterConfirmation() async {
+        guard !isCreating, service.isReadyToCreate else { return }
+        isCreating = true
+        defer { isCreating = false }
+        let traceID = UUID()
+        let resourceID = UUID()
+        do {
+            try await model.recordCalendarEventAudit(
+                traceID: traceID, resourceID: resourceID,
+                decision: .attempted, reason: .userApproved
+            )
+        } catch {
+            service.invalidateReadiness()
+            status = "加密审批审计不可用；事件未写入日历。"
+            return
+        }
+
+        do {
+            try service.createApprovedEvent(draft)
+        } catch {
+            do {
+                try await model.recordCalendarEventAudit(
+                    traceID: traceID, resourceID: resourceID,
+                    decision: .failed, reason: .eventCreationFailed
+                )
+                status = "日历未能创建事件；失败状态已写入审计。请检查内容或权限后再决定是否重试。"
+            } catch {
+                status = "日历未能创建事件，且失败审计未能保存。请勿假定事件已创建。"
+            }
+            service.invalidateReadiness()
+            return
+        }
+
+        do {
+            try await model.recordCalendarEventAudit(
+                traceID: traceID, resourceID: resourceID,
+                decision: .succeeded, reason: .eventCreated
+            )
+            status = "事件已创建，成功状态已写入加密审计。"
+        } catch {
+            status = "事件已创建，但最终审计未能保存。为避免重复事件，请勿再次提交。"
+        }
+        service.invalidateReadiness()
     }
 }
 
