@@ -1696,3 +1696,8 @@
 
 - Swift URLProtocol 新增覆盖：未知 `qwen3.5:8b` 报告无核验时间/证据时，所有缺失能力均保持 `unknown`；服务器返回另一型号的能力报告时客户端拒绝；HTTP 503 响应体不暴露给 UI，只映射安全状态码错误。
 - 定向 capability 负向回归 2 passed；Swift 全量 `swift test --package-path poc/macos-audio` → 66 passed；Beta target build 通过。正向 loopback 查询回归也在全量中通过。
+
+# 2026-11-10：B3 会话分页异步竞态保护
+
+- 检查发现加载较早消息后若用户切换会话，旧分页响应可能在切换后返回并追加到当前消息数组；快速连续选择会话也可能由较早请求的迟到响应覆盖较新选择。Beta 客户端增加历史读取代际校验、分页请求 ID 和会话 ID 核对；创建/删除、恢复、发送、来源跳转和会话选择会令旧请求及加载态失效，迟到请求不会清除新分页请求的加载态。
+- 验证：`swift test --package-path poc/macos-audio` → 66 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。尚未实机验证并发切换；Beta UI 访问超时。之前新增的显式来源跳转按钮仍待 GUI 点验，临时记忆仍需在 UI 中删除。未直接操作数据库。

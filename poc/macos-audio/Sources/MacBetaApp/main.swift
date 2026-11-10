@@ -84,6 +84,8 @@ final class BetaChatModel {
     private var client: LocalAPIClient?
     private var activeRequest: Task<Void, Never>?
     private var activeRequestID: UUID?
+    private var historyRequestGeneration: UInt64 = 0
+    private var olderMessagesRequestID: UUID?
     private(set) var latestRunID: String?
     private(set) var latestRunStatus: LocalChatRunStatus?
     private(set) var importedTextFiles: [LocalImportedTextFile] = []
@@ -218,6 +220,12 @@ final class BetaChatModel {
         )
     }
 
+    private func invalidateHistoryRequests() {
+        historyRequestGeneration &+= 1
+        olderMessagesRequestID = nil
+        isLoadingOlderMessages = false
+    }
+
     func start() async {
         guard client == nil, !isStarting else { return }
         isStarting = true
@@ -295,6 +303,7 @@ final class BetaChatModel {
         }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        invalidateHistoryRequests()
         draft = ""
         messages.append(LocalChatMessage(role: "user", content: text))
         messages.append(LocalChatMessage(role: "assistant", content: ""))
@@ -350,10 +359,13 @@ final class BetaChatModel {
                 }
                 guard let self, self.activeRequestID == requestID else { return }
                 self.status = "本机服务已连接；本轮使用：\(provider) / \(modelID)"
+                let historyGeneration = self.historyRequestGeneration
                 self.activeRequest = nil
                 self.activeRequestID = nil
                 if runID != nil { self.latestRunStatus = .completed }
                 if let history = try? await client.chatHistory(conversationID: activeConversationID) {
+                    guard historyGeneration == self.historyRequestGeneration,
+                          self.conversationID == activeConversationID else { return }
                     self.messages = history.messages
                     self.hasOlderMessages = history.hasMore
                 }
@@ -508,16 +520,27 @@ final class BetaChatModel {
     func loadOlderMessages() async {
         guard !isLoadingOlderMessages, hasOlderMessages,
               let client, let conversationID, let cursor = messages.first?.id else { return }
+        let generation = historyRequestGeneration
+        let requestID = UUID()
+        olderMessagesRequestID = requestID
         isLoadingOlderMessages = true
-        defer { isLoadingOlderMessages = false }
+        defer {
+            if olderMessagesRequestID == requestID {
+                olderMessagesRequestID = nil
+                isLoadingOlderMessages = false
+            }
+        }
         do {
             let page = try await client.chatHistory(
                 conversationID: conversationID, beforeMessageID: cursor
             )
-            guard page.conversationID == conversationID else { return }
+            guard generation == historyRequestGeneration,
+                  self.conversationID == conversationID,
+                  page.conversationID == conversationID else { return }
             messages = page.messages + messages
             hasOlderMessages = page.hasMore
         } catch {
+            guard generation == historyRequestGeneration else { return }
             status = "无法加载更早的聊天记录：\(error.localizedDescription)"
         }
     }
@@ -536,14 +559,18 @@ final class BetaChatModel {
             status = "请先停止当前生成，再切换会话。"
             return
         }
+        invalidateHistoryRequests()
+        let generation = historyRequestGeneration
         do {
             let history = try await client.chatHistory(conversationID: conversation.id)
+            guard generation == historyRequestGeneration else { return }
             conversationID = history.conversationID
             messages = history.messages
             hasOlderMessages = history.hasMore
             lastAssistantResponseInterrupted = false
             status = "已切换到：\(conversation.title)"
         } catch {
+            guard generation == historyRequestGeneration else { return }
             status = "无法打开该会话：\(error.localizedDescription)"
         }
     }
@@ -553,6 +580,8 @@ final class BetaChatModel {
             status = "请先停止当前生成，再打开来源会话。"
             return
         }
+        invalidateHistoryRequests()
+        let generation = historyRequestGeneration
         do {
             var history = try await client.chatHistory(conversationID: source.conversationID)
             var loadedMessages = history.messages
@@ -562,8 +591,10 @@ final class BetaChatModel {
                 history = try await client.chatHistory(
                     conversationID: source.conversationID, beforeMessageID: cursor
                 )
+                guard generation == historyRequestGeneration else { return }
                 loadedMessages = history.messages + loadedMessages
             }
+            guard generation == historyRequestGeneration else { return }
             guard loadedMessages.contains(where: { $0.id == source.messageID }) else {
                 status = "来源消息已不在会话历史中。"
                 return
@@ -575,6 +606,7 @@ final class BetaChatModel {
             pendingSourceMessageID = source.messageID
             status = "已打开记忆来源会话：\(source.conversationTitle)"
         } catch {
+            guard generation == historyRequestGeneration else { return }
             status = "无法打开记忆来源会话：\(error.localizedDescription)"
         }
     }
@@ -599,8 +631,14 @@ final class BetaChatModel {
             status = "请先停止当前生成，再新建会话。"
             return
         }
+        invalidateHistoryRequests()
+        let generation = historyRequestGeneration
         do {
             let conversation = try await client.createConversation()
+            guard generation == historyRequestGeneration else {
+                await refreshConversations()
+                return
+            }
             conversations.insert(conversation, at: 0)
             conversationID = conversation.id
             messages = []
@@ -658,6 +696,7 @@ final class BetaChatModel {
     }
 
     func restoreEncryptedBackup(from url: URL, password: String) async {
+        invalidateHistoryRequests()
         do {
             try await TouchIDAuthorizer().authorize(reason: "恢复本机加密数据")
             guard let client else { backupStatus = "本机服务尚未就绪。"; return }
@@ -811,9 +850,15 @@ final class BetaChatModel {
             status = "请先停止当前生成，再删除聊天记录。"
             return
         }
+        invalidateHistoryRequests()
+        let generation = historyRequestGeneration
         do {
             guard let conversationID else { return }
             try await client.deleteChatHistory(conversationID: conversationID)
+            guard generation == historyRequestGeneration else {
+                await refreshConversations()
+                return
+            }
             messages.removeAll()
             lastAssistantResponseInterrupted = false
             conversations.removeAll { $0.id == conversationID }
