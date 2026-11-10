@@ -129,3 +129,8 @@ swift test --package-path poc/macos-audio
 
 
 2026-11-10 D-005 月预算请求门禁实现：新增 Alembic `0004_monthly_cloud_budget`，只在 SQLCipher 中保存每个自然月的估算人民币总额、请求数和价目版本，不保存提示词或回复。数据库 upsert 原子累加，store 内串行化 SQLCipher 连接池访问；出站前在共享数据库事务中检查累计值和所有未过期预留，再原子创建当前请求预留，完成后在同一事务中删除预留并计入最终估算。单个 Beta 服务进程另用异步锁串行云请求；预估按 UTF-8 字节输入和适配器最大 1,024 输出 token，预留五分钟过期回收、活动流每分钟续租（远端 HTTP 读取空闲超时 45 秒）。无持久库、账本写入失败或未知价目时阻止云请求。`GET /usage` 在单个 SQLCipher read transaction 中返回已结算、在途预留与合计预估，并据合计状态报告 80 元提示和 100 元拦截；macOS 用量页分别显示已累计估算与执行中预留。当前月历史账单无法回填；真实 Provider usage/cost E2E 与价格快照更新流程仍待验收。双 store 实例并发预留/结算自动回归通过，完整测试与 GUI 手动验收详见最新 HANDOFF。
+
+#### D-003 30 天 metadata-only 云请求审计（2026-11-10）
+
+- SQLCipher migration `0005_security_audit` 为当前 Beta 云聊天写入策略拒绝、用户确认/预算门后请求尝试和完成/失败/取消终态。审计仅保留 provider/model/region/purpose/data level/决策与固定 reason code、trace/resource UUID 和时间；不保存 Consent grant、消息正文、回复、Key/Token 或音频。
+- 记录写入、服务启动和认证用量查询时清理 30 天前记录。`GET /usage` 返回最多 100 条审计事件；Swift 用量页按最近 30 天安全记录与进程内 Usage 明细分区显示。自动契约覆盖拒绝/成功路径、超期删除与无正文；还没有真实 Provider 请求或 GUI 实机呈现验收。Consent 持久授权本身仍不保存，未来新增外部写或其他敏感能力时必须补充对应审计事件。

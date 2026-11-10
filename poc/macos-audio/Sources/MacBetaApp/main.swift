@@ -90,6 +90,7 @@ final class BetaChatModel {
     private(set) var isImportingFiles = false
     private(set) var usageRecords: [LocalUsageRecord] = []
     private(set) var cloudBudget: LocalMonthlyCloudBudget?
+    private(set) var securityAuditEvents: [LocalSecurityAuditEvent] = []
     private(set) var usageStatus = "尚未读取本机用量。"
     private(set) var isLoadingUsage = false
     private var lastAssistantResponseInterrupted = false
@@ -821,6 +822,7 @@ final class BetaChatModel {
             let snapshot = try await client.recentUsage()
             usageRecords = snapshot.records
             cloudBudget = snapshot.budget
+            securityAuditEvents = snapshot.auditEvents
             usageStatus = snapshot.records.isEmpty
                 ? "此进程尚无聊天用量记录。记录仅保存在本机内存，退出后清空。"
                 : "显示最近 \(snapshot.records.count) 条记录；退出应用后记录清空。"
@@ -1718,34 +1720,60 @@ private struct UsageHistoryView: View {
             Text("单次费用只显示服务端明确返回值；月预算按版本化公开价估算，不代表账单实扣金额，且仅统计本功能启用后的本机记录。")
                 .font(.caption).foregroundStyle(.secondary)
             Divider()
-            if model.usageRecords.isEmpty {
+            if model.usageRecords.isEmpty && model.securityAuditEvents.isEmpty {
                 ContentUnavailableView("暂无记录", systemImage: "chart.bar", description: Text(model.usageStatus))
             } else {
-                List(model.usageRecords) { record in
-                    VStack(alignment: .leading, spacing: 5) {
-                        HStack {
-                            Text("\(record.provider) / \(record.model)").font(.headline)
-                            Spacer()
-                            Text("\(record.latencyMS) ms").monospacedDigit()
-                        }
-                        HStack {
-                            Text("\(record.purposeDisplayName) · \(record.dataLevelDisplayName)")
-                            Spacer()
-                            Text(record.status.displayName)
-                        }
-                        HStack {
-                            Text("\(record.regionDisplayName) · \(record.startedAtDate.formatted(date: .numeric, time: .shortened))")
-                            Spacer()
-                            Text("\(record.usageState == "actual" ? "实际 token" : record.usageState == "estimated" ? "估算 token" : "token 未知")")
-                        }
-                        HStack {
-                            Text("输入 \(record.promptTokens.map { String($0) } ?? "—")（缓存命中 \(record.cachedPromptTokens.map { String($0) } ?? "—")）/ 输出 \(record.completionTokens.map { String($0) } ?? "—")")
-                            Spacer()
-                            Text(costDescription(record))
+                List {
+                    if !model.securityAuditEvents.isEmpty {
+                        Section("最近 30 天云端安全记录（最多 100 条）") {
+                            ForEach(model.securityAuditEvents) { event in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text("\(event.providerID) / \(event.modelID)").font(.headline)
+                                        Spacer()
+                                        Text(auditDecisionDescription(event))
+                                    }
+                                    HStack {
+                                        Text("\(event.region) · \(event.dataSensitivity) · \(auditDateDescription(event.createdAt))")
+                                        Spacer()
+                                        Text(auditReasonDescription(event.reasonCode))
+                                    }
+                                }
+                                .font(.caption)
+                                .padding(.vertical, 3)
+                            }
                         }
                     }
-                    .font(.caption)
-                    .padding(.vertical, 3)
+                    if !model.usageRecords.isEmpty {
+                        Section("本进程最近请求用量") {
+                            ForEach(model.usageRecords) { record in
+                                VStack(alignment: .leading, spacing: 5) {
+                                    HStack {
+                                        Text("\(record.provider) / \(record.model)").font(.headline)
+                                        Spacer()
+                                        Text("\(record.latencyMS) ms").monospacedDigit()
+                                    }
+                                    HStack {
+                                        Text("\(record.purposeDisplayName) · \(record.dataLevelDisplayName)")
+                                        Spacer()
+                                        Text(record.status.displayName)
+                                    }
+                                    HStack {
+                                        Text("\(record.regionDisplayName) · \(record.startedAtDate.formatted(date: .numeric, time: .shortened))")
+                                        Spacer()
+                                        Text("\(record.usageState == "actual" ? "实际 token" : record.usageState == "estimated" ? "估算 token" : "token 未知")")
+                                    }
+                                    HStack {
+                                        Text("输入 \(record.promptTokens.map { String($0) } ?? "—")（缓存命中 \(record.cachedPromptTokens.map { String($0) } ?? "—")）/ 输出 \(record.completionTokens.map { String($0) } ?? "—")")
+                                        Spacer()
+                                        Text(costDescription(record))
+                                    }
+                                }
+                                .font(.caption)
+                                .padding(.vertical, 3)
+                            }
+                        }
+                    }
                 }
                 .listStyle(.plain)
             }
@@ -1760,6 +1788,44 @@ private struct UsageHistoryView: View {
         }
         let kind = record.costState == "actual" ? "实扣" : "估算"
         return "\(kind) \(amount.formatted()) \(currency)"
+    }
+
+    private func auditDecisionDescription(_ event: LocalSecurityAuditEvent) -> String {
+        switch event.decision {
+        case "ATTEMPTED": "已提交授权检查"
+        case "SUCCEEDED": "已完成"
+        case "FAILED": "失败"
+        case "CANCELLED": "已取消"
+        case "DENIED": "已拒绝"
+        default: "状态未知"
+        }
+    }
+
+    private func auditDateDescription(_ timestamp: String) -> String {
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = fractionalFormatter.date(from: timestamp)
+            ?? ISO8601DateFormatter().date(from: timestamp)
+        guard let date else {
+            return timestamp
+        }
+        return date.formatted(date: .numeric, time: .shortened)
+    }
+
+    private func auditReasonDescription(_ reason: String) -> String {
+        switch reason {
+        case "user_confirmation_missing": "缺少本次确认"
+        case "secret_pattern_blocked": "内容疑似包含凭据"
+        case "local_document_blocked": "所选资料仅允许本机使用"
+        case "collaboration_local_only": "多角色协作仅允许本机模型"
+        case "unsupported_model": "服务商型号不在允许范围内"
+        case "monthly_budget_limit": "月预算上限已触发"
+        case "user_confirmed_budget_reserved": "已确认并预留预算，进入授权检查"
+        case "provider_stream_completed": "服务商响应流已结束"
+        case "provider_or_policy_failed": "服务或策略检查失败"
+        case "request_cancelled": "请求已取消"
+        default: "其他请求结果"
+        }
     }
 
     private func budgetDescription(_ budget: LocalMonthlyCloudBudget) -> String {

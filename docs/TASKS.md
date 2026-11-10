@@ -57,7 +57,7 @@
 
 2026-11-10 阶段 6 在提交 `4d16bec` 的本机等价门禁：依赖锁、Ruff、mypy、tracked-file secret scan、compileall、后端 282 项、Swift 44 项及 Beta target build 均通过。Swift 门禁首次复现了 B5 URLProtocol 测试共享静态捕获器的并行竞态；已隔离拒绝路径网络探针，修复后 Swift 全量复跑通过。远端 GitHub Actions 未运行。
 
-0. **阶段 1 工程底座（DONE，当前决策范围）**：Loopback API trace、统一错误、依赖注入、最小 health、集中配置和可注入进程启动设置均完成；云凭据保存/删除需 Touch ID 或设备密码 gate。Ruff、mypy、secret scan、锁文件、Python/Swift 测试及 `personal-assistant-beta` 产品构建进入 CI。SQLCipher 数据库、schema migration、聊天/任务/确认记忆持久化与加密备份恢复已按 D-003/D-006/D-007 决策实现并分阶段验收；30 天 metadata-only 持久审计日志仍未实现，因此这不是规格书完整 V1 持久化底座验收。
+0. **阶段 1 工程底座（DONE，当前决策范围）**：Loopback API trace、统一错误、依赖注入、最小 health、集中配置和可注入进程启动设置均完成；云凭据保存/删除需 Touch ID 或设备密码 gate。Ruff、mypy、secret scan、锁文件、Python/Swift 测试及 `personal-assistant-beta` 产品构建进入 CI。SQLCipher 数据库、schema migration、聊天/任务/确认记忆持久化与加密备份恢复已按 D-003/D-006/D-007 决策实现并分阶段验收；云 Provider 聊天请求的 30 天 metadata-only 审计已接入并在用量页展示；尚未覆盖的审计事件应在对应安全敏感能力启用前补齐，因此这不是规格书完整 V1 持久化底座验收。
 
 1. **B0 应用可运行骨架（DONE）**：SwiftUI 单实例窗口的本机 Beta 入口已完成；本机后端启动、健康状态、错误恢复和关窗退出清理均已验证。
 2. **B1 本机文字对话和模型设置（IN PROGRESS）**：本机 Ollama/固定云端配置选择；选中云端 Provider 后持续授权，聊天时不弹逐条确认；Keychain 凭据和无自动 fallback。用户与本轮 GUI 均确认 Ollama 正常运行时本机聊天可回复。模型设置云端披露已实机复核，Ollama 双进程与模型安装帮助说明已实机确认。长流取消后 Ollama 短请求明显变慢，疑似上游 runner 槽释放问题；停止提示已如实区分客户端取消与上游状态。需确认可用 Ollama 版本/恢复策略，并完成可本地验证的错误路径和云 API 错误 UI 验收。
@@ -65,7 +65,7 @@
 4. **单助理编排框架（IN PROGRESS）**：`MainAssistantOrchestrator` 支持封闭的固定 profile registry：主助理、项目、会议、任务规划；角色由 UI 显式选择，后端只接受四个固定键并将固定指导放入 system context，主助理路径保持原样。角色本身没有工具/后台执行/外部写权限。其余已有能力、待验收项详见 `docs/beta/orchestrator-framework.md`；版本化估价和跨实例 SQLCipher 月度预算预留/结算已接入；当前月回填限制、真实云型号 usage/cost E2E 与价格快照更新仍待关闭。
 5. 用户已决定本地持久化聊天、任务与确认记忆；B3 存储/API/UI 持续开发。D-014 已完成一轮离线候选评测（合成集 23/24 top-1，缺真实标注集与 FTS 对照），仍需扩充评测后再定是否启用；D-015 通用导出已暂缓。D-012 文件导入按格式分步启用：TXT/Markdown 的文件选择、暂存、聊天引用和移除已通过单一样本 GUI 验收；PDF 在解析器资源限制安全 POC 前保持禁用。D-006 手动加密备份导出/当前 Mac 恢复已实现；预备份已按新决议只保留最近一份，新副本在恢复切换成功后原子替换；连续恢复窄测通过。GUI、Keychain 实机认证、强制终止/断电恢复仍待验收。B4 千问 Token Plan 文本/实时语音仍须符合个人版条款及 Consent/Policy，不接入自建应用路径。
 
-阶段 1 当前决策允许的工程底座已完成并有 CI 门禁；SQLCipher 产品数据库与迁移已用于当前 Beta。D-005 跨实例原子月预算请求门已实现，真实 Provider 端到端计费核对仍待验收；持久审计、PDF 产品导入和产品 Embedding 仍未启用，按追踪矩阵触发点排期。TXT/Markdown 导入在 B5 增量实现中，不代表完整文件导入验收。完整阶段状态以追踪矩阵 §6 为准。
+阶段 1 当前决策允许的工程底座已完成并有 CI 门禁；SQLCipher 产品数据库与迁移已用于当前 Beta。D-005 跨实例原子月预算请求门已实现，真实 Provider 端到端计费核对仍待验收；其余安全操作审计、PDF 产品导入和产品 Embedding 仍未启用，按追踪矩阵触发点排期。TXT/Markdown 导入在 B5 增量实现中，不代表完整文件导入验收。完整阶段状态以追踪矩阵 §6 为准。
 
 ### 非阻塞问题回修清单
 

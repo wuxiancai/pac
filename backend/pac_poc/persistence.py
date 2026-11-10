@@ -9,8 +9,9 @@ import stat
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import re
 from threading import Lock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import sqlcipher3.dbapi2 as sqlcipher
 from alembic import command
@@ -344,6 +345,86 @@ class EncryptedApplicationStore:
             connection.execute(text(
                 "DELETE FROM monthly_cloud_budget_reservations WHERE reservation_id=:id"
             ), {"id": reservation_id})
+
+    def record_security_audit_event(
+        self,
+        *,
+        trace_id: str,
+        action: str,
+        resource_id: str,
+        decision: str,
+        reason_code: str,
+        data_sensitivity: str,
+        provider_id: str,
+        model_id: str,
+        region: str,
+        purpose: str,
+    ) -> dict[str, str]:
+        _validate_audit_uuid(trace_id, "trace id")
+        _validate_audit_uuid(resource_id, "resource id")
+        if decision not in {"ATTEMPTED", "SUCCEEDED", "FAILED", "CANCELLED", "DENIED"}:
+            raise ValueError("security audit decision is invalid")
+        if data_sensitivity not in {"L0", "L1", "L2"}:
+            raise ValueError("security audit data sensitivity is invalid")
+        action = _validate_audit_label(action, "action", 64)
+        reason_code = _validate_audit_label(reason_code, "reason code", 64)
+        provider_id = _validate_audit_label(provider_id, "provider", 32)
+        model_id = _validate_audit_label(model_id, "model", 128)
+        region = _validate_audit_label(region, "region", 32)
+        purpose = _validate_audit_label(purpose, "purpose", 64)
+        record = {
+            "id": str(uuid4()),
+            "trace_id": trace_id,
+            "action": action,
+            "resource_id": resource_id,
+            "decision": decision,
+            "reason_code": reason_code,
+            "data_sensitivity": data_sensitivity,
+            "provider_id": provider_id,
+            "model_id": model_id,
+            "region": region,
+            "purpose": purpose,
+            "created_at": _utc_timestamp(),
+        }
+        engine = self._require_engine()
+        with self._cloud_budget_lock, engine.begin() as connection:
+            connection.execute(text(
+                "INSERT INTO security_audit_events "
+                "(id, trace_id, action, resource_id, decision, reason_code, data_sensitivity, "
+                "provider_id, model_id, region, purpose, created_at) "
+                "VALUES (:id, :trace_id, :action, :resource_id, :decision, :reason_code, "
+                ":data_sensitivity, :provider_id, :model_id, :region, :purpose, :created_at)"
+            ), record)
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+            connection.execute(text(
+                "DELETE FROM security_audit_events WHERE created_at < :cutoff"
+            ), {"cutoff": cutoff})
+        return record
+
+    def purge_expired_security_audit_events(self) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        engine = self._require_engine()
+        with self._cloud_budget_lock, engine.begin() as connection:
+            result = connection.execute(text(
+                "DELETE FROM security_audit_events WHERE created_at < :cutoff"
+            ), {"cutoff": cutoff})
+            return int(result.rowcount or 0)
+
+    def list_security_audit_events(self, *, limit: int = 100) -> list[dict[str, str]]:
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("security audit limit must be between 1 and 100")
+        engine = self._require_engine()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        with self._cloud_budget_lock, engine.begin() as connection:
+            connection.execute(text(
+                "DELETE FROM security_audit_events WHERE created_at < :cutoff"
+            ), {"cutoff": cutoff})
+            rows = connection.execute(text(
+                "SELECT id, trace_id, action, resource_id, decision, reason_code, "
+                "data_sensitivity, provider_id, model_id, region, purpose, created_at "
+                "FROM security_audit_events ORDER BY created_at DESC, id DESC LIMIT :limit"
+            ), {"limit": limit}).mappings().all()
+        return [dict(row) for row in rows]
 
     def _database_key_bytes(self) -> bytes:
         return bytes.fromhex(self._key_hex)
@@ -1148,6 +1229,24 @@ def _validate_budget_month_key(month_key: str) -> None:
 def _validate_budget_amount(value: int, label: str) -> None:
     if type(value) is not int or value < 0:
         raise ValueError(f"{label} amount must be a non-negative integer")
+
+
+def _validate_audit_uuid(value: str, label: str) -> None:
+    try:
+        UUID(value)
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise ValueError(f"security audit {label} must be a UUID") from exc
+
+
+def _validate_audit_label(value: str, label: str, max_length: int) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > max_length
+        or re.fullmatch(r"[A-Za-z0-9._:/-]+", value) is None
+    ):
+        raise ValueError(f"security audit {label} is invalid")
+    return value
 
 
 def _task_row(row) -> dict[str, object]:

@@ -887,6 +887,16 @@ def test_cloud_chat_requires_one_time_consent_before_adapter_access(tmp_path: Pa
         assert credentials.reads == 0
         assert usage.json()["budget"]["is_estimate"] is True
         assert usage.json()["budget"]["estimated_spent_cny"] > 0
+        events = usage.json()["audit_events"]
+        assert [event["decision"] for event in events[:2]] == ["SUCCEEDED", "ATTEMPTED"]
+        assert all(event["provider_id"] == "deepseek" for event in events)
+        assert all(event["data_sensitivity"] == "L2" for event in events)
+        assert "合成测试消息" not in json.dumps(events, ensure_ascii=False)
+        assert "sk-" not in json.dumps(events, ensure_ascii=False)
+        assert usage.json()["audit_retention"] == "encrypted_metadata_30_days"
+        assert {event["reason_code"] for event in events} >= {
+            "user_confirmation_missing", "secret_pattern_blocked"
+        }
 
     asyncio.run(run())
     store.close()
@@ -926,6 +936,8 @@ def test_cloud_budget_blocks_at_monthly_limit_before_adapter_access(tmp_path: Pa
     assert adapter.calls == 0
     assert usage.json()["budget"]["blocked"] is True
     assert usage.json()["budget"]["warning_reached"] is True
+    assert usage.json()["audit_events"][0]["decision"] == "DENIED"
+    assert usage.json()["audit_events"][0]["reason_code"] == "monthly_budget_limit"
     store.close()
 
 

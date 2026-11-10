@@ -4,6 +4,7 @@ import shutil
 import sqlite3
 import stat
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -177,7 +178,7 @@ def test_store_reopens_and_migrations_are_idempotent(storage_root: Path) -> None
     try:
         with second.connection() as connection:
             assert connection.execute(text("SELECT count(*) FROM conversations")).scalar_one() == 1
-            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0004_monthly_cloud_budget"
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0005_security_audit"
     finally:
         second.close()
 
@@ -532,3 +533,66 @@ def test_monthly_cloud_budget_reservations_serialize_across_store_instances(
     finally:
         first.close()
         second.close()
+
+
+def test_security_audit_is_metadata_only_and_purges_events_older_than_30_days(
+    storage_root: Path,
+) -> None:
+    store = _store((storage_root / "security-audit.db").resolve())
+    store.open()
+    trace_id = str(uuid4())
+    resource_id = str(uuid4())
+    try:
+        first = store.record_security_audit_event(
+            trace_id=trace_id,
+            action="provider_request",
+            resource_id=resource_id,
+            decision="ATTEMPTED",
+            reason_code="user_confirmed_budget_reserved",
+            data_sensitivity="L2",
+            provider_id="openrouter",
+            model_id="deepseek/deepseek-v4.1-flash-1017",
+            region="global",
+            purpose="beta-interactive-chat",
+        )
+        assert set(first) == {
+            "id", "trace_id", "action", "resource_id", "decision", "reason_code",
+            "data_sensitivity", "provider_id", "model_id", "region", "purpose", "created_at",
+        }
+        with store.connection() as connection:
+            connection.execute(text(
+                "UPDATE security_audit_events SET created_at=:created_at WHERE id=:id"
+            ), {
+                "created_at": (datetime.now(timezone.utc) - timedelta(days=31)).isoformat(),
+                "id": first["id"],
+            })
+            connection.commit()
+        second = store.record_security_audit_event(
+            trace_id=trace_id,
+            action="provider_request",
+            resource_id=resource_id,
+            decision="SUCCEEDED",
+            reason_code="provider_stream_completed",
+            data_sensitivity="L2",
+            provider_id="openrouter",
+            model_id="deepseek/deepseek-v4.1-flash-1017",
+            region="global",
+            purpose="beta-interactive-chat",
+        )
+        listed = store.list_security_audit_events()
+        assert [event["id"] for event in listed] == [second["id"]]
+        with pytest.raises(ValueError, match="data sensitivity"):
+            store.record_security_audit_event(
+                trace_id=trace_id,
+                action="provider_request",
+                resource_id=resource_id,
+                decision="DENIED",
+                reason_code="blocked",
+                data_sensitivity="L3",
+                provider_id="deepseek",
+                model_id="deepseek-flash",
+                region="china",
+                purpose="beta-interactive-chat",
+            )
+    finally:
+        store.close()

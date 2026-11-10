@@ -687,11 +687,20 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 "blocked": projected_micros >= MONTHLY_CLOUD_BUDGET_MICROS,
                 "price_version": PRICE_VERSION,
             }
+        if persistent_store is None:
+            audit_events: list[dict[str, str]] = []
+        else:
+            try:
+                audit_events = persistent_store.list_security_audit_events(limit=100)
+            except (PersistentStoreError, ValueError):
+                raise HTTPException(status_code=503, detail="security audit history is unavailable") from None
         return {
             "retention": "process_memory_only",
             "budget_retention": "encrypted_monthly_aggregate",
+            "audit_retention": "encrypted_metadata_30_days",
             "summary": usage_ledger.summary(),
             "budget": budget,
+            "audit_events": audit_events,
             "records": [
                 usage_record_to_dict(record)
                 for record in usage_ledger.list_records(limit=limit)
@@ -1084,10 +1093,36 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             payload = StreamChatRequest.model_validate_json(bytes(request_data))
         except ValidationError as exc:
             raise RequestValidationError(exc.errors(), body=bytes(request_data)) from exc
+        audit_trace_id = str(uuid4())
+        audit_resource_id = str(uuid4())
+
+        def record_cloud_audit_event(decision: str, reason_code: str) -> None:
+            if payload.provider not in CLOUD_PROVIDERS or persistent_store is None:
+                return
+            config = CLOUD_PROVIDERS[payload.provider]
+            try:
+                persistent_store.record_security_audit_event(
+                    trace_id=audit_trace_id,
+                    action="provider_request",
+                    resource_id=audit_resource_id,
+                    decision=decision,
+                    reason_code=reason_code,
+                    data_sensitivity=DataLevel.L2.value,
+                    provider_id=config.provider,
+                    model_id=config.model,
+                    region=config.region,
+                    purpose="beta-interactive-chat",
+                )
+            except Exception:
+                raise HTTPException(
+                    status_code=503, detail="security audit storage is unavailable; cloud request blocked"
+                ) from None
+
         if payload.collaborator_keys:
             if len(payload.collaborator_keys) < 2 or len(set(payload.collaborator_keys)) != len(payload.collaborator_keys):
                 raise HTTPException(status_code=422, detail="select two or more distinct collaborators")
             if payload.provider != "ollama":
+                record_cloud_audit_event("DENIED", "collaboration_local_only")
                 raise HTTPException(status_code=403, detail="multi-agent collaboration is local-only")
             if payload.assistant_key != MAIN_ASSISTANT:
                 raise HTTPException(status_code=422, detail="collaboration uses the main assistant for synthesis")
@@ -1108,11 +1143,13 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         if payload.provider in CLOUD_PROVIDERS and any(
             _L3_SECRET_PATTERN.search(item.content) for item in payload.messages
         ):
+            record_cloud_audit_event("DENIED", "secret_pattern_blocked")
             raise HTTPException(
                 status_code=403,
                 detail="sensitive credentials are blocked from cloud requests",
             )
         if payload.provider in CLOUD_PROVIDERS and payload.import_ids:
+            record_cloud_audit_event("DENIED", "local_document_blocked")
             raise HTTPException(
                 status_code=403,
                 detail="selected documents are available to local models only",
@@ -1143,6 +1180,12 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             raise HTTPException(status_code=422, detail="selected Skills are unavailable") from exc
         except Exception:
             raise HTTPException(status_code=503, detail="selected Skills are unavailable") from None
+        if payload.provider in CLOUD_PROVIDERS and not payload.confirmed_for_this_request:
+            record_cloud_audit_event("DENIED", "user_confirmation_missing")
+            raise HTTPException(status_code=403, detail="one-time user consent is required")
+        if payload.provider in CLOUD_PROVIDERS and payload.model != CLOUD_PROVIDERS[payload.provider].model:
+            record_cloud_audit_event("DENIED", "unsupported_model")
+            raise HTTPException(status_code=422, detail="unsupported provider model")
         selected_gateway = gateway_for(payload)
         if payload.provider in CLOUD_PROVIDERS:
             config = CLOUD_PROVIDERS[payload.provider]
@@ -1231,17 +1274,20 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 )
             except UnknownPublicPrice:
                 cloud_budget_lock.release()
+                record_cloud_audit_event("DENIED", "public_price_unavailable")
                 raise HTTPException(
                     status_code=503, detail="cloud budget price is unavailable; request blocked"
                 ) from None
             except Exception:
                 cloud_budget_lock.release()
+                record_cloud_audit_event("DENIED", "budget_accounting_unavailable")
                 raise HTTPException(
                     status_code=503, detail="cloud budget state is unavailable; request blocked"
                 ) from None
             if not reserved:
                 budget_reservation_id = None
                 cloud_budget_lock.release()
+                record_cloud_audit_event("DENIED", "monthly_budget_limit")
                 raise HTTPException(
                     status_code=429,
                     detail="本月云端费用估算加本次请求预估已达到人民币 100 元预算上限，云端请求已拦截。",
@@ -1257,9 +1303,30 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     )
                 except Exception:
                     cloud_budget_write_failed = True
+            if payload.provider in CLOUD_PROVIDERS:
+                try:
+                    record_cloud_audit_event("DENIED", "active_run_limit")
+                except HTTPException:
+                    cloud_budget_write_failed = True
             if budget_lock_acquired:
                 cloud_budget_lock.release()
             raise HTTPException(status_code=503, detail="too many active chat runs") from exc
+        try:
+            if payload.provider in CLOUD_PROVIDERS:
+                record_cloud_audit_event("ATTEMPTED", "user_confirmed_budget_reserved")
+        except HTTPException:
+            run_registry.transition(run.run_id, RunStatus.FAILED)
+            if budget_reservation_id is not None and persistent_store is not None:
+                try:
+                    persistent_store.release_monthly_cloud_budget_reservation(
+                        budget_reservation_id
+                    )
+                except Exception:
+                    cloud_budget_write_failed = True
+            if budget_lock_acquired:
+                cloud_budget_lock.release()
+            cloud_budget_write_failed = True
+            raise
         started_monotonic = monotonic()
 
         async def events() -> AsyncIterator[str]:
@@ -1271,6 +1338,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             cost_currency: str | None = None
             assistant_output: list[str] = []
             last_budget_renewal = monotonic()
+            audit_failure_reason = "provider_or_policy_failed"
 
             def persist_turn(status: RunStatus) -> None:
                 if persistent_store is None or conversation_id is None:
@@ -1393,6 +1461,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     {"done": True, "run_id": run.run_id}, separators=(",", ":")
                 ) + "\n\n"
             except CollaborationOutputLimitExceeded:
+                audit_failure_reason = "collaboration_output_limit"
                 run_registry.transition(run.run_id, RunStatus.FAILED)
                 try:
                     persist_turn(RunStatus.FAILED)
@@ -1403,12 +1472,14 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     ensure_ascii=False,
                 ) + "\n\n"
             except ChatPersistenceUnavailable:
+                audit_failure_reason = "local_persistence_failed"
                 run_registry.transition(run.run_id, RunStatus.FAILED)
                 yield "data: " + json.dumps(
                     {"error": "无法将本轮聊天安全保存到本机加密数据库；请检查磁盘空间后重试。"},
                     ensure_ascii=False,
                 ) + "\n\n"
             except RemoteProviderError as exc:
+                audit_failure_reason = "provider_rejected"
                 run_registry.transition(run.run_id, RunStatus.FAILED)
                 try:
                     persist_turn(RunStatus.FAILED)
@@ -1434,6 +1505,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     )
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except CredentialUnavailable:
+                audit_failure_reason = "credential_unavailable"
                 run_registry.transition(run.run_id, RunStatus.FAILED)
                 try:
                     persist_turn(RunStatus.FAILED)
@@ -1442,6 +1514,8 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 message = "本机无法从 Keychain 读取已保存的云端凭据；未能发起云端请求。"
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except httpx.RequestError as exc:
+                if payload.provider in CLOUD_PROVIDERS:
+                    audit_failure_reason = "provider_transport_error"
                 run_registry.transition(run.run_id, RunStatus.FAILED)
                 try:
                     persist_turn(RunStatus.FAILED)
@@ -1466,6 +1540,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     )
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except Exception:
+                audit_failure_reason = "request_error"
                 run_registry.transition(run.run_id, RunStatus.FAILED)
                 try:
                     persist_turn(RunStatus.FAILED)
@@ -1494,6 +1569,18 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 if current is not None:
                     completed_at = current.updated_at
                     if payload.provider in CLOUD_PROVIDERS and persistent_store is not None:
+                        decision_by_status = {
+                            RunStatus.COMPLETED: ("SUCCEEDED", "provider_stream_completed"),
+                            RunStatus.FAILED: ("FAILED", audit_failure_reason),
+                            RunStatus.CANCELLED: ("CANCELLED", "request_cancelled"),
+                        }
+                        decision, reason_code = decision_by_status.get(
+                            current.status, ("FAILED", "request_terminated")
+                        )
+                        try:
+                            record_cloud_audit_event(decision, reason_code)
+                        except HTTPException:
+                            cloud_budget_write_failed = True
                         try:
                             prompt_text = "\n".join(
                                 item["content"] for item in model_request.messages
@@ -1571,5 +1658,6 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         )
         persistent_store.open()
         persistent_store.purge_expired_completed_tasks()
+        persistent_store.purge_expired_security_audit_events()
         app.router.on_shutdown.append(persistent_store.close)
     return app

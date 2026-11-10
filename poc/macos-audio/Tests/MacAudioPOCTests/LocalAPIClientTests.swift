@@ -660,7 +660,7 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
 
 @Test func localUsageSnapshotDecodesExplicitEstimatedMonthlyCloudBudget() throws {
     let body = """
-    {"records":[],"budget":{"month":"2026-11","estimated_spent_cny":70.25,"estimated_in_flight_cny":10,"estimated_projected_cny":80.25,"warning_threshold_cny":80,"limit_cny":100,"is_estimate":true,"warning_reached":true,"blocked":false,"price_version":"2026-11-10"}}
+    {"records":[],"budget":{"month":"2026-11","estimated_spent_cny":70.25,"estimated_in_flight_cny":10,"estimated_projected_cny":80.25,"warning_threshold_cny":80,"limit_cny":100,"is_estimate":true,"warning_reached":true,"blocked":false,"price_version":"2026-11-10"},"audit_events":[{"id":"0f68f4c9-9f9d-4630-a445-929c55f3f132","trace_id":"ec7325b0-f5ba-42d8-bdf0-78daa65f50cb","action":"provider_request","resource_id":"ea1a9d3e-6f58-4489-a62e-9098d5372254","decision":"DENIED","reason_code":"user_confirmation_missing","data_sensitivity":"L2","provider_id":"deepseek","model_id":"deepseek-flash","region":"china","purpose":"beta-interactive-chat","created_at":"2026-11-10T12:30:00+00:00"}]}
     """
     let snapshot = try JSONDecoder().decode(LocalUsageSnapshot.self, from: Data(body.utf8))
 
@@ -674,6 +674,10 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     #expect(snapshot.budget?.isEstimate == true)
     #expect(snapshot.budget?.warningReached == true)
     #expect(snapshot.budget?.blocked == false)
+    #expect(snapshot.auditEvents.count == 1)
+    #expect(snapshot.auditEvents[0].decision == "DENIED")
+    #expect(snapshot.auditEvents[0].reasonCode == "user_confirmation_missing")
+    #expect(snapshot.auditEvents[0].createdAt == "2026-11-10T12:30:00+00:00")
 }
 
 @Test func voiceStreamUnavailableHasActionableLocalOnlyMessage() {

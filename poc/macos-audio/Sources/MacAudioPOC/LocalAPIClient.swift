@@ -346,6 +346,58 @@ public struct LocalUsageRecord: Decodable, Identifiable, Sendable {
 public struct LocalUsageSnapshot: Decodable, Sendable {
     public let records: [LocalUsageRecord]
     public let budget: LocalMonthlyCloudBudget?
+    public let auditEvents: [LocalSecurityAuditEvent]
+
+    enum CodingKeys: String, CodingKey {
+        case records, budget
+        case auditEvents = "audit_events"
+    }
+
+    public init(
+        records: [LocalUsageRecord],
+        budget: LocalMonthlyCloudBudget?,
+        auditEvents: [LocalSecurityAuditEvent] = []
+    ) {
+        self.records = records
+        self.budget = budget
+        self.auditEvents = auditEvents
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        records = try container.decode([LocalUsageRecord].self, forKey: .records)
+        budget = try container.decodeIfPresent(LocalMonthlyCloudBudget.self, forKey: .budget)
+        auditEvents = try container.decodeIfPresent(
+            [LocalSecurityAuditEvent].self,
+            forKey: .auditEvents
+        ) ?? []
+    }
+}
+
+public struct LocalSecurityAuditEvent: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let traceID: String
+    public let action: String
+    public let resourceID: String
+    public let decision: String
+    public let reasonCode: String
+    public let dataSensitivity: String
+    public let providerID: String
+    public let modelID: String
+    public let region: String
+    public let purpose: String
+    public let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, action, decision, region, purpose
+        case traceID = "trace_id"
+        case resourceID = "resource_id"
+        case reasonCode = "reason_code"
+        case dataSensitivity = "data_sensitivity"
+        case providerID = "provider_id"
+        case modelID = "model_id"
+        case createdAt = "created_at"
+    }
 }
 
 public struct LocalMonthlyCloudBudget: Decodable, Sendable {
@@ -833,7 +885,11 @@ public final class LocalAPIClient: @unchecked Sendable {
         guard let value = try? JSONDecoder().decode(UsageResponse.self, from: data) else {
             throw LocalAPIClientError.invalidResponse
         }
-        return LocalUsageSnapshot(records: value.records, budget: value.budget)
+        return LocalUsageSnapshot(
+            records: value.records,
+            budget: value.budget,
+            auditEvents: value.auditEvents
+        )
     }
 
     public func importSelectedText(data: Data, fileName: String) async throws -> LocalImportedTextFile {
@@ -1030,6 +1086,12 @@ private struct ChatRunStatusResponse: Decodable {
 private struct UsageResponse: Decodable {
     let records: [LocalUsageRecord]
     let budget: LocalMonthlyCloudBudget?
+    let auditEvents: [LocalSecurityAuditEvent]
+
+    enum CodingKeys: String, CodingKey {
+        case records, budget
+        case auditEvents = "audit_events"
+    }
 }
 
 public struct LocalAPIStreamError: Error, LocalizedError {
