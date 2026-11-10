@@ -1948,12 +1948,14 @@ def test_multi_agent_collaboration_runs_selected_local_roles_sequentially(tmp_pa
         )
         assert "只围绕用户本轮明确目标分析" in project_system
         assert "严格遵守用户要求的数量、单项长度、语言、顺序和输出格式" in meeting_system
+        assert "用户明确列出的每个事项都必须逐项回应，不得漏掉或用概括项替代" in project_system
         synthesis_system = adapter.requests[2].messages[0]["content"]
         synthesis_reference = adapter.requests[2].messages[-2]
         synthesis_user = adapter.requests[2].messages[-1]
         assert "不得仅因其由模型生成就称其无效或拒绝" in synthesis_system
         assert "不扩展到无关领域" in synthesis_system
         assert "严格遵守用户要求的数量、单项长度、顺序和输出格式" in synthesis_system
+        assert "用户明确列出的每个事项都必须逐项回应，不得漏掉或用概括项替代" in synthesis_system
         assert synthesis_reference["role"] == "user"
         assert "专业助理结构化参考建议" in synthesis_reference["content"]
         assert synthesis_user == {"role": "user", "content": "分析"}

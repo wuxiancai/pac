@@ -1642,3 +1642,9 @@
 - 新合成题“请为一天的旧书交换活动列出三个准备事项……”复现 UI 按项目助理、后选会议助理，但旧实现把 `Set` 排序后按会议助理、项目助理执行，违背文档约定的选择顺序。将协作选择改为有序数组，点选时追加、取消时移除，发送时直接快照该顺序；发送后仍清空本轮选择。
 - `swift test --package-path poc/macos-audio` → 62 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。通过 `./poc/macos-audio/scripts/run_beta_app.sh` 重建启动后，先选项目、再选会议，GUI 先显示项目观点再显示会议观点；综合回答为三条相关短项。专业观点个别条目仍超过用户长度要求，因此仅确认顺序修复和本题综合表现，B9 继续 IN PROGRESS。
 - 请求状态显示本机 `ollama / qwen3.5:0.8b`；合成会话存于本机 SQLCipher。未调用云端、麦克风或 Keychain。
+
+### 2026-11-10：B9 逐项覆盖提示迭代与复测
+
+- 在专业角色和综合提示中补充：用户明确列出的事项都须逐项回应，不漏项、不以泛化项替代。`tests/test_beta_api.py -k multi_agent_collaboration_runs_selected_local_roles_sequentially` → 1 passed；Ruff 与 `mypy pac_poc/beta_api.py` 通过；后端全量 → 346 passed、1 条既有 Starlette/httpx 弃用警告。
+- 同一“科技节、3 名志愿者、签到/设备检查/场地清洁、三条且每条 ≤12 字”合成题重测：会议角色输出相关但有不顺的措辞；任务规划角色臆造了“15 分钟/10 分钟/5 分钟/8 小时”等用户未给出的时间数据；综合答复为“3 人签到、1 检设备、5 处清洁”，未正确保留原任务含义和顺序。提示迭代未带来可靠质量，显示小模型多 Agent 输出有明显波动，不能用于时间/数量承诺或自动执行。B9 继续 IN PROGRESS。
+- 重测使用本机 `ollama / qwen3.5:0.8b`；合成会话保留在本机 SQLCipher。未调用云端、麦克风或 Keychain。
