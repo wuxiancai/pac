@@ -102,6 +102,42 @@ private final class ImportResponseURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class BackupExportCapture: @unchecked Sendable {
+    static let shared = BackupExportCapture()
+    private let lock = NSLock()
+    private var stored: (URLRequest, Data?)?
+    func record(_ request: URLRequest) {
+        var body = request.httpBody
+        if body == nil, let stream = request.httpBodyStream {
+            stream.open()
+            var bytes = [UInt8](repeating: 0, count: 4096)
+            var collected: [UInt8] = []
+            while stream.hasBytesAvailable {
+                let count = stream.read(&bytes, maxLength: bytes.count)
+                if count <= 0 { break }
+                collected.append(contentsOf: bytes.prefix(count))
+            }
+            stream.close()
+            body = Data(collected)
+        }
+        lock.lock(); stored = (request, body); lock.unlock()
+    }
+    func take() -> (URLRequest, Data?)? { lock.lock(); defer { lock.unlock() }; defer { stored = nil }; return stored }
+}
+
+private final class BackupExportURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        BackupExportCapture.shared.record(request)
+        let response = HTTPURLResponse(url: request.url!, statusCode: 201, httpVersion: "HTTP/1.1", headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"created":true,"bytes_written":256}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
 private final class ImportNetworkProbe: @unchecked Sendable {
     static let shared = ImportNetworkProbe()
     private let lock = NSLock()
@@ -471,6 +507,29 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
 
     #expect(completed.displayName == "已完成")
     #expect(cancelled.displayName == "已取消")
+}
+
+@Test func encryptedBackupExportSendsAuthenticatedOneTimePasswordRequest() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [BackupExportURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43127")!, token: "local-token",
+        sessionConfiguration: configuration
+    )
+    let count = try await client.exportEncryptedBackup(
+        destinationPath: "/tmp/fixture.pacbackup", password: "one-time-secret"
+    )
+    #expect(count == 256)
+    let captured = try #require(BackupExportCapture.shared.take())
+    let request = captured.0
+    #expect(request.httpMethod == "POST")
+    #expect(request.url?.path == "/backups/export")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer local-token")
+    let body = try #require(captured.1)
+    let payload = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+    #expect(payload["destination_path"] as? String == "/tmp/fixture.pacbackup")
+    #expect(payload["password"] as? String == "one-time-secret")
+    #expect(payload["replace_existing"] as? Bool == false)
 }
 
 @Test func localUsageSnapshotDecodesUnknownProviderUsageWithoutInventingValues() throws {

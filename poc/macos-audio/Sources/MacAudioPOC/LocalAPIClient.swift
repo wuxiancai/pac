@@ -184,6 +184,28 @@ private struct LocalMemorySourceResponse: Decodable {
     let source: LocalMemorySource?
 }
 
+private struct BackupExportResponse: Decodable {
+    let created: Bool
+    let bytesWritten: Int
+
+    enum CodingKeys: String, CodingKey {
+        case created
+        case bytesWritten = "bytes_written"
+    }
+}
+
+private struct BackupExportPayload: Encodable {
+    let destinationPath: String
+    let password: String
+    let replaceExisting: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case password
+        case destinationPath = "destination_path"
+        case replaceExisting = "replace_existing"
+    }
+}
+
 public struct LocalTaskItem: Decodable, Identifiable, Sendable {
     public let id: String
     public let title: String
@@ -403,6 +425,30 @@ public final class LocalAPIClient: @unchecked Sendable {
             throw LocalAPIClientError.invalidResponse
         }
         return result.source
+    }
+
+    public func exportEncryptedBackup(
+        destinationPath: String, password: String, replaceExisting: Bool = false
+    ) async throws -> Int {
+        guard destinationPath.hasPrefix("/"), destinationPath.utf8.count <= 4_096,
+              let url = URL(string: "/backups/export", relativeTo: baseURL)?.absoluteURL
+        else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(BackupExportPayload(
+            destinationPath: destinationPath,
+            password: password,
+            replaceExisting: replaceExisting
+        ))
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 201 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let result = try? JSONDecoder().decode(BackupExportResponse.self, from: data), result.created else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        return result.bytesWritten
     }
 
     public func createConfirmedMemory(

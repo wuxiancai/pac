@@ -1531,6 +1531,53 @@ def test_memory_api_requires_explicit_confirmation_and_supports_search_delete(tm
         store.close()
 
 
+def test_backup_export_api_requires_local_auth_and_never_returns_password(tmp_path) -> None:
+    from pac_poc.backup import read_backup_header
+    from pac_poc.persistence import EncryptedApplicationStore
+
+    database_key = b"b" * 32
+    store = EncryptedApplicationStore(path=(tmp_path / "backup-api.db").resolve(), key=database_key)
+    store.open()
+    app = create_beta_api(
+        session=LocalAPISession(token="backup-token"),
+        gateway=ModelGateway(adapters={"ollama": StubLocalAdapter()}, policy=LocalOnlyPolicy()),
+        persistence_store=store,
+    )
+    destination = tmp_path / "manual.pacbackup"
+
+    async def run() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            denied = await client.post("/backups/export", json={
+                "destination_path": str(destination), "password": "private passphrase",
+            })
+            exported = await client.post("/backups/export", headers={
+                "authorization": "Bearer backup-token",
+            }, json={
+                "destination_path": str(destination), "password": "private passphrase",
+            })
+            duplicate = await client.post("/backups/export", headers={
+                "authorization": "Bearer backup-token",
+            }, json={
+                "destination_path": str(destination), "password": "private passphrase",
+            })
+        assert denied.status_code == 401
+        assert exported.status_code == 201
+        assert exported.json() == {"created": True, "bytes_written": destination.stat().st_size}
+        assert "private passphrase" not in exported.text
+        assert "destination" not in exported.text
+        assert duplicate.status_code == 409
+        assert read_backup_header(
+            destination, password="private passphrase", database_key=database_key
+        )[0].source_key_fingerprint
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()
+
+
 def test_conversation_api_can_create_list_select_and_delete_one_conversation(tmp_path) -> None:
     from pac_poc.persistence import EncryptedApplicationStore
 

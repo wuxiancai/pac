@@ -16,8 +16,9 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 
+from .backup import EncryptedBackupError
 from .keychain_credentials import (
     CredentialProvider,
     CredentialUnavailable,
@@ -151,6 +152,14 @@ class ConversationRenameRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=1, max_length=256)
+
+
+class BackupExportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    destination_path: str = Field(min_length=1, max_length=4096)
+    password: SecretStr
+    replace_existing: bool = False
 
 
 class ConfirmedMemoryCreateRequest(BaseModel):
@@ -898,6 +907,30 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             raise HTTPException(status_code=503, detail="task could not be deleted") from exc
         except Exception:
             raise HTTPException(status_code=503, detail="task could not be deleted") from None
+
+    @router.post("/backups/export", status_code=201)
+    async def export_encrypted_backup(payload: BackupExportRequest) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent storage is unavailable")
+        destination = Path(payload.destination_path)
+        if not destination.is_absolute():
+            raise HTTPException(status_code=422, detail="backup destination must be absolute")
+        try:
+            result = await asyncio.to_thread(
+                persistent_store.export_encrypted_backup,
+                destination,
+                password=payload.password.get_secret_value(),
+                replace_existing=payload.replace_existing,
+            )
+            return {"created": True, **result}
+        except FileExistsError as exc:
+            raise HTTPException(status_code=409, detail="backup destination already exists") from exc
+        except (ValueError, EncryptedBackupError) as exc:
+            raise HTTPException(status_code=422, detail="backup request is invalid") from exc
+        except PersistentStoreError as exc:
+            raise HTTPException(status_code=503, detail="encrypted backup could not be created") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="encrypted backup could not be created") from None
 
     @router.get("/chat/history")
     async def get_chat_history(conversation_id: UUID | None = None) -> dict[str, object]:

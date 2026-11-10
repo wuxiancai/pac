@@ -1354,3 +1354,8 @@
 - 补充 fake Gateway 的多会话隔离回归，避免测试请求落到本机 Ollama。首次测试漏注入 stub，意外调用本机 Ollama 返回响应差异；该请求只在 loopback 访问本机服务，未触发云 Provider；已修正夹具，重跑通过。
 - 验证：persistence + API 定向 54 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 300 passed、1 条既有弃用警告；Swift 全量 48 passed；Beta build、Ruff、mypy、`uv lock --check` 通过。
 - 限制：历史仍一次加载到 SwiftUI；多会话分页/搜索、标题重命名、长历史性能和跨设备恢复未覆盖。
+# 2026-11-10：本机加密备份导出 API/UI
+
+- 认证 `POST /backups/export` 与 macOS 保存面板导出 UI 已接通：用户选择目标文件、输入一次性口令并显式开始；口令不存储，已有文件只有经过保存面板覆盖确认后才传入替换参数。Swift 客户端错误只显示通用 HTTP 状态，不回显 API 请求正文。
+- 后端窄回归 `tests/test_backup.py tests/test_beta_api.py`：47 passed；Swift 全量 52 项通过；Ruff、mypy、`uv lock --check` 通过；`personal-assistant-beta` 构建成功。
+- 下一步：提交本段；之后继续恢复前本机预备份和恢复换钥/回滚阶段。

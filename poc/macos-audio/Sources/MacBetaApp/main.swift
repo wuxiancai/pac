@@ -1,4 +1,5 @@
 import MacAudioPOC
+import AppKit
 import Observation
 import SwiftUI
 import UniformTypeIdentifiers
@@ -123,6 +124,7 @@ final class BetaChatModel {
     private(set) var memorySource: LocalMemorySource?
     private(set) var taskStatus = ""
     private(set) var taskNotificationStatus = "通知默认关闭。"
+    private(set) var backupStatus = "备份口令仅用于本次导出，不会保存。"
     private let taskReminderManager = TaskReminderManager.shared
     private(set) var isRecordingVoice = false
     private(set) var isTranscribingVoice = false
@@ -507,6 +509,18 @@ final class BetaChatModel {
             memoryStatus = "\(memories.count) 条用户确认记忆 · 仅保存在本机"
         } catch {
             memoryStatus = "无法读取本机记忆：\(error.localizedDescription)"
+        }
+    }
+
+    func exportEncryptedBackup(to url: URL, password: String, replaceExisting: Bool) async {
+        guard let client else { backupStatus = "本机服务尚未就绪。"; return }
+        do {
+            let bytes = try await client.exportEncryptedBackup(
+                destinationPath: url.path, password: password, replaceExisting: replaceExisting
+            )
+            backupStatus = "已创建加密备份（\(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))）。"
+        } catch {
+            backupStatus = "备份失败：\(error.localizedDescription)"
         }
     }
 
@@ -944,6 +958,7 @@ private struct BetaChatView: View {
     @State private var showingSettings = false
     @State private var showingFileImporter = false
     @State private var showingUsage = false
+    @State private var showingBackup = false
     @State private var showingDeleteChatConfirmation = false
     @State private var showingTasks = false
     @State private var showingMemories = false
@@ -1031,6 +1046,10 @@ private struct BetaChatView: View {
                     Label("用量", systemImage: "chart.bar")
                 }
                 .accessibilityIdentifier("usage-button")
+                Button { showingBackup = true } label: {
+                    Label("备份", systemImage: "externaldrive.badge.plus")
+                }
+                .accessibilityIdentifier("backup-export-button")
                 if !model.messages.isEmpty {
                     Button(role: .destructive) {
                         showingDeleteChatConfirmation = true
@@ -1223,6 +1242,10 @@ private struct BetaChatView: View {
             UsageHistoryView(model: model)
                 .frame(minWidth: 520, minHeight: 420)
         }
+        .sheet(isPresented: $showingBackup) {
+            BackupExportView(model: model)
+                .frame(minWidth: 440, minHeight: 300)
+        }
         .alert("重命名当前会话", isPresented: $showingRenameConversation) {
             TextField("会话名称", text: $renameTitle)
             Button("取消", role: .cancel) {}
@@ -1266,6 +1289,51 @@ private struct BetaChatView: View {
                 .background(.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
                 .frame(maxWidth: 560, alignment: .leading)
             Spacer(minLength: 80)
+        }
+    }
+}
+
+@available(macOS 14.0, *)
+private struct BackupExportView: View {
+    @Bindable var model: BetaChatModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var password = ""
+    @State private var isExporting = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("创建加密备份").font(.title2.bold())
+            Text("选择保存位置后输入本份备份的独立口令。口令不会保存；恢复时需再次输入。")
+                .foregroundStyle(.secondary)
+            SecureField("备份口令", text: $password)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("backup-password-field")
+            Text(model.backupStatus).font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Button("完成") { dismiss() }
+                Spacer()
+                Button(isExporting ? "正在备份…" : "选择位置并加密备份") { chooseDestination() }
+                    .disabled(password.isEmpty || isExporting)
+                    .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("backup-export-confirm-button")
+            }
+        }
+        .padding(22)
+    }
+
+    private func chooseDestination() {
+        let panel = NSSavePanel()
+        panel.title = "保存加密备份"
+        panel.nameFieldStringValue = "PersonalAssistant.pacbackup"
+        panel.allowedContentTypes = [UTType(filenameExtension: "pacbackup") ?? .data]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let replaceExisting = FileManager.default.fileExists(atPath: url.path)
+        let secret = password
+        password = ""
+        isExporting = true
+        Task {
+            await model.exportEncryptedBackup(to: url, password: secret, replaceExisting: replaceExisting)
+            isExporting = false
         }
     }
 }
