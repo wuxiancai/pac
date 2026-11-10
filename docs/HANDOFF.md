@@ -94,7 +94,7 @@
 
 - `LocalChatMessage` 新增仅内存使用的稳定 UUID；自定义编码仍只发送 `role` 与 `content`，自定义相等比较仍只比较原有 API 字段。流式 token 替换助手消息时复用其 UUID。
 - SwiftUI 聊天列表改为 `ForEach(model.messages, id: \\.stableID)`，移除每次消息变化时对全部消息执行 `enumerated().map` 并创建临时 `ChatMessageRow` 的做法。滚动锚点对已存消息仍使用服务端 ID，对新消息使用稳定 UUID。
-- 验证：`swift test --package-path poc/macos-audio` → 84 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。新增回归确认稳定 ID 不进入模型请求 JSON、允许对流式替换明确复用 ID。
+- 验证：`swift test --package-path poc/macos-audio` → 84 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功；随后 `poc/macos-audio/scripts/build_beta_app.sh` 成功生成 `.poc-data/personal-assistant-beta.app`。新增回归确认稳定 ID 不进入模型请求 JSON、允许对流式替换明确复用 ID。
 - 这项代码优化降低每次增量更新时的全列表包装分配，但尚未在 Beta GUI 对超长单条消息和长会话做压力验收；B3 保持 IN PROGRESS。
 
 - 在当前 HEAD `b2ad0c7` 对照 `.github/workflows/ci.yml` 运行本机门禁：后端 all-extras/all-groups pytest、Ruff（含 scripts）、CI mypy、锁文件、compileall、tracked-file detect-secrets hook、Swift 全量与 Beta target build。
