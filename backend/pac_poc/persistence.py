@@ -241,6 +241,33 @@ class EncryptedApplicationStore:
                 for row in rows
             ]
 
+    def get_memory_source(self, memory_id: str) -> dict[str, object] | None:
+        engine = self._require_engine()
+        with engine.connect() as connection:
+            memory = connection.execute(text(
+                "SELECT source_message_id FROM memory_items "
+                "WHERE id=:id AND status='ACTIVE' AND deleted_at IS NULL"
+            ), {"id": memory_id}).mappings().first()
+            if memory is None:
+                raise KeyError("memory not found")
+            if memory["source_message_id"] is None:
+                return None
+            row = connection.execute(text(
+                "SELECT m.id, m.role, m.content, m.created_at, c.id AS conversation_id, c.title "
+                "FROM messages m JOIN conversations c ON c.id=m.conversation_id "
+                "WHERE m.id=:id AND m.deleted_at IS NULL AND c.deleted_at IS NULL"
+            ), {"id": memory["source_message_id"]}).mappings().first()
+            if row is None:
+                return None
+            return {
+                "message_id": str(row["id"]),
+                "conversation_id": str(row["conversation_id"]),
+                "conversation_title": str(row["title"]),
+                "role": str(row["role"]).lower(),
+                "content": str(row["content"]),
+                "created_at": str(row["created_at"]),
+            }
+
     def search_memories(self, query: str, *, limit: int = 50) -> list[dict[str, object]]:
         if not query.strip() or len(query) > 256 or not 1 <= limit <= 200:
             raise ValueError("memory search query is invalid")

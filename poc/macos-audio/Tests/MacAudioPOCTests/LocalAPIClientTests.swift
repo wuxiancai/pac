@@ -389,6 +389,13 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     #expect(version.changeReason == "user_confirmed_edit")
 }
 
+@Test func memorySourceDecodesConversationContext() throws {
+    let data = Data(#"{"message_id":"33333333-3333-4333-8333-333333333333","conversation_id":"11111111-1111-4111-8111-111111111111","conversation_title":"Project discussion","role":"user","content":"Keep the archive local","created_at":"2026-11-10T02:00:00+00:00"}"#.utf8)
+    let source = try JSONDecoder().decode(LocalMemorySource.self, from: data)
+    #expect(source.conversationTitle == "Project discussion")
+    #expect(source.content == "Keep the archive local")
+}
+
 @available(macOS 12.0, *)
 @Test func selectedTextImportUsesAuthenticatedLoopbackAndSendsNoPath() async throws {
     _ = ImportRequestCapture.shared.take()

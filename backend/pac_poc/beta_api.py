@@ -789,6 +789,17 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         except Exception:
             raise HTTPException(status_code=503, detail="memory versions are unavailable") from None
 
+    @router.get("/memories/{memory_id}/source")
+    async def get_memory_source(memory_id: UUID) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent memory storage is unavailable")
+        try:
+            return {"source": persistent_store.get_memory_source(str(memory_id))}
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="memory not found") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="memory source is unavailable") from None
+
     @router.put("/memories/{memory_id}")
     async def update_memory(
         memory_id: UUID, payload: ConfirmedMemoryUpdateRequest

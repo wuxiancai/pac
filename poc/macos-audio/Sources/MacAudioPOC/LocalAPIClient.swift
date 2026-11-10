@@ -163,6 +163,27 @@ private struct LocalMemoryVersionList: Decodable {
     let versions: [LocalMemoryVersion]
 }
 
+public struct LocalMemorySource: Decodable, Sendable {
+    public let messageID: String
+    public let conversationID: String
+    public let conversationTitle: String
+    public let role: String
+    public let content: String
+    public let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case role, content
+        case messageID = "message_id"
+        case conversationID = "conversation_id"
+        case conversationTitle = "conversation_title"
+        case createdAt = "created_at"
+    }
+}
+
+private struct LocalMemorySourceResponse: Decodable {
+    let source: LocalMemorySource?
+}
+
 public struct LocalTaskItem: Decodable, Identifiable, Sendable {
     public let id: String
     public let title: String
@@ -366,6 +387,22 @@ public final class LocalAPIClient: @unchecked Sendable {
             throw LocalAPIClientError.invalidResponse
         }
         return list.versions
+    }
+
+    public func memorySource(id: String) async throws -> LocalMemorySource? {
+        guard let memoryID = UUID(uuidString: id),
+              let url = URL(string: "/memories/\(memoryID.uuidString.lowercased())/source", relativeTo: baseURL)?.absoluteURL
+        else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let result = try? JSONDecoder().decode(LocalMemorySourceResponse.self, from: data) else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        return result.source
     }
 
     public func createConfirmedMemory(

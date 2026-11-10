@@ -1405,9 +1405,13 @@ def test_persistent_chat_history_round_trips_and_can_be_manually_deleted(tmp_pat
                 "subject": "Project title", "content": "Project Atlas",
                 "category": "fact", "confirmed": True, "source_message_id": source_id,
             })
+            source = await client.get(f"/memories/{memory.json()['id']}/source", headers=headers)
             deleted = await client.delete("/chat/history", headers=headers)
             after_delete = await client.get("/chat/history", headers=headers)
             memories = await client.get("/memories", headers=headers)
+            source_after_delete = await client.get(
+                f"/memories/{memory.json()['id']}/source", headers=headers
+            )
         assert initial.status_code == 200
         assert response.status_code == 200
         assert '"done":true' in response.text
@@ -1421,9 +1425,12 @@ def test_persistent_chat_history_round_trips_and_can_be_manually_deleted(tmp_pat
         assert all(UUID(message["id"]) for message in history.json()["messages"])
         assert memory.status_code == 201
         assert memory.json()["source_message_id"] == source_id
+        assert source.json()["source"]["content"] == "记住项目标题"
+        assert source.json()["source"]["conversation_id"] == conversation_id
         assert deleted.json() == {"deleted": True}
         assert after_delete.json()["messages"] == []
         assert memories.json()["memories"][0]["source_message_id"] is None
+        assert source_after_delete.json()["source"] is None
 
     try:
         asyncio.run(run())

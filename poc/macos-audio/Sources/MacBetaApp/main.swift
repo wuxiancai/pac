@@ -120,6 +120,7 @@ final class BetaChatModel {
     private(set) var memories: [LocalMemoryItem] = []
     private(set) var memoryStatus = ""
     private(set) var memoryVersions: [LocalMemoryVersion] = []
+    private(set) var memorySource: LocalMemorySource?
     private(set) var taskStatus = ""
     private(set) var taskNotificationStatus = "通知默认关闭。"
     private let taskReminderManager = TaskReminderManager.shared
@@ -506,6 +507,16 @@ final class BetaChatModel {
         } catch {
             memoryVersions = []
             memoryStatus = "无法读取记忆版本：\(error.localizedDescription)"
+        }
+    }
+
+    func refreshMemorySource(id: String) async {
+        guard let client else { return }
+        do {
+            memorySource = try await client.memorySource(id: id)
+        } catch {
+            memorySource = nil
+            memoryStatus = "无法读取记忆来源：\(error.localizedDescription)"
         }
     }
 
@@ -1298,6 +1309,7 @@ private struct ConfirmedMemoryView: View {
     @State private var editingID: String?
     @State private var sourceMessageID = ""
     @State private var historyMemory: LocalMemoryItem?
+    @State private var sourceMemory: LocalMemoryItem?
     private let categories = ["fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"]
 
     var body: some View {
@@ -1370,6 +1382,13 @@ private struct ConfirmedMemoryView: View {
                             Task { await model.refreshMemoryVersions(id: memory.id) }
                         }
                         .buttonStyle(.borderless)
+                        if memory.sourceMessageID != nil {
+                            Button("查看来源") {
+                                sourceMemory = memory
+                                Task { await model.refreshMemorySource(id: memory.id) }
+                            }
+                            .buttonStyle(.borderless)
+                        }
                         Button(role: .destructive) {
                             Task { await model.deleteMemory(memory) }
                         } label: {
@@ -1409,6 +1428,31 @@ private struct ConfirmedMemoryView: View {
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("完成") { historyMemory = nil }
+                    }
+                }
+            }
+            .frame(minWidth: 480, minHeight: 360)
+        }
+        .sheet(item: $sourceMemory) { memory in
+            NavigationStack {
+                Group {
+                    if let source = model.memorySource {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(source.conversationTitle).font(.headline)
+                            Text(source.role == "user" ? "用户消息" : "助理回复")
+                                .font(.caption).foregroundStyle(.secondary)
+                            ScrollView { Text(source.content).frame(maxWidth: .infinity, alignment: .leading) }
+                            Text(source.createdAt).font(.caption2).foregroundStyle(.tertiary)
+                        }
+                        .padding()
+                    } else {
+                        ContentUnavailableView("来源消息不可用", systemImage: "text.bubble")
+                    }
+                }
+                .navigationTitle("\(memory.subject) · 来源")
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("完成") { sourceMemory = nil }
                     }
                 }
             }
