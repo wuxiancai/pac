@@ -38,7 +38,6 @@ def main() -> None:
             2,
         ):
             parser.error("WAV must be mono, 16 kHz, signed PCM16")
-        audio_seconds = source.getnframes() / source.getframerate()
         pcm = array("h", source.readframes(source.getnframes()))
     if not pcm or pcm.itemsize != 2:
         parser.error("WAV must contain 16-bit PCM audio")

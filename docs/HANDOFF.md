@@ -1531,3 +1531,8 @@
 - 将并发 ASR/模型探针的局部 `measure` 函数改为独立泛型，修复两个异构 Callable 被误判为同一类型的问题；为 FastEmbed 候选引擎定义结构化协议，并在可注入工厂边界显式收窄类型。
 - 验证：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked mypy pac_poc` → 37 个模块无错误；Ruff 两个修改模块通过；定向 `tests/test_concurrent_asr_llm_probe.py tests/test_local_embedding_poc.py` → 9 passed；后端全量同离线设置运行 `uv run --locked --all-extras --all-groups pytest -q` → 341 passed，1 条既有 Starlette/httpx 弃用警告。
 - 影响范围：仅类型注解与静态协议，运行时 embedding、测量和授权行为不变。后续继续 B1/B3/B5/B6/B9 尚未完成的验收与阶段工作。
+
+### 2026-11-10：清理 POC 脚本静态检查告警
+
+- 移除并发 ASR/LLM 测量脚本中的未使用 `sys` 导入，以及本地 ASR 测量脚本中未使用的音频时长局部变量；测量输出、输入校验和运行行为不变。
+- 验证：在 `backend/` 执行 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked ruff check scripts`，全目录通过。此次未运行 POC 脚本，避免启动模型测量或访问设备。
