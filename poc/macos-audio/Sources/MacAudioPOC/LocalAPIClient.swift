@@ -884,7 +884,8 @@ public final class LocalAPIClient: @unchecked Sendable {
         importedDocumentIDs: [String] = [],
         conversationID: String? = nil,
         assistantKey: String = "main_assistant",
-        skillKeys: [String] = []
+        skillKeys: [String] = [],
+        collaboratorKeys: [String] = []
     ) -> AsyncThrowingStream<LocalChatStreamItem, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -905,7 +906,8 @@ public final class LocalAPIClient: @unchecked Sendable {
                         importIDs: importedDocumentIDs,
                         conversationID: conversationID,
                         assistantKey: assistantKey,
-                        skillKeys: skillKeys
+                        skillKeys: skillKeys,
+                        collaboratorKeys: collaboratorKeys
                     ))
                     let (bytes, response) = try await session.bytes(for: request)
                     guard let httpResponse = response as? HTTPURLResponse else {
@@ -968,6 +970,7 @@ private struct ChatRequest: Encodable {
     let conversationID: String?
     let assistantKey: String
     let skillKeys: [String]
+    let collaboratorKeys: [String]
 
     enum CodingKeys: String, CodingKey {
         case messages
@@ -978,6 +981,7 @@ private struct ChatRequest: Encodable {
         case conversationID = "conversation_id"
         case assistantKey = "assistant_key"
         case skillKeys = "skill_keys"
+        case collaboratorKeys = "collaborator_keys"
     }
 }
 

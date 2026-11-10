@@ -399,7 +399,8 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
         importedDocumentIDs: ["11111111-1111-4111-8111-111111111111"],
         conversationID: "22222222-2222-4222-8222-222222222222",
         assistantKey: "task_planner",
-        skillKeys: ["risk_review"]
+        skillKeys: ["risk_review"],
+        collaboratorKeys: ["project_assistant", "meeting_assistant"]
     ) {}
 
     let captured = try #require(ChatRequestCapture.shared.take())
@@ -412,6 +413,7 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     #expect(payload["conversation_id"] as? String == "22222222-2222-4222-8222-222222222222")
     #expect(payload["assistant_key"] as? String == "task_planner")
     #expect(payload["skill_keys"] as? [String] == ["risk_review"])
+    #expect(payload["collaborator_keys"] as? [String] == ["project_assistant", "meeting_assistant"])
     #expect(payload["messages"] != nil)
     let messages = try #require(payload["messages"] as? [[String: Any]])
     #expect(messages[0]["id"] == nil)

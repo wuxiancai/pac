@@ -1599,6 +1599,73 @@ def test_skills_api_returns_fixed_local_catalog_and_chat_applies_explicit_select
         store.close()
 
 
+def test_multi_agent_collaboration_runs_selected_local_roles_sequentially(tmp_path) -> None:
+    from pac_poc.persistence import EncryptedApplicationStore
+
+    class CollaborationAdapter:
+        is_local = True
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        async def generate(self, request):
+            raise AssertionError("collaboration must stream")
+
+        async def call_with_tools(self, request):
+            raise AssertionError("collaboration must not invoke tools")
+
+        async def stream(self, request):
+            self.requests.append(request)
+            systems = "\n".join(item["content"] for item in request.messages if item["role"] == "system")
+            if "你是项目助理" in systems:
+                yield "项目建议"
+            elif "你是会议助理" in systems:
+                yield "会议建议"
+            else:
+                assert "项目建议" in "\n".join(item["content"] for item in request.messages)
+                assert "会议建议" in "\n".join(item["content"] for item in request.messages)
+                yield "综合建议"
+
+    store = EncryptedApplicationStore(path=(tmp_path / "collaboration.db").resolve(), key=b"c" * 32)
+    store.open()
+    adapter = CollaborationAdapter()
+    app = create_beta_api(
+        session=LocalAPISession(token="collab-token"),
+        gateway=ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy()),
+        persistence_store=store,
+    )
+
+    async def run() -> None:
+        headers = {"authorization": "Bearer collab-token"}
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1") as client:
+            single = await client.post("/chat/stream", headers=headers, json={
+                "messages": [{"role": "user", "content": "分析"}],
+                "collaborator_keys": ["project_assistant"],
+            })
+            cloud = await client.post("/chat/stream", headers=headers, json={
+                "provider": "deepseek", "messages": [{"role": "user", "content": "分析"}],
+                "collaborator_keys": ["project_assistant", "meeting_assistant"],
+            })
+            response = await client.post("/chat/stream", headers=headers, json={
+                "messages": [{"role": "user", "content": "分析"}],
+                "collaborator_keys": ["project_assistant", "meeting_assistant"],
+            })
+        assert single.status_code == 422
+        assert cloud.status_code == 403
+        assert response.status_code == 200
+        assert "项目助理观点" in response.text
+        assert "会议助理观点" in response.text
+        assert "综合建议" in response.text
+        assert len(adapter.requests) == 3
+        assert "你是项目助理" in adapter.requests[0].messages[0]["content"]
+        assert "你是会议助理" in adapter.requests[1].messages[0]["content"]
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()
+
+
 def test_memory_api_requires_explicit_confirmation_and_supports_search_delete(tmp_path) -> None:
     from pac_poc.persistence import EncryptedApplicationStore
 

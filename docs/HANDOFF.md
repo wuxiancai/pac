@@ -1411,3 +1411,9 @@
 
 - 用户接受提醒事项完整系统权限，应用只在用户点击后申请权限，仅读取未完成提醒及到期/清单信息，不创建、修改、完成、删除、持久化或发送给 Provider；查询未来 30 天到期条目和无到期日条目。加入独立 `NSRemindersFullAccessUsageDescription` 与本机提醒事项面板。
 - Apple 文档要求读取提醒事项时申请 full access，平台不提供只读权限；系统授权后产品代码保持只读。mock 覆盖按需请求、排序、日期边界和拒绝不读取。验证：Swift 全量 59 项通过；Beta target 与 `.app` 构建成功。没有触发真实 EventKit 权限弹窗或读取个人提醒。
+
+# 2026-11-10：V3 本机顺序多 Agent 协作
+
+- 聊天输入栏增加每轮协作角色选择；至少两个角色、最多三个。选择协作角色时客户端要求 Ollama，本轮由主助理汇总。后端在访问网关前拒绝云 Provider、少于两个/重复角色和非主助理汇总请求；按选择顺序执行固定角色，再把不可信 JSON 结果交给主助理。每个角色最多输出 4,000 字，超出或汇总上下文超限时停止并记录失败；所有中间输出只存在本次请求内存，并在同一最终回复中显示/持久化。
+- 验证：`tests/test_beta_api.py tests/test_orchestrator.py` 59 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` 322 passed、1 条既有 Starlette/httpx 弃用警告；Swift `swift test --package-path poc/macos-audio` 59 passed；Beta product build、Ruff、变更模块 mypy、`git diff --check` 通过。未进行真实 Ollama 多 Agent 质量或 GUI 验收。
+- 后续：取消路径与 UI 交互需要本机 Beta 验收；完成前不启用云端、后台、跨会话记忆、工具或外部写。

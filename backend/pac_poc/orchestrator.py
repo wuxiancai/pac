@@ -23,6 +23,7 @@ from .security_poc import DataLevel
 
 
 MAIN_ASSISTANT = "main_assistant"
+MULTI_AGENT_ASSISTANT = "multi_agent_collaboration"
 ASSISTANT_PROFILES: dict[str, str] = {
     "project_assistant": (
         "你是项目助理。帮助用户梳理目标、里程碑、依赖、风险与进度；明确区分已知事实和假设。"
@@ -37,7 +38,7 @@ ASSISTANT_PROFILES: dict[str, str] = {
         "不得声称已执行任务、安排后台工作或更改任务状态。"
     ),
 }
-ENABLED_ASSISTANT_KEYS = frozenset({MAIN_ASSISTANT, *ASSISTANT_PROFILES})
+ENABLED_ASSISTANT_KEYS = frozenset({MAIN_ASSISTANT, MULTI_AGENT_ASSISTANT, *ASSISTANT_PROFILES})
 
 
 class RunStatus(StrEnum):
@@ -129,6 +130,7 @@ class ConversationTurn:
     required_capabilities: tuple[Capability, ...] = ()
     documents: Sequence[ImportedTextDocument] = ()
     skill_prompts: Sequence[str] = ()
+    system_instructions: Sequence[str] = ()
 
 
 class ContextBuilder(Protocol):
@@ -196,6 +198,7 @@ class MainAssistantOrchestrator:
         profile = ASSISTANT_PROFILES.get(turn.assistant_key)
         if profile is not None:
             system_context.append(profile)
+        system_context.extend(turn.system_instructions)
         system_context.extend(turn.skill_prompts)
         for content in reversed(system_context):
             messages.insert(0, {"role": "system", "content": content})

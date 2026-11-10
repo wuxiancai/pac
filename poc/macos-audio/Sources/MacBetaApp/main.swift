@@ -127,6 +127,7 @@ final class BetaChatModel {
     private(set) var memorySource: LocalMemorySource?
     private(set) var skills: [LocalSkillItem] = []
     private(set) var selectedSkillKeys: Set<String> = []
+    private(set) var selectedCollaboratorKeys: Set<String> = []
     private(set) var taskStatus = ""
     private(set) var taskNotificationStatus = "通知默认关闭。"
     private(set) var backupStatus = "备份口令仅用于本次导出，不会保存。"
@@ -273,6 +274,14 @@ final class BetaChatModel {
             status = "已选资料目前只允许发送到本机模型；切回本地模型后再提问。"
             return
         }
+        if !selectedCollaboratorKeys.isEmpty && usesCloud {
+            status = "多助理协作只支持本机 Ollama；切回本地模型后再发送。"
+            return
+        }
+        if selectedCollaboratorKeys.count == 1 {
+            status = "多助理协作至少选择两个角色，或清除协作选择。"
+            return
+        }
         guard !selectedModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             status = "请先在模型设置中选择模型。"
             return
@@ -293,7 +302,9 @@ final class BetaChatModel {
         let confirmedForThisRequest = usesCloud
         let importedDocumentIDs = importedTextFiles.map(\.importID)
         let activeConversationID = conversationID
-        let selectedAssistantKey = assistantKey
+        let collaboratorKeysForRequest = selectedCollaboratorKeys.sorted()
+        selectedCollaboratorKeys.removeAll()
+        let selectedAssistantKey = collaboratorKeysForRequest.isEmpty ? assistantKey : "main_assistant"
         let skillKeysForRequest = selectedSkillKeys.sorted()
         selectedSkillKeys.removeAll()
         let requestID = UUID()
@@ -312,7 +323,8 @@ final class BetaChatModel {
                     importedDocumentIDs: importedDocumentIDs,
                     conversationID: activeConversationID,
                     assistantKey: selectedAssistantKey,
-                    skillKeys: skillKeysForRequest
+                    skillKeys: skillKeysForRequest,
+                    collaboratorKeys: collaboratorKeysForRequest
                 ) {
                     guard let self else { return }
                     guard self.activeRequestID == requestID else { return }
@@ -603,6 +615,19 @@ final class BetaChatModel {
             status = "每轮最多选择 3 个 Skills。"
         }
     }
+
+    func toggleCollaborator(_ key: String) {
+        guard assistantProfiles.contains(where: { $0.key == key && key != "main_assistant" }) else { return }
+        if selectedCollaboratorKeys.contains(key) {
+            selectedCollaboratorKeys.remove(key)
+        } else if selectedCollaboratorKeys.count < 3 {
+            selectedCollaboratorKeys.insert(key)
+        } else {
+            status = "每轮最多选择 3 个协作角色。"
+        }
+    }
+
+    func clearCollaborators() { selectedCollaboratorKeys.removeAll() }
 
     func exportEncryptedBackup(to url: URL, password: String, replaceExisting: Bool) async {
         guard let client else { backupStatus = "本机服务尚未就绪。"; return }
@@ -1347,6 +1372,28 @@ private struct BetaChatView: View {
                     .disabled(model.skills.isEmpty || model.isStreaming)
                     .help("只对下一条聊天消息生效，每次最多选择 3 个")
                     .accessibilityIdentifier("chat-skill-picker")
+                    Menu {
+                        ForEach(model.assistantProfiles.filter { $0.key != "main_assistant" }, id: \.key) { profile in
+                            Button {
+                                model.toggleCollaborator(profile.key)
+                            } label: {
+                                if model.selectedCollaboratorKeys.contains(profile.key) {
+                                    Label(profile.title, systemImage: "checkmark")
+                                } else {
+                                    Text(profile.title)
+                                }
+                            }
+                        }
+                        if !model.selectedCollaboratorKeys.isEmpty {
+                            Divider()
+                            Button("清除协作选择") { model.clearCollaborators() }
+                        }
+                    } label: {
+                        Label("协作 \(model.selectedCollaboratorKeys.count)", systemImage: "person.3")
+                    }
+                    .disabled(model.isStreaming)
+                    .help("仅本次请求使用；至少选择两个角色，且只在本机 Ollama 顺序运行")
+                    .accessibilityIdentifier("chat-collaborator-picker")
                     Button {
                         showingFileImporter = true
                     } label: {
