@@ -412,3 +412,41 @@ def test_conversation_history_uses_stable_bounded_keyset_pages(storage_root: Pat
         assert older["has_more"] is False
     finally:
         store.close()
+
+
+def test_long_conversation_history_pages_have_no_gaps_or_duplicates(storage_root: Path) -> None:
+    store = _store((storage_root / "long-paged-history.db").resolve())
+    store.open()
+    try:
+        conversation = store.get_or_create_default_conversation()
+        expected = {
+            content
+            for number in range(60)
+            for content in (f"user-long-{number}", f"assistant-long-{number}")
+        }
+        for number in range(60):
+            store.append_chat_turn(
+                conversation_id=conversation["id"], run_id=f"long-page-run-{number}",
+                user_content=f"user-long-{number}",
+                assistant_content=f"assistant-long-{number}",
+                provider="ollama", model="local", status="COMPLETED",
+            )
+
+        page = store.load_conversation(conversation["id"], limit=100)
+        collected: list[str] = []
+        while True:
+            messages = page["messages"]
+            assert len(messages) <= 100
+            collected.extend(message["content"] for message in messages)
+            if not page["has_more"]:
+                break
+            page = store.load_conversation(
+                conversation["id"], limit=100,
+                before_message_id=messages[0]["id"],
+            )
+
+        assert len(collected) == 120
+        assert len(set(collected)) == 120
+        assert set(collected) == expected
+    finally:
+        store.close()

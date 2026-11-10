@@ -1441,3 +1441,10 @@
 
 - 在仓库 Beta 的模型设置页确认“本地大模型”被选中、模型字段为 `qwen3.5:0.8b`；帮助文字明确 PAC 本机服务与 Ollama 是独立进程，并提示确认 Ollama 运行和模型已安装。关闭设置页后恢复原会话；未修改设置、读取 Key 或发起请求。
 - 更新 `docs/beta/macOS-beta-chat.md` 与 `docs/TASKS.md`。B1 其他本机/云端错误 UI 验收仍待完成。
+
+
+# 2026-11-10：长历史分页回归与产品决策更新
+
+- 在临时 SQLCipher 数据库新增 120 条消息的长会话 keyset 分页回归，跨越默认 100 条页长，逐页完整遍历并核对总数、唯一性和覆盖。窄测 2 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（`backend/`）326 passed，1 条既有 Starlette/httpx 弃用警告。仅验证持久层分页，不覆盖 SwiftUI 长会话或极大消息渲染。
+- 用户补充确认 D-005：缺少请求级实际费用/usage 或汇率时，按版本化公开价估算、清楚标为估算，累计估算达限即拦截；D-006：恢复前加密预备份只保留最近一份，新份创建时替换旧份；D-014：先做离线候选评测，再决定产品启用；D-015：暂缓通用数据导出，继续只提供加密备份/恢复。已同步更新 `DECISIONS.md`、`TASKS.md`、`PROJECT_CONTEXT.md` 与持久化报告。
+- 后续优先实现并回归 D-006 预备份安全轮替；D-014 只运行离线候选评测，不自动启用 Embedding。
