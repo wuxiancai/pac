@@ -1430,3 +1430,9 @@
 - 首轮多 Agent 请求在约十几秒内完成，但汇总过度聚焦模型结果的“不可信”标签而未答原问题。已调整综合 prompt，参考内容放在独立前置 user 消息，原请求保持最后一条；实机复测得到两名角色观点和总助理直接生成的三条议题建议。6 字约束仍未完全遵守，因此只证明链路可用，不代表小模型输出质量保证。
 - 自动化：`tests/test_beta_api.py tests/test_local_model_gateway.py tests/test_orchestrator.py` → 69 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（`backend/`）→ 325 passed、1 条既有 Starlette/httpx 弃用警告；Ruff 与 `mypy pac_poc/beta_api.py pac_poc/model_gateway.py pac_poc/orchestrator.py` 通过；`./poc/macos-audio/scripts/run_beta_app.sh` 成功构建并启动。
 - 已更新 `docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`、本报告与 `docs/beta/orchestrator-framework.md`。真实 GUI 验收使用本机 Ollama，没有云 Provider 或麦克风；为复现而创建的合成测试对话保留在本机 SQLCipher 历史。
+
+# 2026-11-10：B5 TXT 聊天引用 GUI 验收
+
+- 新建本机测试会话，使用 macOS 文件选择器导入 `.poc-data/gui-reference-test.txt`（85 bytes，85 字符）。提问“我刚才选择的资料中，唯一 lookup marker 是什么？只回复标记本身。”本机 `qwen3.5:0.8b` 回复包含精确标记 `PAC-TXT-REF-20261110-K7Q2`，确认 Beta GUI 的文件选择、Loopback 导入、请求 ID 引用及模型上下文链路端到端可用；点击附件移除后 chip 消失并提示成功。
+- 回复用时约 45 秒。该结果仅覆盖单一合成 TXT/本机模型，不覆盖 PDF 或其他模型语义质量。无云请求、无麦克风。临时 chip 已移除，测试文件随后删除；验收聊天留存在本机 SQLCipher 历史。
+- 已更新 `docs/beta/file-import.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。B5 仍 IN PROGRESS，因为 PDF 安全启用门槛与正式分发相关工作仍未完成。

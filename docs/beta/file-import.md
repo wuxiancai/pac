@@ -37,6 +37,8 @@ CI 现显式安装 `phase4-pdf-poc` extra，因此通用 Python 回归会实际�
 
 Swift 客户端请求契约回归（2026-11-09）：`swift test --package-path poc/macos-audio` → 40 passed，Beta target build 通过。新增 URLProtocol fixture 验证导入请求只携带 basename、文件内容和 loopback Bearer token；不包含原始路径；PDF 与大于 10 MiB 文件在网络调用前拒绝。GUI 文件选择、暂存和移除已另行实测通过；自动契约测试不代替尚未完成的聊天引用 GUI 验收。较早一次只读检查旧运行实例时，accessibility 控件树未呈现“添加资料”；当时窗口有未持久化对话，因此未重启。之后确认 Beta 实例已退出，从仓库根目录运行 `poc/macos-audio/scripts/run_beta_app.sh` 启动当前构建，状态栏显示本机服务已连接，accessibility 树可见 `import-text-file-button`。随后进行本机 GUI 冒烟：仓库内 141-byte 合成 TXT 由文件选择器选中，Beta 显示 `gui-import-fixture.txt` 和 65 字符计数；点击移除后附件 chip 消失，状态提示“已从本机临时资料中移除”。当时应用选择 Ollama 本地模型，未发送聊天消息或触发 Provider，因此只确认文件选择、暂存和移除；资料实际进入聊天上下文的 GUI 引用仍待验证。
 
+2026-11-10 聊天引用 GUI 验收：在新会话选择 `.poc-data/gui-reference-test.txt`（85 bytes，合成内容含唯一标记 `PAC-TXT-REF-20261110-K7Q2`），界面显示文件名和 85 字符；随后询问该资料中的唯一 marker，本机 `qwen3.5:0.8b` 回复包含完全一致的标记，证明本次附件 ID 和内容进入了本机聊天上下文。点击移除后 chip 消失并显示成功状态。没有调用云 Provider、没有采集麦克风。回复用时约 45 秒，期间显示本机生成状态。验收测试聊天保留在本机 SQLCipher 历史；临时导入 chip 已移除，测试文件已在完成记录后删除。该单样本只证明该 TXT 引用路径，不证明所有模型均能准确利用资料，也不改变 PDF 禁用状态。
+
 在 `backend/` 目录：
 
 ```bash
