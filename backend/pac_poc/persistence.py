@@ -221,6 +221,26 @@ class EncryptedApplicationStore:
         with engine.connect() as own_connection:
             return self.get_memory(memory_id, connection=own_connection)
 
+    def list_memory_versions(self, memory_id: str, *, limit: int = 100) -> list[dict[str, object]]:
+        if not 1 <= limit <= 200:
+            raise ValueError("memory version limit is invalid")
+        engine = self._require_engine()
+        with engine.connect() as connection:
+            rows = connection.execute(text(
+                "SELECT id, version_no, snapshot_json, change_reason, created_at "
+                "FROM memory_versions WHERE memory_id=:id ORDER BY version_no LIMIT :limit"
+            ), {"id": memory_id, "limit": limit}).mappings().all()
+            return [
+                {
+                    "id": str(row["id"]),
+                    "version_no": int(row["version_no"]),
+                    "snapshot": json.loads(str(row["snapshot_json"])),
+                    "change_reason": str(row["change_reason"]),
+                    "created_at": str(row["created_at"]),
+                }
+                for row in rows
+            ]
+
     def search_memories(self, query: str, *, limit: int = 50) -> list[dict[str, object]]:
         if not query.strip() or len(query) > 256 or not 1 <= limit <= 200:
             raise ValueError("memory search query is invalid")
@@ -610,6 +630,7 @@ def _memory_row(row) -> dict[str, object]:
         "subject": str(row["subject"]),
         "content": str(row["content"]),
         "claim_type": str(row["claim_type"]),
+        "status": str(row["status"]),
         "source_message_id": row["source_message_id"],
         "confirmed_at": str(row["confirmed_at"]),
         "created_at": str(row["created_at"]),

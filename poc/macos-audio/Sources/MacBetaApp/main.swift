@@ -119,6 +119,7 @@ final class BetaChatModel {
     private(set) var tasks: [LocalTaskItem] = []
     private(set) var memories: [LocalMemoryItem] = []
     private(set) var memoryStatus = ""
+    private(set) var memoryVersions: [LocalMemoryVersion] = []
     private(set) var taskStatus = ""
     private(set) var taskNotificationStatus = "通知默认关闭。"
     private let taskReminderManager = TaskReminderManager.shared
@@ -494,6 +495,17 @@ final class BetaChatModel {
             memoryStatus = "\(memories.count) 条用户确认记忆 · 仅保存在本机"
         } catch {
             memoryStatus = "无法读取本机记忆：\(error.localizedDescription)"
+        }
+    }
+
+    func refreshMemoryVersions(id: String) async {
+        guard let client else { return }
+        do {
+            memoryVersions = try await client.memoryVersions(id: id)
+            memoryStatus = "已加载 \(memoryVersions.count) 个记忆版本。"
+        } catch {
+            memoryVersions = []
+            memoryStatus = "无法读取记忆版本：\(error.localizedDescription)"
         }
     }
 
@@ -1285,6 +1297,7 @@ private struct ConfirmedMemoryView: View {
     @State private var category = "fact"
     @State private var editingID: String?
     @State private var sourceMessageID = ""
+    @State private var historyMemory: LocalMemoryItem?
     private let categories = ["fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"]
 
     var body: some View {
@@ -1352,6 +1365,11 @@ private struct ConfirmedMemoryView: View {
                             sourceMessageID = memory.sourceMessageID ?? ""
                         }
                         .buttonStyle(.borderless)
+                        Button("版本历史") {
+                            historyMemory = memory
+                            Task { await model.refreshMemoryVersions(id: memory.id) }
+                        }
+                        .buttonStyle(.borderless)
                         Button(role: .destructive) {
                             Task { await model.deleteMemory(memory) }
                         } label: {
@@ -1375,6 +1393,27 @@ private struct ConfirmedMemoryView: View {
             }
         }
         .padding()
+        .sheet(item: $historyMemory) { memory in
+            NavigationStack {
+                List(model.memoryVersions) { version in
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("版本 \(version.versionNo) · \(version.changeReason)").font(.headline)
+                        Text(version.snapshot.subject).font(.subheadline)
+                        Text(version.snapshot.content).font(.body)
+                        Text("\(version.snapshot.category) · \(version.createdAt)")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .navigationTitle("\(memory.subject) · 版本历史")
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("完成") { historyMemory = nil }
+                    }
+                }
+            }
+            .frame(minWidth: 480, minHeight: 360)
+        }
     }
 }
 

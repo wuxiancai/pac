@@ -1,3 +1,9 @@
+# 2026-11-10：V1.1 记忆版本历史查看
+
+- 新增认证 `GET /memories/{id}/versions`，返回有界、按版本号升序排列的确认快照；记忆 UI 增加只读历史 sheet，展示版本号、变更原因、时间、类别、主题和内容。
+- 验证：`tests/test_persistence.py tests/test_beta_api.py` 54 passed，1 条既有 Starlette/httpx 弃用警告；后端全量 300 passed、同 1 条弃用警告；Swift 全量 50 项通过；Beta build、Ruff、mypy 与 `uv lock --check` 通过。
+- 删除记忆会级联删除版本快照。来源跨会话选择/跳转、Embedding、导出和备份/恢复仍待完成。
+
 # 2026-11-10：记忆来源消息追踪
 
 - 持久聊天历史现返回稳定 message UUID；Swift 解码并保留 ID，但编码模型上下文时明确只发 role/content，不扩展聊天请求契约。生成完成后 UI 刷新当前会话历史以取得刚保存消息的 ID。

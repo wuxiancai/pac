@@ -302,6 +302,10 @@ def test_confirmed_memory_search_version_and_delete_lifecycle(storage_root: Path
         assert updated["content"] == "Use a local private archive"
         assert store.search_memories("private archive")[0]["id"] == memory["id"]
         assert store.search_memories("encrypted archive") == []
+        versions = store.list_memory_versions(str(memory["id"]))
+        assert [version["version_no"] for version in versions] == [1, 2]
+        assert versions[0]["snapshot"]["content"] == "Use a local encrypted archive"
+        assert versions[1]["snapshot"]["content"] == "Use a local private archive"
         with store.connection() as connection:
             assert connection.execute(
                 text("SELECT count(*) FROM memory_versions WHERE memory_id=:id"),

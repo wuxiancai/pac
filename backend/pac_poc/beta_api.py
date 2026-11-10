@@ -776,6 +776,19 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         except Exception:
             raise HTTPException(status_code=503, detail="memory could not be deleted") from None
 
+    @router.get("/memories/{memory_id}/versions")
+    async def list_memory_versions(memory_id: UUID, limit: int = Query(default=100, ge=1, le=200)) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent memory storage is unavailable")
+        try:
+            if persistent_store.get_memory(str(memory_id))["status"] != "ACTIVE":
+                raise KeyError("memory not found")
+            return {"versions": persistent_store.list_memory_versions(str(memory_id), limit=limit)}
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="memory not found") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="memory versions are unavailable") from None
+
     @router.put("/memories/{memory_id}")
     async def update_memory(
         memory_id: UUID, payload: ConfirmedMemoryUpdateRequest

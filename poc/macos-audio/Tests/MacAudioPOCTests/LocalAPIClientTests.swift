@@ -381,6 +381,14 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     try await client.deleteChatHistory(conversationID: "11111111-1111-4111-8111-111111111111")
 }
 
+@Test func memoryVersionSnapshotDecodesPersistedCorrection() throws {
+    let data = Data(#"{"id":"11111111-1111-4111-8111-111111111111","version_no":2,"snapshot":{"subject":"Project Atlas","content":"Keep it local","category":"decision","confirmed_at":"2026-11-10T02:00:00+00:00","source_message_id":null},"change_reason":"user_confirmed_edit","created_at":"2026-11-10T02:00:00+00:00"}"#.utf8)
+    let version = try JSONDecoder().decode(LocalMemoryVersion.self, from: data)
+    #expect(version.versionNo == 2)
+    #expect(version.snapshot.content == "Keep it local")
+    #expect(version.changeReason == "user_confirmed_edit")
+}
+
 @available(macOS 12.0, *)
 @Test func selectedTextImportUsesAuthenticatedLoopbackAndSendsNoPath() async throws {
     _ = ImportRequestCapture.shared.take()

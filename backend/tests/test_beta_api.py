@@ -1501,6 +1501,9 @@ def test_memory_api_requires_explicit_confirmation_and_supports_search_delete(tm
                 "subject": "Project Atlas", "content": "Use local encrypted storage",
                 "category": "decision", "confirmed": True,
             })
+            versions = await client.get(
+                f"/memories/{created.json()['id']}/versions", headers=headers
+            )
             search = await client.get("/memories/search", headers=headers, params={"q": "local encrypted storage"})
             listed = await client.get("/memories", headers=headers)
             deleted = await client.delete(f"/memories/{created.json()['id']}", headers=headers)
@@ -1508,6 +1511,9 @@ def test_memory_api_requires_explicit_confirmation_and_supports_search_delete(tm
         assert created.status_code == 201
         assert unconfirmed_update.status_code == 409
         assert updated.json()["content"] == "Use local encrypted storage"
+        assert versions.status_code == 200
+        assert [version["version_no"] for version in versions.json()["versions"]] == [1, 2]
+        assert versions.json()["versions"][0]["snapshot"]["content"] == "Use local encryption"
         assert len(search.json()["memories"]) == 1
         assert listed.json()["memories"][0]["claim_type"] == "user_confirmed_fact"
         assert deleted.json() == {"deleted": True}
