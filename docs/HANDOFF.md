@@ -1,3 +1,9 @@
+# 2026-11-10：记忆来源消息查看
+
+- 新增认证 `GET /memories/{id}/source`，按记忆关联的 message UUID 返回本机原消息和会话标题；记忆中心可打开来源只读 sheet。删除来源会话后返回空来源，不暴露失效引用。
+- 验证：`tests/test_persistence.py tests/test_beta_api.py` 54 passed，1 条既有弃用警告；后端全量 300 passed、同 1 条警告；Swift 全量 51 项通过；Beta build、Ruff、mypy 与 `uv lock --check` 通过。
+- 来源跨会话跳转与备份/恢复仍未完成；本段没有读取真实用户数据或触发 Provider。
+
 # 2026-11-10：V1.1 记忆版本历史查看
 
 - 新增认证 `GET /memories/{id}/versions`，返回有界、按版本号升序排列的确认快照；记忆 UI 增加只读历史 sheet，展示版本号、变更原因、时间、类别、主题和内容。
