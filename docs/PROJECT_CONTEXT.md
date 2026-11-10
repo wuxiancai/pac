@@ -126,3 +126,4 @@
 | [`DECISIONS.md`](DECISIONS.md) | 已确认的项目决策、待决产品事项和 ADR 状态入口 |
 | [`HANDOFF.md`](HANDOFF.md) | 最新工作摘要和下一位执行者的起点 |
 | [`poc/phase0-traceability.md`](poc/phase0-traceability.md) | 阶段 0 要求、证据、缺口及门禁的权威追踪矩阵 |
+- 2026-11-10 `4f29682` 后重启 Beta 的只读 GUI 检查通过：界面连接本机 `ollama / qwen3.5:0.8b` 并加载新对话。无聊天发送、Keychain 项变更或恢复操作；不覆盖锁屏/睡眠/ACL/数据库写入验证。详见最新 HANDOFF。

@@ -167,3 +167,4 @@ UV_CACHE_DIR=.poc-data/uv-cache uv run --locked python scripts/run_live_micropho
 - 每个可用闭环先做必要的本机验证并记录实际范围；不为未启用的后期能力预先重复验证。
 - 涉及敏感数据持久化、远端出站、麦克风采集或正式分发的能力，必须先满足对应安全与授权要求。
 - 每个工作包关闭时，更新实现文档、任务状态和 `HANDOFF.md`，列明验证与剩余限制，并提交 Git。
+2026-11-10 B3 Keychain fake-adapter 生命周期回归已提交（`4f29682`），随后重启 Beta 的只读 GUI 检查显示本机 Ollama 已连接。真实 Keychain ACL/锁屏与睡眠唤醒、数据库读写及恢复流程仍需验收；此前偶发启动错误原因未判定，B3 保持 IN PROGRESS。详见 `docs/HANDOFF.md` 与 `docs/beta/persistent-storage.md`。
