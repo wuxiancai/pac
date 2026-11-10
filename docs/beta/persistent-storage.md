@@ -19,6 +19,7 @@
 - `GET /memories/{id}/versions` 提供有界只读快照历史，UI 展示版本号、变更原因、时间、类别、主题和内容。
 - 任务可保存可选 `schedule_at`；`TaskReminderManager` 仅安排本机通知。系统授权需由用户点击开启，拒绝授权不会自动改走远端通知。
 - 每次启动重建和单条安排只接受未完成/未取消、时间可解析且仍在未来的任务；已过期、无效时间或终态任务会从本机待发通知中移除。纯逻辑回归覆盖有效时间、过去/无效/缺失时间以及完成/取消状态，不代表真实系统授权或通知投递。
+- 用户拒绝通知授权或系统授权后来失效时，提醒开关恢复为关闭并清理本应用待发提醒；不转发到远端。
 
 ## 验证
 
@@ -26,6 +27,7 @@
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`：基础持久化阶段 291 passed；2026-11-10 记忆纠错/来源/版本历史后的最新后端全量 300 passed，1 条既有 Starlette/httpx 弃用警告；Swift 全量 51 项通过。
 - `uv run --locked ruff check pac_poc/persistence.py pac_poc/migrations tests/test_persistence.py`：通过。
 - 2026-11-10 `swift test --package-path poc/macos-audio`：61 项通过（含 Beta target 编译）；任务提醒时间资格回归通过。没有请求通知权限或触发系统通知。
+- 2026-11-10 权限拒绝/撤销处理经 Beta target 编译和同一套 Swift 回归验证；真实系统设置撤销后的行为仍待 GUI 实测。
 - `uv run --locked mypy pac_poc/persistence.py`：通过。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --group dev pytest -q tests/test_persistence.py -k 'long_conversation_history_pages or stable_bounded_keyset_pages'`（`backend/`）：2 passed；120 条消息跨 100 条默认页边界，无重复/遗漏。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --group dev pytest -q tests/test_backup.py`（`backend/`）：10 passed，含连续恢复后只保留一份且替换为最新快照。

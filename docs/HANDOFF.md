@@ -1610,3 +1610,8 @@
 - 自动回归覆盖未来、过去、无效、缺失时间及 COMPLETED/CANCELLED 状态。`swift test --package-path poc/macos-audio` → 61 项通过（含 Beta target 编译）。
 - 未请求系统通知权限，也未投递真实通知；首次授权、拒绝、重启后投递仍待 GUI 验收。
 - B1 本机离线 GUI 尝试未形成失败样本：关闭 Ollama GUI 后其 serve 进程仍在；结束 serve 后系统自动重启了服务，本次请求随后取消。此过程不作离线/恢复通过证据；loopback 状态已恢复。没有云请求或麦克风采集。
+
+### 2026-11-10：B3 通知授权撤销清理
+
+- 更新任务提醒授权状态处理：用户拒绝授权或系统授权失效时，应用关闭提醒偏好并删除 `pac.task.*` 待发请求；不会切换远端通知。显式关闭提醒沿用同一清理流程。
+- 验证：`swift test --package-path poc/macos-audio` → 61 项通过，Beta target 编译成功。权限请求没有在本轮触发；系统设置撤销后的真实行为仍需 GUI 验收。

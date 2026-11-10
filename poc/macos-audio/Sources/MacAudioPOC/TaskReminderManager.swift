@@ -20,7 +20,11 @@ public final class TaskReminderManager {
     /// Called only from an explicit user action in the task reminder controls.
     public func requestAndEnable() async throws -> Bool {
         let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
-        UserDefaults.standard.set(granted, forKey: Self.preferenceKey)
+        if granted {
+            UserDefaults.standard.set(true, forKey: Self.preferenceKey)
+        } else {
+            await disable()
+        }
         return granted
     }
 
@@ -35,7 +39,7 @@ public final class TaskReminderManager {
         guard isEnabled else { return }
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
-            UserDefaults.standard.set(false, forKey: Self.preferenceKey)
+            await disable()
             return
         }
         let now = Date()
@@ -63,6 +67,7 @@ public final class TaskReminderManager {
 
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+            await disable()
             return
         }
         let content = UNMutableNotificationContent()
