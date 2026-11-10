@@ -1577,3 +1577,9 @@
 
 - 新会话显式选择“会议助理”和“项目助理”，针对合成校园图书馆周末延长开放问题进行协作。约 10 秒完成，UI 显示两个角色观点和主助理综合结论，状态栏确认本轮为 `ollama / qwen3.5:0.8b`。
 - 质量限制：提示要求三项各不超过 20 字，综合结论有一条超长；角色观点也出现偏题建议。确认本机协作闭环可运行，但格式遵循与建议相关性仍不稳定，B9 继续 IN PROGRESS。合成聊天保留本机 SQLCipher；未调用云端、麦克风或 Keychain。
+
+### 2026-11-10：B3 跨进程恢复锁回归
+
+- 增加独立 Python 子进程持有 SQLCipher store 的故障用例。父进程尝试恢复时必须因无法取得生命周期独占锁而 fail closed；原库可读，restore marker 与三类 staging 均被清理。释放子进程后，重新打开的 store 可以成功取得独占锁并完成恢复。
+- 验证：`tests/test_backup.py` 15 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 346 passed、1 条既有 Starlette/httpx 弃用警告；`mypy pac_poc` 37 个模块通过；`ruff check pac_poc tests scripts` 通过。
+- 自动进程锁用例不代表真实断电/介质故障；B3 仍待 GUI Keychain 认证、RTO 和物理故障验收。

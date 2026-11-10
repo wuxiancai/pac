@@ -363,6 +363,82 @@ def test_restore_fails_closed_while_another_store_instance_is_open(tmp_path: Pat
     first.close()
 
 
+def test_restore_fails_closed_while_another_process_holds_database_lock(tmp_path: Path) -> None:
+    import select
+
+    database = (tmp_path / "product.db").resolve()
+    backup = tmp_path / "snapshot.pacbackup"
+    key = b"p" * 32
+    parent_store = EncryptedApplicationStore(path=database, key=key)
+    parent_store.open()
+    conversation = parent_store.get_or_create_default_conversation()
+    parent_store.append_chat_turn(
+        conversation_id=str(conversation["id"]), run_id="cross-process-lock",
+        user_content="cross-process lock protects the live database", assistant_content="safe",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    parent_store.export_encrypted_backup(backup, password="cross process fixture")  # pragma: allowlist secret
+
+    child_program = """
+import sys
+from pathlib import Path
+from pac_poc.persistence import EncryptedApplicationStore
+
+store = EncryptedApplicationStore(path=Path(sys.argv[1]), key=bytes.fromhex(sys.argv[2]))
+store.open()
+print('ready', flush=True)
+sys.stdin.readline()
+store.close()
+"""
+    child = subprocess.Popen(
+        [sys.executable, "-c", child_program, str(database), key.hex()],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, bufsize=1,
+    )
+    try:
+        assert child.stdout is not None
+        ready, _, _ = select.select([child.stdout], [], [], 10)
+        assert ready, "database-lock child did not finish opening within 10 seconds"
+        assert child.stdout.readline().strip() == "ready"
+        with pytest.raises(PersistentStoreError, match="all other instances to be closed"):
+            parent_store.restore_encrypted_backup(
+                backup, password="cross process fixture"  # pragma: allowlist secret
+            )
+        assert parent_store.load_conversation(str(conversation["id"]))["messages"][0]["content"] == (
+            "cross-process lock protects the live database"
+        )
+        assert not (tmp_path / ".product.db.restore-in-progress").exists()
+        assert not list(tmp_path.glob(".pac-restore-*.sqlite"))
+        assert not list((tmp_path / "pre-restore").glob(".pac-pre-restore-*.sqlite"))
+    finally:
+        try:
+            if child.stdin is not None and child.poll() is None:
+                child.stdin.write("close\n")
+                child.stdin.flush()
+        except BrokenPipeError:
+            pass
+        finally:
+            if child.stdin is not None:
+                child.stdin.close()
+        try:
+            child.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            child.terminate()
+            child.wait(timeout=10)
+        parent_store.close()
+    assert child.returncode == 0
+
+    reopened_store = EncryptedApplicationStore(path=database, key=key)
+    reopened_store.open()
+    reopened_store.restore_encrypted_backup(
+        backup, password="cross process fixture"  # pragma: allowlist secret
+    )
+    assert reopened_store.load_conversation(str(conversation["id"]))["messages"][0]["content"] == (
+        "cross-process lock protects the live database"
+    )
+    reopened_store.close()
+
+
 def test_store_creates_private_lifecycle_lock_for_new_database_parent(tmp_path: Path) -> None:
     database = tmp_path / "new-parent" / "nested" / "product.db"
     store = EncryptedApplicationStore(path=database, key=b"n" * 32)
