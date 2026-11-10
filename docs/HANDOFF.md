@@ -1517,5 +1517,5 @@
 
 # 2026-11-10：云安全审计 30 天定时清理
 
-- D-003 审计表原先在启动、写入或 `/usage` 读取时惰性清理；进程若持续运行且长时间无请求，过期行可能晚于 30 天才删除。数据库密钥启动的 Beta 服务现每 6 小时清理一次，启动仍先立即清理；关闭服务先取消本机维护任务，再关闭 SQLCipher store。任务只删除到期审计元数据，不读取消息、记忆或音频，也不访问 Provider 或麦克风。
-- 定向 `tests/test_beta_api.py -k 'security_audit or cloud_context_limit or audit_maintenance'` → 3 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 340 passed、1 条既有 Starlette/httpx 弃用警告；`ruff check pac_poc tests` 与 mypy 通过；阶段追踪契约 9 passed。尚未等待实际六小时周期；循环调度及 app 启停取消由受控时钟和 TestClient 生命周期测试验证。
+- D-003：审计行与已完成任务原先分别在启动、写入或读取时惰性清理；进程若持续运行且长时间无请求，审计元数据和到期任务都可能晚于保留期才删除。数据库密钥启动的 Beta 服务每 6 小时清理两类 SQLCipher 数据，启动仍先立即清理；关闭服务先取消本机维护任务，再关闭 store。任务只删除到期元数据和已完成任务，不读取聊天正文、记忆或音频，也不访问 Provider 或麦克风。
+- 验证：`tests/test_beta_api.py -k 'security_audit or cloud_context_limit or audit_maintenance'` → 3 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 340 passed、1 条既有 Starlette/httpx 弃用警告；`ruff check pac_poc tests` 与 mypy 通过；阶段追踪契约 9 passed。尚未等待实际六小时周期；循环调度及 app 启停取消由受控时钟和 TestClient 生命周期测试验证。

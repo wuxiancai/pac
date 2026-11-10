@@ -53,6 +53,8 @@
 
 2026-11-10 B3/V1.1 持久化切片：SQLCipher store/schema、Keychain 密钥私有管道、多会话列表/新建/切换/分别删除、指定会话历史读写，V2 本机任务 CRUD/状态迁移/30 天清理已分段提交。任务状态转移图后由用户按 D-018 确认为产品规则。当前后端全量 305 passed（1 条既有 Starlette/httpx 弃用警告）；Swift 全量 51 项、Beta build、Ruff、mypy、`uv lock --check` 通过。V1.1 已确认记忆来源/修正/历史查看与会话重命名均已接入；来源 UUID 仅在本地数据库/UI 使用，不随 Model Gateway 消息发送。此前全量曾有 APFS-128 临时映像间歇 RuntimeError，目标单测及重跑全量通过，原因未判定。任务和确认记忆基础 UI/API 已接入；记忆版本历史只读查看已接入；历史分页/加载边界、备份/恢复验收仍未完成；会话重命名验证后的当前回归为后端 300 项、Swift 51 项通过。会话现可重命名。纠错编辑现需显式确认且保留版本快照。
 
+2026-11-10 D-003 保留清理改进：数据库密钥启动时立即清理过期完成任务与云安全审计元数据，服务运行期间每 6 小时清理两类 SQLCipher 数据，退出先取消维护任务再关闭 store。定向回归 3 passed，后端全量 340 passed（1 条既有 Starlette/httpx 弃用警告），Ruff/mypy 及阶段追踪契约 9 项通过。实际六小时墙钟等待及 GUI/实机运行周期未验证。
+
 2026-11-10 B5 补充自动客户端证据：Swift URLProtocol 回归捕获认证 loopback `/chat/stream` 请求并确认 `import_ids` 序列化；Swift 全量 44 项通过，`personal-assistant-beta` target 构建通过。另在 API 调用 ContextBuilder 前增加附件字符数下限检查，100,000 字符超大附件在 Orchestrator 构建前返回 413；后端全量 282 passed，1 条既有警告。它不替代 GUI 对话中实际引用资料的手动验收，B5 保持 IN PROGRESS。
 
 2026-11-10 阶段 6 在提交 `4d16bec` 的本机等价门禁：依赖锁、Ruff、mypy、tracked-file secret scan、compileall、后端 282 项、Swift 44 项及 Beta target build 均通过。Swift 门禁首次复现了 B5 URLProtocol 测试共享静态捕获器的并行竞态；已隔离拒绝路径网络探针，修复后 Swift 全量复跑通过。远端 GitHub Actions 未运行。

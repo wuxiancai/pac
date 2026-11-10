@@ -269,7 +269,9 @@ class BetaVoiceTranscriber(Protocol):
     def transcribe_pcm16le(self, pcm: bytes) -> str: ...
 
 
-class SecurityAuditRetentionStore(Protocol):
+class RetentionCleanupStore(Protocol):
+    def purge_expired_completed_tasks(self) -> int: ...
+
     def purge_expired_security_audit_events(self) -> int: ...
 
 
@@ -1680,7 +1682,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         async def start_audit_cleanup() -> None:
             nonlocal audit_cleanup_task
             audit_cleanup_task = asyncio.create_task(
-                _security_audit_cleanup_loop(persistent_store)
+                _retention_cleanup_loop(persistent_store)
             )
 
         async def stop_audit_cleanup() -> None:
@@ -1698,13 +1700,17 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
     return app
 
 
-async def _security_audit_cleanup_loop(
-    store: SecurityAuditRetentionStore,
+async def _retention_cleanup_loop(
+    store: RetentionCleanupStore,
     *,
     sleep: Callable[[float], Any] = asyncio.sleep,
 ) -> None:
     while True:
         await sleep(_AUDIT_RETENTION_CLEANUP_INTERVAL_SECONDS)
+        try:
+            store.purge_expired_completed_tasks()
+        except Exception:
+            _LOGGER.exception("Scheduled completed-task retention cleanup failed")
         try:
             store.purge_expired_security_audit_events()
         except Exception:

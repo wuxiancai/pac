@@ -22,7 +22,7 @@ from pac_poc.beta_api import (
     MAX_CHAT_REQUEST_BYTES,
     create_beta_api,
     create_beta_app,
-    _security_audit_cleanup_loop,
+    _retention_cleanup_loop,
     _run_voice_worker,
     _stream_with_keepalives,
 )
@@ -978,12 +978,17 @@ def test_cloud_context_limit_rejection_is_audited_before_provider_access(tmp_pat
     store.close()
 
 
-def test_security_audit_retention_cleanup_runs_periodically() -> None:
+def test_completed_task_and_security_audit_retention_cleanup_runs_periodically() -> None:
     class StoreStub:
-        purges = 0
+        task_purges = 0
+        audit_purges = 0
+
+        def purge_expired_completed_tasks(self) -> int:
+            self.task_purges += 1
+            return 0
 
         def purge_expired_security_audit_events(self) -> int:
-            self.purges += 1
+            self.audit_purges += 1
             return 0
 
     async def run() -> None:
@@ -998,9 +1003,9 @@ def test_security_audit_retention_cleanup_runs_periodically() -> None:
                 raise asyncio.CancelledError
 
         with pytest.raises(asyncio.CancelledError):
-            await _security_audit_cleanup_loop(store, sleep=controlled_sleep)
+            await _retention_cleanup_loop(store, sleep=controlled_sleep)
         assert waits == 2
-        assert store.purges == 1
+        assert store.task_purges == store.audit_purges == 1
 
     asyncio.run(run())
 
@@ -1021,7 +1026,7 @@ def test_database_key_app_starts_and_stops_audit_maintenance(
         finally:
             stopped.set()
 
-    monkeypatch.setattr(beta_api_module, "_security_audit_cleanup_loop", wait_for_shutdown)
+    monkeypatch.setattr(beta_api_module, "_retention_cleanup_loop", wait_for_shutdown)
     app = create_beta_app(
         dependencies=BetaAPIDependencies(
             session=LocalAPISession(token="maintenance-token"), database_key=b"m" * 32
