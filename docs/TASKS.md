@@ -67,6 +67,8 @@
 
 ### 阶段 6 本机门禁复核（2026-11-10，仍开放）
 
+- 最低系统自动覆盖：当前主 CI 仍运行于 `macos-26`。本段新增独立 `macos-14` GitHub Actions job，执行 `swift test` 与 Beta target build；本地只完成工作流 YAML 解析和 diff 检查，macOS 14 runner 结果尚未产生。此项待提交触发的 Actions 成功后才关闭；仍需真实 macOS 14 用户设备做 GUI/Keychain/通知/恢复验收。
+
 - 当前提交 `000f341`：后端 all-extras/all-groups 347 passed（1 条既有弃用警告）；Swift 94 passed；Beta target build、Ruff、CI mypy、`uv lock --check`、compileall、tracked-file secret scan 全通过。远端 Actions、Provider、麦克风、真实恢复认证与 macOS 14 runtime 未验；阶段 6 继续开放。命令及边界见最新 `docs/HANDOFF.md`。
 - 用户授权后已将当时领先远端的 319 个提交推送；随后修正 workflow 未定义的 `phase0-security` extra 并推送 `541ad6a`。run `42836663902` attempt 2 全部门禁通过：Python 347、Swift 94、lint/typecheck/secret scan/lock/compileall/Beta build 成功。attempt 1 的 APFS-128 用例间歇失败，隔离重跑和远端 attempt 2 通过，原因未判定。阶段 6 其他系统/产品验收仍开放。
 - 最新基线 `58c771d`：后端 all-extras/all-groups 347 passed（1 条既有 Starlette/httpx 弃用警告），Swift 84 passed；Ruff、CI mypy、`uv lock --check`、compileall、tracked-file detect-secrets、Beta target、`.app` 打包和 `NSFaceIDUsageDescription` plist 校验均通过。无远端 Actions/Provider/麦克风运行；系统认证及恢复仍未验。

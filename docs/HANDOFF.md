@@ -1,3 +1,9 @@
+# 2026-11-10：增加最低 macOS 14 CI 构建门禁
+
+- 当前 GitHub Actions 主 job 固定运行 `macos-26`，不能为 Beta 声明的最低版本 `macOS 14.0` 提供编译/运行环境覆盖。按官方 runner 文档确认 `macos-14` 可作为 GitHub-hosted runner 标签后，新增独立 `minimum-macos` job，运行 `swift test` 和 `swift build --product personal-assistant-beta`；保持现有完整 Python/Swift CI 在 `macos-26`。
+- 本地检查：Ruby Psych YAML parse 成功；`git diff --check` 通过。尚未触发远端 Actions，因此 `macos-14` job 结果待提交后取得；runner 编译/测试成功也不代替真实 macOS 14 GUI、Keychain、通知和备份恢复验收。
+- 变更提交后应核对对应 Actions 两个 job 的结论，并更新本交接、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。阶段 6 继续开放。
+
 # 2026-11-10：排查 Beta 每次启动的 Keychain 系统授权提示
 
 - 没有输入或保存用户在聊天中提供的 macOS 登录密码。该凭据已暴露于对话中，建议用户尽快自行更改；系统对 Keychain 的“允许”授权也须由用户本人操作。
