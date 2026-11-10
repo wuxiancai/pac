@@ -1197,6 +1197,7 @@ private struct ChatMessageRow: Identifiable {
 @available(macOS 14.0, *)
 private struct BetaChatView: View {
     @Bindable var model: BetaChatModel
+    @FocusState private var isDraftFocused: Bool
     @State private var showingSettings = false
     @State private var showingFileImporter = false
     @State private var showingUsage = false
@@ -1287,6 +1288,13 @@ private struct BetaChatView: View {
                 .keyboardShortcut("n", modifiers: .command)
                 .disabled(model.isStreaming)
                 .accessibilityIdentifier("new-conversation-button")
+                Button {
+                    isDraftFocused = true
+                } label: {
+                    Label("输入消息", systemImage: "text.cursor")
+                }
+                .keyboardShortcut("l", modifiers: .command)
+                .accessibilityIdentifier("focus-message-input-button")
                 Button {
                     showingMemories = true
                     Task { await model.refreshMemories() }
@@ -1445,6 +1453,7 @@ private struct BetaChatView: View {
             }
             HStack(alignment: .bottom, spacing: 10) {
                 TextField("输入消息…", text: $model.draft, axis: .vertical)
+                    .focused($isDraftFocused)
                     .lineLimit(1...5)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(requestSend)

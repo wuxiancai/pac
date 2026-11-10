@@ -1,3 +1,9 @@
+# 2026-11-10：V1.1 输入框快捷指令
+
+- 聊天页新增 `⌘L`“输入消息”指令，通过 SwiftUI `FocusState` 聚焦草稿输入框；不发送消息，也不启动语音。
+- 验证：`swift test --package-path poc/macos-audio` → 68 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。GUI 快捷键实机点验待做。
+- 本段完成后按项目规则更新本文件并提交；其他未完成工作见 `docs/TASKS.md`。
+
 # 2026-11-10：V1.1 新对话快捷指令
 
 - 聊天页“新对话”按钮现支持 macOS `⌘N`。快捷键复用现有 `createConversation()` 流程，仍遵守生成中禁用规则。

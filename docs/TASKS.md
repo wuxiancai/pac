@@ -53,7 +53,7 @@
 
 2026-11-10 阶段 6 代码提交 `35d6644` 本机 CI 等价门禁：`uv lock --check`、Ruff、CI mypy、tracked-file `detect-secrets-hook`、compileall、后端全量 346 passed、Swift 全量 68 passed 和 `personal-assistant-beta` 构建均通过（后端仅 1 条既有 Starlette/httpx 弃用警告）。远端 Actions 未运行，阶段 6 仍开放。
 
-2026-11-10 V1.1 快捷指令：聊天页“新对话”按钮增加 macOS `⌘N`，复用既有创建逻辑并沿用生成中禁用条件。Swift 全量回归与 Beta target build 结果记录于 `docs/HANDOFF.md`；GUI 快捷键实机点验仍待完成。
+2026-11-10 V1.1 快捷指令：聊天页“新对话”按钮增加 macOS `⌘N`；`⌘L` 聚焦消息输入框，不发送、不启动语音。快捷键复用既有会话创建逻辑和 SwiftUI FocusState；Swift 全量回归与 Beta target build 结果记录于 `docs/HANDOFF.md`，GUI 实机点验仍待完成。
 
 2026-11-10 B3 客户端历史读取并发保护：SwiftUI 为分页、会话选择、记忆来源跳转和聊天历史刷新增加代际校验、会话 ID 核对和分页请求 ID，阻止失效的迟到响应覆盖当前会话、追加到错误会话或清除新分页请求状态。Swift 全量 68 项（含分页代际及加载态竞争回归）、Beta target build 通过；并发 GUI 复测尚未完成。来源跳转按钮 GUI 点验及临时合成记忆清理仍待 Beta 窗口恢复后执行。
 
