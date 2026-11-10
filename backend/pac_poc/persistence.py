@@ -307,6 +307,42 @@ class EncryptedApplicationStore:
             ), {"cutoff": cutoff.isoformat()})
             return int(result.rowcount or 0)
 
+
+    def list_conversations(self, *, limit: int = 100) -> list[dict[str, object]]:
+        if not 1 <= limit <= 500:
+            raise ValueError("conversation limit is outside the supported range")
+        engine = self._require_engine()
+        with engine.connect() as connection:
+            rows = connection.execute(text(
+                "SELECT c.id,c.title,c.created_at,c.updated_at,COUNT(m.id) AS message_count "
+                "FROM conversations c LEFT JOIN messages m ON m.conversation_id=c.id "
+                "AND m.deleted_at IS NULL WHERE c.status='ACTIVE' AND c.deleted_at IS NULL "
+                "GROUP BY c.id ORDER BY c.updated_at DESC LIMIT :limit"
+            ), {"limit": limit}).mappings().all()
+            return [{
+                "id": str(row["id"]),
+                "title": str(row["title"]),
+                "created_at": str(row["created_at"]),
+                "updated_at": str(row["updated_at"]),
+                "message_count": int(row["message_count"]),
+            } for row in rows]
+
+    def create_conversation(self, *, title: str = "新对话") -> dict[str, object]:
+        if not title.strip() or len(title) > 256:
+            raise ValueError("conversation title is invalid")
+        engine = self._require_engine()
+        now = _utc_timestamp()
+        conversation_id = str(uuid4())
+        with engine.begin() as connection:
+            connection.execute(text(
+                "INSERT INTO conversations(id,title,status,created_at,updated_at) "
+                "VALUES(:id,:title,'ACTIVE',:now,:now)"
+            ), {"id": conversation_id, "title": title.strip(), "now": now})
+            return {
+                "id": conversation_id, "title": title.strip(),
+                "created_at": now, "updated_at": now, "message_count": 0,
+            }
+
     def get_or_create_default_conversation(self) -> dict[str, str]:
         """Return the single Beta chat, creating it on first use."""
         engine = self._require_engine()

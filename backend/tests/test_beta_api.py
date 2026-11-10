@@ -1490,3 +1490,48 @@ def test_memory_api_requires_explicit_confirmation_and_supports_search_delete(tm
         asyncio.run(run())
     finally:
         store.close()
+
+
+def test_conversation_api_can_create_list_select_and_delete_one_conversation(tmp_path) -> None:
+    from pac_poc.persistence import EncryptedApplicationStore
+
+    store = EncryptedApplicationStore(path=(tmp_path / "conversations.db").resolve(), key=b"c" * 32)
+    store.open()
+    app = create_beta_api(
+        session=LocalAPISession(token="conversation-token"),
+        gateway=ModelGateway(adapters={"ollama": StubLocalAdapter()}, policy=LocalOnlyPolicy()),
+        persistence_store=store,
+    )
+
+    async def run() -> None:
+        headers = {"authorization": "Bearer conversation-token"}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            first = (await client.get("/chat/history", headers=headers)).json()
+            second_response = await client.post("/conversations", headers=headers, json={"title": "Second"})
+            second = second_response.json()
+            await client.post("/chat/stream", headers=headers, json={
+                "conversation_id": first["conversation_id"],
+                "messages": [{"role": "user", "content": "first message"}],
+            })
+            await client.post("/chat/stream", headers=headers, json={
+                "conversation_id": second["id"],
+                "messages": [{"role": "user", "content": "second message"}],
+            })
+            listed = await client.get("/conversations", headers=headers)
+            selected = await client.get(f"/conversations/{second['id']}", headers=headers)
+            deleted = await client.delete(f"/conversations/{first['conversation_id']}", headers=headers)
+            remaining = await client.get("/conversations", headers=headers)
+        assert second_response.status_code == 201
+        assert len(listed.json()["conversations"]) == 2
+        assert [message["content"] for message in selected.json()["messages"]] == [
+            "second message", "本机回答"
+        ]
+        assert deleted.json() == {"deleted": True}
+        assert [item["id"] for item in remaining.json()["conversations"]] == [second["id"]]
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()

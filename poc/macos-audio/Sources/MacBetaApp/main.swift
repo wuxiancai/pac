@@ -115,6 +115,7 @@ final class BetaChatModel {
     private(set) var status = "正在连接本机服务…"
     private(set) var messages: [LocalChatMessage] = []
     private(set) var conversationID: String?
+    private(set) var conversations: [LocalConversationItem] = []
     private(set) var tasks: [LocalTaskItem] = []
     private(set) var memories: [LocalMemoryItem] = []
     private(set) var memoryStatus = ""
@@ -198,6 +199,7 @@ final class BetaChatModel {
             let history = try await localClient.chatHistory()
             conversationID = history.conversationID
             messages = history.messages
+            conversations = try await localClient.conversations()
             client = localClient
             startupFailed = false
             startupLatency = max(0, ProcessInfo.processInfo.systemUptime - processStartedAt)
@@ -291,6 +293,7 @@ final class BetaChatModel {
                 self.activeRequest = nil
                 self.activeRequestID = nil
                 if runID != nil { self.latestRunStatus = .completed }
+                await self.refreshConversations()
                 if let runID {
                     await self.refreshRunStatus(runID, client: client)
                 }
@@ -425,6 +428,52 @@ final class BetaChatModel {
         status = "无法打开所选文件：\(error.localizedDescription)"
     }
 
+    var selectedConversationTitle: String {
+        conversations.first(where: { $0.id == conversationID })?.title ?? "新对话"
+    }
+
+    func refreshConversations() async {
+        guard let client else { return }
+        do {
+            conversations = try await client.conversations()
+        } catch {
+            status = "无法读取本机会话列表：\(error.localizedDescription)"
+        }
+    }
+
+    func selectConversation(_ conversation: LocalConversationItem) async {
+        guard activeRequest == nil, let client else {
+            status = "请先停止当前生成，再切换会话。"
+            return
+        }
+        do {
+            let history = try await client.chatHistory(conversationID: conversation.id)
+            conversationID = history.conversationID
+            messages = history.messages
+            lastAssistantResponseInterrupted = false
+            status = "已切换到：\(conversation.title)"
+        } catch {
+            status = "无法打开该会话：\(error.localizedDescription)"
+        }
+    }
+
+    func createConversation() async {
+        guard activeRequest == nil, let client else {
+            status = "请先停止当前生成，再新建会话。"
+            return
+        }
+        do {
+            let conversation = try await client.createConversation()
+            conversations.insert(conversation, at: 0)
+            conversationID = conversation.id
+            messages = []
+            lastAssistantResponseInterrupted = false
+            status = "已创建新会话。"
+        } catch {
+            status = "无法创建新会话：\(error.localizedDescription)"
+        }
+    }
+
     func refreshMemories() async {
         guard let client else { return }
         do {
@@ -505,13 +554,17 @@ final class BetaChatModel {
             return
         }
         do {
-            try await client.deleteChatHistory()
+            guard let conversationID else { return }
+            try await client.deleteChatHistory(conversationID: conversationID)
             messages.removeAll()
-            conversationID = nil
             lastAssistantResponseInterrupted = false
-            let history = try await client.chatHistory()
-            conversationID = history.conversationID
-            status = "已从本机加密数据库删除聊天记录。"
+            conversations.removeAll { $0.id == conversationID }
+            if let remaining = conversations.first {
+                await selectConversation(remaining)
+            } else {
+                await createConversation()
+            }
+            status = "已从本机加密数据库删除该会话。"
         } catch {
             status = "无法删除本机聊天记录：\(error.localizedDescription)"
         }
@@ -834,6 +887,29 @@ private struct BetaChatView: View {
                     Label("模型设置", systemImage: "gearshape")
                 }
                 .accessibilityIdentifier("model-settings-button")
+                Menu {
+                    ForEach(model.conversations) { conversation in
+                        Button {
+                            Task { await model.selectConversation(conversation) }
+                        } label: {
+                            if conversation.id == model.conversationID {
+                                Label(conversation.title, systemImage: "checkmark")
+                            } else {
+                                Text(conversation.title)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(model.selectedConversationTitle, systemImage: "bubble.left.and.bubble.right")
+                }
+                .accessibilityIdentifier("conversation-picker-menu")
+                Button {
+                    Task { await model.createConversation() }
+                } label: {
+                    Label("新对话", systemImage: "plus.bubble")
+                }
+                .disabled(model.isStreaming)
+                .accessibilityIdentifier("new-conversation-button")
                 Button {
                     showingMemories = true
                     Task { await model.refreshMemories() }

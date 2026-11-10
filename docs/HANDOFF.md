@@ -1284,3 +1284,10 @@
 - SwiftUI 新增记忆中心，用户可手动编辑主题/内容/类别，主动确认后保存；可查看和永久删除。没有从聊天自动提取，没有启用 Embedding；来源消息选择和纠错版本编辑后续实现。
 - 验证：persistence + API 定向 52 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 298 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 47 passed；Beta target 构建、Ruff/mypy 通过。
 - 未执行 GUI 手工验收，未启动 Beta、访问真实 Keychain/用户记忆/Provider 或麦克风；功能仍按 B3 IN PROGRESS 追踪。
+
+# 2026-11-10：V1.1 多会话管理
+
+- SQLCipher repository/Beta API 新增会话列表（含消息计数）、新建、指定 ID 读取与删除；历史 GET/DELETE 接受 conversation ID，删除动作只作用于被选会话。Swift 客户端与标题菜单接入切换/新建，删除后切到剩余会话或创建空白会话。聊天模型上下文继续只传最近 20 条；UI 目前读取完整会话，尚未加分页/虚拟化。
+- 补充 fake Gateway 的多会话隔离回归，避免测试请求落到本机 Ollama。首次测试漏注入 stub，意外调用本机 Ollama 返回响应差异；该请求只在 loopback 访问本机服务，未触发云 Provider；已修正夹具，重跑通过。
+- 验证：persistence + API 定向 54 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 300 passed、1 条既有弃用警告；Swift 全量 48 passed；Beta build、Ruff、mypy、`uv lock --check` 通过。
+- 限制：历史仍一次加载到 SwiftUI；多会话分页/搜索、标题重命名、长历史性能和跨设备恢复未覆盖。

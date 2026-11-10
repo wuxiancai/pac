@@ -302,3 +302,28 @@ def test_confirmed_memory_search_version_and_delete_lifecycle(storage_root: Path
         assert store.list_memories() == []
     finally:
         store.close()
+
+
+def test_conversation_list_create_and_targeted_delete_isolate_histories(storage_root: Path) -> None:
+    store = _store((storage_root / "conversations.db").resolve())
+    store.open()
+    try:
+        first = store.get_or_create_default_conversation()
+        second = store.create_conversation(title="Second conversation")
+        store.append_chat_turn(
+            conversation_id=first["id"], run_id="conversation-run-1",
+            user_content="first only", assistant_content="reply one",
+            provider="ollama", model="local", status="COMPLETED",
+        )
+        store.append_chat_turn(
+            conversation_id=second["id"], run_id="conversation-run-2",
+            user_content="second only", assistant_content="reply two",
+            provider="ollama", model="local", status="COMPLETED",
+        )
+        conversations = store.list_conversations()
+        assert {item["id"] for item in conversations} == {first["id"], second["id"]}
+        assert next(item for item in conversations if item["id"] == first["id"])["message_count"] == 2
+        assert store.delete_conversation(first["id"])
+        assert store.load_conversation(second["id"])["messages"][0]["content"] == "second only"
+    finally:
+        store.close()

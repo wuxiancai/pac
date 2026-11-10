@@ -141,6 +141,12 @@ class ChatPersistenceUnavailable(RuntimeError):
     """Safe marker for a local chat write failure."""
 
 
+class ConversationCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(default="新对话", min_length=1, max_length=256)
+
+
 class ConfirmedMemoryCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -670,6 +676,46 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             raise HTTPException(status_code=404, detail="import not found")
         return {"removed": True}
 
+    @router.get("/conversations")
+    async def list_conversations(limit: int = Query(default=100, ge=1, le=500)) -> dict[str, object]:
+        if persistent_store is None:
+            return {"conversations": []}
+        try:
+            return {"conversations": persistent_store.list_conversations(limit=limit)}
+        except Exception:
+            raise HTTPException(status_code=503, detail="conversations are unavailable") from None
+
+    @router.post("/conversations", status_code=201)
+    async def create_conversation(payload: ConversationCreateRequest) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent conversation storage is unavailable")
+        try:
+            return persistent_store.create_conversation(title=payload.title)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="conversation title is invalid") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="conversation could not be created") from None
+
+    @router.get("/conversations/{conversation_id}")
+    async def get_conversation(conversation_id: UUID) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent conversation storage is unavailable")
+        try:
+            return persistent_store.load_conversation(str(conversation_id))
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="conversation not found") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="conversation is unavailable") from None
+
+    @router.delete("/conversations/{conversation_id}")
+    async def remove_conversation(conversation_id: UUID) -> dict[str, bool]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent conversation storage is unavailable")
+        try:
+            return {"deleted": persistent_store.delete_conversation(str(conversation_id))}
+        except Exception:
+            raise HTTPException(status_code=503, detail="conversation could not be deleted") from None
+
     @router.get("/memories")
     async def list_memories(limit: int = Query(default=200, ge=1, le=500)) -> dict[str, object]:
         if persistent_store is None:
@@ -779,23 +825,31 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             raise HTTPException(status_code=503, detail="task could not be deleted") from None
 
     @router.get("/chat/history")
-    async def get_chat_history() -> dict[str, object]:
+    async def get_chat_history(conversation_id: UUID | None = None) -> dict[str, object]:
         if persistent_store is None:
             return {"conversation_id": None, "messages": []}
         try:
-            snapshot = persistent_store.load_conversation()
+            snapshot = persistent_store.load_conversation(
+                str(conversation_id) if conversation_id else None
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="conversation not found") from exc
         except PersistentStoreError as exc:
             raise HTTPException(status_code=503, detail="chat history is unavailable") from exc
         return {"conversation_id": snapshot["id"], "messages": snapshot["messages"]}
 
     @router.delete("/chat/history")
-    async def delete_chat_history() -> dict[str, bool]:
+    async def delete_chat_history(conversation_id: UUID | None = None) -> dict[str, bool]:
         if persistent_store is None:
             raise HTTPException(status_code=503, detail="persistent storage is unavailable")
         try:
-            snapshot = persistent_store.load_conversation()
+            snapshot = persistent_store.load_conversation(
+                str(conversation_id) if conversation_id else None
+            )
             deleted = persistent_store.delete_conversation(str(snapshot["id"]))
-        except (KeyError, PersistentStoreError) as exc:
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="conversation not found") from exc
+        except PersistentStoreError as exc:
             raise HTTPException(status_code=503, detail="chat history could not be deleted") from exc
         return {"deleted": deleted}
 

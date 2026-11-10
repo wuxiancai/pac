@@ -75,6 +75,25 @@ public struct LocalImportedTextFile: Decodable, Identifiable, Sendable {
     }
 }
 
+public struct LocalConversationItem: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let createdAt: String
+    public let updatedAt: String
+    public let messageCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case messageCount = "message_count"
+    }
+}
+
+private struct LocalConversationList: Decodable {
+    let conversations: [LocalConversationItem]
+}
+
 public struct LocalMemoryItem: Decodable, Identifiable, Sendable {
     public let id: String
     public let category: String
@@ -377,10 +396,45 @@ public final class LocalAPIClient: @unchecked Sendable {
         return task
     }
 
-    public func chatHistory() async throws -> LocalChatHistory {
-        guard let url = URL(string: "/chat/history", relativeTo: baseURL)?.absoluteURL else {
+    public func conversations() async throws -> [LocalConversationItem] {
+        guard let url = URL(string: "/conversations", relativeTo: baseURL)?.absoluteURL else {
             throw LocalAPIClientError.invalidEndpoint
         }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let list = try? JSONDecoder().decode(LocalConversationList.self, from: data) else { throw LocalAPIClientError.invalidResponse }
+        return list.conversations
+    }
+
+    public func createConversation(title: String = "新对话") async throws -> LocalConversationItem {
+        guard let url = URL(string: "/conversations", relativeTo: baseURL)?.absoluteURL else {
+            throw LocalAPIClientError.invalidEndpoint
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(ConversationCreatePayload(title: title))
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 201 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let item = try? JSONDecoder().decode(LocalConversationItem.self, from: data) else { throw LocalAPIClientError.invalidResponse }
+        return item
+    }
+
+    public func chatHistory(conversationID: String? = nil) async throws -> LocalChatHistory {
+        var components = URLComponents(
+            url: URL(string: "/chat/history", relativeTo: baseURL)!.absoluteURL,
+            resolvingAgainstBaseURL: false
+        )!
+        if let conversationID {
+            components.queryItems = [URLQueryItem(name: "conversation_id", value: conversationID)]
+        }
+        guard let url = components.url else { throw LocalAPIClientError.invalidEndpoint }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -397,10 +451,16 @@ public final class LocalAPIClient: @unchecked Sendable {
         return history
     }
 
-    public func deleteChatHistory() async throws {
-        guard let url = URL(string: "/chat/history", relativeTo: baseURL)?.absoluteURL else {
+    public func deleteChatHistory(conversationID: String) async throws {
+        guard let identifier = UUID(uuidString: conversationID) else {
             throw LocalAPIClientError.invalidEndpoint
         }
+        var components = URLComponents(
+            url: URL(string: "/chat/history", relativeTo: baseURL)!.absoluteURL,
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "conversation_id", value: identifier.uuidString.lowercased())]
+        guard let url = components.url else { throw LocalAPIClientError.invalidEndpoint }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -692,4 +752,8 @@ private struct ConfirmedMemoryPayload: Encodable {
     let content: String
     let category: String
     let confirmed: Bool
+}
+
+private struct ConversationCreatePayload: Encodable {
+    let title: String
 }
