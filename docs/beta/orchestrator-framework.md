@@ -66,7 +66,7 @@ macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的
 - Gateway 现也保留 Provider 报告的缓存命中输入 token：DeepSeek 使用 `usage.prompt_cache_hit_tokens`；Qwen/OpenAI-compatible 用法读取 `usage.prompt_tokens_details.cached_tokens`，校验它不超过 prompt 总 token 后再写入 bounded ledger，并显示在 macOS 用量面板。Qwen 官方说明此字段表示输入缓存命中 token；DeepSeek 官方 usage 分别提供 cache hit/miss token。当前这是原始用量明细，不据此推算费用。
 - 对云端流请求附加 `stream_options.include_usage=true`。DeepSeek 官方 Chat Completions API 文档说明 SSE 最后一帧带整次请求 usage；阿里云 Model Studio 文档说明 Qwen OpenAI-compatible streaming 可用此选项返回最终 token usage；OpenRouter API/SDK 文档列出 `stream_options.include_usage`。这些是协议文档依据，不等于 Beta 当前精确型号的真实 usage 实测：未发云请求、未读取 Keychain。
 - OpenRouter 最终 `usage.cost` 如为有限、非负数值，按 OpenRouter 报告的 USD 标记为 actual 并记账；[Chat Completions 文档](https://openrouter.ai/docs/api/api-reference/chat/create-a-chat-completion) 在 `usage` schema 列出 `cost`，OpenRouter [支持说明](https://openrouter.ai/support)说明费用依据 Provider 使用量计算。mock 回归覆盖了流最终帧。当前固定 Beta 型号尚未做真实流式费用 E2E；DeepSeek/Qwen 没有经核实的实际费用流字段，因此继续 unknown/null。
-- 请求用量明细只有收到非负整数 Provider token 字段才标为 `actual`。中断、缺少最终 usage 或字段不完整时仍是 `unknown`；独立的 D-005 预算估算器会在用量缺失时按请求文本字符数估 token 并标记估算，不改写此实际 usage 记录。请求前预算预估用 UTF-8 字节数和适配器 1,024 输出 token 上限估算，用于在本服务单实例内串行保护预算余量。
+- 请求用量明细只有收到非负整数 Provider token 字段才标为 `actual`。中断、缺少最终 usage 或字段不完整时仍是 `unknown`；独立的 D-005 预算估算器会在用量缺失时按请求文本字符数估 token 并标记估算，不改写此实际 usage 记录。请求前预算预估用 UTF-8 字节数和适配器 1,024 输出 token 上限估算，通过跨实例 SQLCipher 事务预留保护预算余量。
 
 #### D-005 计费输入研究（公开官方资料，2026-11-10 更新）
 
@@ -124,8 +124,8 @@ swift test --package-path poc/macos-audio
 #### D-005 版本化估算器首版（2026-11-10）
 
 - `pac_poc/budget.py` 保存 `PRICE_VERSION=2026-11-10` 的静态价目快照：DeepSeek 直连按官方峰时价估算；Qwen `qwen3.8-flash` 按北京原价；OpenRouter 固定 `deepseek/deepseek-v4.1-flash-1017` 按公开模型目录的输入/缓存/输出费率。USD 统一使用 SAFE 2026-11-10 中间价向上取整为 6.72 CNY/USD，记录汇率版本。缓存 usage 可用时拆分命中/未命中；缺失 token usage 时暂按文本字符数作估算 token，并返回 `estimated` 成本估算。
-- 未登记的 Provider/model、价币不符、无效数值拒绝估算（调用方必须 fail-closed）。估算器已连接 Stream API、SQLCipher 月度聚合、80 元用量页提示与 100 元请求前硬拦截；云请求按本地 Asia/Shanghai 自然月分桶，单个 Beta 服务进程串行发送云请求。OpenRouter reported USD 先换算成人民币估算后计入预算，原始 USD 仍在进程内分项记录中。当前月在此功能启用前已发生的账单无法回填，因此首次启用当月累计可能低估；跨进程同时请求、真实型号 usage/cost E2E 和价目快照更新流程仍待验证。
+- 未登记的 Provider/model、价币不符、无效数值拒绝估算（调用方必须 fail-closed）。估算器已连接 Stream API、SQLCipher 月度聚合、80 元用量页提示与 100 元请求前硬拦截；云请求按本地 Asia/Shanghai 自然月分桶，SQLCipher 事务在共享数据库实例间原子预留请求预算并于结束时结算，单个 Beta 服务进程另用异步锁串行发送。预留五分钟过期回收，活动流每分钟续租；当前远端 HTTP 读取空闲超时为 45 秒。OpenRouter reported USD 先换算成人民币估算后计入预算，原始 USD 仍在进程内分项记录中。当前月在此功能启用前已发生的账单无法回填，因此首次启用当月累计可能低估；真实型号 usage/cost E2E 和价目快照更新流程仍待验证。
 - 公开来源： [DeepSeek 模型与价目](https://api-docs.deepseek.com/quick_start/pricing/)、[阿里云 Qwen3.8-Flash 价目](https://help.aliyun.com/zh/model-studio/qwen3-8-flash)、[OpenRouter models API](https://openrouter.ai/api/v1/models)、[SAFE 汇率中间价](https://www.safe.gov.cn/AppStructured/hlw/RMBQuery.do)。OpenRouter 实扣推理 USD 转成人民币后仍是估算，且不含充值手续费、税费或个人账户折扣。
 
 
-2026-11-10 D-005 月预算请求门禁实现：新增 Alembic `0004_monthly_cloud_budget`，只在 SQLCipher 中保存每个自然月的估算人民币总额、请求数和价目版本，不保存提示词或回复。数据库 upsert 原子累加，store 内串行化 SQLCipher 连接池访问；单个 Beta 服务进程用异步锁串行云请求，先检查累计值及按 UTF-8 字节/最大 1,024 输出 token 得到的本次保守预估，再决定是否出站。无持久库、账本写入失败或未知价目时阻止云请求；估算按请求结束时实际 usage/cost（可用时）或文本长度回退估算后写入。`GET /usage` 返回预算月份、估算金额、80 元提示状态和 100 元拦截状态；macOS 用量页以“估算”呈现。当前月历史账单无法回填，且锁不覆盖多个并行 Beta 服务进程，不能声称跨进程硬上限已验收。完整测试与 GUI 手动验收详见最新 HANDOFF。
+2026-11-10 D-005 月预算请求门禁实现：新增 Alembic `0004_monthly_cloud_budget`，只在 SQLCipher 中保存每个自然月的估算人民币总额、请求数和价目版本，不保存提示词或回复。数据库 upsert 原子累加，store 内串行化 SQLCipher 连接池访问；出站前在共享数据库事务中检查累计值和所有未过期预留，再原子创建当前请求预留，完成后在同一事务中删除预留并计入最终估算。单个 Beta 服务进程另用异步锁串行云请求；预估按 UTF-8 字节输入和适配器最大 1,024 输出 token，预留五分钟过期回收、活动流每分钟续租（远端 HTTP 读取空闲超时 45 秒）。无持久库、账本写入失败或未知价目时阻止云请求。`GET /usage` 返回预算月份、估算金额、80 元提示状态和 100 元拦截状态；macOS 用量页以“估算”呈现。当前月历史账单无法回填；真实 Provider usage/cost E2E 与价格快照更新流程仍待验收。双 store 实例并发预留/结算自动回归通过，完整测试与 GUI 手动验收详见最新 HANDOFF。

@@ -475,3 +475,60 @@ def test_monthly_cloud_budget_is_encrypted_atomic_and_validated(storage_root: Pa
             )
     finally:
         store.close()
+
+
+def test_monthly_cloud_budget_reservations_serialize_across_store_instances(
+    storage_root: Path,
+) -> None:
+    path = (storage_root / "shared-cloud-budget.db").resolve()
+    first = _store(path)
+    second = _store(path)
+    first.open()
+    second.open()
+    try:
+        def reserve(store: EncryptedApplicationStore, reservation_id: str) -> bool:
+            return store.reserve_monthly_cloud_budget(
+                "2026-11",
+                reservation_id=reservation_id,
+                amount_micros=60_000_000,
+                limit_micros=100_000_000,
+                expires_at="2999-01-01T00:00:00+00:00",
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(
+                lambda args: reserve(*args),
+                [(first, "first-request"), (second, "second-request")],
+            ))
+        assert sorted(results) == [False, True]
+        winner = "first-request" if results[0] else "second-request"
+        assert second.renew_monthly_cloud_budget_reservation(
+            winner, expires_at="2999-02-01T00:00:00+00:00"
+        ) is True
+        assert first.settle_monthly_cloud_budget_reservation(
+            "2026-11",
+            reservation_id=winner,
+            amount_micros=50_000_000,
+            price_version="2026-11-10",
+        ) == 50_000_000
+        assert second.renew_monthly_cloud_budget_reservation(
+            winner, expires_at="2999-03-01T00:00:00+00:00"
+        ) is False
+        assert second.reserve_monthly_cloud_budget(
+            "2026-11",
+            reservation_id="third-request",
+            amount_micros=50_000_000,
+            limit_micros=100_000_000,
+            expires_at="2999-01-01T00:00:00+00:00",
+        ) is False
+        assert second.reserve_monthly_cloud_budget(
+            "2026-11",
+            reservation_id="fourth-request",
+            amount_micros=49_999_999,
+            limit_micros=100_000_000,
+            expires_at="2999-01-01T00:00:00+00:00",
+        ) is True
+        first.release_monthly_cloud_budget_reservation("fourth-request")
+    finally:
+        first.close()
+        second.close()

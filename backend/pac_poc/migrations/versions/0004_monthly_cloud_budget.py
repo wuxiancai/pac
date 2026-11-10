@@ -21,7 +21,16 @@ def upgrade() -> None:
         sa.CheckConstraint("estimated_micros_cny >= 0"),
         sa.CheckConstraint("request_count >= 0"),
     )
+    op.create_table(
+        "monthly_cloud_budget_reservations",
+        sa.Column("reservation_id", sa.String(36), primary_key=True),
+        sa.Column("month_key", sa.String(7), nullable=False, index=True),
+        sa.Column("reserved_micros_cny", sa.Integer(), nullable=False),
+        sa.Column("expires_at", sa.String(32), nullable=False),
+        sa.CheckConstraint("reserved_micros_cny >= 0"),
+    )
 
 
 def downgrade() -> None:
+    op.drop_table("monthly_cloud_budget_reservations")
     op.drop_table("monthly_cloud_budget")

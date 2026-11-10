@@ -209,6 +209,114 @@ class EncryptedApplicationStore:
                 ), {"month": month_key}).scalar_one()
                 return int(total)
 
+    def reserve_monthly_cloud_budget(
+        self,
+        month_key: str,
+        *,
+        reservation_id: str,
+        amount_micros: int,
+        limit_micros: int,
+        expires_at: str,
+    ) -> bool:
+        """Atomically reserve budget across all processes sharing this database."""
+        _validate_budget_month_key(month_key)
+        _validate_budget_amount(amount_micros, "reservation")
+        _validate_budget_amount(limit_micros, "limit")
+        if not reservation_id or len(reservation_id) > 36:
+            raise ValueError("budget reservation id is invalid")
+        if len(expires_at) > 32:
+            raise ValueError("budget reservation expiry is invalid")
+        engine = self._require_engine()
+        now = _utc_timestamp()
+        with self._cloud_budget_lock, engine.begin() as connection:
+            connection.execute(text(
+                "DELETE FROM monthly_cloud_budget_reservations WHERE expires_at <= :now"
+            ), {"now": now})
+            spent = connection.execute(text(
+                "SELECT estimated_micros_cny FROM monthly_cloud_budget WHERE month_key=:month"
+            ), {"month": month_key}).scalar_one_or_none() or 0
+            reserved = connection.execute(text(
+                "SELECT COALESCE(SUM(reserved_micros_cny), 0) "
+                "FROM monthly_cloud_budget_reservations WHERE month_key=:month"
+            ), {"month": month_key}).scalar_one()
+            if int(spent) + int(reserved) + amount_micros >= limit_micros:
+                return False
+            connection.execute(text(
+                "INSERT INTO monthly_cloud_budget_reservations "
+                "(reservation_id, month_key, reserved_micros_cny, expires_at) "
+                "VALUES (:id, :month, :amount, :expires)"
+            ), {
+                "id": reservation_id,
+                "month": month_key,
+                "amount": amount_micros,
+                "expires": expires_at,
+            })
+            return True
+
+    def settle_monthly_cloud_budget_reservation(
+        self,
+        month_key: str,
+        *,
+        reservation_id: str,
+        amount_micros: int,
+        price_version: str,
+    ) -> int:
+        """Replace a request reservation with its final estimate atomically."""
+        _validate_budget_month_key(month_key)
+        _validate_budget_amount(amount_micros, "budget estimate")
+        if not reservation_id or len(reservation_id) > 36:
+            raise ValueError("budget reservation id is invalid")
+        if not price_version or len(price_version) > 32:
+            raise ValueError("budget price version is invalid")
+        engine = self._require_engine()
+        with self._cloud_budget_lock, engine.begin() as connection:
+            connection.execute(text(
+                "DELETE FROM monthly_cloud_budget_reservations WHERE reservation_id=:id"
+            ), {"id": reservation_id})
+            connection.execute(text(
+                "INSERT INTO monthly_cloud_budget "
+                "(month_key, estimated_micros_cny, request_count, price_version, updated_at) "
+                "VALUES (:month, :amount, 1, :version, :now) "
+                "ON CONFLICT(month_key) DO UPDATE SET "
+                "estimated_micros_cny = monthly_cloud_budget.estimated_micros_cny "
+                "+ excluded.estimated_micros_cny, "
+                "request_count = monthly_cloud_budget.request_count + 1, "
+                "price_version = excluded.price_version, updated_at = excluded.updated_at"
+            ), {
+                "month": month_key,
+                "amount": amount_micros,
+                "version": price_version,
+                "now": _utc_timestamp(),
+            })
+            total = connection.execute(text(
+                "SELECT estimated_micros_cny FROM monthly_cloud_budget WHERE month_key=:month"
+            ), {"month": month_key}).scalar_one()
+            return int(total)
+
+    def renew_monthly_cloud_budget_reservation(
+        self, reservation_id: str, *, expires_at: str
+    ) -> bool:
+        if not reservation_id or len(reservation_id) > 36:
+            raise ValueError("budget reservation id is invalid")
+        if len(expires_at) > 32:
+            raise ValueError("budget reservation expiry is invalid")
+        engine = self._require_engine()
+        with self._cloud_budget_lock, engine.begin() as connection:
+            result = connection.execute(text(
+                "UPDATE monthly_cloud_budget_reservations SET expires_at=:expires "
+                "WHERE reservation_id=:id"
+            ), {"expires": expires_at, "id": reservation_id})
+            return result.rowcount == 1
+
+    def release_monthly_cloud_budget_reservation(self, reservation_id: str) -> None:
+        if not reservation_id or len(reservation_id) > 36:
+            raise ValueError("budget reservation id is invalid")
+        engine = self._require_engine()
+        with self._cloud_budget_lock, engine.begin() as connection:
+            connection.execute(text(
+                "DELETE FROM monthly_cloud_budget_reservations WHERE reservation_id=:id"
+            ), {"id": reservation_id})
+
     def _database_key_bytes(self) -> bytes:
         return bytes.fromhex(self._key_hex)
 
@@ -1007,6 +1115,11 @@ def _validate_budget_month_key(month_key: str) -> None:
         or not 1 <= int(month_key[5:]) <= 12
     ):
         raise ValueError("budget month must use YYYY-MM format")
+
+
+def _validate_budget_amount(value: int, label: str) -> None:
+    if type(value) is not int or value < 0:
+        raise ValueError(f"{label} amount must be a non-negative integer")
 
 
 def _task_row(row) -> dict[str, object]:

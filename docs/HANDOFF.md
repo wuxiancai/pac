@@ -1473,7 +1473,14 @@
 
 # 2026-11-10：D-005 月预算持久累计与请求门禁
 
-- 添加 SQLCipher migration `0004_monthly_cloud_budget`，按 Asia/Shanghai 自然月保存 CNY 估算 aggregate、请求数和价目版本。预算读取/更新通过 store 专属锁保护 SQLCipher 连接池，更新使用原子 upsert；16 个线程并发增量回归总额一致。
-- 云请求要求预算数据库、已登记价目和账本状态可用。单个 Beta 服务进程串行执行云请求；发送前检查已累计估算和本次预估（UTF-8 字节输入、1,024 输出 token 上限），两者触及 ¥100 即阻止请求。请求完成或失败后以 Provider 实际 usage/cost（有则用）或文本长度估算写入月度总额。无持久库、写账错误或未知价目 fail-closed。用量 API 和 Swift UI 展示估算累计、¥80 提示与 ¥100 已拦截状态，明确不等于账单实扣。
+- 添加 SQLCipher migration `0004_monthly_cloud_budget`，按 Asia/Shanghai 自然月保存 CNY 估算 aggregate、请求数和价目版本。预算读取/更新通过 store 专属锁保护 SQLCipher 连接池，更新使用原子 upsert；16 个线程并发增量回归总额一致。随后增加共享数据库级五分钟预留记录：预估额与在途预留一起参与 100 元门限的原子判断，结束时用最终估算替换预留；双 store 实例并发测试证明只有一个 60 元预留可以通过，结算后余额门限正确。
+- 云请求要求预算数据库、已登记价目和账本状态可用。单个 Beta 服务进程串行执行云请求；发送前检查已累计估算和所有未过期预留，再创建本次预留（UTF-8 字节输入、1,024 输出 token 上限），触及 ¥100 即阻止请求。请求完成或失败后以 Provider 实际 usage/cost（有则用）或文本长度估算写入月度总额并释放预留。无持久库、写账错误或未知价目 fail-closed。用量 API 和 Swift UI 展示估算累计、¥80 提示与 ¥100 已拦截状态，明确不等于账单实扣。
 - 测试开发时首次尝试 SQLCipher 多线程连接池回归导致原生段错误；在 store 内串行化预算连接使用后，针对回归通过。相关 Python 定向 71 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 334 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 60 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta`、Ruff 与 mypy 通过。
-- 未完成：当月功能启用前已产生的供应商账单无法回填，首次启用当月显示值可能低估；Budget lock 只覆盖单个 Beta 服务进程，不覆盖多个同时运行的进程；真实 Provider usage/cost E2E、预算 GUI 展示和每月价格快照更新/审查仍待验收。未发起真实云请求、未访问 Keychain。
+- 未完成：当月功能启用前已产生的供应商账单无法回填，首次启用当月显示值可能低估；预留五分钟过期回收（后续实现增加活动流续租，见下节）；真实 Provider usage/cost E2E、预算 GUI 展示和每月价格快照更新/审查仍待验收。未发起真实云请求、未访问 Keychain。
+
+# 2026-11-10：D-005 跨实例预算预留
+
+- 为解决多个 Beta backend 进程同时读取相同预算余额的竞态，在 SQLCipher migration `0004_monthly_cloud_budget` 添加请求预留表。发请求前，SQLite 写事务先清理过期预留，再把已累计估算与其他在途预留一并纳入原子额度检查；请求结束后同一事务删除预留并记入最终估算。共享库写锁确保多个 store/进程不能同时越过余量判断。
+- 预留 5 分钟后自动回收，活动流每分钟续租；当前 Provider HTTP 读取空闲超时为 45 秒。进程异常退出留下的预留最多短暂占用额度，后续预算请求会清理过期记录。单实例锁仍用于避免同一 SQLCipher store 的连接池并发问题。
+- 双 store 实例并发 60 元预留回归确认仅一个获准；完成 50 元结算后，50 元新请求被拦截、49.999999 元可预留。定向后端 73 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 335 passed、1 条既有 Starlette/httpx 弃用警告；阶段追踪契约 9 passed，Ruff/mypy 通过。
+- 仍未完成当前月历史账单回填、真实 Provider usage/cost E2E、用量 GUI 手动验收与价格快照更新流程；没有发起真实云请求。

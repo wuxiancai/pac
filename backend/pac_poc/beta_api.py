@@ -7,12 +7,12 @@ import math
 import re
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from time import monotonic, time
 from typing import Any, Callable, Literal, Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -86,6 +86,7 @@ VOICE_STREAM_LOCK_WAIT_SECONDS = 2.0
 CHAT_STREAM_KEEPALIVE_SECONDS = 15.0
 MONTHLY_CLOUD_BUDGET_MICROS = 100_000_000
 MONTHLY_CLOUD_WARNING_MICROS = 80_000_000
+_BUDGET_RESERVATION_TTL = timedelta(minutes=5)
 _BUDGET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 VOICE_MODEL_DIR = (
     Path(__file__).resolve().parent.parent
@@ -1063,6 +1064,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
 
     @router.post("/chat/stream")
     async def stream_chat(request: Request) -> StreamingResponse:
+        nonlocal cloud_budget_write_failed
         content_type = request.headers.get("content-type")
         if content_type is not None:
             media_type = content_type.split(";", 1)[0].strip().lower()
@@ -1188,6 +1190,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     raise HTTPException(status_code=413, detail="conversation context is too long")
                 collaboration_requests.append((assistant_key, specialist_request))
         budget_lock_acquired = False
+        budget_reservation_id: str | None = None
         budget_month = _budget_month_key()
         if payload.provider in CLOUD_PROVIDERS:
             if persistent_store is None:
@@ -1197,7 +1200,6 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             await cloud_budget_lock.acquire()
             budget_lock_acquired = True
             try:
-                spent_micros = persistent_store.monthly_cloud_budget_micros(budget_month)
                 prompt_text = "\n".join(item["content"] for item in model_request.messages)
                 # Resolve the reviewed model/price before any Provider request.
                 request_reserve = estimate_chat_cost(
@@ -1212,6 +1214,16 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     cached_prompt_tokens=None,
                 )
                 reserve_micros = _amount_to_budget_micros(request_reserve.amount_cny)
+                budget_reservation_id = str(uuid4())
+                reserved = persistent_store.reserve_monthly_cloud_budget(
+                    budget_month,
+                    reservation_id=budget_reservation_id,
+                    amount_micros=reserve_micros,
+                    limit_micros=MONTHLY_CLOUD_BUDGET_MICROS,
+                    expires_at=(
+                        datetime.now(timezone.utc) + _BUDGET_RESERVATION_TTL
+                    ).isoformat(),
+                )
             except UnknownPublicPrice:
                 cloud_budget_lock.release()
                 raise HTTPException(
@@ -1222,7 +1234,8 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 raise HTTPException(
                     status_code=503, detail="cloud budget state is unavailable; request blocked"
                 ) from None
-            if spent_micros + reserve_micros >= MONTHLY_CLOUD_BUDGET_MICROS:
+            if not reserved:
+                budget_reservation_id = None
                 cloud_budget_lock.release()
                 raise HTTPException(
                     status_code=429,
@@ -1232,6 +1245,13 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             run = run_registry.create(MULTI_AGENT_ASSISTANT if collaboration_requests else turn.assistant_key)
             run_registry.transition(run.run_id, RunStatus.RUNNING)
         except RuntimeError as exc:
+            if budget_reservation_id is not None and persistent_store is not None:
+                try:
+                    persistent_store.release_monthly_cloud_budget_reservation(
+                        budget_reservation_id
+                    )
+                except Exception:
+                    cloud_budget_write_failed = True
             if budget_lock_acquired:
                 cloud_budget_lock.release()
             raise HTTPException(status_code=503, detail="too many active chat runs") from exc
@@ -1245,6 +1265,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             cost_amount: float | None = None
             cost_currency: str | None = None
             assistant_output: list[str] = []
+            last_budget_renewal = monotonic()
 
             def persist_turn(status: RunStatus) -> None:
                 if persistent_store is None or conversation_id is None:
@@ -1331,6 +1352,21 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     stream_for_request(),
                     settings.chat_stream_keepalive_seconds,
                 ):
+                    if (
+                        budget_reservation_id is not None
+                        and persistent_store is not None
+                        and monotonic() - last_budget_renewal >= 60
+                    ):
+                        renewed = persistent_store.renew_monthly_cloud_budget_reservation(
+                            budget_reservation_id,
+                            expires_at=(
+                                datetime.now(timezone.utc) + _BUDGET_RESERVATION_TTL
+                            ).isoformat(),
+                        )
+                        if not renewed:
+                            cloud_budget_write_failed = True
+                            raise RuntimeError("cloud budget reservation expired during request")
+                        last_budget_renewal = monotonic()
                     if delta is None:
                         yield ": keep-alive\n\n"
                         continue
@@ -1470,10 +1506,18 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                                 ),
                                 reported_currency=cost_currency,
                             )
-                            persistent_store.add_monthly_cloud_budget_estimate(
+                            persistent_store.settle_monthly_cloud_budget_reservation(
                                 budget_month,
+                                reservation_id=budget_reservation_id or "",
                                 amount_micros=_amount_to_budget_micros(estimate.amount_cny),
                                 price_version=estimate.price_version,
+                            )
+                        except Exception:
+                            cloud_budget_write_failed = True
+                    elif payload.provider in CLOUD_PROVIDERS and persistent_store is not None:
+                        try:
+                            persistent_store.release_monthly_cloud_budget_reservation(
+                                budget_reservation_id or ""
                             )
                         except Exception:
                             cloud_budget_write_failed = True
