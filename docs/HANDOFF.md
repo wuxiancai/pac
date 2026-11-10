@@ -1636,3 +1636,9 @@
 - 静态门禁：Ruff 全目录通过；`mypy pac_poc` 37 个源文件无问题；`uv lock --check`、Python `compileall` 通过。SwiftPM 曾等待另一构建实例释放 `.build`，随后成功完成。未运行远端 GitHub Actions，故不更新远端 CI/PR 证据；阶段 6 仍开放。
 - 补齐 CI 工作流门禁：`git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 无命中；CI 配置范围 `uv run --locked mypy` 3 个目标文件通过；包含 `scripts` 的 `compileall` 通过。
 - 本轮未发起 Provider 请求、未采集麦克风、未读写真实 Keychain 或触发系统通知授权。
+
+### 2026-11-10：B9 角色选择顺序修复与 GUI 复测
+
+- 新合成题“请为一天的旧书交换活动列出三个准备事项……”复现 UI 按项目助理、后选会议助理，但旧实现把 `Set` 排序后按会议助理、项目助理执行，违背文档约定的选择顺序。将协作选择改为有序数组，点选时追加、取消时移除，发送时直接快照该顺序；发送后仍清空本轮选择。
+- `swift test --package-path poc/macos-audio` → 62 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。通过 `./poc/macos-audio/scripts/run_beta_app.sh` 重建启动后，先选项目、再选会议，GUI 先显示项目观点再显示会议观点；综合回答为三条相关短项。专业观点个别条目仍超过用户长度要求，因此仅确认顺序修复和本题综合表现，B9 继续 IN PROGRESS。
+- 请求状态显示本机 `ollama / qwen3.5:0.8b`；合成会话存于本机 SQLCipher。未调用云端、麦克风或 Keychain。

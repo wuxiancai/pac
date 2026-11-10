@@ -144,3 +144,9 @@ swift test --package-path poc/macos-audio
 
 - 在新本机会话选择“行动项整理”，输入三项合成读书周事项；发送后 UI 从 `Skills 1` 立即变为 `Skills 0`，证明所选 Skill 不跨轮保留。
 - 本机 `qwen3.5:0.8b` 超过两分钟仍显示生成中且没有正文；用户点击停止后 run 标记已取消。不能据此判断 Skill 行为导致延迟；默认 thinking/本机服务状态仍可能影响，原因未判定。无云请求或麦克风采集，聊天保存在本机 SQLCipher。
+
+### 2026-11-10 B9 选择顺序修复与 GUI 复测
+
+- 协作选择原以 `Set` 保存并在发送前排序，导致点选顺序与实际专业角色调用顺序不一致。现以有序数组保存点选顺序，取消单个选择会移除对应项，发送时复制顺序快照并清空选择。
+- GUI 合成样本先选“项目助理”、后选“会议助理”，修复后按该顺序展示角色观点；旧书交换活动综合结论三项切题且简短，专业观点仍有条目超过 15 字。该样本证明请求顺序和一题输出，不证明普遍内容质量；B9 继续 IN PROGRESS。
+- Swift 全量 62 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。真实调用仅到本机 Ollama，未访问云 Provider、麦克风或 Keychain。

@@ -129,7 +129,7 @@ final class BetaChatModel {
     private(set) var memorySource: LocalMemorySource?
     private(set) var skills: [LocalSkillItem] = []
     private(set) var selectedSkillKeys: Set<String> = []
-    private(set) var selectedCollaboratorKeys: Set<String> = []
+    private(set) var selectedCollaboratorKeys: [String] = []
     private(set) var taskStatus = ""
     private(set) var taskNotificationStatus = "通知默认关闭。"
     private(set) var backupStatus = "备份口令仅用于本次导出，不会保存。"
@@ -304,7 +304,7 @@ final class BetaChatModel {
         let confirmedForThisRequest = usesCloud
         let importedDocumentIDs = importedTextFiles.map(\.importID)
         let activeConversationID = conversationID
-        let collaboratorKeysForRequest = selectedCollaboratorKeys.sorted()
+        let collaboratorKeysForRequest = selectedCollaboratorKeys
         selectedCollaboratorKeys.removeAll()
         let selectedAssistantKey = collaboratorKeysForRequest.isEmpty ? assistantKey : "main_assistant"
         let skillKeysForRequest = selectedSkillKeys.sorted()
@@ -630,9 +630,9 @@ final class BetaChatModel {
     func toggleCollaborator(_ key: String) {
         guard assistantProfiles.contains(where: { $0.key == key && key != "main_assistant" }) else { return }
         if selectedCollaboratorKeys.contains(key) {
-            selectedCollaboratorKeys.remove(key)
+            selectedCollaboratorKeys.removeAll { $0 == key }
         } else if selectedCollaboratorKeys.count < 3 {
-            selectedCollaboratorKeys.insert(key)
+            selectedCollaboratorKeys.append(key)
         } else {
             status = "每轮最多选择 3 个协作角色。"
         }
