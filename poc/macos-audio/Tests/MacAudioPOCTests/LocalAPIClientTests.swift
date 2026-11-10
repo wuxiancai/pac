@@ -153,6 +153,8 @@ private final class ConversationAPIURLProtocol: URLProtocol {
         let body: String
         if request.httpMethod == "POST" {
             body = #"{"id":"22222222-2222-4222-8222-222222222222","title":"New","created_at":"2026-11-10T00:00:00+00:00","updated_at":"2026-11-10T00:00:00+00:00","message_count":0}"#
+        } else if request.httpMethod == "PATCH" {
+            body = #"{"id":"11111111-1111-4111-8111-111111111111","title":"Renamed","created_at":"2026-11-09T00:00:00+00:00","updated_at":"2026-11-10T00:00:00+00:00","message_count":2}"#
         } else {
             body = #"{"conversations":[{"id":"11111111-1111-4111-8111-111111111111","title":"Existing","created_at":"2026-11-09T00:00:00+00:00","updated_at":"2026-11-09T00:00:00+00:00","message_count":2}]}"#
         }
@@ -355,11 +357,15 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
 
     let existing = try await client.conversations()
     let created = try await client.createConversation(title: "New")
+    let renamed = try await client.renameConversation(
+        id: "11111111-1111-4111-8111-111111111111", title: "Renamed"
+    )
     #expect(existing.count == 1)
     #expect(existing[0].title == "Existing")
     #expect(existing[0].messageCount == 2)
     #expect(created.title == "New")
     #expect(created.messageCount == 0)
+    #expect(renamed.title == "Renamed")
 }
 
 @available(macOS 12.0, *)

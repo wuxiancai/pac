@@ -147,6 +147,12 @@ class ConversationCreateRequest(BaseModel):
     title: str = Field(default="新对话", min_length=1, max_length=256)
 
 
+class ConversationRenameRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=256)
+
+
 class ConfirmedMemoryCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -717,6 +723,21 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             raise HTTPException(status_code=404, detail="conversation not found") from exc
         except Exception:
             raise HTTPException(status_code=503, detail="conversation is unavailable") from None
+
+    @router.patch("/conversations/{conversation_id}")
+    async def rename_conversation(
+        conversation_id: UUID, payload: ConversationRenameRequest
+    ) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent conversation storage is unavailable")
+        try:
+            return persistent_store.rename_conversation(str(conversation_id), payload.title)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="conversation not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="conversation title is invalid") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="conversation could not be renamed") from None
 
     @router.delete("/conversations/{conversation_id}")
     async def remove_conversation(conversation_id: UUID) -> dict[str, bool]:

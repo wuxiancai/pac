@@ -1550,6 +1550,9 @@ def test_conversation_api_can_create_list_select_and_delete_one_conversation(tmp
             first = (await client.get("/chat/history", headers=headers)).json()
             second_response = await client.post("/conversations", headers=headers, json={"title": "Second"})
             second = second_response.json()
+            renamed = await client.patch(
+                f"/conversations/{second['id']}", headers=headers, json={"title": "Planning"}
+            )
             await client.post("/chat/stream", headers=headers, json={
                 "conversation_id": first["conversation_id"],
                 "messages": [{"role": "user", "content": "first message"}],
@@ -1563,7 +1566,10 @@ def test_conversation_api_can_create_list_select_and_delete_one_conversation(tmp
             deleted = await client.delete(f"/conversations/{first['conversation_id']}", headers=headers)
             remaining = await client.get("/conversations", headers=headers)
         assert second_response.status_code == 201
+        assert renamed.status_code == 200
+        assert renamed.json()["title"] == "Planning"
         assert len(listed.json()["conversations"]) == 2
+        assert selected.json()["title"] == "Planning"
         assert [message["content"] for message in selected.json()["messages"]] == [
             "second message", "本机回答"
         ]

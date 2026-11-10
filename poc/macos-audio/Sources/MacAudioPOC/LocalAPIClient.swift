@@ -555,6 +555,24 @@ public final class LocalAPIClient: @unchecked Sendable {
         return item
     }
 
+    public func renameConversation(id: String, title: String) async throws -> LocalConversationItem {
+        guard let conversationID = UUID(uuidString: id),
+              let url = URL(string: "/conversations/\(conversationID.uuidString.lowercased())", relativeTo: baseURL)?.absoluteURL
+        else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(ConversationRenamePayload(title: title))
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let item = try? JSONDecoder().decode(LocalConversationItem.self, from: data) else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        return item
+    }
+
     public func chatHistory(conversationID: String? = nil) async throws -> LocalChatHistory {
         var components = URLComponents(
             url: URL(string: "/chat/history", relativeTo: baseURL)!.absoluteURL,
@@ -892,5 +910,9 @@ private struct ConfirmedMemoryPayload: Encodable {
 }
 
 private struct ConversationCreatePayload: Encodable {
+    let title: String
+}
+
+private struct ConversationRenamePayload: Encodable {
     let title: String
 }

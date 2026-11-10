@@ -324,6 +324,8 @@ def test_conversation_list_create_and_targeted_delete_isolate_histories(storage_
     try:
         first = store.get_or_create_default_conversation()
         second = store.create_conversation(title="Second conversation")
+        second = store.rename_conversation(second["id"], "Planning")
+        assert second["title"] == "Planning"
         store.append_chat_turn(
             conversation_id=first["id"], run_id="conversation-run-1",
             user_content="first only", assistant_content="reply one",

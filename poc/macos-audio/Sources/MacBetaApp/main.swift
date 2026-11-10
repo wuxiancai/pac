@@ -472,6 +472,17 @@ final class BetaChatModel {
         }
     }
 
+    func renameConversation(_ conversation: LocalConversationItem, title: String) async {
+        guard let client else { return }
+        do {
+            let renamed = try await client.renameConversation(id: conversation.id, title: title)
+            conversations = conversations.map { $0.id == renamed.id ? renamed : $0 }
+            status = "会话已重命名为：\(renamed.title)"
+        } catch {
+            status = "无法重命名会话：\(error.localizedDescription)"
+        }
+    }
+
     func createConversation() async {
         guard activeRequest == nil, let client else {
             status = "请先停止当前生成，再新建会话。"
@@ -936,6 +947,8 @@ private struct BetaChatView: View {
     @State private var showingDeleteChatConfirmation = false
     @State private var showingTasks = false
     @State private var showingMemories = false
+    @State private var showingRenameConversation = false
+    @State private var renameTitle = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -982,6 +995,14 @@ private struct BetaChatView: View {
                     Label(model.selectedConversationTitle, systemImage: "bubble.left.and.bubble.right")
                 }
                 .accessibilityIdentifier("conversation-picker-menu")
+                Button {
+                    renameTitle = model.selectedConversationTitle
+                    showingRenameConversation = true
+                } label: {
+                    Label("重命名会话", systemImage: "pencil")
+                }
+                .disabled(model.conversationID == nil || model.isStreaming)
+                .accessibilityIdentifier("rename-conversation-button")
                 Button {
                     Task { await model.createConversation() }
                 } label: {
@@ -1201,6 +1222,16 @@ private struct BetaChatView: View {
         .sheet(isPresented: $showingUsage) {
             UsageHistoryView(model: model)
                 .frame(minWidth: 520, minHeight: 420)
+        }
+        .alert("重命名当前会话", isPresented: $showingRenameConversation) {
+            TextField("会话名称", text: $renameTitle)
+            Button("取消", role: .cancel) {}
+            Button("保存") {
+                guard let conversation = model.conversations.first(where: { $0.id == model.conversationID }) else { return }
+                Task { await model.renameConversation(conversation, title: renameTitle) }
+            }
+        } message: {
+            Text("会话名称仅保存在本机。")
         }
         .fileImporter(
             isPresented: $showingFileImporter,

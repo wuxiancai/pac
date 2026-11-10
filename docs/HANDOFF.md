@@ -1,3 +1,8 @@
+# 2026-11-10：本地会话重命名
+
+- 加入认证 `PATCH /conversations/{id}` 与 SQLCipher 标题更新；macOS 会话顶部新增“重命名会话”，支持用户手动编辑标题，后端会拒绝空白或超长名称。
+- 验证：`tests/test_persistence.py tests/test_beta_api.py` 54 passed，1 条既有 Starlette/httpx 弃用警告；后端全量 300 passed、同 1 条弃用警告；Swift 全量 51 项通过；Beta build、Ruff、mypy 与 `uv lock --check` 通过。分页/虚拟化和超大历史加载边界仍待实现。
+
 # 2026-11-10：记忆来源消息查看
 
 - 新增认证 `GET /memories/{id}/source`，按记忆关联的 message UUID 返回本机原消息和会话标题；记忆中心可打开来源只读 sheet。删除来源会话后返回空来源，不暴露失效引用。

@@ -577,6 +577,29 @@ class EncryptedApplicationStore:
             ), {"id": conversation_id})
             return result.rowcount > 0
 
+    def rename_conversation(self, conversation_id: str, title: str) -> dict[str, object]:
+        if not title.strip() or len(title) > 256:
+            raise ValueError("conversation title must contain 1 to 256 characters")
+        engine = self._require_engine()
+        with engine.begin() as connection:
+            result = connection.execute(text(
+                "UPDATE conversations SET title=:title, updated_at=:now "
+                "WHERE id=:id AND status='ACTIVE' AND deleted_at IS NULL"
+            ), {"id": conversation_id, "title": title.strip(), "now": _utc_timestamp()})
+            if result.rowcount == 0:
+                raise KeyError("conversation not found")
+            row = connection.execute(text(
+                "SELECT id, title, created_at, updated_at FROM conversations WHERE id=:id"
+            ), {"id": conversation_id}).mappings().one()
+            count = connection.execute(text(
+                "SELECT count(*) FROM messages WHERE conversation_id=:id AND deleted_at IS NULL"
+            ), {"id": conversation_id}).scalar_one()
+            return {
+                "id": str(row["id"]), "title": str(row["title"]),
+                "created_at": str(row["created_at"]), "updated_at": str(row["updated_at"]),
+                "message_count": int(count),
+            }
+
     def _require_engine(self) -> Engine:
         if self._engine is None:
             raise PersistentStoreError("database is not open")
