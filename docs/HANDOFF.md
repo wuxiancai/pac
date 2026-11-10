@@ -1,7 +1,13 @@
+# 2026-11-10：当前远端 CI 重跑通过
+
+- 同一提交 `541ad6aa287d127706a7bdf804d25d948fc48a9d` 的 Actions run `42836663902` 第一次后端全量测试中，APFS-128 ENOSPC 临时映像子进程返回通用 `RuntimeError`（其余 346 项通过）；该脚本只输出安全错误类型，未暴露失败阶段。隔离重跑 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_sqlcipher_enospc_poc.py -k 'bounded_disk_image_exhaustion and APFS'` → 1 passed、6 deselected（13.36 秒）。这与既有间歇记录一致，原因仍未判定。
+- 对同一 SHA 执行 `gh run rerun 42836663902 --failed` 后，run attempt 2 全部成功：依赖安装、Ruff、mypy、secret scan、lock、Python 347 passed（1 条既有 Starlette/httpx 弃用警告）、compileall、Swift 94 passed、Beta build 均通过。远端 run：[42836663902](https://github.com/wuxiancai/pac/actions/runs/42836663902)。
+- 当前远端 CI 工作流修复已验证通过；APFS 单次间歇失败已记录但不归因。无其他用户数据、Provider、麦克风或系统认证操作。
+
 # 2026-11-10：修复 GitHub Actions 依赖安装参数
 
 - 推送后的 Actions run `42836277748` 在首步失败，尚未执行 lint/测试。失败日志精确显示 `.github/workflows/ci.yml` 请求不存在的 `phase0-security` extra；`backend/pyproject.toml` 只声明 `phase0-embedding`、`phase4-pdf-poc` 两个 extras，安全扫描依赖已由 `dev` dependency group 提供。
-- 删除无效 extra 后，按 CI 原命令在 `backend/` 执行 `uv sync --locked --extra phase0-embedding --extra phase4-pdf-poc --group dev` → 成功，解析 64 packages、检查 61 packages。用户授权后已将此前本地 319 个领先提交推送至 `origin/main`（达到 `c4b9a1e`）；本工作流修正仍待提交并推送，之后重新运行 Actions。
+- 删除无效 extra 后，按 CI 原命令在 `backend/` 执行 `uv sync --locked --extra phase0-embedding --extra phase4-pdf-poc --group dev` → 成功，解析 64 packages、检查 61 packages。用户授权后已将此前本地 319 个领先提交推送至 `origin/main`（达到 `c4b9a1e`）；修正已提交/推送为 `541ad6a`，对应 Actions run 见上节。
 
 # 2026-11-10：远端 CI 与本地分支差异核对
 

@@ -1,5 +1,6 @@
 # 项目上下文
 
+- 2026-11-10 远端 Actions run `42836663902` attempt 2 在当前提交 `541ad6a` 全部通过：后端 347、Swift 94、静态/依赖门禁和 Beta build 成功。attempt 1 的 APFS-128 ENOSPC POC 曾间歇返回通用 RuntimeError；本机窄重跑通过，根因未判定。详见最新 HANDOFF。
 - 2026-11-10 当前 GitHub Actions run `42836277748` 首步因无效 `phase0-security` extra 失败；该依赖实际位于 `dev` group。工作流参数已修正，本机精确复跑 `uv sync --locked --extra phase0-embedding --extra phase4-pdf-poc --group dev` 成功；修复待提交并重触发远端全门禁。
 - 2026-11-10 本地 `main` 曾领先远端 319 个提交；用户授权后已推送至 `c4b9a1e`，远端 Actions 触发但暴露 workflow dependency extra 配置错误。待修复提交后重验远端门禁。详见最新 HANDOFF。
 - 2026-11-10 阶段 6 当前提交 `000f341` 本机 CI 等价门禁通过：后端 347 passed（1 条既有 Starlette/httpx 弃用警告）、Swift 94 passed、Beta target build、Ruff、CI mypy、锁文件、compileall、tracked-file secret scan 通过。远端 Actions、Provider、麦克风、系统恢复与 macOS 14 实机未验。详见最新 HANDOFF。
