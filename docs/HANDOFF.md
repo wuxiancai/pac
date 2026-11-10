@@ -1,3 +1,9 @@
+# 2026-11-10：V1.1 本机模型预设
+
+- 模型设置支持保存、使用和删除命名预设；仅本机保存模型来源、Ollama 型号和固定云 Provider 标识，不存 Key。预设名称非空、最多 32 字且不区分大小写去重。云预设展示 Provider/型号/区域，并沿用现有 Keychain/预算/安全审计流程。
+- 验证：`swift test --package-path poc/macos-audio` → 69 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。设置界面实机验收待做。
+- 该功能不新增 Provider 或权限，也不代表真实云请求通过。
+
 # 2026-11-10：V1.1 本机朗读语速预设
 
 - 模型设置新增“较慢/标准/较快”本机朗读语速，选择保存在本机 UserDefaults；点按朗读时将速率传给 AVSpeechUtterance。默认仍为系统标准语速，只有本机 TTS 使用，不改变 ASR/模型请求。

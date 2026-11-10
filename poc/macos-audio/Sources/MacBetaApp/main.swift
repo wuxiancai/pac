@@ -4,7 +4,7 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-enum ModelSource: String, CaseIterable, Identifiable {
+enum ModelSource: String, CaseIterable, Identifiable, Codable {
     case local
     case cloud
 
@@ -12,7 +12,7 @@ enum ModelSource: String, CaseIterable, Identifiable {
     var title: String { self == .local ? "本地大模型" : "云端大模型" }
 }
 
-enum CloudProvider: String, CaseIterable, Identifiable {
+enum CloudProvider: String, CaseIterable, Identifiable, Codable {
     case qwenApp = "qwen-app"
     case deepseek
     case openrouter
@@ -35,6 +35,19 @@ enum CloudProvider: String, CaseIterable, Identifiable {
         }
     }
 }
+
+fileprivate struct BetaModelPreset: Codable, Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var source: ModelSource
+    var localModel: String
+    var cloudProvider: CloudProvider
+
+    var summary: String {
+        source == .local ? "本机 · \(localModel)" : "\(cloudProvider.title) · \(cloudProvider.model) · \(cloudProvider.region)"
+    }
+}
+
 @main
 @available(macOS 14.0, *)
 struct PersonalAssistantBetaApp: App {
@@ -168,6 +181,12 @@ final class BetaChatModel {
     var speechRatePreset: SpeechRatePreset {
         didSet { defaults.set(speechRatePreset.rawValue, forKey: "beta.speech.rate-preset") }
     }
+    fileprivate private(set) var modelPresets: [BetaModelPreset] {
+        didSet {
+            guard let data = try? JSONEncoder().encode(modelPresets) else { return }
+            defaults.set(data, forKey: "beta.model.presets")
+        }
+    }
     let assistantProfiles: [(key: String, title: String)] = [
         ("main_assistant", "总助理"),
         ("project_assistant", "项目助理"),
@@ -219,6 +238,8 @@ final class BetaChatModel {
         speechRatePreset = SpeechRatePreset(
             rawValue: defaults.string(forKey: "beta.speech.rate-preset") ?? SpeechRatePreset.normal.rawValue
         ) ?? .normal
+        modelPresets = (defaults.data(forKey: "beta.model.presets")
+            .flatMap { try? JSONDecoder().decode([BetaModelPreset].self, from: $0) }) ?? []
         supervisor = LocalBackendSupervisor(
             pythonExecutableURL: configuration.pythonExecutableURL,
             backendDirectoryURL: configuration.backendDirectoryURL
@@ -1147,6 +1168,32 @@ final class BetaChatModel {
         if speechPlayback.interrupt() {
             status = "已停止本机朗读。"
         }
+    }
+
+    fileprivate func saveModelPreset(named rawName: String) -> Bool {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let selectedLocalModel = localModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.count <= 32,
+              source != .local || !selectedLocalModel.isEmpty,
+              !modelPresets.contains(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame })
+        else { return false }
+        modelPresets.append(BetaModelPreset(
+            id: UUID(), name: name, source: source,
+            localModel: selectedLocalModel,
+            cloudProvider: cloudProvider
+        ))
+        return true
+    }
+
+    fileprivate func applyModelPreset(_ preset: BetaModelPreset) {
+        guard modelPresets.contains(preset) else { return }
+        localModel = preset.localModel
+        cloudProvider = preset.cloudProvider
+        source = preset.source
+    }
+
+    fileprivate func deleteModelPreset(_ preset: BetaModelPreset) {
+        modelPresets.removeAll { $0.id == preset.id }
     }
 
     private func nonemptyMessages(_ values: [LocalChatMessage]) -> [LocalChatMessage] {
@@ -2338,6 +2385,8 @@ private struct BetaModelSettingsView: View {
     @State private var apiKey = ""
     @State private var keyStatus = ""
     @State private var saveMessage = ""
+    @State private var presetName = ""
+    @State private var presetStatus = ""
     @State private var hasConfiguredCredential = false
     @State private var isUpdatingCredential = false
     private let keychain = KeychainCredentialStore(
@@ -2380,6 +2429,51 @@ private struct BetaModelSettingsView: View {
                 .pickerStyle(.segmented)
                 Text("仅影响点按“本机朗读回复”时的 macOS 合成语速；设置保存在本机，不会发送到模型服务商。")
                     .font(.callout).foregroundStyle(.secondary)
+            }
+
+            GroupBox("模型预设") {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        TextField("预设名称", text: $presetName)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityIdentifier("model-preset-name")
+                        Button("保存当前配置") {
+                            presetStatus = model.saveModelPreset(named: presetName)
+                                ? "已保存当前选择。"
+                                : "请填写有效名称；本机预设还需要模型名称，名称最多 32 字且不能重复。"
+                            if presetStatus == "已保存当前选择。" { presetName = "" }
+                        }
+                        .disabled(model.isStreaming)
+                        .accessibilityIdentifier("save-model-preset-button")
+                    }
+                    if model.modelPresets.isEmpty {
+                        Text("保存服务商与型号选择，API Key 不会写入预设。")
+                            .font(.callout).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(model.modelPresets) { preset in
+                            HStack(alignment: .center) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(preset.name).font(.headline)
+                                    Text(preset.summary).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button("使用") { model.applyModelPreset(preset) }
+                                    .disabled(model.isStreaming)
+                                Button(role: .destructive) {
+                                    model.deleteModelPreset(preset)
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .accessibilityLabel("删除预设 \(preset.name)")
+                            }
+                        }
+                        Text("应用云端预设会切换到该服务商；发送时沿用现有 Keychain、预算与安全审计规则。")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                    if !presetStatus.isEmpty {
+                        Text(presetStatus).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
             }
 
             if model.source == .local {
