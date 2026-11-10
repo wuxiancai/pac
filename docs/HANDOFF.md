@@ -1536,3 +1536,9 @@
 
 - 移除并发 ASR/LLM 测量脚本中的未使用 `sys` 导入，以及本地 ASR 测量脚本中未使用的音频时长局部变量；测量输出、输入校验和运行行为不变。
 - 验证：在 `backend/` 执行 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked ruff check scripts`，全目录通过。此次未运行 POC 脚本，避免启动模型测量或访问设备。
+
+### 2026-11-10：阶段 6 本机 CI 等价门禁复核
+
+- 当前提交基线的本机验证：后端全量 341 passed（1 条既有 Starlette/httpx 弃用警告）；`ruff check pac_poc tests scripts`、CI 配置的 `mypy`、`compileall`、`uv lock --check` 通过；Swift 全量 60 项通过，`personal-assistant-beta` 构建成功。
+- 首轮 tracked-file detect-secrets scan 报告 9 条测试口令字面量，逐条核对均为临时合成值；只在对应测试行加入 scanner 指定的局部 allowlist 注释。复跑 `git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 通过，未改动 baseline。
+- 此次没有触发远端 GitHub Actions、真实云 Provider 请求、麦克风、日历/提醒事项个人数据访问或数据库恢复操作。桌面自动化未能取得应用状态，因此 B1/B3/B5/B6 尚需 GUI 验收的项目仍保持未验证；不能据本地 CI 等价门禁关闭阶段 6。

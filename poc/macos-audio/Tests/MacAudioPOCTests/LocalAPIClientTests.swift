@@ -591,7 +591,7 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
         sessionConfiguration: configuration
     )
     let count = try await client.exportEncryptedBackup(
-        destinationPath: "/tmp/fixture.pacbackup", password: "one-time-secret"
+        destinationPath: "/tmp/fixture.pacbackup", password: "one-time-secret" // pragma: allowlist secret
     )
     #expect(count == 256)
     let captured = try #require(BackupExportCapture.shared.take(path: "/backups/export"))
@@ -614,7 +614,7 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
         sessionConfiguration: configuration
     )
     let prebackupPath = try await client.restoreEncryptedBackup(
-        sourcePath: "/tmp/fixture.pacbackup", password: "one-time-secret"
+        sourcePath: "/tmp/fixture.pacbackup", password: "one-time-secret" // pragma: allowlist secret
     )
     #expect(prebackupPath == "/private/pre-restore.sqlcipher")
     let captured = try #require(BackupExportCapture.shared.take(path: "/backups/restore"))

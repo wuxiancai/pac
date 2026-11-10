@@ -51,6 +51,8 @@
 
 ## 当前执行顺序
 
+2026-11-10 阶段 6 本机 CI 等价门禁复核：后端全量 341 passed（1 条既有 Starlette/httpx 弃用警告）；Ruff 全目录、CI mypy、compileall、`uv lock --check`、tracked-file detect-secrets、Swift 60 项和 Beta target build 均通过。扫描命中的测试口令均为合成字面量，已逐行 allowlist 并复扫通过。桌面状态读取失败，B1/B3/B5/B6 的 GUI 验收及远端 GitHub Actions 仍未完成，阶段 6 不关闭。详见 `docs/HANDOFF.md`。
+
 2026-11-10 POC 脚本静态质量：修复两个历史未使用符号，`ruff check scripts` 全目录通过；未运行会启动本机模型/设备的测量脚本。
 
 2026-11-10 工程静态质量：修复并发 ASR/模型测量探针的异构泛型类型错误，并为 FastEmbed 注入引擎补充结构化协议。`mypy pac_poc` 37 个模块通过；Ruff 两个修改模块通过；相关窄测 9 passed；后端全量 341 passed、1 条既有 Starlette/httpx 弃用警告。详细命令见 `docs/HANDOFF.md`。

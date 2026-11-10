@@ -2092,7 +2092,7 @@ def test_backup_export_api_requires_local_auth_and_never_returns_password(tmp_pa
         assert "destination" not in exported.text
         assert duplicate.status_code == 409
         assert read_backup_header(
-            destination, password="private passphrase", database_key=database_key
+            destination, password="private passphrase", database_key=database_key  # pragma: allowlist secret
         )[0].source_key_fingerprint
 
     try:
@@ -2114,7 +2114,7 @@ def test_backup_restore_api_requires_local_auth_and_returns_only_prebackup_locat
         provider="ollama", model="fixture", status="COMPLETED",
     )
     backup = tmp_path / "restore-api.pacbackup"
-    store.export_encrypted_backup(backup, password="api passphrase")
+    store.export_encrypted_backup(backup, password="api passphrase")  # pragma: allowlist secret
     store.append_chat_turn(
         conversation_id=str(conversation["id"]), run_id="api-later",
         user_content="remove this turn", assistant_content="later",
