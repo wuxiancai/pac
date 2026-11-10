@@ -34,11 +34,11 @@
 
 ## 尚未完成
 
-1. 删除记忆会同步删除其版本快照，FTS 由数据库触发器同步。来源目前可选当前会话中已有稳定 ID 的消息，不支持跨会话选择或跳转。
+1. 删除记忆会同步删除其版本快照，FTS 由数据库触发器同步。新建记忆的来源选择目前限于当前会话；已有来源消息可按分页读取所属会话、切换并滚动定位，仍待 GUI 实机验收。
 2. 会话历史已实现：初始最多 100 条，可通过有序 `(created_at,id)` keyset cursor 加载更早记录，SQLCipher schema 增加复合索引，SwiftUI 只在用户点击时拉取历史页并保留当前滚动锚点；已加载数据库行使用稳定消息 ID，临时流式消息使用稳定的本轮索引 ID，自动滚动与分页锚点共用同一行 ID。模型上下文仍限制最近 20 条。LazyVStack 当前对已加载消息做惰性视图创建，但尚无 SwiftUI 长会话压力与极大消息单体渲染验收。SQLCipher repository 新增 120 条消息跨 100 条分页边界的完整遍历回归（无重复/遗漏），不代表 GUI 渲染压力已通过。
-3. D-018 已确认当前任务状态迁移图：`PENDING→READY/CANCELLED`；`READY→RUNNING/PAUSED/CANCELLED`；`RUNNING→WAITING/PARTIAL/COMPLETED/FAILED/CANCELLED`；`WAITING→READY/RUNNING/PAUSED/CANCELLED`；`PAUSED→READY/CANCELLED`；`PARTIAL→READY/COMPLETED/FAILED/CANCELLED`；`FAILED→READY/CANCELLED`；`COMPLETED` 与 `CANCELLED` 为终态。API 返回当前状态的 `allowed_transitions`，任务 UI 提供这些动作。状态只表示用户维护的计划，不代表后台执行；重复状态幂等，不重置 `completed_at`。清理现于服务启动和任务列表读取时执行，长时间运行期间可能延至下一次触发。
+3. D-018 已确认当前任务状态迁移图：`PENDING→READY/CANCELLED`；`READY→RUNNING/PAUSED/CANCELLED`；`RUNNING→WAITING/PARTIAL/COMPLETED/FAILED/CANCELLED`；`WAITING→READY/RUNNING/PAUSED/CANCELLED`；`PAUSED→READY/CANCELLED`；`PARTIAL→READY/COMPLETED/FAILED/CANCELLED`；`FAILED→READY/CANCELLED`；`COMPLETED` 与 `CANCELLED` 为终态。API 返回当前状态的 `allowed_transitions`，任务 UI 提供这些动作。状态只表示用户维护的计划，不代表后台执行；重复状态幂等，不重置 `completed_at`。到期清理在服务启动和任务列表读取时执行，服务运行期间另有每 6 小时周期清理。
 4. 手动加密备份已接入认证 API 与 macOS UI：用户通过系统保存面板选择 `.pacbackup` 路径，输入每份独立口令后显式导出；口令不持久化，覆盖已有文件需保存面板确认。恢复前需确认并通过 macOS 设备认证；服务端验证容器口令、安装密钥指纹、SQLCipher 完整性/schema，创建当前数据库的私有本机 SQLCipher 预备份，再将内容在线复制到使用当前 Keychain 密钥加密的 staging DB 后切换；失败时从 rollback 文件还原。预备份放在 Application Support/PersonalAI/pre-restore，固定文件仅保留最近一份；校验并完成恢复切换后通过原子替换更新。失败时不会覆盖旧预备份。当前备份相关窄回归 12 passed，Swift 全量 53 项通过，后端全量 312 passed、1 条既有 Starlette/httpx 弃用警告；Ruff/mypy/锁文件检查通过，Beta build 成功。启动时若唯一未提交 rollback 文件存在，会先还原旧库；多个候选则 fail-closed。GUI、Keychain 实机认证、强制终止/断电期间恢复与 RTO 验收未做。
-5. 记忆来源跨会话跳转；真实 macOS Keychain 与冻结/休眠/重启路径验收。
+5. 新建记忆时选择其他会话的来源消息；现有记忆来源跨会话跳转的 GUI 实机验收；真实 macOS Keychain 与冻结/休眠/重启路径验收。
 6. 本机任务通知的真实系统授权、投递/过期行为及重启恢复验收；当前测试仅覆盖 stable identifier 与客户端/后端契约，不声称已验证系统投递。
 
 聊天及任务数据现写入本机加密数据库；用量记录仍为进程内临时数据；用户确认记忆已进入本机加密数据库。任务提醒实现期间未实际启动 Beta、未请求 macOS 通知授权，也未访问真实用户数据、Keychain、Provider、麦克风或 GUI。
