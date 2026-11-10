@@ -251,10 +251,19 @@ public struct LocalTaskList: Decodable, Sendable {
 public struct LocalChatHistory: Decodable, Sendable {
     public let conversationID: String?
     public let messages: [LocalChatMessage]
+    public let hasMore: Bool
 
     enum CodingKeys: String, CodingKey {
         case conversationID = "conversation_id"
         case messages
+        case hasMore = "has_more"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        conversationID = try container.decodeIfPresent(String.self, forKey: .conversationID)
+        messages = try container.decode([LocalChatMessage].self, forKey: .messages)
+        hasMore = try container.decodeIfPresent(Bool.self, forKey: .hasMore) ?? false
     }
 }
 
@@ -657,14 +666,23 @@ public final class LocalAPIClient: @unchecked Sendable {
         return item
     }
 
-    public func chatHistory(conversationID: String? = nil) async throws -> LocalChatHistory {
+    public func chatHistory(
+        conversationID: String? = nil, beforeMessageID: String? = nil, limit: Int = 100
+    ) async throws -> LocalChatHistory {
+        guard (1...200).contains(limit) else { throw LocalAPIClientError.invalidEndpoint }
         var components = URLComponents(
             url: URL(string: "/chat/history", relativeTo: baseURL)!.absoluteURL,
             resolvingAgainstBaseURL: false
         )!
+        var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
         if let conversationID {
-            components.queryItems = [URLQueryItem(name: "conversation_id", value: conversationID)]
+            queryItems.append(URLQueryItem(name: "conversation_id", value: conversationID))
         }
+        if let beforeMessageID {
+            guard UUID(uuidString: beforeMessageID) != nil else { throw LocalAPIClientError.invalidEndpoint }
+            queryItems.append(URLQueryItem(name: "before_message_id", value: beforeMessageID))
+        }
+        components.queryItems = queryItems
         guard let url = components.url else { throw LocalAPIClientError.invalidEndpoint }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"

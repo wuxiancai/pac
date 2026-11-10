@@ -176,7 +176,7 @@ def test_store_reopens_and_migrations_are_idempotent(storage_root: Path) -> None
     try:
         with second.connection() as connection:
             assert connection.execute(text("SELECT count(*) FROM conversations")).scalar_one() == 1
-            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0001_product_store"
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0002_history_cursor"
     finally:
         second.close()
 
@@ -341,5 +341,32 @@ def test_conversation_list_create_and_targeted_delete_isolate_histories(storage_
         assert next(item for item in conversations if item["id"] == first["id"])["message_count"] == 2
         assert store.delete_conversation(first["id"])
         assert store.load_conversation(second["id"])["messages"][0]["content"] == "second only"
+    finally:
+        store.close()
+
+
+def test_conversation_history_uses_stable_bounded_keyset_pages(storage_root: Path) -> None:
+    store = _store((storage_root / "paged-history.db").resolve())
+    store.open()
+    try:
+        conversation = store.get_or_create_default_conversation()
+        for number in range(3):
+            store.append_chat_turn(
+                conversation_id=conversation["id"], run_id=f"page-run-{number}",
+                user_content=f"user-{number}", assistant_content=f"assistant-{number}",
+                provider="ollama", model="local", status="COMPLETED",
+            )
+        latest = store.load_conversation(conversation["id"], limit=3)
+        assert [item["content"] for item in latest["messages"]] == [
+            "assistant-1", "user-2", "assistant-2",
+        ]
+        assert latest["has_more"] is True
+        older = store.load_conversation(
+            conversation["id"], limit=3, before_message_id=latest["messages"][0]["id"]
+        )
+        assert [item["content"] for item in older["messages"]] == [
+            "user-0", "assistant-0", "user-1",
+        ]
+        assert older["has_more"] is False
     finally:
         store.close()

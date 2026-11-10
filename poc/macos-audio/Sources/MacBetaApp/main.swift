@@ -115,6 +115,8 @@ final class BetaChatModel {
     private let defaults = UserDefaults.standard
     private(set) var status = "正在连接本机服务…"
     private(set) var messages: [LocalChatMessage] = []
+    private(set) var hasOlderMessages = false
+    private(set) var isLoadingOlderMessages = false
     private(set) var conversationID: String?
     private(set) var conversations: [LocalConversationItem] = []
     private(set) var tasks: [LocalTaskItem] = []
@@ -205,6 +207,7 @@ final class BetaChatModel {
             let history = try await localClient.chatHistory()
             conversationID = history.conversationID
             messages = history.messages
+            hasOlderMessages = history.hasMore
             conversations = try await localClient.conversations()
             client = localClient
             if taskReminderManager.isEnabled {
@@ -309,6 +312,7 @@ final class BetaChatModel {
                 if runID != nil { self.latestRunStatus = .completed }
                 if let history = try? await client.chatHistory(conversationID: activeConversationID) {
                     self.messages = history.messages
+                    self.hasOlderMessages = history.hasMore
                 }
                 await self.refreshConversations()
                 if let runID {
@@ -458,6 +462,23 @@ final class BetaChatModel {
         }
     }
 
+    func loadOlderMessages() async {
+        guard !isLoadingOlderMessages, hasOlderMessages,
+              let client, let conversationID, let cursor = messages.first?.id else { return }
+        isLoadingOlderMessages = true
+        defer { isLoadingOlderMessages = false }
+        do {
+            let page = try await client.chatHistory(
+                conversationID: conversationID, beforeMessageID: cursor
+            )
+            guard page.conversationID == conversationID else { return }
+            messages = page.messages + messages
+            hasOlderMessages = page.hasMore
+        } catch {
+            status = "无法加载更早的聊天记录：\(error.localizedDescription)"
+        }
+    }
+
     func selectConversation(_ conversation: LocalConversationItem) async {
         guard activeRequest == nil, let client else {
             status = "请先停止当前生成，再切换会话。"
@@ -467,6 +488,7 @@ final class BetaChatModel {
             let history = try await client.chatHistory(conversationID: conversation.id)
             conversationID = history.conversationID
             messages = history.messages
+            hasOlderMessages = history.hasMore
             lastAssistantResponseInterrupted = false
             status = "已切换到：\(conversation.title)"
         } catch {
@@ -495,6 +517,7 @@ final class BetaChatModel {
             conversations.insert(conversation, at: 0)
             conversationID = conversation.id
             messages = []
+            hasOlderMessages = false
             lastAssistantResponseInterrupted = false
             status = "已创建新会话。"
         } catch {
@@ -536,6 +559,7 @@ final class BetaChatModel {
             } else {
                 messages = []
                 conversationID = nil
+                hasOlderMessages = false
             }
             await refreshTasks()
             await refreshMemories()
@@ -1085,6 +1109,24 @@ private struct BetaChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 14) {
+                        if model.hasOlderMessages {
+                            Button {
+                                let anchorID = model.messages.first?.id
+                                Task {
+                                    await model.loadOlderMessages()
+                                    if let anchorID { proxy.scrollTo(anchorID, anchor: .top) }
+                                }
+                            } label: {
+                                if model.isLoadingOlderMessages {
+                                    ProgressView("正在加载更早记录…")
+                                } else {
+                                    Text("加载更早的聊天记录")
+                                }
+                            }
+                            .disabled(model.isLoadingOlderMessages)
+                            .frame(maxWidth: .infinity)
+                            .accessibilityIdentifier("load-older-messages-button")
+                        }
                         if model.messages.isEmpty {
                             ContentUnavailableView(
                                 "开始一段对话",
@@ -1126,12 +1168,12 @@ private struct BetaChatView: View {
                                     userBubble(message.content)
                                 }
                             }
-                            .id(index)
+                            .id(message.id ?? "transient-\(index)")
                         }
                     }
                     .padding()
                 }
-                .onChange(of: model.messages.count) { _, _ in
+                .onChange(of: model.messages.last?.content) { _, _ in
                     guard !model.messages.isEmpty else { return }
                     proxy.scrollTo(model.messages.count - 1, anchor: .bottom)
                 }

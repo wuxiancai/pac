@@ -694,8 +694,13 @@ class EncryptedApplicationStore:
                 return {"id": conversation_id, "title": "新对话", "created_at": now, "updated_at": now}
             return {key: str(row[key]) for key in ("id", "title", "created_at", "updated_at")}
 
-    def load_conversation(self, conversation_id: str | None = None) -> dict[str, object]:
-        """Load the active conversation and ordered visible messages."""
+    def load_conversation(
+        self, conversation_id: str | None = None, *, limit: int = 100,
+        before_message_id: str | None = None,
+    ) -> dict[str, object]:
+        """Load one bounded page, newest first by default or older than a stable cursor."""
+        if not 1 <= limit <= 200:
+            raise ValueError("conversation history limit is outside the supported range")
         engine = self._require_engine()
         with engine.begin() as connection:
             if conversation_id is None:
@@ -720,10 +725,27 @@ class EncryptedApplicationStore:
                 ), {"id": conversation_id}).mappings().first()
             if row is None:
                 raise KeyError("conversation not found")
+            parameters: dict[str, object] = {"id": row["id"], "limit": limit + 1}
+            cursor_clause = ""
+            if before_message_id is None:
+                order = "created_at DESC, id DESC"
+            else:
+                cursor = connection.execute(text(
+                    "SELECT created_at FROM messages WHERE id=:cursor_id "
+                    "AND conversation_id=:id AND deleted_at IS NULL"
+                ), {"cursor_id": before_message_id, "id": row["id"]}).mappings().first()
+                if cursor is None:
+                    raise KeyError("history cursor not found")
+                cursor_clause = "AND (created_at < :cursor_created OR " \
+                    "(created_at = :cursor_created AND id < :cursor_id))"
+                parameters.update({"cursor_created": cursor["created_at"], "cursor_id": before_message_id})
+                order = "created_at DESC, id DESC"
             messages = connection.execute(text(
-                "SELECT id, role, content FROM messages WHERE conversation_id=:id "
-                "AND deleted_at IS NULL ORDER BY created_at, id"
-            ), {"id": row["id"]}).mappings().all()
+                "SELECT id, role, content, created_at FROM messages WHERE conversation_id=:id "
+                f"AND deleted_at IS NULL {cursor_clause} ORDER BY {order} LIMIT :limit"
+            ), parameters).mappings().all()
+            has_more = len(messages) > limit
+            messages = list(reversed(messages[:limit]))
             return {
                 "id": str(row["id"]),
                 "title": str(row["title"]),
@@ -737,6 +759,7 @@ class EncryptedApplicationStore:
                     }
                     for message in messages
                 ],
+                "has_more": has_more,
             }
 
     def append_chat_turn(

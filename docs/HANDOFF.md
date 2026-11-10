@@ -1365,3 +1365,9 @@
 - 恢复 API/UI 已接通；用户选择 `.pacbackup` 后确认破坏性操作，再通过 macOS `deviceOwnerAuthentication`（Touch ID 或设备密码）后发起恢复。服务端先验证口令、同机密钥指纹，再抽取并验证 SQLCipher 数据库；生成 `Application Support/PersonalAI/pre-restore/` 私有目录中的本机密钥加密副本，恢复库在线复制并用当前 Keychain 密钥加密，关闭连接后切换。若新库打开失败，自动将 rollback 文件复原并重开旧库；进程中断后启动时发现唯一未提交 rollback 会优先恢复旧库，多个候选则停止打开数据库。口令未保存。
 - 自动化：备份相关后端/API窄回归 12 passed，覆盖导出/恢复/错误口令不触库/预备份内容/新库激活失败回滚/启动恢复；Swift 全量 53 项通过；后端全量 312 passed，1 条既有 Starlette/httpx 弃用警告；Ruff/mypy/`uv lock --check` 通过；Beta build 成功。
 - 尚未进行真实 UI、Keychain/设备认证交互、强制退出/断电恢复验收。预备份在 Application Support 保留，当前没有自动删除策略；用户的外部备份与预备份保留期及 RTO 仍待决定。
+
+# 2026-11-10：长会话 keyset 分页
+
+- `GET /chat/history` 现在默认最多返回最新 100 条；UI 可按稳定的 `(created_at,id)` 游标请求更早记录，服务端页大小限制 1–200，`has_more` 表示是否尚有更早消息。SwiftUI 在用户点击后加载并将原首条消息保留在滚动锚点；模型上下文仍只发送最近 20 条。新增迁移以 `(conversation_id,created_at,id)` 复合索引支持 keyset 查询，并替换被其覆盖的旧索引。
+- 验证：后端分页 repository/API 窄回归 2 passed；Swift 全量 54 项通过；后端全量 314 passed、1 条既有 Starlette/httpx 弃用警告；Ruff/mypy/`uv lock --check` 通过；Beta build 成功。
+- 未做真实 GUI 长对话或百万级消息/超长单体性能验收；来源跨会话跳转仍待完成。

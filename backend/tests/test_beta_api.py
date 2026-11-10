@@ -1439,6 +1439,56 @@ def test_persistent_chat_history_round_trips_and_can_be_manually_deleted(tmp_pat
         store.close()
 
 
+def test_chat_history_api_returns_bounded_keyset_pages(tmp_path) -> None:
+    from pac_poc.persistence import EncryptedApplicationStore
+
+    store = EncryptedApplicationStore(path=(tmp_path / "history-pages.db").resolve(), key=b"p" * 32)
+    store.open()
+    conversation = store.get_or_create_default_conversation()
+    for number in range(3):
+        store.append_chat_turn(
+            conversation_id=str(conversation["id"]), run_id=f"history-page-{number}",
+            user_content=f"user-{number}", assistant_content=f"assistant-{number}",
+            provider="ollama", model="fixture", status="COMPLETED",
+        )
+    app = create_beta_api(
+        session=LocalAPISession(token="history-page-token"),
+        gateway=ModelGateway(adapters={"ollama": StubLocalAdapter()}, policy=LocalOnlyPolicy()),
+        persistence_store=store,
+    )
+
+    async def run() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            headers = {"authorization": "Bearer history-page-token"}
+            latest = await client.get(
+                "/chat/history", headers=headers,
+                params={"conversation_id": conversation["id"], "limit": 3},
+            )
+            older = await client.get(
+                "/chat/history", headers=headers,
+                params={
+                    "conversation_id": conversation["id"], "limit": 3,
+                    "before_message_id": latest.json()["messages"][0]["id"],
+                },
+            )
+        assert latest.status_code == older.status_code == 200
+        assert [message["content"] for message in latest.json()["messages"]] == [
+            "assistant-1", "user-2", "assistant-2",
+        ]
+        assert latest.json()["has_more"] is True
+        assert [message["content"] for message in older.json()["messages"]] == [
+            "user-0", "assistant-0", "user-1",
+        ]
+        assert older.json()["has_more"] is False
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()
+
+
 def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path) -> None:
     from pac_poc.persistence import EncryptedApplicationStore
 

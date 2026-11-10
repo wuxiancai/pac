@@ -243,6 +243,22 @@ private final class ChatHistoryURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class PaginatedChatHistoryURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        BackupExportCapture.shared.record(request)
+        let response = HTTPURLResponse(
+            url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        let body = #"{"conversation_id":"11111111-1111-4111-8111-111111111111","messages":[{"id":"33333333-3333-4333-8333-333333333333","role":"user","content":"older page"}],"has_more":true}"#
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
 private final class ChatRequestCapture: @unchecked Sendable {
     static let shared = ChatRequestCapture()
     private let lock = NSLock()
@@ -438,6 +454,30 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     )])
     #expect(history.messages[0].id == "33333333-3333-4333-8333-333333333333")
     try await client.deleteChatHistory(conversationID: "11111111-1111-4111-8111-111111111111")
+}
+
+@Test func chatHistoryPaginationUsesStableMessageCursorAndBoundedLimit() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [PaginatedChatHistoryURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43127")!, token: "history-token",
+        sessionConfiguration: configuration
+    )
+    let history = try await client.chatHistory(
+        conversationID: "11111111-1111-4111-8111-111111111111",
+        beforeMessageID: "22222222-2222-4222-8222-222222222222", limit: 75
+    )
+    #expect(history.hasMore)
+    #expect(history.messages[0].content == "older page")
+    let captured = try #require(BackupExportCapture.shared.take(path: "/chat/history"))
+    let request = captured.0
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer history-token")
+    let query = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)?.queryItems
+    #expect(query?.first(where: { $0.name == "before_message_id" })?.value == "22222222-2222-4222-8222-222222222222")
+    #expect(query?.first(where: { $0.name == "limit" })?.value == "75")
+    await #expect(throws: LocalAPIClientError.invalidEndpoint) {
+        _ = try await client.chatHistory(limit: 201)
+    }
 }
 
 @Test func memoryVersionSnapshotDecodesPersistedCorrection() throws {

@@ -961,18 +961,28 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             raise HTTPException(status_code=503, detail="encrypted backup could not be restored safely") from None
 
     @router.get("/chat/history")
-    async def get_chat_history(conversation_id: UUID | None = None) -> dict[str, object]:
+    async def get_chat_history(
+        conversation_id: UUID | None = None,
+        before_message_id: UUID | None = None,
+        limit: int = Query(default=100, ge=1, le=200),
+    ) -> dict[str, object]:
         if persistent_store is None:
-            return {"conversation_id": None, "messages": []}
+            return {"conversation_id": None, "messages": [], "has_more": False}
         try:
             snapshot = persistent_store.load_conversation(
-                str(conversation_id) if conversation_id else None
+                str(conversation_id) if conversation_id else None,
+                limit=limit,
+                before_message_id=str(before_message_id) if before_message_id else None,
             )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="conversation not found") from exc
         except PersistentStoreError as exc:
             raise HTTPException(status_code=503, detail="chat history is unavailable") from exc
-        return {"conversation_id": snapshot["id"], "messages": snapshot["messages"]}
+        return {
+            "conversation_id": snapshot["id"],
+            "messages": snapshot["messages"],
+            "has_more": snapshot["has_more"],
+        }
 
     @router.delete("/chat/history")
     async def delete_chat_history(conversation_id: UUID | None = None) -> dict[str, bool]:
