@@ -1634,4 +1634,5 @@
 
 - 在提交 `2790722` 后复核：后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --directory backend --locked --all-extras --all-groups pytest -q` → 346 passed、1 条既有 Starlette/httpx 弃用警告；`swift test --package-path poc/macos-audio` → 62 passed；Beta target build 成功。
 - 静态门禁：Ruff 全目录通过；`mypy pac_poc` 37 个源文件无问题；`uv lock --check`、Python `compileall` 通过。SwiftPM 曾等待另一构建实例释放 `.build`，随后成功完成。未运行远端 GitHub Actions，故不更新远端 CI/PR 证据；阶段 6 仍开放。
+- 补齐 CI 工作流门禁：`git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 无命中；CI 配置范围 `uv run --locked mypy` 3 个目标文件通过；包含 `scripts` 的 `compileall` 通过。
 - 本轮未发起 Provider 请求、未采集麦克风、未读写真实 Keychain 或触发系统通知授权。
