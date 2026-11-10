@@ -398,7 +398,8 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
         messages: [LocalChatMessage(id: "33333333-3333-4333-8333-333333333333", role: "user", content: "Summarize the attached notes")],
         importedDocumentIDs: ["11111111-1111-4111-8111-111111111111"],
         conversationID: "22222222-2222-4222-8222-222222222222",
-        assistantKey: "task_planner"
+        assistantKey: "task_planner",
+        skillKeys: ["risk_review"]
     ) {}
 
     let captured = try #require(ChatRequestCapture.shared.take())
@@ -410,6 +411,7 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     #expect(payload["import_ids"] as? [String] == ["11111111-1111-4111-8111-111111111111"])
     #expect(payload["conversation_id"] as? String == "22222222-2222-4222-8222-222222222222")
     #expect(payload["assistant_key"] as? String == "task_planner")
+    #expect(payload["skill_keys"] as? [String] == ["risk_review"])
     #expect(payload["messages"] != nil)
     let messages = try #require(payload["messages"] as? [[String: Any]])
     #expect(messages[0]["id"] == nil)
@@ -437,6 +439,17 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     #expect(created.title == "New")
     #expect(created.messageCount == 0)
     #expect(renamed.title == "Renamed")
+}
+
+@available(macOS 12.0, *)
+@Test func fixedLocalSkillCatalogDecodesItsStableIdentifiers() throws {
+    let data = Data(
+        #"{"id":"ba0d927c-67e7-4de0-b52d-79b816ea6210","skill_key":"risk_review","name":"风险审查","description":"风险检查","version":"1","status":"ACTIVE"}"#.utf8
+    )
+    let skill = try JSONDecoder().decode(LocalSkillItem.self, from: data)
+    #expect(skill.id == "ba0d927c-67e7-4de0-b52d-79b816ea6210")
+    #expect(skill.skillKey == "risk_review")
+    #expect(skill.name == "风险审查")
 }
 
 @available(macOS 12.0, *)

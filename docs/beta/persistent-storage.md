@@ -12,6 +12,7 @@
 
 - `backend/pac_poc/persistence.py` 提供 `EncryptedApplicationStore`，限定绝对路径、私有目录/文件权限、拒绝符号链接和错误密钥，并打开 SQLCipher WAL 数据库。
 - `backend/pac_poc/migrations/` 提供随 wheel 打包的 Alembic 初始 migration。
+- migration `0003_local_skills` 在 SQLCipher store 内安装三个固定、只含提示文本的本机 Skills；读取接口不返回提示定义，不开放用户编辑或执行工具。聊天请求必须逐次提交登记的 skill keys。
 - 会话支持显式重命名，标题与更新时刻写入加密数据库。
 - schema 包含 conversations、turns、messages 与 FTS；任务状态表为后续 V2 使用；memory_items 仅接受用户确认的 claim，并有版本记录和 ACTIVE 条件 FTS。FTS 由触发器同步；会话删除通过外键级联。
 - SQLAlchemy、Alembic、SQLCipher 已从可选 POC 依赖移入默认后端依赖。发行材料仍需包含 SQLCipher Community attribution/NOTICE。

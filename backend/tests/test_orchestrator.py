@@ -85,6 +85,23 @@ def test_fixed_assistant_profiles_add_role_context(
     assert request.messages[-1] == {"role": "user", "content": "帮我规划"}
 
 
+def test_selected_skill_prompts_are_added_as_fixed_system_context() -> None:
+    gateway = RecordingGateway()
+    orchestrator = MainAssistantOrchestrator(gateway)  # type: ignore[arg-type]
+    request = orchestrator.prepare_request(
+        ConversationTurn(
+            messages=({"role": "user", "content": "评估方案"},),
+            provider="ollama",
+            model="local-model",
+            skill_prompts=("按风险、影响和缓解办法逐项分析。",),
+        )
+    )
+    assert request.messages == [
+        {"role": "system", "content": "按风险、影响和缓解办法逐项分析。"},
+        {"role": "user", "content": "评估方案"},
+    ]
+
+
 def test_imported_prompt_injection_stays_untrusted_user_data_without_tools() -> None:
     gateway = RecordingGateway()
     orchestrator = MainAssistantOrchestrator(gateway)  # type: ignore[arg-type]

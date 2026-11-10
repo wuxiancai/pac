@@ -128,6 +128,7 @@ class ConversationTurn:
     assistant_key: str = MAIN_ASSISTANT
     required_capabilities: tuple[Capability, ...] = ()
     documents: Sequence[ImportedTextDocument] = ()
+    skill_prompts: Sequence[str] = ()
 
 
 class ContextBuilder(Protocol):
@@ -191,9 +192,13 @@ class MainAssistantOrchestrator:
                 raise CapabilityNotVerified(capability, state=CapabilityState.UNKNOWN)
             self._capability_registry.require(turn.provider, turn.model, capability)
         messages = list(self._context_builder.build(turn))
+        system_context = []
         profile = ASSISTANT_PROFILES.get(turn.assistant_key)
         if profile is not None:
-            messages.insert(0, {"role": "system", "content": profile})
+            system_context.append(profile)
+        system_context.extend(turn.skill_prompts)
+        for content in reversed(system_context):
+            messages.insert(0, {"role": "system", "content": content})
         return LocalModelRequest(
             provider=turn.provider,
             model=turn.model,

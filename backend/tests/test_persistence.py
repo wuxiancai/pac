@@ -176,7 +176,7 @@ def test_store_reopens_and_migrations_are_idempotent(storage_root: Path) -> None
     try:
         with second.connection() as connection:
             assert connection.execute(text("SELECT count(*) FROM conversations")).scalar_one() == 1
-            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0002_history_cursor"
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0003_local_skills"
     finally:
         second.close()
 
@@ -290,6 +290,39 @@ def test_task_lifecycle_is_idempotent_and_completed_tasks_expire_after_30_days(
             )
         assert store.purge_expired_completed_tasks(now=now) == 1
         assert [item["id"] for item in store.list_tasks()] == [task["id"]]
+    finally:
+        store.close()
+
+
+def test_local_skill_catalog_is_fixed_prompt_only_and_rejects_unknown_keys(
+    storage_root: Path,
+) -> None:
+    store = _store((storage_root / "skills.db").resolve())
+    store.open()
+    try:
+        skills = store.list_skills()
+        assert {skill["skill_key"] for skill in skills} == {
+            "risk_review", "decision_brief", "action_items"
+        }
+        assert store.get_skill_prompts(["risk_review"])[0].startswith("对用户提供的项目")
+        assert store.get_skill_prompts([]) == []
+        with store.connection() as connection:
+            manifest = connection.execute(
+                text("SELECT permission_manifest_json FROM skills WHERE skill_key='risk_review'")
+            ).scalar_one()
+        assert manifest == '{"tools":[],"external_write":false}'
+        with pytest.raises(ValueError, match="selection"):
+            store.get_skill_prompts(["unknown_skill"])
+        with pytest.raises(ValueError, match="selection"):
+            store.get_skill_prompts(["risk_review", "risk_review"])
+        with pytest.raises(ValueError, match="selection"):
+            store.get_skill_prompts(["risk_review", "decision_brief", "action_items", "risk_review"])
+        with store.connection() as connection, connection.begin():
+            connection.execute(
+                text("UPDATE skills SET definition_json='invalid' WHERE skill_key='risk_review'")
+            )
+        with pytest.raises(RuntimeError, match="definition"):
+            store.get_skill_prompts(["risk_review"])
     finally:
         store.close()
 

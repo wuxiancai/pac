@@ -132,6 +132,24 @@ private struct LocalMemoryList: Decodable {
     let memories: [LocalMemoryItem]
 }
 
+public struct LocalSkillItem: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let skillKey: String
+    public let name: String
+    public let description: String
+    public let version: String
+    public let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, description, version, status
+        case skillKey = "skill_key"
+    }
+}
+
+private struct LocalSkillList: Decodable {
+    let skills: [LocalSkillItem]
+}
+
 public struct LocalMemoryVersionSnapshot: Decodable, Sendable {
     public let subject: String
     public let content: String
@@ -424,6 +442,26 @@ public final class LocalAPIClient: @unchecked Sendable {
         guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
         guard let list = try? JSONDecoder().decode(LocalMemoryList.self, from: data) else { throw LocalAPIClientError.invalidResponse }
         return list.memories
+    }
+
+    public func listSkills() async throws -> [LocalSkillItem] {
+        guard let url = URL(string: "/skills", relativeTo: baseURL)?.absoluteURL else {
+            throw LocalAPIClientError.invalidEndpoint
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard httpResponse.statusCode == 200 else {
+            throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+        guard let list = try? JSONDecoder().decode(LocalSkillList.self, from: data) else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        return list.skills
     }
 
     public func memoryVersions(id: String) async throws -> [LocalMemoryVersion] {
@@ -845,7 +883,8 @@ public final class LocalAPIClient: @unchecked Sendable {
         confirmedForThisRequest: Bool = false,
         importedDocumentIDs: [String] = [],
         conversationID: String? = nil,
-        assistantKey: String = "main_assistant"
+        assistantKey: String = "main_assistant",
+        skillKeys: [String] = []
     ) -> AsyncThrowingStream<LocalChatStreamItem, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -865,7 +904,8 @@ public final class LocalAPIClient: @unchecked Sendable {
                         confirmedForThisRequest: confirmedForThisRequest,
                         importIDs: importedDocumentIDs,
                         conversationID: conversationID,
-                        assistantKey: assistantKey
+                        assistantKey: assistantKey,
+                        skillKeys: skillKeys
                     ))
                     let (bytes, response) = try await session.bytes(for: request)
                     guard let httpResponse = response as? HTTPURLResponse else {
@@ -927,6 +967,7 @@ private struct ChatRequest: Encodable {
     let importIDs: [String]
     let conversationID: String?
     let assistantKey: String
+    let skillKeys: [String]
 
     enum CodingKeys: String, CodingKey {
         case messages
@@ -936,6 +977,7 @@ private struct ChatRequest: Encodable {
         case importIDs = "import_ids"
         case conversationID = "conversation_id"
         case assistantKey = "assistant_key"
+        case skillKeys = "skill_keys"
     }
 }
 

@@ -231,6 +231,7 @@ class StreamChatRequest(BaseModel):
     assistant_key: Literal[
         "main_assistant", "project_assistant", "meeting_assistant", "task_planner"
     ] = "main_assistant"
+    skill_keys: list[str] = Field(default_factory=list, max_length=3)
 
 
 class BetaVoiceTranscriber(Protocol):
@@ -776,6 +777,15 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         except Exception:
             raise HTTPException(status_code=503, detail="memories are unavailable") from None
 
+    @router.get("/skills")
+    async def list_skills() -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="local Skills are unavailable")
+        try:
+            return {"skills": persistent_store.list_skills()}
+        except Exception:
+            raise HTTPException(status_code=503, detail="local Skills are unavailable") from None
+
     @router.get("/memories/search")
     async def search_memories(q: str = Query(min_length=1, max_length=256), limit: int = Query(default=50, ge=1, le=200)) -> dict[str, object]:
         if persistent_store is None:
@@ -1058,6 +1068,18 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         if total_chars + sum(item.character_count for item in imported_documents) > settings.max_context_chars:
             raise HTTPException(status_code=413, detail="conversation context is too long")
         messages = [{"role": item.role, "content": item.content} for item in payload.messages]
+        try:
+            skill_prompts = (
+                persistent_store.get_skill_prompts(payload.skill_keys)
+                if persistent_store is not None
+                else []
+            )
+            if payload.skill_keys and persistent_store is None:
+                raise ValueError("skills are unavailable")
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="selected Skills are unavailable") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="selected Skills are unavailable") from None
         selected_gateway = gateway_for(payload)
         if payload.provider in CLOUD_PROVIDERS:
             config = CLOUD_PROVIDERS[payload.provider]
@@ -1080,6 +1102,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             source=source,
             assistant_key=payload.assistant_key,
             documents=imported_documents,
+            skill_prompts=skill_prompts,
         )
         orchestrator = MainAssistantOrchestrator(
             selected_gateway, capability_registry=capability_registry

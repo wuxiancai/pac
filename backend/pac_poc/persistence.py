@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 import stat
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -394,6 +395,39 @@ class EncryptedApplicationStore:
                 "ORDER BY updated_at DESC LIMIT :limit"
             ), {"limit": limit}).mappings().all()
             return [_memory_row(row) for row in rows]
+
+    def list_skills(self) -> list[dict[str, object]]:
+        engine = self._require_engine()
+        with engine.connect() as connection:
+            rows = connection.execute(text(
+                "SELECT id,skill_key,name,description,version,status FROM skills "
+                "WHERE status='ACTIVE' ORDER BY name,skill_key"
+            )).mappings().all()
+            return [dict(row) for row in rows]
+
+    def get_skill_prompts(self, skill_keys: Sequence[str]) -> list[str]:
+        if len(skill_keys) > 3 or len(set(skill_keys)) != len(skill_keys):
+            raise ValueError("skill selection is invalid")
+        if not skill_keys:
+            return []
+        engine = self._require_engine()
+        with engine.connect() as connection:
+            prompts: list[str] = []
+            for key in skill_keys:
+                row = connection.execute(text(
+                    "SELECT definition_json FROM skills WHERE skill_key=:key AND status='ACTIVE'"
+                ), {"key": key}).mappings().first()
+                if row is None:
+                    raise ValueError("skill selection is invalid")
+                try:
+                    definition = json.loads(str(row["definition_json"]))
+                except json.JSONDecodeError as exc:
+                    raise RuntimeError("stored skill definition is invalid") from exc
+                prompt = definition.get("prompt") if isinstance(definition, dict) else None
+                if not isinstance(prompt, str) or not prompt or len(prompt) > 4_000:
+                    raise RuntimeError("stored skill definition is invalid")
+                prompts.append(prompt)
+            return prompts
 
     def update_confirmed_memory(
         self,

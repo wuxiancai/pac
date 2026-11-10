@@ -125,6 +125,8 @@ final class BetaChatModel {
     private(set) var memoryStatus = ""
     private(set) var memoryVersions: [LocalMemoryVersion] = []
     private(set) var memorySource: LocalMemorySource?
+    private(set) var skills: [LocalSkillItem] = []
+    private(set) var selectedSkillKeys: Set<String> = []
     private(set) var taskStatus = ""
     private(set) var taskNotificationStatus = "通知默认关闭。"
     private(set) var backupStatus = "备份口令仅用于本次导出，不会保存。"
@@ -225,6 +227,7 @@ final class BetaChatModel {
             messages = history.messages
             hasOlderMessages = history.hasMore
             conversations = try await localClient.conversations()
+            skills = try await localClient.listSkills()
             client = localClient
             if taskReminderManager.isEnabled {
                 do {
@@ -291,6 +294,8 @@ final class BetaChatModel {
         let importedDocumentIDs = importedTextFiles.map(\.importID)
         let activeConversationID = conversationID
         let selectedAssistantKey = assistantKey
+        let skillKeysForRequest = selectedSkillKeys.sorted()
+        selectedSkillKeys.removeAll()
         let requestID = UUID()
         activeRequestID = requestID
         latestRunID = nil
@@ -306,7 +311,8 @@ final class BetaChatModel {
                     confirmedForThisRequest: confirmedForThisRequest,
                     importedDocumentIDs: importedDocumentIDs,
                     conversationID: activeConversationID,
-                    assistantKey: selectedAssistantKey
+                    assistantKey: selectedAssistantKey,
+                    skillKeys: skillKeysForRequest
                 ) {
                     guard let self else { return }
                     guard self.activeRequestID == requestID else { return }
@@ -585,6 +591,16 @@ final class BetaChatModel {
             memoryStatus = "\(memories.count) 条用户确认记忆 · 仅保存在本机"
         } catch {
             memoryStatus = "无法读取本机记忆：\(error.localizedDescription)"
+        }
+    }
+
+    func toggleSkill(_ skill: LocalSkillItem) {
+        if selectedSkillKeys.contains(skill.skillKey) {
+            selectedSkillKeys.remove(skill.skillKey)
+        } else if selectedSkillKeys.count < 3 {
+            selectedSkillKeys.insert(skill.skillKey)
+        } else {
+            status = "每轮最多选择 3 个 Skills。"
         }
     }
 
@@ -1308,6 +1324,24 @@ private struct BetaChatView: View {
                     ProgressView("本机识别…")
                         .controlSize(.small)
                 } else {
+                    Menu {
+                        ForEach(model.skills) { skill in
+                            Button {
+                                model.toggleSkill(skill)
+                            } label: {
+                                if model.selectedSkillKeys.contains(skill.skillKey) {
+                                    Label(skill.name, systemImage: "checkmark")
+                                } else {
+                                    Text(skill.name)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Skills \(model.selectedSkillKeys.count)", systemImage: "sparkles")
+                    }
+                    .disabled(model.skills.isEmpty || model.isStreaming)
+                    .help("只对下一条聊天消息生效，每次最多选择 3 个")
+                    .accessibilityIdentifier("chat-skill-picker")
                     Button {
                         showingFileImporter = true
                     } label: {

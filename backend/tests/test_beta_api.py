@@ -1555,6 +1555,50 @@ def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path)
         store.close()
 
 
+def test_skills_api_returns_fixed_local_catalog_and_chat_applies_explicit_selection(tmp_path) -> None:
+    from pac_poc.persistence import EncryptedApplicationStore
+
+    store = EncryptedApplicationStore(path=(tmp_path / "skills.db").resolve(), key=b"s" * 32)
+    store.open()
+    adapter = StubLocalAdapter()
+    gateway = ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy())
+    app = create_beta_api(
+        session=LocalAPISession(token="skill-token"),
+        gateway=gateway,
+        persistence_store=store,
+    )
+
+    async def run() -> None:
+        headers = {"authorization": "Bearer skill-token"}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            catalog = await client.get("/skills", headers=headers)
+            invalid = await client.post("/chat/stream", headers=headers, json={
+                "messages": [{"role": "user", "content": "review"}],
+                "skill_keys": ["arbitrary_tool"],
+            })
+            response = await client.post("/chat/stream", headers=headers, json={
+                "messages": [{"role": "user", "content": "review"}],
+                "skill_keys": ["risk_review"],
+            })
+        assert catalog.status_code == 200
+        assert {item["skill_key"] for item in catalog.json()["skills"]} == {
+            "risk_review", "decision_brief", "action_items"
+        }
+        assert "definition_json" not in catalog.json()["skills"][0]
+        assert invalid.status_code == 422
+        assert response.status_code == 200
+        assert adapter.request is not None
+        assert adapter.request.messages[0]["role"] == "system"
+        assert "风险审查" in adapter.request.messages[0]["content"] or "风险" in adapter.request.messages[0]["content"]
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()
+
+
 def test_memory_api_requires_explicit_confirmation_and_supports_search_delete(tmp_path) -> None:
     from pac_poc.persistence import EncryptedApplicationStore
 
