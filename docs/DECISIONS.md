@@ -28,19 +28,19 @@
 |---|---|---|
 | D-001 | 主力 Mac 型号、内存、磁盘 | **Accepted（2026-11-09）**。用户确认当前 MacBook Air `MacBookAir10,1` / Apple M1 / 16 GiB 为主力开发/运行设备；数据卷剩余约 21 GiB，当前快照见 `poc/phase0-local-asr.md`。 |
 | D-002 | 最低 macOS | **Accepted（2026-11-09）：macOS 14.0**。与 Beta Info.plist 当前 `LSMinimumSystemVersion` 相符；仍需 CI 目标和安装包验证覆盖该最低版本。 |
-| D-003 | 对话、日志、缓存和备份保留期限 | **Accepted（2026-11-09）**。不保存对话；安全日志仅记录安全事件元数据，保留 30 天；临时会话/音频缓存于退出或中断清理；无对话数据备份。模型权重和用户明确保留的模型下载缓存不属于临时会话缓存。Beta 当前对话仅在进程内存，尚无持久安全日志；启用日志写盘前需实现 30 天清理并复核不含对话正文、凭据和音频。 |
+| D-003 | 对话、日志、缓存和备份保留期限 | **REOPENED（2026-11-10）**：用户要求将路线扩展到 V2/V3，原“不保存对话”不再作为后续版本默认。待确定会话/任务/记忆/日志各自是否持久化、保留期限和删除语义；既有 Beta 仍不保存对话。安全日志仍限定为元数据，不含正文、凭据和音频。 |
 | D-004 | 音频缓冲上限及异常清理 | **Accepted（2026-11-09）**。本机 PCM16 单声道缓存最多 30 秒（960,000 字节）；取消、异常、断连和应用退出时立即停止采集并清空未完成音频。正常停止只把最终转写放入当前输入草稿，录音本身不保留。Beta 已有 30 秒上限及实时 WebSocket 上限/断连回归；用户实机确认取消丢弃 partial，且录音中 Cmd-Q 后 app/backend 退出、重启无残留。真实 AVAudioEngine 硬件驱动故障仍未注入。 |
 | D-005 | 月 API 预算、币种、软/硬阈值 | **Accepted（2026-11-09）**：每月 100 元人民币；累计到 80 元提示；累计到 100 元硬拦截后续云请求，额度按自然月重置。当前 Beta 尚未实现费用归一和限额拦截；启用前必须明确 Provider 费用来源、汇率/缺失 usage 的 fail-closed 规则，并覆盖并发与月界重置，不能把 token usage 估值冒充实扣费用。 |
-| D-006 | 备份 RPO/RTO、份数和目的地 | **Accepted（2026-11-09）**：V1 不提供备份/恢复；未来若加入持久数据，再确认 RPO/RTO、份数和目的地。 |
-| D-007 | 静态加密方案 | **Accepted（2026-11-09，范围决策）**：V1 不保存会话数据且不做备份，因此不引入 app 数据库或 app 级静态加密实现。未来开始任何持久化功能前，再选择并验证加密方案；ADR-019 在该功能范围内继续 Deferred，SQLCipher POC 不视为产品选型。 |
+| D-006 | 备份 RPO/RTO、份数和目的地 | **REOPENED（2026-11-10）**：V2/V3 路线可能引入持久任务、记忆和连接器数据；待确定是否提供备份/恢复、RPO/RTO、份数、目的地和恢复认证。既有 Beta 当前仍无备份功能。 |
+| D-007 | 静态加密方案 | **REOPENED（2026-11-10）**：为推进 V1.1/V2/V3，待基于持久化数据类型、备份需求和威胁模型选择数据库及静态加密方案，并验证 migration/恢复；SQLCipher POC 不视为已选型，ADR-019 待重开评审。既有 Beta 继续不写入持久对话数据。 |
 | D-008 | 外接盘能否作为活动数据目录 | **Accepted（2026-11-09，范围决策）**：V1 不支持外接盘作为活动数据目录；若未来加入持久化数据目录，再评估外接介质并补断连/故障/性能验证。该决策不批准将模型权重或缓存写到外接盘。 |
 | D-009 | 固定专业 Agent 属于 V2 还是 V3 | **Accepted（2026-11-09）**：V2 提供少量固定专业 Agent；完整专业 Agent 集放 V3。V1 仍为一个总助理，不实现 Agent 团队或任意 Agent 执行器。 |
 | D-010 | V1 首批 Provider | **Accepted（2026-11-09）**：千问应用 API 为默认云端 Provider，另支持 DeepSeek（中国路由）和 OpenRouter（Global 路由）。这是产品范围选择，不代表各 Provider 的完整能力、取消、费用或区域证据均已验收；POC 证据见 `poc/phase0-remote-provider.md`。 |
 | D-011 | 云 ASR/TTS 供应商与区域 | **阶段 0 交互式 POC 候选已确认（2026-11-08）**：优先千问 Token Plan，北京区域；候选为 `qwen-audio-3.0-asr-flash`、`qwen-audio-3.0-realtime-plus` 和 `qwen-audio-3.0-tts-plus`。服务端能力支持已核实，但个人版 Key 不可用于本项目自建应用；应用内云语音须另选适用于自定义应用的计费凭据，或经官方允许的 Agent 工具扩展路线。接口和用户真实音频尚未验证。范围见[Token Plan 个人版条款](https://platform.qianwenai.com/docs/token-plan/personal/token-plan-personal-overview)、[接入概览](https://platform.qianwenai.com/docs/token-plan/best-practices/integration-overview)、[Token Plan 实时语音接入](https://platform.qianwenai.com/docs/token-plan/best-practices/realtime-voice)、[Realtime API 协议矩阵](https://platform.qianwenai.com/docs/api-reference/realtime-api/overview)。 |
 | D-012 | 文件导入白名单和容量限制 | **Accepted（2026-11-09）**：V1 用户主动选择并只读导入 TXT、Markdown、PDF；每个文件最大 10 MB。不得扫描目录或执行文件内容；解析器/格式校验、PDF 资源限制、路径权限和删除策略需在功能启用前做安全 POC。 |
 | D-013 | 性能目标数值 | **Accepted（2026-11-09）**：在主力 MacBook Air M1/16 GiB 上，App 启动 P95 ≤5 秒；ASR partial 延迟 P95 ≤500 毫秒；用户停止录音到 final 草稿可用 P95 ≤2 秒。以独立、可复核的 Beta 端到端样本测量；既有合成/CLI 帧推理结果不能替代这些门槛。 |
-| D-014 | Embedding 型号和存储格式 | **Accepted（2026-11-09，范围决策）**：V1 不提供长期记忆/Embedding；开始持久化记忆功能前再选模型、向量维度及存储格式。现有 FastEmbed/MiniLM POC 仅为候选，不是产品选型。 |
-| D-015 | 导出格式及默认加密 | **Accepted（2026-11-09，范围决策）**：V1 不提供 app 数据导出；未来加入持久数据时再决定导出格式和默认加密。当前不生成 app 数据导出文件。 |
+| D-014 | Embedding 型号和存储格式 | **REOPENED（2026-11-10）**：用户要求推进 V1.1 记忆中心；待确认记忆是否持久化、事实/推断确认流程、Embedding 是否启用及模型/维度/存储格式。现有 FastEmbed/MiniLM POC 仅为候选，不是产品选型。 |
+| D-015 | 导出格式及默认加密 | **REOPENED（2026-11-10）**：V1.1 计划含导出恢复优化；待确认导出数据范围、格式、默认加密/密钥交付和凭据/Consent 排除规则。当前 Beta 不生成 app 数据导出文件。 |
 
 ## ADR 状态
 

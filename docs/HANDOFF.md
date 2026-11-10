@@ -1,3 +1,9 @@
+# 2026-11-10：路线扩展至 V1.1/V2/V3
+
+- 用户明确要求重开决策并推进 V2/V3。按规格书 §13 将 V1.1（记忆中心/导出恢复优化）、V2（任务状态机、只读日历/待办、受控通知）、V3（固定专业 Agent、多 Agent、审批后的外部写操作与 Skills）纳入目标路线。
+- 用户要求不自动推翻既有约束：已将 D-003、D-006、D-007、D-014、D-015 标记为 REOPENED，需决定持久化/保留期、备份、数据库与静态加密、记忆/Embedding、导出细节。既有 Beta 在决定前继续不保存对话，不启用记忆/导出。
+- 更新 `docs/TASKS.md`、`docs/DECISIONS.md`、`docs/PROJECT_CONTEXT.md`。接续工作先处理不依赖这些决议的当前 V1 工程项；V2/V3 的外部连接和写操作仍需各自授权、策略与审批设计。
+
 # 2026-11-10：D-005 DeepSeek 费用来源补证
 
 - 核对 DeepSeek 官方价目表与 Chat Completions schema：固定 Beta 型号 `deepseek-flash` 映射到 V4.1-Flash-1017；输入缓存命中/未命中、输出及 UTC 峰谷时段费率不同，价目可能调整。响应 usage 包含 prompt/completion 与 cache hit/miss token，没有请求级费用金额。
