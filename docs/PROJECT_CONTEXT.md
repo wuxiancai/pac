@@ -16,6 +16,8 @@
 - 2026-11-10 本机 TTS 点播行为更新：开始朗读另一条回复时先停止当前播放；如果系统不能立即停止，就不排入新文本并显示明确状态。Swift 全量 43 项通过，Beta target 构建通过；仅用 fake SpeechEngine 自动验证，真实设备可听性仍待用户手动验收。
 - 2026-11-10 Provider 重试契约更新：远端 Adapter 最多两次尝试，仅对 HTTP 429 与建连前失败重试；读/写超时不重试，避免结果未知时重复发送。Consent 撤销会取消退避任务。最新后端全量 276 passed（1 条既有弃用警告）；无真实云请求。
 
+- 2026-11-10 本机 Provider 传输错误映射：修正 `httpx.RequestError` 在 Ollama 请求时错误套用云端失败/计费提示的问题；连接错误提示检查 Ollama，响应超时提示本机生成可能仍在继续。窄回归 8 passed，Ruff/mypy 通过；后端全量 276 passed（1 条既有弃用警告）。
+- 2026-11-10 阶段 6 本机 CI 等价门禁复核（代码基线 `0418d25`）：Ruff、mypy、`uv lock --check`、后端 all-extras/all-groups pytest（276 passed，1 条既有 Starlette/httpx 弃用警告）、compileall、tracked-file detect-secrets-hook、Swift 43 项及 Beta target build 均通过。未触发远端 GitHub Actions。
 - 2026-11-08 模型设置更新：SwiftUI 聊天页增加本地/云端选择，默认本机 Ollama；云端默认千问按量计费应用 API（`qwen3.8-flash`、`sk-ws-`、Keychain account `qwen-app`），另有 DeepSeek/OpenRouter 路由。选择云 Provider 即持续授权后续聊天发送到该服务商，不再逐条弹窗；设置文案披露此行为，Key 存 login Keychain，L3 凭据在后端出站前拒绝。千问 Token Plan 个人版 `sk-sp-` 官方条款明确排除自建应用后端，未接入直连 Provider；本会话一次千问合成请求返回通用错误且未重试，用户随后反馈已可正常聊天；未在本地记录该次成功响应/usage。详见 `docs/beta/macOS-beta-chat.md` 和 `docs/beta/qwen-token-plan-integration.md`。
 - 当前目标：单用户 macOS 本机优先测试版；POC 证据仍标为 POC，阶段 0 完整 V1/正式发布验收未完成。SwiftUI Beta、受认证的本机 `/chat/stream`、Ollama 增量对话和 Provider/模型切换已实现；GUI 发消息/显示回复、模型切换与语音冒烟已由用户实机复核，详情见 `docs/beta/macOS-beta-chat.md`、`docs/beta/macOS-beta-voice.md`。生成请求使用 request ID 隔离回调；对话不持久化。B2 现为显式点击采集、本机实时 ASR、partial/final 草稿和手动 AVSpeechSynthesizer 朗读；用户实机验证 final、取消、点击打断和录音中 Cmd-Q 退出清理。延期能力保持清晰扩展边界，不宣称已通过验证。
 - 对话主干已增加独立 `MainAssistantOrchestrator` / `ContextBuilder`、有界进程内 `RunRegistry`、精确型号能力门和随包静态 capability manifest、认证 Usage API 和有界进程内 UsageLedger，以及用户主动 TXT/Markdown 文件导入。认证 `/model-capabilities` 返回型号报告和证据；未登记型号及缺省能力为 UNKNOWN，证据有限的工具状态为 LIMITED。macOS Beta 已提供认证只读用量面板；Gateway 可透传 Ollama 与云 Provider 流最终帧中的实际 token 数，未收到时明确为 UNKNOWN。OpenRouter 若报告 `usage.cost` 则原样记为实际 USD；其他供应商缺失费用仍为 UNKNOWN。没有 USD/CNY 换算或预算拦截；精确云型号真实 usage/cost 尚未实测。导入内容只留本机进程内存，可移除，只用于本机模型并按不可信资料加入上下文；PDF 保持禁用直至解析资源限制验证完成。当前只路由 `main_assistant`，run 状态可经认证 API 查询，macOS UI 显示短 ID 和状态，记录不含对话正文且不跨进程保存；后续主线优先推进，不影响闭环的小问题先登记回修，具体规则见根目录 `AGENTS.md` 与 `docs/TASKS.md`。
@@ -58,7 +60,3 @@
 | [`DECISIONS.md`](DECISIONS.md) | 已确认的项目决策、待决产品事项和 ADR 状态入口 |
 | [`HANDOFF.md`](HANDOFF.md) | 最新工作摘要和下一位执行者的起点 |
 | [`poc/phase0-traceability.md`](poc/phase0-traceability.md) | 阶段 0 要求、证据、缺口及门禁的权威追踪矩阵 |
-
-- 2026-11-10 本机 Provider 传输错误映射：修正 `httpx.RequestError` 在 Ollama 请求时错误套用云端失败/计费提示的问题；连接错误提示检查 Ollama，响应超时提示本机生成可能仍在继续。窄回归 8 passed，Ruff/mypy 通过；后端全量 276 passed（1 条既有弃用警告）。
-
-- 2026-11-10 阶段 6 本机 CI 等价门禁复核（代码基线 `0418d25`）：Ruff、mypy、`uv lock --check`、后端 all-extras/all-groups pytest（276 passed，1 条既有 Starlette/httpx 弃用警告）、compileall、tracked-file detect-secrets-hook、Swift 43 项及 Beta target build 均通过。未触发远端 GitHub Actions。
