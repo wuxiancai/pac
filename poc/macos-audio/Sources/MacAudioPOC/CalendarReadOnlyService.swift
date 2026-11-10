@@ -2,7 +2,7 @@ import EventKit
 import Foundation
 import Observation
 
-public enum CalendarAccessState: Sendable {
+public enum CalendarAccessState: Sendable, Equatable {
     case notDetermined
     case fullAccess
     case writeOnly

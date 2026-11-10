@@ -5,6 +5,12 @@
 - D-022 已记录为当前接受范围；下一段继续 EventKit write-only 服务与逐次预览/确认 UI。尚未触发任何真实日历写入。
 - API 依据：[EventKit access model](https://developer.apple.com/documentation/eventkit/accessing-the-event-store)、[write-only purpose string](https://developer.apple.com/documentation/BundleResources/Information-Property-List/NSCalendarsWriteOnlyAccessUsageDescription)、[saving events](https://developer.apple.com/documentation/EventKit/EKEventStore/save%28_%3Aspan%3Acommit%3A%29)。
 
+# 2026-11-10：B10 EventKit 创建服务
+
+- 新增单事件 EventKit 创建服务：权限准备只请求 write-only（已有 full access 则复用），确认默认新事件日历可用；另一个显式 `createApprovedEvent` 入口校验标题、时间范围、地点/备注长度后保存，不含重复、提醒、邀请或读取能力。UI 尚未接线，且服务准备阶段不会写入。
+- 验证：`swift test --package-path poc/macos-audio --filter CalendarEventCreationServiceTests` → 4 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。未触发系统权限弹窗或真实事件写入。
+- 下一段接审计 API Swift 客户端，再做精确预览/逐次确认 UI 和 Info.plist 声明；仍需保证前置 ATTEMPTED 失败关闭，写后结果审计不重试事件。
+
 # 2026-11-10：模型预设旧格式迁移
 
 - `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。
