@@ -1,5 +1,6 @@
 # 项目上下文
 
+- 2026-11-10 B3 备份面板复测：在 Beta 表单输入临时口令后，accessibility 点击导出按钮两次均未出现 NSSavePanel；口令已清空并关闭表单，无路径选择、导出 API 调用或新文件。原因未判定，不能归因到按钮代码或系统面板。既有成功导出证据不受影响，详见最新 HANDOFF。
 - 2026-11-10 PDF 隔离候选复核：本机 `launchd.plist(5)` 虽提供 `ResidentSetSize` 资源项，但文档语义是在内存紧张时优先从超出申报 RSS 的进程回收内存；没有证明 worker 超限会确定性拒绝/终止，也未对独立解析 worker 实测。故不作为硬内存隔离证据，PDF 保持禁用。详见 `docs/beta/file-import.md`。
 
 - 2026-11-10 B3 恢复认证现可由用户显式取消（`LAContext.invalidate()`）；认证/导出时禁用完成与交互式关窗。GUI 点击取消后立即退出等待、未启动恢复 API，但系统原始文案为英文；新中文错误映射有 86 项 Swift 回归覆盖。新包重新打开时 CUA 超时，映射暂未实机确认。LocalAuthentication 成功提示/恢复仍未验收，见最新 HANDOFF。

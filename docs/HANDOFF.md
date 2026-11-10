@@ -1,5 +1,11 @@
 # 2026-11-10：B3 恢复认证可取消与中文终态
 
+# 2026-11-10：B3 备份 NSSavePanel 重试未触发
+
+- 在当前已连接 Ollama 的 Beta 备份表单输入一次性合成口令后，通过 accessibility 按钮操作两次“选择位置并加密备份”，均未出现 NSSavePanel，界面无状态变化。随后清空口令并关闭表单。
+- 未选择路径、未调用导出 API、未生成备份；未选择已有备份或执行恢复。原因未判定：当前证据只能说明本轮自动化点击没有触发面板，不能区分按钮 action 与系统面板呈现问题。
+- 该表现与先前的偶发复现一致；此前通过保存面板成功导出的证据仍有效。后续应先用可观察的键盘/GUI 操作单独确认按钮 action，再调查呈现路径；不在未选定备份时测试恢复。
+
 # 2026-11-10：B5 PDF launchd 资源限制候选复核
 
 - 检查本机 `man launchd.plist`：`HardResourceLimits`/`SoftResourceLimits` 通过 `setrlimit(2)` 调整限制；`ResidentSetSize` 描述为系统内存紧张时优先从超过声明 RSS 的进程回收内存。没有证据表明 worker 超限时会确定性拒绝/终止，也未在独立 PDF worker 验证。
