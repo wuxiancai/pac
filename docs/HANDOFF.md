@@ -1659,6 +1659,11 @@
 - 模型设置当前选中“本地大模型”，模型字段显示 `qwen3.5:0.8b`，并提示 PAC 本机服务与 Ollama 是独立进程、须先启动 Ollama 并安装模型。
 - 设置面板未展示精确型号 capability 明细；本次只验证配置呈现，不宣称 capability 查询或 API 认证失败状态已通过。
 
+### 2026-11-10：B2 本机 TTS GUI 尝试
+
+- 新本机会话请求本机模型只回复“本机语音输出测试”。`ollama / qwen3.5:0.8b` 超过约 30 秒仍无正文，用户停止后 run 为已取消；因此未点击朗读，也没有验证实际语音播放/停止。该观察只表明本次本机文字请求延迟，原因未判定，不归因 TTS。
+- 合成用户消息和取消状态保留在本机 SQLCipher；未切换 Provider、未调用云端、未点击麦克风。
+
 ### 2026-11-10：阶段 6 精确型号 capability 查询接入
 
 - Swift 本机 API 客户端新增认证 loopback `GET /model-capabilities`，参数使用当前精确 Provider/Model；响应 Provider/Model 不匹配时拒绝，并将缺省 capability 状态呈现为 `unknown`。模型设置新增显式“查询当前型号能力”按钮，展示核验时间、区域、证据引用及所有能力的 supported/limited/unsupported/unknown，切换型号后清除旧结果，不调用外部 Provider。
