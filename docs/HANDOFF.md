@@ -1567,3 +1567,8 @@
 - 子进程硬退出注入覆盖切换前和切换后两处；重启均恢复原会话并清除 rollback、marker 和 staging。另覆盖新 DB 父目录/锁文件权限及并发 store 拒绝恢复。测试故障点不代表物理断电或介质故障。
 - 验证：后端全量 345 passed（1 条既有 Starlette/httpx 弃用警告）；`mypy pac_poc` 37 个模块、`ruff check pac_poc tests scripts`、compileall 和 tracked-file secret scan 通过。
 - GUI/Keychain 设备认证、真实断电、介质故障与 RTO 仍待验收；B3 保持 IN PROGRESS。
+
+### 2026-11-10：B5 资料引用延迟复核
+
+- 当前 Beta 文件选择、临时暂存与显式移除路径通过复核。使用合成 TXT 询问 marker 后，本机 `qwen3.5:0.8b` 约 60 秒仍在生成；用户停止后本轮标为已取消，UI 提示 Ollama 可能仍在结束本机生成。没有得到本次回答。
+- 既有约 45 秒单样本成功引用记录仍有效；本次仅增加延迟/取消证据，原因未判定，不据此归因附件上下文实现。临时资料已移除并删除，测试聊天保留在本机 SQLCipher 历史。无云 Provider、麦克风或 Keychain 操作。
