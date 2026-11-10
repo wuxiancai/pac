@@ -1376,3 +1376,9 @@
 
 - 重复提交当前任务状态现在直接返回既有记录，不再刷新 `updated_at`、`completed_at` 或清除既有错误码；特别是重复完成不会延后用户选择的 30 天清理期限。
 - 验证：任务 lifecycle 定向 1 passed；Ruff 与 mypy 通过。
+
+# 2026-11-10：V2 EventKit 日历只读面板
+
+- 用户接受 EventKit 完整日历访问；应用只在用户点击“授权并读取”时请求权限，只读未来 30 天事件标题、时间和日历名称；不会创建/修改/删除事件、持久化事件或发送给 Provider。拒绝后显示系统设置指引。Info.plist 加入 `NSCalendarsFullAccessUsageDescription`。提醒事项需要另一项权限，仍未启用。用户同时确定 V2 三个固定专业助理：项目、会议和任务规划。
+- Swift 全量 56 项通过，含两个 mock 权限/日期范围/排序回归；Beta app 构建成功。尚未真实触发权限弹窗，也未实际读取个人日历数据。
+- Apple EventKit 文档说明平台不提供只读日历授权，读取事件需要 full access：[Accessing the event store](https://developer.apple.com/documentation/eventkit/accessing-the-event-store)。

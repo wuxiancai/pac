@@ -20,6 +20,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSMicrophoneUsageDescription</key><string>仅在你点击“语音输入”后采集最多 30 秒音频，并在本机识别；音频不会写入文件或发送到云端。</string>
+<key>NSCalendarsFullAccessUsageDescription</key><string>仅在你点击“日历”后读取未来 30 天的日历事件，以便在本机查看日程；应用不会修改或保存日历内容，也不会把内容发送给模型服务商。</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST

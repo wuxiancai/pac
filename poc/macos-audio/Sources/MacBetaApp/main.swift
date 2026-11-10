@@ -1003,6 +1003,7 @@ private struct BetaChatView: View {
     @State private var showingFileImporter = false
     @State private var showingUsage = false
     @State private var showingBackup = false
+    @State private var showingCalendar = false
     @State private var showingDeleteChatConfirmation = false
     @State private var showingTasks = false
     @State private var showingMemories = false
@@ -1094,6 +1095,10 @@ private struct BetaChatView: View {
                     Label("备份", systemImage: "externaldrive.badge.plus")
                 }
                 .accessibilityIdentifier("backup-export-button")
+                Button { showingCalendar = true } label: {
+                    Label("日历", systemImage: "calendar")
+                }
+                .accessibilityIdentifier("calendar-read-only-button")
                 if !model.messages.isEmpty {
                     Button(role: .destructive) {
                         showingDeleteChatConfirmation = true
@@ -1308,6 +1313,10 @@ private struct BetaChatView: View {
             BackupExportView(model: model)
                 .frame(minWidth: 440, minHeight: 300)
         }
+        .sheet(isPresented: $showingCalendar) {
+            CalendarReadOnlyView()
+                .frame(minWidth: 520, minHeight: 420)
+        }
         .alert("重命名当前会话", isPresented: $showingRenameConversation) {
             TextField("会话名称", text: $renameTitle)
             Button("取消", role: .cancel) {}
@@ -1435,6 +1444,48 @@ private struct BackupExportView: View {
             await model.restoreEncryptedBackup(from: selectedBackup, password: secret)
             isExporting = false
         }
+    }
+}
+
+@available(macOS 14.0, *)
+private struct CalendarReadOnlyView: View {
+    @State private var service = CalendarReadOnlyService()
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("本机日历（只读）").font(.title2.bold())
+            Text("系统需要授予日历完整访问权限才能读取；应用只查询未来 30 天的事件，不会创建、修改或删除事件，也不会保存或发送日历内容。")
+                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Text(service.status).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(service.isLoading ? "正在读取…" : "授权并读取") {
+                    Task { await service.loadUpcomingEvents() }
+                }
+                .disabled(service.isLoading)
+                .accessibilityIdentifier("calendar-read-only-load-button")
+            }
+            List(service.events) { event in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(event.title).font(.body.weight(.medium))
+                    HStack {
+                        Text(event.isAllDay ? event.startDate.formatted(date: .abbreviated, time: .omitted) : event.startDate.formatted(date: .abbreviated, time: .shortened))
+                        if !event.isAllDay {
+                            Text("– \(event.endDate.formatted(date: .omitted, time: .shortened))")
+                        }
+                        Text("· \(event.calendarTitle)")
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            HStack {
+                Spacer()
+                Button("完成") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(18)
     }
 }
 
