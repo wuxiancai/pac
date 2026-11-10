@@ -40,6 +40,11 @@
 - EventKit 审计/写入正在进行时禁止关闭创建 sheet，避免异步结果提示被关闭窗口隐藏；“完成”按钮在忙碌时禁用。标题、起止日期、地点、备注输入项均提供稳定 accessibility identifier，支持后续 GUI 点验。
 - 验证：`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过；`git diff --check` 通过。尚未实机打开创建页或授权日历。
 
+# 2026-11-10：B10 审计前草稿校验
+
+- 协调器现在在写入 ATTEMPTED 前使用创建服务同一校验器检查标题、日期范围、地点和备注；无效草稿返回专用结果，不触碰审计或 EventKit。UI 禁用无效草稿的确认入口并显示字段限制。
+- 新增回归确认无效草稿不记录审计且不写事件；B10 服务/协调器窄回归 8 passed，Swift 全量 83 passed，Beta target build 成功。
+
 # 2026-11-10：模型预设旧格式迁移
 
 - `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。

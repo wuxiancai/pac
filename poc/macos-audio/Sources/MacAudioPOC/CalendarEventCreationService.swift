@@ -133,7 +133,7 @@ public final class CalendarEventCreationService {
         guard isReadyToCreate,
               writer.authorization == .fullAccess || writer.authorization == .writeOnly
         else { throw CalendarEventCreationError.authorizationRequired }
-        let normalized = try Self.validated(draft)
+        let normalized = try Self.validatedDraft(draft)
         guard writer.hasDefaultCalendarForNewEvents else {
             throw CalendarEventCreationError.defaultCalendarUnavailable
         }
@@ -141,7 +141,7 @@ public final class CalendarEventCreationService {
         status = "事件已创建。"
     }
 
-    private static func validated(_ draft: CalendarEventDraft) throws -> CalendarEventDraft {
+    public static func validatedDraft(_ draft: CalendarEventDraft) throws -> CalendarEventDraft {
         let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, title.count <= 200 else { throw CalendarEventCreationError.invalidTitle }
         guard draft.endDate > draft.startDate else { throw CalendarEventCreationError.invalidDateRange }

@@ -134,6 +134,25 @@ private actor FakeCalendarEventAudit: CalendarEventAuditRecording {
 }
 
 @available(macOS 14.0, *)
+@Test @MainActor func calendarApprovalRejectsInvalidDraftBeforeWritingAudit() async {
+    let writer = FakeCalendarEventWriter()
+    writer.authorization = .writeOnly
+    let service = CalendarEventCreationService(writer: writer)
+    #expect(await service.prepareForEventCreation())
+    let audit = FakeCalendarEventAudit()
+    let coordinator = CalendarEventApprovalCoordinator(audit: audit, eventCreation: service)
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    let outcome = await coordinator.createAfterExplicitApproval(
+        CalendarEventDraft(title: " ", startDate: start, endDate: start.addingTimeInterval(-60))
+    )
+
+    #expect(outcome == .invalidEventDetails)
+    #expect(await audit.decisions().isEmpty)
+    #expect(writer.saves.isEmpty)
+}
+
+@available(macOS 14.0, *)
 @Test @MainActor func calendarApprovalWritesFailedOutcomeAfterEventKitFailure() async {
     let writer = FakeCalendarEventWriter()
     writer.authorization = .writeOnly

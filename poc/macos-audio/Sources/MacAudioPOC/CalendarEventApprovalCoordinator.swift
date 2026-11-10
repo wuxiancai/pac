@@ -10,6 +10,7 @@ public protocol CalendarEventAuditRecording: Sendable {
 }
 
 public enum CalendarEventApprovalOutcome: Equatable, Sendable {
+    case invalidEventDetails
     case blockedByAudit
     case eventCreationFailed(auditRecorded: Bool)
     case eventCreated(auditRecorded: Bool)
@@ -32,6 +33,12 @@ public final class CalendarEventApprovalCoordinator {
         traceID: UUID = UUID(),
         resourceID: UUID = UUID()
     ) async -> CalendarEventApprovalOutcome {
+        do {
+            _ = try CalendarEventCreationService.validatedDraft(draft)
+        } catch {
+            return .invalidEventDetails
+        }
+
         do {
             try await audit.recordCalendarEventAudit(
                 traceID: traceID, resourceID: resourceID,

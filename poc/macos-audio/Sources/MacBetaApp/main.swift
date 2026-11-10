@@ -1869,6 +1869,10 @@ private struct CalendarEventCreationView: View {
         )
     }
 
+    private var isDraftValid: Bool {
+        (try? CalendarEventCreationService.validatedDraft(draft)) != nil
+    }
+
     private var preview: String {
         "标题：\(title.trimmingCharacters(in: .whitespacesAndNewlines))\n开始：\(startDate.formatted(date: .long, time: .shortened))\n结束：\(endDate.formatted(date: .long, time: .shortened))\n地点：\(location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "（无）" : location)\n备注：\(notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "（无）" : notes)\n目标：macOS 当前默认日历（该账户可能会同步此事件）"
     }
@@ -1890,6 +1894,11 @@ private struct CalendarEventCreationView: View {
                 TextField("备注（可选）", text: $notes, axis: .vertical)
                     .lineLimit(2...5)
                     .accessibilityIdentifier("calendar-event-notes-field")
+            }
+            if !isDraftValid {
+                Text("标题需为 1–200 字；结束时间必须晚于开始时间，地点最多 200 字，备注最多 2,000 字。")
+                    .font(.caption).foregroundStyle(.orange)
+                    .accessibilityIdentifier("calendar-event-validation-message")
             }
             HStack {
                 Text(status).font(.caption).foregroundStyle(.secondary)
@@ -1915,7 +1924,7 @@ private struct CalendarEventCreationView: View {
                     .textSelection(.enabled)
                     .accessibilityIdentifier("calendar-event-preview")
                 Button("预览并确认创建…") { showingConfirmation = true }
-                    .disabled(isCreating)
+                    .disabled(isCreating || !isDraftValid)
                     .accessibilityIdentifier("calendar-event-review-button")
             }
             Spacer(minLength: 0)
@@ -1950,6 +1959,8 @@ private struct CalendarEventCreationView: View {
         defer { isCreating = false }
         let coordinator = CalendarEventApprovalCoordinator(audit: model, eventCreation: service)
         switch await coordinator.createAfterExplicitApproval(draft) {
+        case .invalidEventDetails:
+            status = "请填写不为空且不超过 200 字的标题，设置有效起止时间，并检查地点/备注长度。"
         case .blockedByAudit:
             status = "加密审批审计不可用；事件未写入日历。"
         case .eventCreationFailed(let auditRecorded):
