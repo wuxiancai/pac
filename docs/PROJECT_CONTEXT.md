@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-- 2026-11-10 阶段 6 当前 HEAD `0e109f9` 本机 CI 等价门禁：后端全量 346 passed、1 条既有 Starlette/httpx 弃用警告；Swift 66 passed，Beta target build、Ruff、CI mypy、`uv lock --check`、tracked-file detect-secrets、compileall 全通过。远端 GitHub Actions 未运行，macOS 14 runtime/正式安装器也未验收；阶段 6 保持开放。
+- 2026-11-10 阶段 6 代码提交 `35d6644` 本机 CI 等价门禁：后端全量 346 passed、1 条既有 Starlette/httpx 弃用警告；Swift 68 passed，Beta target build、Ruff、CI mypy、`uv lock --check`、tracked-file detect-secrets、compileall 全通过。远端 GitHub Actions 未运行，macOS 14 runtime/正式安装器也未验收；阶段 6 保持开放。
 - 2026-11-10 B3 历史读取竞态保护：切换会话、恢复备份、创建/删除、发送和来源跳转都会使先前分页/选择请求失效；迟到响应需同时匹配历史代际与当前会话 ID 才可写入消息数组；分页忙碌态另绑定请求 ID，避免旧请求迟到清除新分页状态。Swift 68 项通过（含分页请求协调器的两项新回归），Beta target 构建通过；并发 GUI 实测未完成，来源跳转验收和临时记忆 UI 清理仍待完成。
 - 2026-11-10 B3 任务提醒边界修正：重建时只保留提醒时间可解析且仍在未来、状态未完成/未取消的任务；重新安排无效、过去或缺失时间会撤销该任务旧通知。用户拒绝授权或系统授权失效时，关闭提醒偏好并移除 PAC 待发通知。Swift 全量 62 项通过，含拒绝/撤销 mock 清理用例。真实授权与系统投递仍未验收。
 - 2026-11-10 B3 恢复抗崩溃与并发协调：子进程在恢复切换前/后硬退出后，启动恢复完整旧会话并清理 rollback、marker 和 3 类加密 staging；POSIX shared/exclusive 生命周期锁允许多个 store 正常共存，恢复需独占，其他实例仍打开时 fail closed。自动回归覆盖私有锁文件、同进程多 store 与独立子进程持锁时拒绝恢复；后端全量最新 346 passed。完整应用 GUI/Keychain 认证、断电实机和 RTO 仍待验证。

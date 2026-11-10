@@ -1689,7 +1689,7 @@
 
 ### 2026-11-10：提交 `b06aa7e` 后本地阶段 6 等价门禁
 
-- 后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --directory backend --locked --all-extras --all-groups pytest -q` → 346 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 `swift test --package-path poc/macos-audio` → 66 passed；Beta target build 成功。
+- 后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --directory backend --locked --all-extras --all-groups pytest -q` → 346 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 `swift test --package-path poc/macos-audio` → 68 passed；Beta target build 成功。
 - CI 静态门禁：Ruff 全目录通过；CI mypy 3 个目标文件通过；`uv lock --check`、`compileall -q pac_poc scripts tests`、tracked-file `detect-secrets-hook --baseline .secrets.baseline` 通过（无新 secret 命中）。SwiftPM 等待另一实例后正常完成。本地门禁不替代远端 Actions、最低 macOS 14 runtime/安装验证或剩余 GUI/Provider 验收；阶段 6 继续开放。
 
 ### 2026-11-10：阶段 6 capability 查询负向客户端回归
@@ -1702,8 +1702,8 @@
 - 检查发现加载较早消息后若用户切换会话，旧分页响应可能在切换后返回并追加到当前消息数组；快速连续选择会话也可能由较早请求的迟到响应覆盖较新选择。Beta 客户端将历史代际和分页请求状态封装为 `ChatHistoryRequestGate`；切换、发送、恢复、创建/删除、来源跳转会使旧请求和加载态失效，响应须匹配代际及会话 ID。新增回归验证切换后拒绝旧页、旧请求结束不清除新分页加载态。
 - 验证：`swift test --package-path poc/macos-audio` → 68 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。尚未实机验证并发切换；Beta UI 访问超时。之前新增的显式来源跳转按钮仍待 GUI 点验，临时记忆仍需在 UI 中删除。未直接操作数据库。
 
-# 2026-11-10：阶段 6 当前 HEAD 本机 CI 等价门禁
+# 2026-11-10：阶段 6 本机 CI 等价门禁复核
 
-- 对照 `.github/workflows/ci.yml`，在 HEAD `0e109f9` 执行依赖锁、Ruff、mypy、tracked-file secret scan、Python compileall、后端全量、Swift 全量和 Beta 产品构建。
+- 对照 `.github/workflows/ci.yml`，在代码提交 `35d6644` 执行依赖锁、Ruff、mypy、tracked-file secret scan、Python compileall、后端全量、Swift 全量和 Beta 产品构建。
 - 结果：`uv lock --check`、`ruff check pac_poc tests`、CI `mypy`、`git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline`、`python -m compileall -q pac_poc scripts tests` 均通过；后端 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --directory backend --locked --all-extras --all-groups pytest -q` → 346 passed，1 条既有 Starlette/httpx 弃用警告；`swift test --package-path poc/macos-audio` → 66 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。
 - 首次 compileall 路径按仓库根目录写入、但命令已切到 `backend/` 工作目录，输出 `Can't list`；随后改为 CI 相同的 backend 相对路径并通过。未将第一次无效调用记作通过。远端 GitHub Actions 未运行，阶段 6 仍开放。
