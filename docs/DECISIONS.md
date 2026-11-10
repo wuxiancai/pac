@@ -44,6 +44,8 @@
 
 | D-016 | V2 本机日历读取权限 | **Accepted（2026-11-10）**：用户接受 macOS EventKit 完整日历访问权限，因为平台不提供只读授权。产品只在用户点击后请求权限并读取未来 30 天事件的标题、时间和日历名称；不创建/修改/删除事件，不持久化或发送模型服务商。提醒事项是单独的 EventKit 权限，当前未授权/未接入。 |
 | D-017 | V2 固定专业助理角色 | **Accepted（2026-11-10）**：先提供项目助理、会议助理和任务规划助理三个固定角色。保持项目自有最小权限，不启用任意工具、后台 Agent 团队或外部写操作；后续 Skills 与外部操作需各自审批边界。 |
+| D-018 | V2 本机任务状态迁移 | **Accepted（2026-11-10）**：采用当前已实现迁移图。`PENDING→READY/CANCELLED`；`READY→RUNNING/PAUSED/CANCELLED`；`RUNNING→WAITING/PARTIAL/COMPLETED/FAILED/CANCELLED`；`WAITING→READY/RUNNING/PAUSED/CANCELLED`；`PAUSED→READY/CANCELLED`；`PARTIAL→READY/COMPLETED/FAILED/CANCELLED`；`FAILED→READY/CANCELLED`；`COMPLETED` 与 `CANCELLED` 为终态。相同状态提交幂等，不自动执行任务或后台重试。 |
+| D-019 | V3 首版 Skills 权限范围 | **Accepted（2026-11-10）**：首版仅本机保存的固定提示模板，用户逐次显式选择是否附加到当前请求；不注册工具、不执行代码、不做外部写。 |
 
 ## ADR 状态
 

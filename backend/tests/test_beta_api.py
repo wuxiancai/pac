@@ -1542,7 +1542,9 @@ def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path)
             deleted = await client.delete(f"/tasks/{task['id']}", headers=headers)
         assert created.status_code == 201
         assert created.json()["schedule_at"] == "2026-11-11T10:30:00+08:00"
+        assert task["allowed_transitions"] == ["CANCELLED", "READY"]
         assert ready.json()["status"] == "READY"
+        assert ready.json()["allowed_transitions"] == ["CANCELLED", "PAUSED", "RUNNING"]
         assert invalid.status_code == 409
         assert len(listed.json()["tasks"]) == 1
         assert deleted.json() == {"deleted": True}

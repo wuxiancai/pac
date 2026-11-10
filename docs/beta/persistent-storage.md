@@ -32,7 +32,7 @@
 
 1. 删除记忆会同步删除其版本快照，FTS 由数据库触发器同步。来源目前可选当前会话中已有稳定 ID 的消息，不支持跨会话选择或跳转。
 2. 会话历史已实现：初始最多 100 条，可通过有序 `(created_at,id)` keyset cursor 加载更早记录，SQLCipher schema 增加复合索引，SwiftUI 只在用户点击时拉取历史页并保留当前滚动锚点；模型上下文仍限制最近 20 条。LazyVStack 当前对已加载消息做惰性视图创建，但尚无总页数/长会话压力与极大消息单体渲染验收。
-3. 任务状态迁移图目前是实现暂定规则；V2 完整验收前需要确认等待、部分完成、失败重试、暂停/取消的业务语义。重复相同状态现在为幂等返回，不重置 `completed_at`，避免反复点击“完成”延长 30 天保留期。清理现于服务启动和任务列表读取时执行，长时间运行期间可能延至下一次触发。
+3. D-018 已确认当前任务状态迁移图：`PENDING→READY/CANCELLED`；`READY→RUNNING/PAUSED/CANCELLED`；`RUNNING→WAITING/PARTIAL/COMPLETED/FAILED/CANCELLED`；`WAITING→READY/RUNNING/PAUSED/CANCELLED`；`PAUSED→READY/CANCELLED`；`PARTIAL→READY/COMPLETED/FAILED/CANCELLED`；`FAILED→READY/CANCELLED`；`COMPLETED` 与 `CANCELLED` 为终态。API 返回当前状态的 `allowed_transitions`，任务 UI 提供这些动作。状态只表示用户维护的计划，不代表后台执行；重复状态幂等，不重置 `completed_at`。清理现于服务启动和任务列表读取时执行，长时间运行期间可能延至下一次触发。
 4. 手动加密备份已接入认证 API 与 macOS UI：用户通过系统保存面板选择 `.pacbackup` 路径，输入每份独立口令后显式导出；口令不持久化，覆盖已有文件需保存面板确认。恢复前需确认并通过 macOS 设备认证；服务端验证容器口令、安装密钥指纹、SQLCipher 完整性/schema，创建当前数据库的私有本机 SQLCipher 预备份，再将内容在线复制到使用当前 Keychain 密钥加密的 staging DB 后切换；失败时从 rollback 文件还原。预备份放在 Application Support/PersonalAI/pre-restore，当前没有自动清理策略，按用户手动管理。当前备份相关窄回归 12 passed，Swift 全量 53 项通过，后端全量 312 passed、1 条既有 Starlette/httpx 弃用警告；Ruff/mypy/锁文件检查通过，Beta build 成功。启动时若唯一未提交 rollback 文件存在，会先还原旧库；多个候选则 fail-closed。GUI、Keychain 实机认证、强制终止/断电期间恢复与 RTO 验收未做。
 5. 记忆来源跨会话跳转；真实 macOS Keychain 与冻结/休眠/重启路径验收。
 6. 本机任务通知的真实系统授权、投递/过期行为及重启恢复验收；当前测试仅覆盖 stable identifier 与客户端/后端契约，不声称已验证系统投递。

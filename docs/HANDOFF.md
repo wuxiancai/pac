@@ -1394,3 +1394,9 @@
 
 - 记忆来源只读面板现在可以“在对话中查看”：客户端按 100 条 keyset 历史页向前加载来源会话，直到找到来源消息，再切换会话并滚动至该消息；不存在或已删除的来源会显示状态，不影响原有来源查看。
 - 来源正文仍只从本机 SQLCipher API 读取，不会加入模型上下文或发送给 Provider。验证：`swift test --package-path poc/macos-audio` 56 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功；`git diff --check` 通过。未做人工 GUI 操作验收。
+
+# 2026-11-10：V2 任务状态图产品化
+
+- 用户确认 D-018 采用现有状态迁移图，并确认 D-019 首版 Skills 只包含本机固定提示模板、每次请求由用户显式选择、无工具/代码/外部写。
+- `/tasks` 创建/读取/迁移响应增加 `allowed_transitions`，作为 UI 唯一的状态动作来源；Swift 任务板现在显示所有合法动作（等待、部分完成、失败、暂停、取消等），终态不出现状态变更菜单。保留幂等状态更新和 completed_at 的 30 天保留语义。
+- 验证：任务窄回归 2 passed；Ruff 与修改模块 mypy 通过；Swift 全量 56 项与 Beta build 通过。完整测试未因此小改动重复运行。

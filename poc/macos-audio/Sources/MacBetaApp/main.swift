@@ -1797,6 +1797,20 @@ private struct ConfirmedMemoryView: View {
 @available(macOS 14.0, *)
 private struct TaskBoardView: View {
     @Bindable var model: BetaChatModel
+
+    private func statusTitle(_ status: String) -> String {
+        switch status {
+        case "READY": "准备"
+        case "RUNNING": "开始执行"
+        case "WAITING": "等待"
+        case "PAUSED": "暂停"
+        case "PARTIAL": "部分完成"
+        case "COMPLETED": "完成"
+        case "FAILED": "标记失败"
+        case "CANCELLED": "取消"
+        default: status
+        }
+    }
     @State private var title = ""
     @State private var reminderEnabled = false
     @State private var reminderDate = Date().addingTimeInterval(3_600)
@@ -1843,12 +1857,14 @@ private struct TaskBoardView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if task.status == "PENDING" || task.status == "PAUSED" || task.status == "FAILED" {
-                        Button("准备") { Task { await model.updateTask(task, status: "READY") } }
-                    } else if task.status == "READY" {
-                        Button("开始") { Task { await model.updateTask(task, status: "RUNNING") } }
-                    } else if task.status == "RUNNING" || task.status == "PARTIAL" {
-                        Button("完成") { Task { await model.updateTask(task, status: "COMPLETED") } }
+                    if let transitions = task.allowedTransitions, !transitions.isEmpty {
+                        Menu("更新状态") {
+                            ForEach(transitions, id: \.self) { status in
+                                Button(statusTitle(status)) {
+                                    Task { await model.updateTask(task, status: status) }
+                                }
+                            }
+                        }
                     }
                     Button(role: .destructive) {
                         Task { await model.deleteTask(task) }

@@ -235,12 +235,14 @@ public struct LocalTaskItem: Decodable, Identifiable, Sendable {
     public let scheduleAt: String?
     public let startedAt: String?
     public let completedAt: String?
+    public let allowedTransitions: [String]?
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, status, priority
         case scheduleAt = "schedule_at"
         case startedAt = "started_at"
         case completedAt = "completed_at"
+        case allowedTransitions = "allowed_transitions"
     }
 }
 

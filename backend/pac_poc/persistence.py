@@ -918,11 +918,13 @@ def _utc_timestamp() -> str:
 
 
 def _task_row(row) -> dict[str, object]:
+    status = str(row["status"])
     return {
         "id": str(row["id"]),
         "title": str(row["title"]),
         "description": str(row["description"]),
-        "status": str(row["status"]),
+        "status": status,
+        "allowed_transitions": sorted(EncryptedApplicationStore.TASK_TRANSITIONS[status]),
         "priority": int(row["priority"]),
         "schedule_at": row["schedule_at"],
         "started_at": row["started_at"],

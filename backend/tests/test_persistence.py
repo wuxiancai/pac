@@ -260,12 +260,18 @@ def test_task_lifecycle_is_idempotent_and_completed_tasks_expire_after_30_days(
         )
         assert repeated["id"] == task["id"]
         assert repeated["title"] == "Prepare V2 task flow"
+        assert task["allowed_transitions"] == ["CANCELLED", "READY"]
         ready = store.transition_task(str(task["id"]), "READY")
         assert ready["status"] == "READY"
+        assert ready["allowed_transitions"] == ["CANCELLED", "PAUSED", "RUNNING"]
         running = store.transition_task(str(task["id"]), "RUNNING")
         assert running["started_at"] is not None
+        assert running["allowed_transitions"] == [
+            "CANCELLED", "COMPLETED", "FAILED", "PARTIAL", "WAITING"
+        ]
         completed = store.transition_task(str(task["id"]), "COMPLETED")
         assert completed["completed_at"] is not None
+        assert completed["allowed_transitions"] == []
         repeated_completion = store.transition_task(str(task["id"]), "COMPLETED")
         assert repeated_completion["completed_at"] == completed["completed_at"]
         assert repeated_completion["updated_at"] == completed["updated_at"]
