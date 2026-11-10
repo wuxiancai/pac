@@ -1,27 +1,51 @@
 import Foundation
 import UserNotifications
 
+@MainActor
+@available(macOS 14.0, *)
+protocol TaskReminderNotificationCenter {
+    func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
+    func authorizationStatus() async -> UNAuthorizationStatus
+    func pendingNotificationRequests() async -> [UNNotificationRequest]
+    func removePendingNotificationRequests(withIdentifiers identifiers: [String])
+    func add(_ request: UNNotificationRequest) async throws
+}
+
+@available(macOS 14.0, *)
+extension UNUserNotificationCenter: TaskReminderNotificationCenter {
+    func authorizationStatus() async -> UNAuthorizationStatus {
+        await notificationSettings().authorizationStatus
+    }
+}
+
 @available(macOS 14.0, *)
 @MainActor
 public final class TaskReminderManager {
     public static let shared = TaskReminderManager()
     public static let preferenceKey = "beta.tasks.notifications.enabled"
 
-    private let center: UNUserNotificationCenter
+    private let center: any TaskReminderNotificationCenter
+    private let defaults: UserDefaults
 
     public init(center: UNUserNotificationCenter = .current()) {
         self.center = center
+        defaults = .standard
+    }
+
+    init(center: any TaskReminderNotificationCenter, defaults: UserDefaults) {
+        self.center = center
+        self.defaults = defaults
     }
 
     public var isEnabled: Bool {
-        UserDefaults.standard.bool(forKey: Self.preferenceKey)
+        defaults.bool(forKey: Self.preferenceKey)
     }
 
     /// Called only from an explicit user action in the task reminder controls.
     public func requestAndEnable() async throws -> Bool {
         let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
         if granted {
-            UserDefaults.standard.set(true, forKey: Self.preferenceKey)
+            defaults.set(true, forKey: Self.preferenceKey)
         } else {
             await disable()
         }
@@ -29,7 +53,7 @@ public final class TaskReminderManager {
     }
 
     public func disable() async {
-        UserDefaults.standard.set(false, forKey: Self.preferenceKey)
+        defaults.set(false, forKey: Self.preferenceKey)
         let requests = await center.pendingNotificationRequests()
         let identifiers = requests.map(\.identifier).filter { $0.hasPrefix("pac.task.") }
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
@@ -37,8 +61,8 @@ public final class TaskReminderManager {
 
     public func reconcile(tasks: [LocalTaskItem]) async {
         guard isEnabled else { return }
-        let settings = await center.notificationSettings()
-        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+        let authorization = await center.authorizationStatus()
+        guard authorization == .authorized || authorization == .provisional else {
             await disable()
             return
         }
@@ -65,8 +89,8 @@ public final class TaskReminderManager {
             return
         }
 
-        let settings = await center.notificationSettings()
-        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+        let authorization = await center.authorizationStatus()
+        guard authorization == .authorized || authorization == .provisional else {
             await disable()
             return
         }

@@ -26,8 +26,8 @@
 - `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --group dev pytest -q tests/test_persistence.py`：9 passed。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`：基础持久化阶段 291 passed；2026-11-10 记忆纠错/来源/版本历史后的最新后端全量 300 passed，1 条既有 Starlette/httpx 弃用警告；Swift 全量 51 项通过。
 - `uv run --locked ruff check pac_poc/persistence.py pac_poc/migrations tests/test_persistence.py`：通过。
-- 2026-11-10 `swift test --package-path poc/macos-audio`：61 项通过（含 Beta target 编译）；任务提醒时间资格回归通过。没有请求通知权限或触发系统通知。
-- 2026-11-10 权限拒绝/撤销处理经 Beta target 编译和同一套 Swift 回归验证；真实系统设置撤销后的行为仍待 GUI 实测。
+- 2026-11-10 `swift test --package-path poc/macos-audio`：62 项通过（含 Beta target 编译）；任务提醒时间资格、权限拒绝与授权撤销 mock 回归通过。没有请求通知权限或触发系统通知。
+- Mock 回归确认拒绝/撤销会清理 `pac.task.*`，同时保留其他应用的 pending 通知；真实系统设置撤销行为仍待 GUI 实测。
 - `uv run --locked mypy pac_poc/persistence.py`：通过。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --group dev pytest -q tests/test_persistence.py -k 'long_conversation_history_pages or stable_bounded_keyset_pages'`（`backend/`）：2 passed；120 条消息跨 100 条默认页边界，无重复/遗漏。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --group dev pytest -q tests/test_backup.py`（`backend/`）：10 passed，含连续恢复后只保留一份且替换为最新快照。
