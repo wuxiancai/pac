@@ -1,3 +1,9 @@
+# 2026-11-11：验证任务读取 API 会执行 30 天清理
+
+- 在存储层边界回归之外，给认证 `GET /tasks` API 增加行为覆盖：请求返回前会调用过期任务清理；构造 31 天前 COMPLETED 与 29 天前 COMPLETED，另由 API 创建一条未完成任务，读取结果保留后两者并排除过期项，随后直接核实 SQLCipher 中过期记录已删除。
+- 定向验证：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked pytest -q tests/test_beta_api.py -k persistent_task_api_enforces_transitions_and_requires_storage` → 1 passed、55 deselected。`ruff check tests/test_beta_api.py` 通过；后端全量 → 347 passed，1 条既有 Starlette/httpx 弃用警告（44.42 秒）。
+- 这覆盖任务读取触发清理的 API 路径；启动时清理和每 6 小时后台清理另有独立路径，未在本段重复验证。本段按独立提交交付。
+
 # 2026-11-11：补齐已完成任务 30 天保留边界回归
 
 - 核对 D-003：任务清理以 `completed_at` 为准，30 天定时清理逻辑已在 B3 接入；原测试只覆盖 31 天前已完成任务。本次补强同一 SQLCipher 存储回归：31 天和正好 30 天前的 COMPLETED 被清理，29 天前的 COMPLETED 保留，31 天前的 FAILED 保留，防止把未完成任务误当作过期完成任务。

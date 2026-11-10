@@ -37,6 +37,7 @@
 ## 验证
 
 - 2026-11-11 任务 30 天清理边界补强：定向 `tests/test_persistence.py -k task_lifecycle_is_idempotent_and_completed_tasks_expire_after_30_days` → 1 passed、18 deselected；覆盖 31/30 天前 COMPLETED 清理、29 天前 COMPLETED 保留及 31 天前 FAILED 保留。后端全量 347 passed，1 条既有 Starlette/httpx 弃用警告；`ruff check tests/test_persistence.py` 和 `mypy pac_poc/persistence.py` 通过。此处只验证持久层清理条件。
+- 2026-11-11 API 清理路径回归：`tests/test_beta_api.py -k persistent_task_api_enforces_transitions_and_requires_storage` → 1 passed、55 deselected。认证 `GET /tasks` 后核实过期 COMPLETED 已从 SQLCipher 删除，29 天完成项及未完成项仍存在；Ruff 通过，后端全量 347 passed（1 条既有弃用警告）。该证据覆盖读取 API 触发点，不代替启动清理/6 小时维护循环运行验收。
 
 - `UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --group dev pytest -q tests/test_persistence.py`：9 passed。
 - `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`：基础持久化阶段 291 passed；2026-11-10 记忆纠错/来源/版本历史后的最新后端全量 300 passed，1 条既有 Starlette/httpx 弃用警告；Swift 全量 51 项通过。

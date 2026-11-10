@@ -1854,6 +1854,10 @@ def test_chat_history_api_returns_bounded_keyset_pages(tmp_path) -> None:
 
 
 def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import text
+
     from pac_poc.persistence import EncryptedApplicationStore
 
     app_without_storage = create_beta_api(session=LocalAPISession(token="no-tasks-token"))
@@ -1862,6 +1866,20 @@ def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path)
     app = create_beta_api(
         session=LocalAPISession(token="task-token"), persistence_store=store
     )
+    cleanup_now = datetime.now(timezone.utc)
+    seeded_tasks = [
+        ("api-expired-task", cleanup_now - timedelta(days=31)),
+        ("api-recent-task", cleanup_now - timedelta(days=29)),
+    ]
+    stored_ids_after_listing: set[str] = set()
+    with store.connection() as connection, connection.begin():
+        for task_id, completed_at in seeded_tasks:
+            timestamp = completed_at.isoformat()
+            connection.execute(text(
+                "INSERT INTO tasks(id,title,status,priority,retry_count,idempotency_key,"
+                "created_at,updated_at,started_at,completed_at) "
+                "VALUES(:id,:id,'COMPLETED',0,0,:key,:time,:time,:time,:time)"
+            ), {"id": task_id, "key": f"{task_id}-key", "time": timestamp})
 
     async def run() -> None:
         headers = {"authorization": "Bearer task-token"}
@@ -1881,6 +1899,7 @@ def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path)
             ready = await client.patch(f"/tasks/{task['id']}/status", headers=headers, json={"status": "READY"})
             invalid = await client.patch(f"/tasks/{task['id']}/status", headers=headers, json={"status": "COMPLETED"})
             listed = await client.get("/tasks", headers=headers)
+            stored_ids_after_listing.update(item["id"] for item in store.list_tasks())
             deleted = await client.delete(f"/tasks/{task['id']}", headers=headers)
         assert created.status_code == 201
         assert created.json()["schedule_at"] == "2026-11-11T10:30:00+08:00"
@@ -1888,7 +1907,9 @@ def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path)
         assert ready.json()["status"] == "READY"
         assert ready.json()["allowed_transitions"] == ["CANCELLED", "PAUSED", "RUNNING"]
         assert invalid.status_code == 409
-        assert len(listed.json()["tasks"]) == 1
+        listed_ids = {item["id"] for item in listed.json()["tasks"]}
+        assert listed_ids == {task["id"], "api-recent-task"}
+        assert stored_ids_after_listing == listed_ids
         assert deleted.json() == {"deleted": True}
 
     try:
