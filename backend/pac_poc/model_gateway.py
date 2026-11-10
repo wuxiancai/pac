@@ -389,6 +389,8 @@ class OllamaAdapter:
             "messages": list(request.messages),
             "stream": stream,
         }
+        if request.thinking_enabled is not None:
+            payload["think"] = request.thinking_enabled
         if request.tools:
             payload["tools"] = list(request.tools)
         return payload

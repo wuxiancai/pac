@@ -131,6 +131,7 @@ class ConversationTurn:
     documents: Sequence[ImportedTextDocument] = ()
     skill_prompts: Sequence[str] = ()
     system_instructions: Sequence[str] = ()
+    thinking_enabled: bool | None = None
 
 
 class ContextBuilder(Protocol):
@@ -210,6 +211,7 @@ class MainAssistantOrchestrator:
             purpose=turn.purpose,
             data_level=turn.data_level,
             source=turn.source,
+            thinking_enabled=turn.thinking_enabled,
         )
 
     def stream_request(self, request: LocalModelRequest) -> AsyncIterator[str]:

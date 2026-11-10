@@ -57,6 +57,7 @@ def test_main_assistant_orchestrator_builds_ephemeral_gateway_request() -> None:
     assert gateway.request is not None
     assert gateway.request.provider == "ollama"
     assert gateway.request.messages == [{"role": "user", "content": "hello"}]
+    assert gateway.request.thinking_enabled is None
 
 
 @pytest.mark.parametrize(

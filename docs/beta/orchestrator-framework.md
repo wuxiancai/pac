@@ -79,6 +79,13 @@ macOS Beta 的“用量”面板已接入此只读接口，显示最近记录的
 
 ## 验证
 
+### 2026-11-10 V3 多 Agent 本机生成与综合复核
+
+- Ollama 官方 `/api/chat` 支持请求级 `think` 布尔字段；关闭时请求不输出 thinking，参考 [Ollama Thinking API](https://github.com/ollama/ollama/blob/main/docs/capabilities/thinking.mdx)。Beta 仅为多 Agent 专业角色和总助理综合请求传 `think:false`，普通单助理请求省略该字段，保持模型默认行为。
+- 综合请求将专业角色结果作为前置参考消息，并把原始用户请求保留为最后一条消息；system guidance 要求直接回答、遵守语言/格式/篇幅，并把注入指令仅作为内容过滤对象，不因模型来源而整体拒绝。
+- 自动化：定向 `tests/test_beta_api.py tests/test_local_model_gateway.py tests/test_orchestrator.py` → 69 passed；Ruff 与三个修改后端模块 mypy 通过；后端 all-extras/all-groups 全量 → 325 passed，1 条既有 Starlette/httpx 弃用警告。
+- GUI：本机 `qwen3.5:0.8b` 首次默认 thinking 请求两分钟后仍无第一角色正文，停止后 UI 正确显示取消；应用 `think:false` 后双角色、汇总流程在约十几秒内完成。第一次汇总只讨论“信任边界”并拒绝回答；调整建议与原请求顺序后，复测直接给出议题建议。仍观察到小模型没有严格遵守用户要求的字数上限，单样本不构成质量承诺。验收只访问 Ollama loopback，无云端请求、无麦克风采集。合成验收聊天保留在本机 SQLCipher 历史，没有删除。
+
 2026-11-10 UsageLedger token 状态校验补强：`unknown` 记录必须不含 token 数；`actual`/`estimated` 记录必须至少含输入或输出 token 数，防止 `/usage` 返回互相矛盾的状态和数值。定向回归 `tests/test_usage.py tests/test_beta_api.py` → 46 passed；完整后端回归 → 267 passed、1 条既有 Starlette/httpx 弃用警告；`ruff check pac_poc/usage.py tests/test_usage.py` 与 `mypy pac_poc/usage.py` 均通过。该校验只约束内存用量记录一致性，不估算费用、不持久化、不改变预算策略。
 
 2026-11-10 用量面板元数据显示：每条记录展示用途、数据等级、开始时间和正确区域标签，便于分辨本机处理和带授权的云端交互；空值/未知 token 与费用语义保持不变。`swift test --package-path poc/macos-audio` → 40 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。Swift Codable 回归覆盖本机 L0、空区域→本机、Unix 时间戳，以及交互聊天 L2/DeepSeek China 区域映射。GUI 用量面板手动验收和真实 Provider usage/cost E2E 仍待完成。

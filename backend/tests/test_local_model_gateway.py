@@ -132,6 +132,32 @@ def test_ollama_adapter_normalizes_local_chat_response() -> None:
     assert asyncio.run(call()) == "你好"
 
 
+@pytest.mark.parametrize("thinking_enabled", [True, False])
+def test_ollama_adapter_passes_explicit_thinking_preference(thinking_enabled: bool) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["think"] is thinking_enabled
+        return httpx.Response(200, json={"message": {"content": "ok"}})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    adapter = OllamaAdapter(client=client)
+
+    async def call() -> str:
+        try:
+            return await adapter.generate(
+                LocalModelRequest(
+                    provider="ollama",
+                    model="test-model",
+                    messages=({"role": "user", "content": "hello"},),
+                    thinking_enabled=thinking_enabled,
+                )
+            )
+        finally:
+            await client.aclose()
+
+    assert asyncio.run(call()) == "ok"
+
+
 def test_ollama_stream_emits_local_text_deltas() -> None:
     lines = [
         json.dumps({"message": {"content": "你"}, "done": False}),

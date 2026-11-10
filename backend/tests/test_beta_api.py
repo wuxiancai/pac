@@ -1665,8 +1665,16 @@ def test_multi_agent_collaboration_runs_selected_local_roles_sequentially(tmp_pa
         assert "会议助理观点" in response.text
         assert "综合建议" in response.text
         assert len(adapter.requests) == 3
+        assert [request.thinking_enabled for request in adapter.requests] == [False, False, False]
         assert "你是项目助理" in adapter.requests[0].messages[0]["content"]
         assert "你是会议助理" in adapter.requests[1].messages[0]["content"]
+        synthesis_system = adapter.requests[2].messages[0]["content"]
+        synthesis_reference = adapter.requests[2].messages[-2]
+        synthesis_user = adapter.requests[2].messages[-1]
+        assert "不得仅因其由模型生成就称其无效或拒绝" in synthesis_system
+        assert synthesis_reference["role"] == "user"
+        assert "专业助理结构化参考建议" in synthesis_reference["content"]
+        assert synthesis_user == {"role": "user", "content": "分析"}
 
     try:
         asyncio.run(run())

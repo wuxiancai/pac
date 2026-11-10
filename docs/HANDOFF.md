@@ -1423,3 +1423,10 @@
 - 按最新交接启动 `./poc/macos-audio/scripts/run_beta_app.sh`；构建成功。测试版窗口正常连接本机服务，当前模型显示 `ollama / qwen3.5:0.8b`。协作菜单中的“项目助理”“会议助理”“任务规划”均可见；同时选中项目助理与会议助理后按钮显示“协作 2”，确认最少两角色的界面选择路径可用。
 - 未发送聊天消息：发送会把验收内容持久化到用户 SQLCipher 历史。真实多 Agent Ollama 答复、逐角色结果与汇总呈现因此仍未验收。测试版当前输入框仍选中项目助理和会议助理；下一步可先取消这两个选择，或在用户明确提供可写入的测试会话/验收短句后完成实际发送验收。
 - 本次仅做 GUI 只读观察与角色选择，无代码改动、无测试运行、无麦克风或云 Provider 请求。既有自动回归结果仍以本节之前的报告为准。
+
+# 2026-11-10：V3 多 Agent 响应延迟与综合质量修复
+
+- GUI 实机发送无敏感合成议题问题后，`qwen3.5:0.8b` 默认 thinking 两分钟仍没有第一角色正文；手动停止后客户端显示“已停止接收回复；Ollama 可能仍在结束本机生成”。检查发现 `LocalModelRequest.thinking_enabled` 未传入 Ollama payload。已仅对多 Agent 各专业角色和汇总请求传 `think:false`，普通聊天保持默认；官方 API 字段资料链接见 `docs/beta/orchestrator-framework.md`。
+- 首轮多 Agent 请求在约十几秒内完成，但汇总过度聚焦模型结果的“不可信”标签而未答原问题。已调整综合 prompt，参考内容放在独立前置 user 消息，原请求保持最后一条；实机复测得到两名角色观点和总助理直接生成的三条议题建议。6 字约束仍未完全遵守，因此只证明链路可用，不代表小模型输出质量保证。
+- 自动化：`tests/test_beta_api.py tests/test_local_model_gateway.py tests/test_orchestrator.py` → 69 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（`backend/`）→ 325 passed、1 条既有 Starlette/httpx 弃用警告；Ruff 与 `mypy pac_poc/beta_api.py pac_poc/model_gateway.py pac_poc/orchestrator.py` 通过；`./poc/macos-audio/scripts/run_beta_app.sh` 成功构建并启动。
+- 已更新 `docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`、本报告与 `docs/beta/orchestrator-framework.md`。真实 GUI 验收使用本机 Ollama，没有云 Provider 或麦克风；为复现而创建的合成测试对话保留在本机 SQLCipher 历史。
