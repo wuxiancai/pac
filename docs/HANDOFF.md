@@ -1658,3 +1658,9 @@
 
 - 模型设置当前选中“本地大模型”，模型字段显示 `qwen3.5:0.8b`，并提示 PAC 本机服务与 Ollama 是独立进程、须先启动 Ollama 并安装模型。
 - 设置面板未展示精确型号 capability 明细；本次只验证配置呈现，不宣称 capability 查询或 API 认证失败状态已通过。
+
+### 2026-11-10：阶段 6 精确型号 capability 查询接入
+
+- Swift 本机 API 客户端新增认证 loopback `GET /model-capabilities`，参数使用当前精确 Provider/Model；响应 Provider/Model 不匹配时拒绝，并将缺省 capability 状态呈现为 `unknown`。模型设置新增显式“查询当前型号能力”按钮，展示核验时间、区域、证据引用及所有能力的 supported/limited/unsupported/unknown，切换型号后清除旧结果，不调用外部 Provider。
+- 自动验证：`swift test --package-path poc/macos-audio --filter localAPIClientLoadsAuthenticatedExactModelCapabilities` → 1 passed；Swift 全量 → 63 passed；Beta target build 成功。测试确认 Bearer loopback 请求、精确 query、精确型号匹配、缺失能力默认 unknown。
+- 尚未在 GUI 点击查询按钮验收：重启后 `personal-assistant-beta` 进程存在，但 CUA 两次读取窗口均超时，且进程检查未见受管 backend 子进程。未对进程强制结束；UI 能力清单呈现与本次启动异常待复核。未发起云请求或麦克风采集。

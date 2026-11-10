@@ -374,6 +374,27 @@ public struct LocalUsageSnapshot: Decodable, Sendable {
     }
 }
 
+public struct LocalModelCapabilityReport: Decodable, Sendable {
+    public let providerID: String
+    public let modelID: String
+    public let verifiedAt: String?
+    public let evidenceRefs: [String]
+    public let region: String?
+    public let capabilities: [String: String]
+
+    enum CodingKeys: String, CodingKey {
+        case region, capabilities
+        case providerID = "provider_id"
+        case modelID = "model_id"
+        case verifiedAt = "verified_at"
+        case evidenceRefs = "evidence_refs"
+    }
+
+    public func state(for capability: String) -> String {
+        capabilities[capability] ?? "unknown"
+    }
+}
+
 public struct LocalSecurityAuditEvent: Decodable, Identifiable, Sendable {
     public let id: String
     public let traceID: String
@@ -890,6 +911,37 @@ public final class LocalAPIClient: @unchecked Sendable {
             budget: value.budget,
             auditEvents: value.auditEvents
         )
+    }
+
+    public func modelCapabilities(
+        providerID: String,
+        modelID: String
+    ) async throws -> LocalModelCapabilityReport {
+        guard !providerID.isEmpty, providerID.count <= 64,
+              !modelID.isEmpty, modelID.count <= 128,
+              let endpoint = URL(string: "/model-capabilities", relativeTo: baseURL),
+              var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: true)
+        else { throw LocalAPIClientError.invalidEndpoint }
+        components.queryItems = [
+            URLQueryItem(name: "provider_id", value: providerID),
+            URLQueryItem(name: "model_id", value: modelID),
+        ]
+        guard let url = components.url else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard httpResponse.statusCode == 200 else {
+            throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+        guard let report = try? JSONDecoder().decode(LocalModelCapabilityReport.self, from: data),
+              report.providerID == providerID, report.modelID == modelID
+        else { throw LocalAPIClientError.invalidResponse }
+        return report
     }
 
     public func importSelectedText(data: Data, fileName: String) async throws -> LocalImportedTextFile {

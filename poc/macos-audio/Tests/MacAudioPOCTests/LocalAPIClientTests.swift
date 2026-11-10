@@ -317,6 +317,47 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class ModelCapabilityRequestCapture: @unchecked Sendable {
+    static let shared = ModelCapabilityRequestCapture()
+    private let lock = NSLock()
+    private var storedRequest: URLRequest?
+
+    func record(_ request: URLRequest) {
+        lock.lock()
+        storedRequest = request
+        lock.unlock()
+    }
+
+    func take() -> URLRequest? {
+        lock.lock()
+        defer { lock.unlock() }
+        let request = storedRequest
+        storedRequest = nil
+        return request
+    }
+}
+
+private final class ModelCapabilityURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        ModelCapabilityRequestCapture.shared.record(request)
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        let body = #"{"provider_id":"ollama","model_id":"qwen3.5:0.8b","verified_at":"2026-11-09T00:00:00Z","evidence_refs":["docs/poc/phase0-model-gateway-local.md"],"region":null,"capabilities":{"text_generation":"supported","streaming":"supported","tools":"limited"}}"#
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 @available(macOS 12.0, *)
 @Test func localAPIClientBuildsAuthenticatedLoopbackRequest() throws {
     let client = try LocalAPIClient(
@@ -329,6 +370,33 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     #expect(request.url?.absoluteString == "http://127.0.0.1:43127/health")
     #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer ephemeral-test-token")
     #expect(request.value(forHTTPHeaderField: "Origin") == nil)
+}
+
+@available(macOS 12.0, *)
+@Test func localAPIClientLoadsAuthenticatedExactModelCapabilities() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ModelCapabilityURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43128")!,
+        token: "ephemeral-capability-token",
+        sessionConfiguration: configuration
+    )
+
+    let report = try await client.modelCapabilities(
+        providerID: "ollama",
+        modelID: "qwen3.5:0.8b"
+    )
+    let request = ModelCapabilityRequestCapture.shared.take()
+
+    #expect(report.providerID == "ollama")
+    #expect(report.modelID == "qwen3.5:0.8b")
+    #expect(report.state(for: "text_generation") == "supported")
+    #expect(report.state(for: "tools") == "limited")
+    #expect(report.state(for: "vision") == "unknown")
+    #expect(request?.value(forHTTPHeaderField: "Authorization") == "Bearer ephemeral-capability-token")
+    let query = URLComponents(url: request!.url!, resolvingAgainstBaseURL: false)?.queryItems
+    #expect(query?.first(where: { $0.name == "provider_id" })?.value == "ollama")
+    #expect(query?.first(where: { $0.name == "model_id" })?.value == "qwen3.5:0.8b")
 }
 
 @available(macOS 12.0, *)

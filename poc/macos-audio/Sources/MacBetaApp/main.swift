@@ -93,6 +93,10 @@ final class BetaChatModel {
     private(set) var securityAuditEvents: [LocalSecurityAuditEvent] = []
     private(set) var usageStatus = "尚未读取本机用量。"
     private(set) var isLoadingUsage = false
+    private(set) var modelCapabilityReport: LocalModelCapabilityReport?
+    private(set) var modelCapabilityStatus = "尚未查询当前型号能力。"
+    private(set) var isLoadingModelCapabilities = false
+    private var modelCapabilityRequestID: UUID?
     private var lastAssistantResponseInterrupted = false
     private let microphone = LocalMicrophoneCapture()
     private let speechPlayback = SpeechPlaybackController(engine: AVSpeechEngine())
@@ -171,6 +175,7 @@ final class BetaChatModel {
     }
 
     var isStreaming: Bool { activeRequest != nil }
+    var isBackendConnected: Bool { client != nil }
     var performanceSummary: String {
         guard performanceDiagnosticsEnabled else { return "" }
         let partial = Self.p95Milliseconds(partialLatencySamples)
@@ -840,7 +845,48 @@ final class BetaChatModel {
         }
     }
 
+    func refreshModelCapabilities() async {
+        guard let client else {
+            modelCapabilityStatus = "本机服务尚未就绪，无法查询型号能力。"
+            return
+        }
+        guard !isLoadingModelCapabilities else { return }
+        let providerID = selectedProvider
+        let modelID = selectedModel
+        let requestID = UUID()
+        modelCapabilityRequestID = requestID
+        isLoadingModelCapabilities = true
+        modelCapabilityReport = nil
+        modelCapabilityStatus = "正在读取本机已核验的型号能力…"
+        defer {
+            if modelCapabilityRequestID == requestID {
+                modelCapabilityRequestID = nil
+                isLoadingModelCapabilities = false
+            }
+        }
+        do {
+            let report = try await client.modelCapabilities(
+                providerID: providerID,
+                modelID: modelID
+            )
+            guard modelCapabilityRequestID == requestID,
+                  selectedProvider == providerID, selectedModel == modelID
+            else { return }
+            modelCapabilityReport = report
+            modelCapabilityStatus = report.verifiedAt == nil
+                ? "没有该型号的已核验证据；能力保持未知。"
+                : "已读取该精确型号的能力证据。"
+        } catch {
+            guard modelCapabilityRequestID == requestID else { return }
+            modelCapabilityStatus = "无法读取型号能力：\(error.localizedDescription)"
+        }
+    }
+
     private func modelSelectionDidChange() {
+        modelCapabilityRequestID = nil
+        isLoadingModelCapabilities = false
+        modelCapabilityReport = nil
+        modelCapabilityStatus = "型号已变化，请重新查询能力。"
         if activeRequest != nil {
             let stoppedRunID = latestRunID
             let runClient = client
@@ -2248,6 +2294,15 @@ private struct BetaModelSettingsView: View {
         service: "com.personal-ai-assistant.phase0.provider",
         authorizer: TouchIDAuthorizer()
     )
+    private let capabilityLabels: [(key: String, title: String)] = [
+        ("text_generation", "文本生成"), ("streaming", "流式输出"),
+        ("tools", "工具调用"), ("parallel_tools", "并行工具"),
+        ("json_schema", "JSON Schema"), ("vision", "图像输入"),
+        ("audio_input", "音频输入"), ("audio_output", "音频输出"),
+        ("embeddings", "向量嵌入"), ("rerank", "重排序"),
+        ("realtime_audio", "实时音频"), ("batch", "批处理"),
+        ("cancellation", "请求取消"),
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -2300,6 +2355,45 @@ private struct BetaModelSettingsView: View {
                 Label("千问 Token Plan 个人版 Key（sk-sp-）仅能通过官方支持的编程/智能体工具扩展使用，不接入本自建应用；千问应用 API 使用独立 Keychain 项 qwen-app。", systemImage: "info.circle")
                     .font(.callout).foregroundStyle(.secondary)
             }
+            GroupBox("精确型号能力") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Button(model.isLoadingModelCapabilities ? "查询中…" : "查询当前型号能力") {
+                        Task { await model.refreshModelCapabilities() }
+                    }
+                    .disabled(!model.isBackendConnected || model.isLoadingModelCapabilities)
+                    Text(model.modelCapabilityStatus)
+                        .font(.callout).foregroundStyle(.secondary)
+                    if let report = model.modelCapabilityReport {
+                        Text("\(report.providerID) / \(report.modelID)")
+                            .font(.caption.monospaced())
+                        if let verifiedAt = report.verifiedAt {
+                            Text("核验时间：\(verifiedAt)").font(.caption)
+                        }
+                        if let region = report.region {
+                            Text("区域：\(region)").font(.caption)
+                        }
+                        if !report.evidenceRefs.isEmpty {
+                            Text("证据：\(report.evidenceRefs.joined(separator: "、"))")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(capabilityLabels, id: \.key) { item in
+                                    HStack {
+                                        Text(item.title)
+                                        Spacer()
+                                        Text(capabilityStateTitle(report.state(for: item.key)))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .font(.caption)
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 150)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             Spacer()
         }
         .padding(24)
@@ -2316,6 +2410,15 @@ private struct BetaModelSettingsView: View {
         } catch {
             hasConfiguredCredential = false
             keyStatus = "无法读取 Keychain 状态"
+        }
+    }
+
+    private func capabilityStateTitle(_ state: String) -> String {
+        switch state {
+        case "supported": "已核验支持"
+        case "limited": "有限支持"
+        case "unsupported": "已核验不支持"
+        default: "未知"
         }
     }
 
