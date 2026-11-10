@@ -193,6 +193,7 @@ private final class FakeDatabaseKeychainAccess: DatabaseKeychainAccessing {
 private final class FakeTaskReminderNotificationCenter: TaskReminderNotificationCenter {
     var requestAuthorizationResult = false
     var currentAuthorizationStatus: UNAuthorizationStatus = .notDetermined
+    var addError: Error?
     var requests: [String] = []
 
     func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
@@ -212,6 +213,7 @@ private final class FakeTaskReminderNotificationCenter: TaskReminderNotification
     }
 
     func add(identifier: String, title: String, date: Date) async throws {
+        if let addError { throw addError }
         requests.removeAll { $0 == identifier }
         requests.append(identifier)
     }
@@ -281,4 +283,38 @@ private final class FakeTaskReminderNotificationCenter: TaskReminderNotification
 
     let rebuilt = await center.pendingNotificationIdentifiers()
     #expect(rebuilt == ["other.app.notification", "pac.task.task-restored-after-launch"])
+}
+
+@available(macOS 14.0, *)
+@MainActor
+@Test func taskReminderReconcileReportsNotificationSchedulingFailure() async throws {
+    enum SyntheticError: Error { case notificationUnavailable }
+
+    let suiteName = "TaskReminderFailureTests-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set(true, forKey: TaskReminderManager.preferenceKey)
+    let center = FakeTaskReminderNotificationCenter()
+    center.currentAuthorizationStatus = .authorized
+    center.addError = SyntheticError.notificationUnavailable
+    center.seed(identifier: "pac.task.task-notification-failure")
+    center.seed(identifier: "other.app.notification")
+    let manager = TaskReminderManager(center: center, defaults: defaults)
+    let future = ISO8601DateFormatter().string(from: Date().addingTimeInterval(3600))
+    let task = LocalTaskItem(
+        id: "task-notification-failure",
+        title: "synthetic",
+        description: "",
+        status: "READY",
+        priority: 1,
+        scheduleAt: future,
+        startedAt: nil,
+        completedAt: nil,
+        allowedTransitions: nil
+    )
+
+    let failures = await manager.reconcile(tasks: [task])
+    #expect(failures == 1)
+    #expect(manager.isEnabled)
+    #expect(await center.pendingNotificationIdentifiers() == ["other.app.notification"])
 }

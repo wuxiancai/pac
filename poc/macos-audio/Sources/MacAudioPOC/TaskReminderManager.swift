@@ -111,12 +111,13 @@ public final class TaskReminderManager {
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
     }
 
-    public func reconcile(tasks: [LocalTaskItem]) async {
-        guard isEnabled else { return }
+    @discardableResult
+    public func reconcile(tasks: [LocalTaskItem]) async -> Int {
+        guard isEnabled else { return 0 }
         let authorization = await center.authorizationStatus()
         guard authorization == .authorized || authorization == .provisional else {
             await disable()
-            return
+            return 0
         }
         let now = Date()
         let eligible = tasks.filter { Self.isEligible($0, now: now) }
@@ -126,27 +127,36 @@ public final class TaskReminderManager {
             $0.hasPrefix("pac.task.") && !keep.contains($0)
         }
         center.removePendingNotificationRequests(withIdentifiers: stale)
+        var failures = 0
         for task in eligible {
-            await schedule(task: task)
+            if !(await schedule(task: task)) { failures += 1 }
         }
+        return failures
     }
 
-    public func schedule(task: LocalTaskItem) async {
-        guard isEnabled else { return }
+    @discardableResult
+    public func schedule(task: LocalTaskItem) async -> Bool {
+        guard isEnabled else { return true }
         guard Self.isEligible(task, now: Date()),
               let scheduledAt = task.scheduleAt,
               let date = Self.parseDate(scheduledAt)
         else {
             remove(taskID: task.id)
-            return
+            return true
         }
 
         let authorization = await center.authorizationStatus()
         guard authorization == .authorized || authorization == .provisional else {
             await disable()
-            return
+            return false
         }
-        try? await center.add(identifier: Self.identifier(for: task.id), title: task.title, date: date)
+        do {
+            try await center.add(identifier: Self.identifier(for: task.id), title: task.title, date: date)
+            return true
+        } catch {
+            remove(taskID: task.id)
+            return false
+        }
     }
 
     public func remove(taskID: String) {

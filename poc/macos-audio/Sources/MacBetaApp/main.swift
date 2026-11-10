@@ -829,10 +829,12 @@ final class BetaChatModel: CalendarEventAuditRecording {
         guard let client else { return }
         do {
             tasks = try await client.listTasks()
-            await taskReminderManager.reconcile(tasks: tasks)
+            let reminderFailures = await taskReminderManager.reconcile(tasks: tasks)
             taskStatus = "本机任务 · 完成 30 天后自动清理"
             taskNotificationStatus = taskReminderManager.isEnabled
-                ? "本机任务提醒已启用。"
+                ? reminderFailures == 0
+                    ? "本机任务提醒已启用。"
+                    : "本机任务提醒已启用，但有 \(reminderFailures) 项未能安排；任务仍保存在本机。"
                 : "通知默认关闭。"
         } catch {
             taskStatus = "无法读取本机任务：\(error.localizedDescription)"
@@ -847,8 +849,7 @@ final class BetaChatModel: CalendarEventAuditRecording {
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 return formatter.string(from: $0)
             }
-            let task = try await client.createTask(title: title, scheduleAt: scheduleAt)
-            await taskReminderManager.schedule(task: task)
+            _ = try await client.createTask(title: title, scheduleAt: scheduleAt)
             await refreshTasks()
         } catch {
             taskStatus = "无法保存本机任务：\(error.localizedDescription)"
@@ -861,7 +862,12 @@ final class BetaChatModel: CalendarEventAuditRecording {
             taskNotificationStatus = granted
                 ? "已允许系统通知；本机任务提醒已开启。"
                 : "系统未授权通知；任务仍保存在本机。"
-            if granted { await taskReminderManager.reconcile(tasks: tasks) }
+            if granted {
+                let failures = await taskReminderManager.reconcile(tasks: tasks)
+                if failures > 0 {
+                    taskNotificationStatus = "本机任务提醒已启用，但有 \(failures) 项未能安排；任务仍保存在本机。"
+                }
+            }
         } catch {
             taskNotificationStatus = "无法启用系统通知：\(error.localizedDescription)"
         }
@@ -891,7 +897,6 @@ final class BetaChatModel: CalendarEventAuditRecording {
             if ["COMPLETED", "CANCELLED"].contains(updated.status) {
                 taskReminderManager.remove(taskID: updated.id)
             }
-            await taskReminderManager.schedule(task: updated)
             await refreshTasks()
         } catch {
             taskStatus = "无法更新任务状态：\(error.localizedDescription)"
