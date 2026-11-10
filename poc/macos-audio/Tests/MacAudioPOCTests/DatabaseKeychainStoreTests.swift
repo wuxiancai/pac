@@ -9,6 +9,29 @@ import UserNotifications
     #expect(!DatabaseKeychainStore.account.isEmpty)
 }
 
+@Test func databaseKeychainErrorsProvideSafeActionableDescriptions() {
+    #expect(
+        DatabaseKeychainError.invalidIdentity.localizedDescription
+            == "本机数据库密钥配置无效。"
+    )
+    #expect(
+        DatabaseKeychainError.invalidStoredKey.localizedDescription
+            == "Keychain 中的数据库密钥数据无效；未替换密钥或数据库。"
+    )
+    #expect(
+        DatabaseKeychainError.randomGenerationFailed(-1).localizedDescription
+            == "无法安全生成本机数据库密钥（OSStatus -1）。"
+    )
+    #expect(
+        DatabaseKeychainError.keychain(operation: "read", status: -50).localizedDescription
+            == "无法从本机 Keychain 读取数据库密钥（OSStatus -50）。"
+    )
+    #expect(
+        DatabaseKeychainError.keychain(operation: "create", status: -50).localizedDescription
+            == "无法从本机 Keychain 保存数据库密钥（OSStatus -50）。"
+    )
+}
+
 @available(macOS 14.0, *)
 @MainActor
 @Test func taskReminderIdentifiersUseStableAppOwnedPrefix() {

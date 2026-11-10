@@ -10,6 +10,8 @@
 
 2026-11-10 B3 面板 GUI 回验：查明并修复 sheet 未能通过 `NSApp.keyWindow/mainWindow` 获取窗口的问题；用 `NSViewRepresentable` 捕获实际宿主窗口后，保存与打开面板均在 GUI 实测通过。Documents 合成备份 274,726 bytes 保存并重新选择成功；取消保存后口令保留；临时文件/口令已清理。恢复/认证仍未验收，B3 继续 IN PROGRESS。另记录本轮首启 `DatabaseKeychainError error 1`，手动重试后连接恢复，原因待判定。
 
+2026-11-10 B3 数据库密钥错误诊断：`DatabaseKeychainError` 已提供不含密钥数据的中文原因和 OSStatus；没有增加自动换钥。Swift 87 项及 Beta build 通过。首启失败只观察到一次、重试恢复，根因尚未确认；保留为待回归观察。
+
 ## 状态和流程
 
 - `DONE`：工作包的明确完成条件已满足，证据可复核。

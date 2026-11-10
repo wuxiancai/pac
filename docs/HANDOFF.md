@@ -1,5 +1,11 @@
 # 2026-11-10：B3 恢复认证可取消与中文终态
 
+# 2026-11-10：B3 数据库 Keychain 错误诊断信息
+
+- 为排查本轮 Beta 首启 `DatabaseKeychainError error 1` 后重试连接成功的现象，给数据库 Keychain 错误添加安全的中文 `LocalizedError` 描述：区分无效标识/已存密钥/随机数生成/Keychain 读写状态，并对 OSStatus 显示数值。无效已存密钥的提示明确没有自动换钥或改数据库；错误描述不包含密钥数据。
+- 新增描述契约回归覆盖上述类别。`swift test --package-path poc/macos-audio` → 87 passed；`poc/macos-audio/scripts/build_beta_app.sh` 成功；`git diff --check` 通过。
+- 本轮未重现 Keychain 故障。首次启动错误后点击重试确实恢复连接，但单次恢复不足以确定根因；后续若再现，中文状态将区分具体错误类型与 OSStatus。未清除或替换任何 Keychain 项。
+
 # 2026-11-10：B3 异步文件面板宿主窗口修复及 GUI 验收
 
 - 前次异步面板改造显示“无法打开保存面板”：SwiftUI 备份 sheet 中 `NSApp.keyWindow` 与 `NSApp.mainWindow` 均为空。现加 `NSViewRepresentable` 捕获实际承载 sheet 的 `NSWindow`，保存/打开面板均附着该窗口；没有宿主窗口时仍失败关闭并显示提示。

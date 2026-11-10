@@ -8,6 +8,26 @@ public enum DatabaseKeychainError: Error, Equatable {
     case keychain(operation: String, status: OSStatus)
 }
 
+extension DatabaseKeychainError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .invalidIdentity:
+            return "本机数据库密钥配置无效。"
+        case .invalidStoredKey:
+            return "Keychain 中的数据库密钥数据无效；未替换密钥或数据库。"
+        case .randomGenerationFailed(let status):
+            return "无法安全生成本机数据库密钥（OSStatus \(status)）。"
+        case .keychain(let operation, let status):
+            let action = switch operation {
+            case "read": "读取"
+            case "create": "保存"
+            default: "访问"
+            }
+            return "无法从本机 Keychain \(action)数据库密钥（OSStatus \(status)）。"
+        }
+    }
+}
+
 /// Keeps the installation's SQLCipher key in the unlocked user's Keychain.
 /// The item is device-only and never requires per-launch user presence.
 public final class DatabaseKeychainStore {
