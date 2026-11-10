@@ -1686,3 +1686,8 @@
 - Swift 本机 API 客户端新增认证 loopback `GET /model-capabilities`，参数使用当前精确 Provider/Model；响应 Provider/Model 不匹配时拒绝，并将缺省 capability 状态呈现为 `unknown`。模型设置新增显式“查询当前型号能力”按钮，展示核验时间、区域、证据引用及所有能力的 supported/limited/unsupported/unknown，切换型号后清除旧结果，不调用外部 Provider。
 - 自动验证：`swift test --package-path poc/macos-audio --filter localAPIClientLoadsAuthenticatedExactModelCapabilities` → 1 passed；Swift 全量 → 63 passed；Beta target build 成功。测试确认 Bearer loopback 请求、精确 query、精确型号匹配、缺失能力默认 unknown。
 - 重启后初次两次 CUA 窗口读取超时；稍后读取恢复，UI 显示本机服务已连接。随后点击“查询当前型号能力”，`ollama / qwen3.5:0.8b` 显示文本生成/流式输出“已核验支持”、工具调用“有限支持”、其余 10 项“未知”，并展示核验时间 `2026-11-09T00:00:00Z` 与证据 `docs/poc/phase0-model-gateway-local.md`。GUI 验收通过；早期超时原因未判定，不据此归因代码。未发起云请求或麦克风采集。
+
+### 2026-11-10：阶段 6 capability 查询负向客户端回归
+
+- Swift URLProtocol 新增覆盖：未知 `qwen3.5:8b` 报告无核验时间/证据时，所有缺失能力均保持 `unknown`；服务器返回另一型号的能力报告时客户端拒绝；HTTP 503 响应体不暴露给 UI，只映射安全状态码错误。
+- 定向 capability 负向回归 2 passed；Swift 全量 `swift test --package-path poc/macos-audio` → 66 passed；Beta target build 通过。正向 loopback 查询回归也在全量中通过。

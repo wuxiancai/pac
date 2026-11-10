@@ -358,6 +358,42 @@ private final class ModelCapabilityURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class UnknownModelCapabilityURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        let body = #"{"provider_id":"ollama","model_id":"qwen3.5:8b","verified_at":null,"evidence_refs":[],"region":null,"capabilities":{"text_generation":"unknown","streaming":"unknown","tools":"unknown"}}"#
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+private final class MismatchedModelCapabilityURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        let body = #"{"provider_id":"ollama","model_id":"qwen3.5:8b","verified_at":"2026-11-09T00:00:00Z","evidence_refs":["other-model"],"region":null,"capabilities":{"text_generation":"supported"}}"#
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 @available(macOS 12.0, *)
 @Test func localAPIClientBuildsAuthenticatedLoopbackRequest() throws {
     let client = try LocalAPIClient(
@@ -397,6 +433,56 @@ private final class ModelCapabilityURLProtocol: URLProtocol {
     let query = URLComponents(url: request!.url!, resolvingAgainstBaseURL: false)?.queryItems
     #expect(query?.first(where: { $0.name == "provider_id" })?.value == "ollama")
     #expect(query?.first(where: { $0.name == "model_id" })?.value == "qwen3.5:0.8b")
+}
+
+@available(macOS 12.0, *)
+@Test func localAPIClientKeepsUnknownModelCapabilitiesUnknown() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [UnknownModelCapabilityURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43129")!,
+        token: "ephemeral-capability-token",
+        sessionConfiguration: configuration
+    )
+
+    let report = try await client.modelCapabilities(providerID: "ollama", modelID: "qwen3.5:8b")
+
+    #expect(report.verifiedAt == nil)
+    #expect(report.evidenceRefs.isEmpty)
+    #expect(report.state(for: "text_generation") == "unknown")
+    #expect(report.state(for: "streaming") == "unknown")
+    #expect(report.state(for: "tools") == "unknown")
+    #expect(report.state(for: "vision") == "unknown")
+}
+
+@available(macOS 12.0, *)
+@Test func localAPIClientRejectsCapabilityReportForDifferentModel() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [MismatchedModelCapabilityURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43130")!,
+        token: "ephemeral-capability-token",
+        sessionConfiguration: configuration
+    )
+
+    await #expect(throws: LocalAPIClientError.invalidResponse) {
+        try await client.modelCapabilities(providerID: "ollama", modelID: "qwen3.5:0.8b")
+    }
+}
+
+@available(macOS 12.0, *)
+@Test func localAPIClientCapabilityFailureDoesNotSurfaceResponseBody() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ErrorResponseURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43131")!,
+        token: "ephemeral-capability-token",
+        sessionConfiguration: configuration
+    )
+
+    await #expect(throws: LocalAPIClientError.requestFailed(statusCode: 503)) {
+        try await client.modelCapabilities(providerID: "ollama", modelID: "qwen3.5:0.8b")
+    }
 }
 
 @available(macOS 12.0, *)
