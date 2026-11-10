@@ -24,6 +24,7 @@ public enum CalendarEventCreationError: Error, Equatable {
     case fieldTooLong
     case authorizationRequired
     case defaultCalendarUnavailable
+    case eventAlreadyCreated
 }
 
 @MainActor
@@ -85,6 +86,7 @@ public final class CalendarEventCreationService {
     private let writer: any CalendarEventWriting
     public private(set) var status = "填写事件后检查日历创建权限；检查不会创建事件。"
     public private(set) var isReadyToCreate = false
+    public private(set) var hasCreatedEvent = false
 
     public init() {
         writer = EventKitCalendarWriter()
@@ -130,6 +132,7 @@ public final class CalendarEventCreationService {
 
     /// Call only after the UI has shown the exact event and the user has confirmed it.
     public func createApprovedEvent(_ draft: CalendarEventDraft) throws {
+        guard !hasCreatedEvent else { throw CalendarEventCreationError.eventAlreadyCreated }
         guard isReadyToCreate,
               writer.authorization == .fullAccess || writer.authorization == .writeOnly
         else { throw CalendarEventCreationError.authorizationRequired }
@@ -138,6 +141,7 @@ public final class CalendarEventCreationService {
             throw CalendarEventCreationError.defaultCalendarUnavailable
         }
         try writer.save(normalized)
+        hasCreatedEvent = true
         status = "事件已创建。"
     }
 

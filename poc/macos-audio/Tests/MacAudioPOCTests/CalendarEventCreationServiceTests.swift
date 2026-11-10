@@ -189,4 +189,11 @@ private actor FakeCalendarEventAudit: CalendarEventAuditRecording {
     #expect(outcome == .eventCreated(auditRecorded: false))
     #expect(writer.saves.count == 1)
     #expect(await audit.decisions() == [.attempted, .succeeded])
+
+    let retryOutcome = await coordinator.createAfterExplicitApproval(
+        CalendarEventDraft(title: "Planning", startDate: start, endDate: start.addingTimeInterval(60))
+    )
+    #expect(retryOutcome == .eventAlreadyCreated)
+    #expect(writer.saves.count == 1)
+    #expect(await audit.decisions() == [.attempted, .succeeded])
 }

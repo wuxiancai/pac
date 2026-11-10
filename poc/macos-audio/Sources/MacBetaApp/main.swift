@@ -1895,6 +1895,7 @@ private struct CalendarEventCreationView: View {
                     .lineLimit(2...5)
                     .accessibilityIdentifier("calendar-event-notes-field")
             }
+            .disabled(service.hasCreatedEvent)
             if !isDraftValid {
                 Text("标题需为 1–200 字；结束时间必须晚于开始时间，地点最多 200 字，备注最多 2,000 字。")
                     .font(.caption).foregroundStyle(.orange)
@@ -1915,7 +1916,7 @@ private struct CalendarEventCreationView: View {
                         isCheckingPermission = false
                     }
                 }
-                .disabled(isCheckingPermission || isCreating)
+                .disabled(isCheckingPermission || isCreating || service.hasCreatedEvent)
                 .accessibilityIdentifier("calendar-event-check-permission-button")
             }
             if service.isReadyToCreate && model.isBackendConnected {
@@ -1959,6 +1960,8 @@ private struct CalendarEventCreationView: View {
         defer { isCreating = false }
         let coordinator = CalendarEventApprovalCoordinator(audit: model, eventCreation: service)
         switch await coordinator.createAfterExplicitApproval(draft) {
+        case .eventAlreadyCreated:
+            status = "此表单中的事件已经创建过；为避免重复，不会再次写入。"
         case .invalidEventDetails:
             status = "请填写不为空且不超过 200 字的标题，设置有效起止时间，并检查地点/备注长度。"
         case .blockedByAudit:

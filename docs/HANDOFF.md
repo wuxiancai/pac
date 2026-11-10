@@ -45,6 +45,11 @@
 - 协调器现在在写入 ATTEMPTED 前使用创建服务同一校验器检查标题、日期范围、地点和备注；无效草稿返回专用结果，不触碰审计或 EventKit。UI 禁用无效草稿的确认入口并显示字段限制。
 - 新增回归确认无效草稿不记录审计且不写事件；B10 服务/协调器窄回归 8 passed，Swift 全量 83 passed，Beta target build 成功。
 
+# 2026-11-10：B10 单表单重复写保护
+
+- EventKit 保存成功后，创建服务会记录本实例已创建事件；协调器在下一次审计前直接拒绝同实例再次调用，避免最终审计响应丢失后用户重复提交。UI 表单和权限检查在成功后禁用；用户需关闭表单再开始另一条独立创建流程。
+- 扩展终态审计失败回归：模拟 SUCCEEDED 审计失败后再次调用协调器，结果为 `eventAlreadyCreated`，审计仍只有 ATTEMPTED/SUCCEEDED 两条，EventKit save 仍恰好一次。Swift 全量 83 passed，Beta target build 成功。
+
 # 2026-11-10：模型预设旧格式迁移
 
 - `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。
