@@ -47,7 +47,7 @@
 
 - 范围按 D-022：用户手动填写单个事件，预览后逐次确认，写入 macOS 当前默认日历；EventKit write-only；无 Agent 自动调用、提醒事项写入、重复、邀请、修改/删除或后台执行。
 - 先行段已新增认证 `/security-audit/calendar-event`，只接受受限决策/原因码，并在 SQLCipher 中记录 metadata-only 的 `ATTEMPTED/SUCCEEDED/FAILED`（敏感级别 L2），不接收标题/时间/备注。
-- 审计 API 窄回归通过；Ruff/mypy 通过，后端全量 347 passed（1 条既有弃用警告）。EventKit 创建服务/协调器现有 7 项自动回归，覆盖权限准备不写入、校验、审批审计失败关闭、写入失败记 FAILED、成功结果审计失败不重试。Swift 审计客户端另有 2 项窄回归覆盖 metadata-only 与 503 失败关闭。Beta 独立创建入口现有手填字段、默认日历同步披露、权限检查、确切预览和逐次二次确认；协调器统一执行 ATTEMPTED→EventKit→SUCCEEDED/FAILED。Swift 全量 79 passed，Beta target 与 `.app` 打包成功。尚未实机验收首次权限/拒绝/创建成功与审计故障路径；未创建真实事件。详见 `docs/HANDOFF.md`。
+- 审计 API 窄回归通过；Ruff/mypy 通过，后端全量 347 passed（1 条既有弃用警告）。EventKit 创建服务/协调器现有 7 项自动回归，覆盖权限准备不写入、校验、审批审计失败关闭、写入失败记 FAILED、成功结果审计失败不重试。Swift 审计客户端另有 2 项窄回归覆盖 metadata-only 与 503 失败关闭。Beta 独立创建入口现有手填字段、默认日历同步披露、权限检查、确切预览和逐次二次确认；协调器统一执行 ATTEMPTED→EventKit→SUCCEEDED/FAILED。Swift 全量 82 passed，Beta target 与 `.app` 打包成功。尚未实机验收首次权限/拒绝/创建成功与审计故障路径；未创建真实事件。详见 `docs/HANDOFF.md`。
 
 ## 阶段 0 证据状态（已结束；延期项保留原状态）
 

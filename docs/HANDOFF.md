@@ -26,7 +26,7 @@
 # 2026-11-10：B10 审批顺序协调器
 
 - 将关键审批次序从 SwiftUI 回调抽取到 `CalendarEventApprovalCoordinator`：先写 ATTEMPTED，只有成功才调用 EventKit；写入失败后尽力记 FAILED；写入成功后记 SUCCEEDED。每种完成路径都会撤销服务的可写就绪态；前置审计失败返回阻断，最终审计失败返回“已创建但审计未完成”，不重试事件。
-- 新增三项自动回归，验证审批审计失败时保存次数为 0、EventKit 失败时产生 ATTEMPTED/FAILED、成功但终态审计失败时只保存一次并准确返回。B10 服务/协调器窄回归共 7 passed；Beta target build 成功。完整 Swift 回归在提交前复跑。
+- 新增三项自动回归，验证审批审计失败时保存次数为 0、EventKit 失败时产生 ATTEMPTED/FAILED、成功但终态审计失败时只保存一次并准确返回。B10 服务/协调器窄回归共 7 passed；Beta target build 成功。提交后完整 `swift test --package-path poc/macos-audio` → 82 passed。
 - 该协调器测试为 fake 审计和 fake EventKit，不代表 macOS 权限/日历真实写入已验收。
 
 # 2026-11-10：模型预设旧格式迁移
