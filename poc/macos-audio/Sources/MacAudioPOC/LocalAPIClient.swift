@@ -75,6 +75,28 @@ public struct LocalImportedTextFile: Decodable, Identifiable, Sendable {
     }
 }
 
+public struct LocalTaskItem: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let description: String
+    public let status: String
+    public let priority: Int
+    public let scheduleAt: String?
+    public let startedAt: String?
+    public let completedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, status, priority
+        case scheduleAt = "schedule_at"
+        case startedAt = "started_at"
+        case completedAt = "completed_at"
+    }
+}
+
+public struct LocalTaskList: Decodable, Sendable {
+    public let tasks: [LocalTaskItem]
+}
+
 public struct LocalChatHistory: Decodable, Sendable {
     public let conversationID: String?
     public let messages: [LocalChatMessage]
@@ -226,6 +248,70 @@ public final class LocalAPIClient: @unchecked Sendable {
             throw LocalAPIClientError.invalidResponse
         }
         return value.text
+    }
+
+    public func listTasks(includeCompleted: Bool = true) async throws -> [LocalTaskItem] {
+        var components = URLComponents(
+            url: URL(string: "/tasks", relativeTo: baseURL)!.absoluteURL,
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "include_completed", value: String(includeCompleted))]
+        guard let url = components.url else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let list = try? JSONDecoder().decode(LocalTaskList.self, from: data) else { throw LocalAPIClientError.invalidResponse }
+        return list.tasks
+    }
+
+    public func createTask(title: String, description: String = "", priority: Int = 0) async throws -> LocalTaskItem {
+        guard let url = URL(string: "/tasks", relativeTo: baseURL)?.absoluteURL else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(TaskCreatePayload(
+            title: title,
+            description: description,
+            priority: priority,
+            idempotencyKey: UUID().uuidString.lowercased()
+        ))
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 201 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let task = try? JSONDecoder().decode(LocalTaskItem.self, from: data) else { throw LocalAPIClientError.invalidResponse }
+        return task
+    }
+
+    public func deleteTask(id: String) async throws {
+        guard let taskID = UUID(uuidString: id),
+              let url = URL(string: "/tasks/\(taskID.uuidString.lowercased())", relativeTo: baseURL)?.absoluteURL
+        else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+    }
+
+    public func transitionTask(id: String, status: String) async throws -> LocalTaskItem {
+        guard let taskID = UUID(uuidString: id),
+              let url = URL(string: "/tasks/\(taskID.uuidString.lowercased())/status", relativeTo: baseURL)?.absoluteURL
+        else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(TaskTransitionPayload(status: status))
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let task = try? JSONDecoder().decode(LocalTaskItem.self, from: data) else { throw LocalAPIClientError.invalidResponse }
+        return task
     }
 
     public func chatHistory() async throws -> LocalChatHistory {
@@ -520,4 +606,20 @@ private final class LocalOnlyURLSessionDelegate: NSObject, URLSessionTaskDelegat
     ) {
         completionHandler(nil)
     }
+}
+
+private struct TaskCreatePayload: Encodable {
+    let title: String
+    let description: String
+    let priority: Int
+    let idempotencyKey: String
+
+    enum CodingKeys: String, CodingKey {
+        case title, description, priority
+        case idempotencyKey = "idempotency_key"
+    }
+}
+
+private struct TaskTransitionPayload: Encodable {
+    let status: String
 }

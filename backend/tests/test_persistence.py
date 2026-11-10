@@ -237,3 +237,45 @@ def test_conversation_turns_load_in_order_and_manual_delete_removes_content(
         assert store.load_conversation()["messages"] == []
     finally:
         store.close()
+
+
+def test_task_lifecycle_is_idempotent_and_completed_tasks_expire_after_30_days(
+    storage_root: Path,
+) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    store = _store((storage_root / "tasks.db").resolve())
+    store.open()
+    now = datetime(2026, 11, 10, tzinfo=timezone.utc)
+    try:
+        task = store.create_task(
+            title="Prepare V2 task flow", idempotency_key="task-create-once"
+        )
+        repeated = store.create_task(
+            title="Ignored duplicate", idempotency_key="task-create-once"
+        )
+        assert repeated["id"] == task["id"]
+        assert repeated["title"] == "Prepare V2 task flow"
+        ready = store.transition_task(str(task["id"]), "READY")
+        assert ready["status"] == "READY"
+        running = store.transition_task(str(task["id"]), "RUNNING")
+        assert running["started_at"] is not None
+        completed = store.transition_task(str(task["id"]), "COMPLETED")
+        assert completed["completed_at"] is not None
+        with pytest.raises(ValueError, match="transition"):
+            store.transition_task(str(task["id"]), "READY")
+
+        old_id = "expired-task"
+        with store.connection() as connection, connection.begin():
+            old = (now - timedelta(days=31)).isoformat()
+            connection.execute(
+                text(
+                    "INSERT INTO tasks(id,title,status,priority,retry_count,idempotency_key,"
+                    "created_at,updated_at,started_at,completed_at) "
+                    "VALUES(:id,'Old task','COMPLETED',0,0,'old-task',:old,:old,:old,:old)"
+                ), {"id": old_id, "old": old}
+            )
+        assert store.purge_expired_completed_tasks(now=now) == 1
+        assert [item["id"] for item in store.list_tasks()] == [task["id"]]
+    finally:
+        store.close()

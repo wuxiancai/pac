@@ -141,6 +141,26 @@ class ChatPersistenceUnavailable(RuntimeError):
     """Safe marker for a local chat write failure."""
 
 
+class TaskCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=512)
+    description: str = Field(default="", max_length=20_000)
+    priority: int = Field(default=0, ge=0, le=5)
+    schedule_at: str | None = Field(default=None, max_length=32)
+    idempotency_key: UUID
+
+
+class TaskTransitionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal[
+        "PENDING", "READY", "RUNNING", "WAITING", "PAUSED",
+        "PARTIAL", "COMPLETED", "FAILED", "CANCELLED",
+    ]
+    error_code: str | None = Field(default=None, max_length=64)
+
+
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -638,6 +658,65 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             raise HTTPException(status_code=404, detail="import not found")
         return {"removed": True}
 
+    @router.get("/tasks")
+    async def list_tasks(include_completed: bool = True, limit: int = Query(default=100, ge=1, le=500)) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent task storage is unavailable")
+        try:
+            persistent_store.purge_expired_completed_tasks()
+            return {"tasks": persistent_store.list_tasks(include_completed=include_completed, limit=limit)}
+        except PersistentStoreError as exc:
+            raise HTTPException(status_code=503, detail="tasks are unavailable") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="tasks are unavailable") from None
+
+    @router.post("/tasks", status_code=201)
+    async def create_task(payload: TaskCreateRequest) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent task storage is unavailable")
+        try:
+            return persistent_store.create_task(
+                title=payload.title,
+                description=payload.description,
+                priority=payload.priority,
+                schedule_at=payload.schedule_at,
+                idempotency_key=str(payload.idempotency_key),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except PersistentStoreError as exc:
+            raise HTTPException(status_code=503, detail="task could not be saved") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="task could not be saved") from None
+
+    @router.patch("/tasks/{task_id}/status")
+    async def transition_task(task_id: UUID, payload: TaskTransitionRequest) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent task storage is unavailable")
+        try:
+            return persistent_store.transition_task(
+                str(task_id), payload.status, error_code=payload.error_code
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="task not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail="task status transition is not allowed") from exc
+        except PersistentStoreError as exc:
+            raise HTTPException(status_code=503, detail="task could not be updated") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="task could not be updated") from None
+
+    @router.delete("/tasks/{task_id}")
+    async def delete_task(task_id: UUID) -> dict[str, bool]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent task storage is unavailable")
+        try:
+            return {"deleted": persistent_store.delete_task(str(task_id))}
+        except PersistentStoreError as exc:
+            raise HTTPException(status_code=503, detail="task could not be deleted") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="task could not be deleted") from None
+
     @router.get("/chat/history")
     async def get_chat_history() -> dict[str, object]:
         if persistent_store is None:
@@ -935,5 +1014,6 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             path=default_database_path(), key=dependencies.database_key
         )
         persistent_store.open()
+        persistent_store.purge_expired_completed_tasks()
         app.router.on_shutdown.append(persistent_store.close)
     return app

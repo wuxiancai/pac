@@ -1415,3 +1415,43 @@ def test_persistent_chat_history_round_trips_and_can_be_manually_deleted(tmp_pat
         asyncio.run(run())
     finally:
         store.close()
+
+
+def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path) -> None:
+    from pac_poc.persistence import EncryptedApplicationStore
+
+    app_without_storage = create_beta_api(session=LocalAPISession(token="no-tasks-token"))
+    store = EncryptedApplicationStore(path=(tmp_path / "tasks.db").resolve(), key=b"t" * 32)
+    store.open()
+    app = create_beta_api(
+        session=LocalAPISession(token="task-token"), persistence_store=store
+    )
+
+    async def run() -> None:
+        headers = {"authorization": "Bearer task-token"}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app_without_storage), base_url="http://127.0.0.1"
+        ) as no_store_client:
+            assert (await no_store_client.get("/tasks", headers={"authorization": "Bearer no-tasks-token"})).status_code == 503
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            created = await client.post("/tasks", headers=headers, json={
+                "title": "Read calendar", "priority": 2,
+                "idempotency_key": "33333333-3333-4333-8333-333333333333",
+            })
+            task = created.json()
+            ready = await client.patch(f"/tasks/{task['id']}/status", headers=headers, json={"status": "READY"})
+            invalid = await client.patch(f"/tasks/{task['id']}/status", headers=headers, json={"status": "COMPLETED"})
+            listed = await client.get("/tasks", headers=headers)
+            deleted = await client.delete(f"/tasks/{task['id']}", headers=headers)
+        assert created.status_code == 201
+        assert ready.json()["status"] == "READY"
+        assert invalid.status_code == 409
+        assert len(listed.json()["tasks"]) == 1
+        assert deleted.json() == {"deleted": True}
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()

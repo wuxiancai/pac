@@ -115,6 +115,8 @@ final class BetaChatModel {
     private(set) var status = "正在连接本机服务…"
     private(set) var messages: [LocalChatMessage] = []
     private(set) var conversationID: String?
+    private(set) var tasks: [LocalTaskItem] = []
+    private(set) var taskStatus = ""
     private(set) var isRecordingVoice = false
     private(set) var isTranscribingVoice = false
     private(set) var voiceSeconds = 0
@@ -421,6 +423,47 @@ final class BetaChatModel {
         status = "无法打开所选文件：\(error.localizedDescription)"
     }
 
+    func refreshTasks() async {
+        guard let client else { return }
+        do {
+            tasks = try await client.listTasks()
+            taskStatus = "本机任务 · 完成 30 天后自动清理"
+        } catch {
+            taskStatus = "无法读取本机任务：\(error.localizedDescription)"
+        }
+    }
+
+    func addTask(title: String) async {
+        guard let client else { return }
+        do {
+            _ = try await client.createTask(title: title)
+            await refreshTasks()
+        } catch {
+            taskStatus = "无法保存本机任务：\(error.localizedDescription)"
+        }
+    }
+
+    func deleteTask(_ task: LocalTaskItem) async {
+        guard let client else { return }
+        do {
+            try await client.deleteTask(id: task.id)
+            tasks.removeAll { $0.id == task.id }
+            taskStatus = "已从本机数据库删除任务。"
+        } catch {
+            taskStatus = "无法删除本机任务：\(error.localizedDescription)"
+        }
+    }
+
+    func updateTask(_ task: LocalTaskItem, status: String) async {
+        guard let client else { return }
+        do {
+            _ = try await client.transitionTask(id: task.id, status: status)
+            await refreshTasks()
+        } catch {
+            taskStatus = "无法更新任务状态：\(error.localizedDescription)"
+        }
+    }
+
     func deleteChatHistory() async {
         guard activeRequest == nil, let client else {
             status = "请先停止当前生成，再删除聊天记录。"
@@ -724,6 +767,7 @@ private struct BetaChatView: View {
     @State private var showingFileImporter = false
     @State private var showingUsage = false
     @State private var showingDeleteChatConfirmation = false
+    @State private var showingTasks = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -754,6 +798,13 @@ private struct BetaChatView: View {
                     Label("模型设置", systemImage: "gearshape")
                 }
                 .accessibilityIdentifier("model-settings-button")
+                Button {
+                    showingTasks = true
+                    Task { await model.refreshTasks() }
+                } label: {
+                    Label("任务", systemImage: "checklist")
+                }
+                .accessibilityIdentifier("tasks-button")
                 Button {
                     showingUsage = true
                     Task { await model.refreshUsage() }
@@ -941,6 +992,10 @@ private struct BetaChatView: View {
         .sheet(isPresented: $showingSettings) {
             BetaModelSettingsView(model: model)
         }
+        .sheet(isPresented: $showingTasks) {
+            TaskBoardView(model: model)
+                .frame(minWidth: 480, minHeight: 420)
+        }
         .sheet(isPresented: $showingUsage) {
             UsageHistoryView(model: model)
                 .frame(minWidth: 520, minHeight: 420)
@@ -1040,6 +1095,61 @@ private struct UsageHistoryView: View {
         }
         let kind = record.costState == "actual" ? "实扣" : "估算"
         return "\(kind) \(amount.formatted()) \(currency)"
+    }
+}
+
+@available(macOS 14.0, *)
+private struct TaskBoardView: View {
+    @Bindable var model: BetaChatModel
+    @State private var title = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("本机任务").font(.title2.bold())
+            Text(model.taskStatus).font(.caption).foregroundStyle(.secondary)
+            HStack {
+                TextField("新任务标题", text: $title)
+                    .textFieldStyle(.roundedBorder)
+                Button("添加") {
+                    let value = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !value.isEmpty else { return }
+                    title = ""
+                    Task { await model.addTask(title: value) }
+                }
+                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            List(model.tasks) { task in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(task.title)
+                        Text(task.status).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if task.status == "PENDING" || task.status == "PAUSED" || task.status == "FAILED" {
+                        Button("准备") { Task { await model.updateTask(task, status: "READY") } }
+                    } else if task.status == "READY" {
+                        Button("开始") { Task { await model.updateTask(task, status: "RUNNING") } }
+                    } else if task.status == "RUNNING" || task.status == "PARTIAL" {
+                        Button("完成") { Task { await model.updateTask(task, status: "COMPLETED") } }
+                    }
+                    Button(role: .destructive) {
+                        Task { await model.deleteTask(task) }
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("删除任务：\(task.title)")
+                }
+            }
+            HStack {
+                Button("刷新") { Task { await model.refreshTasks() } }
+                Spacer()
+                Text("任务保存在本机；完成 30 天后自动删除。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
     }
 }
 

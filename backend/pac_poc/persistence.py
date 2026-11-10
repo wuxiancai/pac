@@ -91,6 +91,119 @@ class EncryptedApplicationStore:
         return self._engine.connect()
 
 
+
+    TASK_TRANSITIONS = {
+        "PENDING": {"READY", "CANCELLED"},
+        "READY": {"RUNNING", "PAUSED", "CANCELLED"},
+        "RUNNING": {"WAITING", "PARTIAL", "COMPLETED", "FAILED", "CANCELLED"},
+        "WAITING": {"READY", "RUNNING", "PAUSED", "CANCELLED"},
+        "PAUSED": {"READY", "CANCELLED"},
+        "PARTIAL": {"READY", "COMPLETED", "FAILED", "CANCELLED"},
+        "FAILED": {"READY", "CANCELLED"},
+        "COMPLETED": set(),
+        "CANCELLED": set(),
+    }
+    TASK_STATUSES = frozenset(TASK_TRANSITIONS)
+
+    def create_task(
+        self,
+        *,
+        title: str,
+        description: str = "",
+        priority: int = 0,
+        schedule_at: str | None = None,
+        idempotency_key: str,
+    ) -> dict[str, object]:
+        if not title.strip() or len(title) > 512:
+            raise ValueError("task title must contain 1 to 512 characters")
+        if len(description) > 20_000:
+            raise ValueError("task description is too long")
+        if isinstance(priority, bool) or not 0 <= priority <= 5:
+            raise ValueError("task priority must be between 0 and 5")
+        if not idempotency_key or len(idempotency_key) > 128:
+            raise ValueError("task idempotency key is invalid")
+        engine = self._require_engine()
+        now = _utc_timestamp()
+        task_id = str(uuid4())
+        with engine.begin() as connection:
+            existing = connection.execute(text(
+                "SELECT id FROM tasks WHERE idempotency_key=:key"
+            ), {"key": idempotency_key}).scalar_one_or_none()
+            if existing:
+                return self.get_task(str(existing), connection=connection)
+            connection.execute(text(
+                "INSERT INTO tasks(id,title,description,status,priority,schedule_at,retry_count,"
+                "idempotency_key,created_at,updated_at) VALUES(:id,:title,:description,'PENDING',"
+                ":priority,:schedule,0,:key,:now,:now)"
+            ), {
+                "id": task_id, "title": title.strip(), "description": description,
+                "priority": priority, "schedule": schedule_at, "key": idempotency_key, "now": now,
+            })
+            return self.get_task(task_id, connection=connection)
+
+    def list_tasks(self, *, include_completed: bool = True, limit: int = 100) -> list[dict[str, object]]:
+        if not 1 <= limit <= 500:
+            raise ValueError("task limit is outside the supported range")
+        engine = self._require_engine()
+        where = "" if include_completed else "WHERE status NOT IN ('COMPLETED','CANCELLED')"
+        with engine.connect() as connection:
+            rows = connection.execute(text(
+                f"SELECT * FROM tasks {where} ORDER BY "
+                "CASE status WHEN 'RUNNING' THEN 0 WHEN 'READY' THEN 1 WHEN 'PENDING' THEN 2 ELSE 3 END, "
+                "priority DESC, updated_at DESC LIMIT :limit"
+            ), {"limit": limit}).mappings().all()
+            return [_task_row(row) for row in rows]
+
+    def get_task(self, task_id: str, *, connection=None) -> dict[str, object]:
+        engine = self._require_engine()
+        if connection is not None:
+            row = connection.execute(text("SELECT * FROM tasks WHERE id=:id"), {"id": task_id}).mappings().first()
+            if row is None:
+                raise KeyError("task not found")
+            return _task_row(row)
+        with engine.connect() as own_connection:
+            return self.get_task(task_id, connection=own_connection)
+
+    def transition_task(self, task_id: str, status: str, *, error_code: str | None = None) -> dict[str, object]:
+        if status not in self.TASK_STATUSES:
+            raise ValueError("unknown task status")
+        engine = self._require_engine()
+        now = _utc_timestamp()
+        with engine.begin() as connection:
+            row = connection.execute(text("SELECT * FROM tasks WHERE id=:id"), {"id": task_id}).mappings().first()
+            if row is None:
+                raise KeyError("task not found")
+            current = str(row["status"])
+            if status != current and status not in self.TASK_TRANSITIONS[current]:
+                raise ValueError("task status transition is not allowed")
+            started_at = row["started_at"] or (now if status == "RUNNING" else None)
+            completed_at = now if status == "COMPLETED" else None
+            connection.execute(text(
+                "UPDATE tasks SET status=:status, started_at=:started, completed_at=:completed, "
+                "error_code=:error, updated_at=:now WHERE id=:id"
+            ), {
+                "id": task_id, "status": status, "started": started_at,
+                "completed": completed_at, "error": error_code, "now": now,
+            })
+            return self.get_task(task_id, connection=connection)
+
+    def delete_task(self, task_id: str) -> bool:
+        engine = self._require_engine()
+        with engine.begin() as connection:
+            result = connection.execute(text("DELETE FROM tasks WHERE id=:id"), {"id": task_id})
+            return result.rowcount > 0
+
+    def purge_expired_completed_tasks(self, *, now: datetime | None = None) -> int:
+        """Delete completed tasks after the user's selected 30-day retention."""
+        cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=30)
+        engine = self._require_engine()
+        with engine.begin() as connection:
+            result = connection.execute(text(
+                "DELETE FROM tasks WHERE status='COMPLETED' AND completed_at IS NOT NULL "
+                "AND completed_at <= :cutoff"
+            ), {"cutoff": cutoff.isoformat()})
+            return int(result.rowcount or 0)
+
     def get_or_create_default_conversation(self) -> dict[str, str]:
         """Return the single Beta chat, creating it on first use."""
         engine = self._require_engine()
@@ -278,3 +391,20 @@ class EncryptedApplicationStore:
 
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _task_row(row) -> dict[str, object]:
+    return {
+        "id": str(row["id"]),
+        "title": str(row["title"]),
+        "description": str(row["description"]),
+        "status": str(row["status"]),
+        "priority": int(row["priority"]),
+        "schedule_at": row["schedule_at"],
+        "started_at": row["started_at"],
+        "completed_at": row["completed_at"],
+        "retry_count": int(row["retry_count"]),
+        "error_code": row["error_code"],
+        "created_at": str(row["created_at"]),
+        "updated_at": str(row["updated_at"]),
+    }

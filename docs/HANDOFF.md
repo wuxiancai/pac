@@ -1270,3 +1270,10 @@
 - Swift 客户端启动后读取历史；发送请求带 conversation ID；历史最多取末尾 20 条作为模型上下文，但完整会话留在本地数据库；新增确认对话框后手动删除当前对话。
 - 验证：持久化与 API 定向 48 passed；全后端 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 294 passed，1 条既有 Starlette/httpx 弃用警告；Swift 全量 47 passed；Beta build 通过；Ruff/mypy/`uv lock --check` 通过。
 - 范围限制：目前只有单个默认对话；无多对话列表、分页/搜索、导出；任务、已确认记忆、30 天清理、备份/恢复未接入。未启动本地 Beta 或触碰真实 Keychain/用户数据/Provider/麦克风。
+
+# 2026-11-10：V2 本机任务持久化与状态操作
+
+- SQLCipher repository 新增任务创建、幂等键去重、列表、状态迁移校验、手动删除和完成 30 天自动清理。清理在后端启动及任务列表读取时执行。Beta API 新增认证的 `GET/POST /tasks`、`PATCH /tasks/{id}/status`、`DELETE /tasks/{id}`；SwiftUI 新增本机任务面板，可创建、准备、开始、完成与删除任务。
+- 状态集合来自规格书 V2+ schema。规格只列 `PENDING/READY/RUNNING/WAITING/PAUSED/PARTIAL/COMPLETED/FAILED/CANCELLED`，未定义迁移边；当前迁移图作为可测试的实现暂定规则记录，V2 完整验收前需按实际业务重新确认。未接入后台执行、周期任务、外部日历/待办、通知或外部写操作。
+- 验证：定向 persistence + API → 50 passed；最终后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 296 passed，1 条既有 Starlette/httpx 弃用警告；Swift 全量 47 passed；Beta build、Ruff、mypy、`uv lock --check` 通过。中途一次全量出现已登记 APFS-128 临时映像通用 `RuntimeError`，目标用例隔离复跑 1 passed，随后全量重跑通过，根因未判定。
+- 记录：已完成任务按 UTC 时间 30 天删除，在启动及列表刷新时运行；App 长时间不重启且用户不打开任务面板时，删除会延至下一次触发。后续应加本机定时清理/删除结果可见性验收。
