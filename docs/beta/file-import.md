@@ -15,6 +15,8 @@
 
 2026-11-09：macOS Beta 将文件导入限制为单个在途任务。导入期间禁用重复文件选择、发送和语音入口；模型层也拒绝重入。这样避免用户连续打开选择器时并发读取/上传多个 10 MiB 文件，并确保前端最多 4 个附件的限制不会因并发检查竞态而被绕过。后端 8 文件/20 MiB 和每次聊天最多 4 个 ID 限制仍是独立保护。2026-11-10 后端 API 也增加单飞接收锁：已有上传尚未完成时，第二个上传立即收到 409，且不消费其请求体；因此请求流暂存不会按并发上传数倍增，单请求仍受 10 MiB 流上限约束。Swift 全量 40 项通过，`personal-assistant-beta` 构建通过。之后 GUI 文件选择、导入暂存和移除已用 141-byte 合成 TXT 在本机 Ollama 模式验证通过；附件进入聊天上下文的 GUI 闭环仍待人工验证。
 
+2026-11-10 Swift 聊天请求契约新增 URLProtocol 回归：捕获 `/chat/stream` 请求，验证 loopback Bearer 认证和 `import_ids` 序列化。Swift 全量 44 项通过，`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。此自动回归证明客户端会提交选中的资料 ID，不替代 GUI 对话中资料引用的手动验收。
+
 ## 尚未启用
 
 PDF 仍禁用。新增隔离的 pypdf 7.0.0 安全 POC（`backend/pac_poc/pdf_import_poc.py`），仅在 `phase4-pdf-poc` 可选 extra 下可用，不接入 Beta API/UI。它在独立子进程解析，输入上限 10 MiB、CPU 软/硬限额 4/5 秒、墙钟超时 5 秒、页树最多 100 页、提取文本最多 200,000 字符，并设置解析对象/流解压/工作预算；超时会终止子进程。7 项自动化测试覆盖有效 PDF、输入超限、无效 PDF、页数边界、FlateDecode 解压上限和父进程超时转换（超时通过模拟覆盖）。新增的合成解压炸弹 PDF 小于 10 KB，内容解压后超过 worker 的 2 MB 单过滤器上限，实际由隔离子进程拒绝；另一项构造 200,001 字符页面文本，验证 worker 的 200,000 字符上限。

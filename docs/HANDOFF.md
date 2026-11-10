@@ -1,3 +1,9 @@
+# 2026-11-10：B5 聊天资料 ID 客户端契约回归
+
+- 新增 Swift URLProtocol 回归，捕获认证 loopback `/chat/stream` 请求并验证 `import_ids` 已序列化。
+- 验证：`swift test --package-path poc/macos-audio` → 44 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。第一次全量尝试暴露测试夹具共享捕获器竞态/URLSession body stream 读取方式问题，隔离捕获器并读取 stream 后复跑通过。
+- 同步 `docs/beta/file-import.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。GUI 实际资料引用仍待人工验收；未发起云请求、未读取 Keychain、未采集麦克风。
+
 # 2026-11-09：B5 TXT/Markdown GUI 选择与移除实测
 
 - 通过当前仓库构建的 Beta 文件选择器选中仓库 `.poc-data` 下 141-byte 合成 TXT。UI 状态显示文件名与 65 字符计数，附件 chip 显示文件；点击“移除资料”后 chip 消失且状态提示本机临时资料已移除。证明当前 GUI 选择/读取/本机 API 暂存/显式删除链路可用。

@@ -39,6 +39,8 @@
 
 ## 当前执行顺序
 
+2026-11-10 B5 补充自动客户端证据：Swift URLProtocol 回归捕获认证 loopback `/chat/stream` 请求并确认 `import_ids` 序列化；Swift 全量 44 项通过，`personal-assistant-beta` target 构建通过。它不替代 GUI 对话中实际引用资料的手动验收，B5 保持 IN PROGRESS。
+
 0. **阶段 1 工程底座（DONE，当前决策范围）**：Loopback API trace、统一错误、依赖注入、最小 health、集中配置和可注入进程启动设置均完成；云凭据保存/删除需 Touch ID 或设备密码 gate。Ruff、mypy、secret scan、锁文件、Python/Swift 测试及 `personal-assistant-beta` 产品构建进入 CI。数据库/迁移/会话持久化/静态加密和 metadata-only 30 天审计日志明确未实现，按 D-003/D-007 触发条件延期；因此这不是规格书完整 V1 持久化底座验收。
 
 1. **B0 应用可运行骨架（DONE）**：SwiftUI 单实例窗口的本机 Beta 入口已完成；本机后端启动、健康状态、错误恢复和关窗退出清理均已验证。

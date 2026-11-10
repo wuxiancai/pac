@@ -102,6 +102,64 @@ private final class ImportResponseURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class ChatRequestCapture: @unchecked Sendable {
+    static let shared = ChatRequestCapture()
+    private let lock = NSLock()
+    private var storedRequest: URLRequest?
+    private var storedBody: Data?
+
+    func record(_ request: URLRequest) {
+        var body = request.httpBody
+        if body == nil, let stream = request.httpBodyStream {
+            stream.open()
+            var bytes: [UInt8] = []
+            var buffer = [UInt8](repeating: 0, count: 8_192)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                if count <= 0 { break }
+                bytes.append(contentsOf: buffer.prefix(count))
+            }
+            stream.close()
+            body = Data(bytes)
+        }
+        lock.lock()
+        storedRequest = request
+        storedBody = body
+        lock.unlock()
+    }
+
+    func take() -> (URLRequest, Data?)? {
+        lock.lock()
+        defer { lock.unlock() }
+        let request = storedRequest
+        let body = storedBody
+        storedRequest = nil
+        storedBody = nil
+        guard let request else { return nil }
+        return (request, body)
+    }
+}
+
+private final class ChatRequestCaptureURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        ChatRequestCapture.shared.record(request)
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "text/event-stream"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data("data: {\"done\":true}\n\n".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 @available(macOS 12.0, *)
 @Test func localAPIClientBuildsAuthenticatedLoopbackRequest() throws {
     let client = try LocalAPIClient(
@@ -166,6 +224,32 @@ private final class ImportResponseURLProtocol: URLProtocol {
         #expect(error.message == "本机模型请求失败，请确认 Ollama 正在运行且模型已安装")
         #expect(error.localizedDescription == error.message)
     }
+}
+
+@available(macOS 12.0, *)
+@Test func chatStreamIncludesImportedDocumentIDsInAuthenticatedRequest() async throws {
+    _ = ChatRequestCapture.shared.take()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ChatRequestCaptureURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43127")!,
+        token: "test-token",
+        sessionConfiguration: configuration
+    )
+
+    for try await _ in client.streamChat(
+        messages: [LocalChatMessage(role: "user", content: "Summarize the attached notes")],
+        importedDocumentIDs: ["11111111-1111-4111-8111-111111111111"]
+    ) {}
+
+    let captured = try #require(ChatRequestCapture.shared.take())
+    #expect(captured.0.url?.path == "/chat/stream")
+    #expect(captured.0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
+    let body = try #require(captured.1)
+    let object = try JSONSerialization.jsonObject(with: body)
+    let payload = try #require(object as? [String: Any])
+    #expect(payload["import_ids"] as? [String] == ["11111111-1111-4111-8111-111111111111"])
+    #expect(payload["messages"] != nil)
 }
 
 @available(macOS 12.0, *)
