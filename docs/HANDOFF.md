@@ -1389,3 +1389,8 @@
 - 新增后端三角色上下文回归、API 任意 profile 拒绝回归与 Swift 请求序列化断言。验证：后端 all-extras/all-groups 全量 318 passed（1 条既有 Starlette/httpx 弃用警告）；Swift 全量 56 passed；Beta product build 成功；Ruff 与变更 Python 模块 mypy 通过。全包 mypy 仍报未改动的 `pac_poc/concurrent_probe.py` 两个泛型类型错误（第 48、57 行）。`git diff --check` 通过。
 - 完成提交后继续 V2/V3 剩余工作；真实桌面角色切换/回复行为仍待 GUI 验收。
 - B7 自动化实现完成。接下来继续收敛 V2 状态机/通知与 V3 Skills、协作等按决策允许的主干项；未决且不阻断的能力继续记录门禁，不把范围假设为已授权。
+
+# 2026-11-10：V1.1 记忆来源跨会话跳转
+
+- 记忆来源只读面板现在可以“在对话中查看”：客户端按 100 条 keyset 历史页向前加载来源会话，直到找到来源消息，再切换会话并滚动至该消息；不存在或已删除的来源会显示状态，不影响原有来源查看。
+- 来源正文仍只从本机 SQLCipher API 读取，不会加入模型上下文或发送给 Provider。验证：`swift test --package-path poc/macos-audio` 56 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功；`git diff --check` 通过。未做人工 GUI 操作验收。

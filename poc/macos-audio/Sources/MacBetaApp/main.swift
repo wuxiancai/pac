@@ -118,6 +118,7 @@ final class BetaChatModel {
     private(set) var hasOlderMessages = false
     private(set) var isLoadingOlderMessages = false
     private(set) var conversationID: String?
+    private(set) var pendingSourceMessageID: String?
     private(set) var conversations: [LocalConversationItem] = []
     private(set) var tasks: [LocalTaskItem] = []
     private(set) var memories: [LocalMemoryItem] = []
@@ -511,6 +512,41 @@ final class BetaChatModel {
         } catch {
             status = "无法打开该会话：\(error.localizedDescription)"
         }
+    }
+
+    func openMemorySourceInChat(_ source: LocalMemorySource) async {
+        guard activeRequest == nil, let client else {
+            status = "请先停止当前生成，再打开来源会话。"
+            return
+        }
+        do {
+            var history = try await client.chatHistory(conversationID: source.conversationID)
+            var loadedMessages = history.messages
+            while !loadedMessages.contains(where: { $0.id == source.messageID }),
+                  history.hasMore,
+                  let cursor = loadedMessages.first?.id {
+                history = try await client.chatHistory(
+                    conversationID: source.conversationID, beforeMessageID: cursor
+                )
+                loadedMessages = history.messages + loadedMessages
+            }
+            guard loadedMessages.contains(where: { $0.id == source.messageID }) else {
+                status = "来源消息已不在会话历史中。"
+                return
+            }
+            conversationID = history.conversationID
+            messages = loadedMessages
+            hasOlderMessages = history.hasMore
+            lastAssistantResponseInterrupted = false
+            pendingSourceMessageID = source.messageID
+            status = "已打开记忆来源会话：\(source.conversationTitle)"
+        } catch {
+            status = "无法打开记忆来源会话：\(error.localizedDescription)"
+        }
+    }
+
+    func clearPendingSourceNavigation() {
+        pendingSourceMessageID = nil
     }
 
     func renameConversation(_ conversation: LocalConversationItem, title: String) async {
@@ -1216,6 +1252,11 @@ private struct BetaChatView: View {
                     guard !model.messages.isEmpty else { return }
                     proxy.scrollTo(model.messages.count - 1, anchor: .bottom)
                 }
+                .onChange(of: model.pendingSourceMessageID) { _, messageID in
+                    guard let messageID else { return }
+                    proxy.scrollTo(messageID, anchor: .center)
+                    model.clearPendingSourceNavigation()
+                }
             }
             Divider()
             if !model.importedTextFiles.isEmpty {
@@ -1735,6 +1776,14 @@ private struct ConfirmedMemoryView: View {
                 }
                 .navigationTitle("\(memory.subject) · 来源")
                 .toolbar {
+                    ToolbarItem(placement: .secondaryAction) {
+                        if let source = model.memorySource {
+                            Button("在对话中查看") {
+                                sourceMemory = nil
+                                Task { await model.openMemorySourceInChat(source) }
+                            }
+                        }
+                    }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("完成") { sourceMemory = nil }
                     }

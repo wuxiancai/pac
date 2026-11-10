@@ -49,7 +49,7 @@
 
 ## 当前执行顺序
 
-2026-11-10 B3/V1.1 持久化切片：SQLCipher store/schema、Keychain 密钥私有管道、多会话列表/新建/切换/分别删除、指定会话历史读写，V2 本机任务 CRUD/状态迁移/30 天清理已分段提交。当前任务状态转移图是明确记录的实现暂定规则，规格只列状态集合，V2 完整验收前仍需产品语义复核。当前后端全量 305 passed（1 条既有 Starlette/httpx 弃用警告）；Swift 全量 51 项、Beta build、Ruff、mypy、`uv lock --check` 通过。V1.1 已确认记忆来源/修正/历史查看与会话重命名均已接入；来源 UUID 仅在本地数据库/UI 使用，不随 Model Gateway 消息发送。此前全量曾有 APFS-128 临时映像间歇 RuntimeError，目标单测及重跑全量通过，原因未判定。任务和确认记忆基础 UI/API 已接入；记忆版本历史只读查看已接入；来源跨会话选择/跳转、历史分页/加载边界、备份/恢复仍未完成；会话重命名验证后的当前回归为后端 300 项、Swift 51 项通过。会话现可重命名。纠错编辑现需显式确认且保留版本快照。
+2026-11-10 B3/V1.1 持久化切片：SQLCipher store/schema、Keychain 密钥私有管道、多会话列表/新建/切换/分别删除、指定会话历史读写，V2 本机任务 CRUD/状态迁移/30 天清理已分段提交。当前任务状态转移图是明确记录的实现暂定规则，规格只列状态集合，V2 完整验收前仍需产品语义复核。当前后端全量 305 passed（1 条既有 Starlette/httpx 弃用警告）；Swift 全量 51 项、Beta build、Ruff、mypy、`uv lock --check` 通过。V1.1 已确认记忆来源/修正/历史查看与会话重命名均已接入；来源 UUID 仅在本地数据库/UI 使用，不随 Model Gateway 消息发送。此前全量曾有 APFS-128 临时映像间歇 RuntimeError，目标单测及重跑全量通过，原因未判定。任务和确认记忆基础 UI/API 已接入；记忆版本历史只读查看已接入；历史分页/加载边界、备份/恢复验收仍未完成；会话重命名验证后的当前回归为后端 300 项、Swift 51 项通过。会话现可重命名。纠错编辑现需显式确认且保留版本快照。
 
 2026-11-10 B5 补充自动客户端证据：Swift URLProtocol 回归捕获认证 loopback `/chat/stream` 请求并确认 `import_ids` 序列化；Swift 全量 44 项通过，`personal-assistant-beta` target 构建通过。另在 API 调用 ContextBuilder 前增加附件字符数下限检查，100,000 字符超大附件在 Orchestrator 构建前返回 413；后端全量 282 passed，1 条既有警告。它不替代 GUI 对话中实际引用资料的手动验收，B5 保持 IN PROGRESS。
 
