@@ -105,14 +105,32 @@ class CloseFailingStream:
         raise RuntimeError("synthetic stream close failure")
 
 
+class CancelCloseFailingStream(CloseFailingStream):
+    def __init__(self, started: asyncio.Event, pending: asyncio.Event) -> None:
+        super().__init__()
+        self.started = started
+        self.pending = pending
+
+    async def __anext__(self) -> str:
+        if not self.sent:
+            self.sent = True
+            return "one chunk"
+        self.started.set()
+        await self.pending.wait()
+        raise StopAsyncIteration
+
+
 class CloseFailingAdapter:
     is_local = False
+
+    def __init__(self, stream: CloseFailingStream | None = None) -> None:
+        self.stream_instance = stream
 
     async def generate(self, request: LocalModelRequest) -> str:
         raise AssertionError("test uses a stream")
 
     def stream(self, request: LocalModelRequest) -> CloseFailingStream:
-        return CloseFailingStream()
+        return self.stream_instance or CloseFailingStream()
 
 
 def remote_request(**overrides: object) -> LocalModelRequest:
@@ -372,6 +390,30 @@ def test_usage_stream_releases_consent_lease_when_upstream_close_fails() -> None
 
         with pytest.raises(RuntimeError, match="synthetic stream close failure"):
             await consume()
+
+        assert consent._in_flight == {}
+
+    asyncio.run(run())
+
+
+def test_usage_stream_preserves_cancellation_when_upstream_close_fails() -> None:
+    async def run() -> None:
+        consent = ConsentManager()
+        grant_consent(consent, actions=frozenset({ModelAction.STREAM}))
+        started = asyncio.Event()
+        pending = asyncio.Event()
+        adapter = CloseFailingAdapter(CancelCloseFailingStream(started, pending))
+        gateway = make_gateway(consent, adapter)  # type: ignore[arg-type]
+
+        async def consume() -> None:
+            async for _ in gateway.stream_with_usage(remote_request()):
+                pass
+
+        task = asyncio.create_task(consume())
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
 
         assert consent._in_flight == {}
 

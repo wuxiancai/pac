@@ -213,6 +213,7 @@ class ModelGateway:
     ) -> AsyncIterator[ProviderStreamChunk]:
         adapter = self._get_authorized_adapter(request, ModelAction.STREAM)
         lease = self._begin_operation(adapter, request, ModelAction.STREAM)
+        stream: Any = None
         try:
             stream_with_usage = getattr(adapter, "stream_with_usage", None)
             if callable(stream_with_usage):
@@ -223,13 +224,21 @@ class ModelGateway:
                 stream = adapter.stream(request)
                 async for text in stream:
                     yield ProviderStreamChunk(text=text)
-        finally:
-            try:
-                close = getattr(locals().get("stream"), "aclose", None)
-                if close is not None:
+        except BaseException:
+            close = getattr(stream, "aclose", None)
+            if close is not None:
+                try:
                     await close()
-            finally:
-                self._close_operation(lease)
+                except Exception:
+                    # Keep the original stream error or cancellation as the result.
+                    pass
+            raise
+        else:
+            close = getattr(stream, "aclose", None)
+            if close is not None:
+                await close()
+        finally:
+            self._close_operation(lease)
 
     async def call_with_tools(self, request: LocalModelRequest) -> ToolCallResult:
         adapter = self._get_authorized_adapter(request, ModelAction.TOOL_PROPOSAL)
