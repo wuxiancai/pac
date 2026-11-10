@@ -60,3 +60,5 @@
 | [`poc/phase0-traceability.md`](poc/phase0-traceability.md) | 阶段 0 要求、证据、缺口及门禁的权威追踪矩阵 |
 
 - 2026-11-10 本机 Provider 传输错误映射：修正 `httpx.RequestError` 在 Ollama 请求时错误套用云端失败/计费提示的问题；连接错误提示检查 Ollama，响应超时提示本机生成可能仍在继续。窄回归 8 passed，Ruff/mypy 通过；后端全量 276 passed（1 条既有弃用警告）。
+
+- 2026-11-10 阶段 6 本机 CI 等价门禁复核（代码基线 `0418d25`）：Ruff、mypy、`uv lock --check`、后端 all-extras/all-groups pytest（276 passed，1 条既有 Starlette/httpx 弃用警告）、compileall、tracked-file detect-secrets-hook、Swift 43 项及 Beta target build 均通过。未触发远端 GitHub Actions。

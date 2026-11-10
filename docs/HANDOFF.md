@@ -1124,3 +1124,11 @@
 - 现在 Ollama 连接错误提示检查本机服务与 loopback 地址；读/连接超时提示 Ollama 可能仍在本机生成并建议先检查状态。底层异常不回显。云 Provider 原来的“是否已收到请求/用量记录”提示不变。
 - 新增合成 `ConnectError` / `ReadTimeout` 回归，确保输出为本机措辞且不包含异常标记或“云端”；同组本机/云端错误回归 8 passed。Ruff 与 mypy 通过；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：276 passed、1 条既有 Starlette/httpx 弃用警告。
 - 没有真实 Provider 请求或 GUI 错误展示验收；GUI 仍待可用桌面操作。已更新 `docs/beta/macOS-beta-chat.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。
+
+
+### 2026-11-10：阶段 6 本机 CI 等价门禁复核
+
+- 在代码基线 `0418d25` 运行 `.github/workflows/ci.yml` 对应本机门禁：后端 `ruff check pac_poc tests`、`mypy`、`uv lock --check`、all-extras/all-groups pytest、`compileall` 均通过；tracked-file `detect-secrets-hook` 通过。
+- Python 全量：276 passed，1 条既有 Starlette/httpx 弃用警告。Swift `swift test --package-path poc/macos-audio`：43 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。
+- 未触发远端 GitHub Actions；本机等价门禁不能证明 PR/push workflow 已运行。工作区保持干净。
+- 后续继续阶段 2 可本机闭环开发；GUI 手动验收、D-005 预算决策、真实 Provider usage/cost 和 PDF 安全启用证据仍分别保持未完成。
