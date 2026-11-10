@@ -1675,6 +1675,12 @@
 - 后续改用已完成的本机会话回复点按“本机朗读回复”，状态变为“已开始本机朗读回复”；点按“停止本机朗读”后状态变为“已停止本机朗读”。TTS 控制器 UI 启停路径通过。由于无法独立确认设备扬声器/耳机的可听性，声学输出仍待用户设备确认。
 - 未发起新的模型请求；所读内容是本机 SQLCipher 中的合成测试回复。无云 Provider、麦克风或 Keychain 凭据操作。
 
+### 2026-11-10：B3 已保存记忆来源跳转 GUI 尝试
+
+- 为验收在本机 SQLCipher 创建临时合成记忆 `临时验收记忆 PAC-MEMORY-JUMP-20261110`，来源关联科技节用户消息。首次 GUI 发现记忆卡片把编辑/版本/来源/删除按钮挤在标题行，改为独立操作行并新增来源按钮 accessibility identifier；Swift 全量 63 passed，Beta target build 通过。随后“查看来源”成功打开详情，显示原始用户消息、会话标题和时间。
+- 来源详情原有“在对话中查看”藏于 toolbar secondary action，UI 未显示。已改为详情中的明确按钮并增加 accessibility identifier。新代码 Swift 全量 63 passed、Beta target build 通过；退出并用仓库脚本重启后，CUA 对 Beta 窗口连续超时，尚未验证新按钮跳回原会话/定位消息。
+- 临时合成记忆尚未删除；需要在 Beta GUI 恢复可访问后完成跳转复测并删除该条测试记忆。期间无云请求、麦克风或 Keychain 操作。
+
 ### 2026-11-10：阶段 6 精确型号 capability 查询接入
 
 - Swift 本机 API 客户端新增认证 loopback `GET /model-capabilities`，参数使用当前精确 Provider/Model；响应 Provider/Model 不匹配时拒绝，并将缺省 capability 状态呈现为 `unknown`。模型设置新增显式“查询当前型号能力”按钮，展示核验时间、区域、证据引用及所有能力的 supported/limited/unsupported/unknown，切换型号后清除旧结果，不调用外部 Provider。

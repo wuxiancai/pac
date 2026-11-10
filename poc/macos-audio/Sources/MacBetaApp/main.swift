@@ -2028,9 +2028,13 @@ private struct ConfirmedMemoryView: View {
             }
             List(model.memories) { memory in
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(memory.subject).font(.headline)
-                        Spacer()
+                    Text(memory.subject).font(.headline)
+                    Text(memory.content).font(.body)
+                    Text("\(memory.category) · 用户确认").font(.caption).foregroundStyle(.secondary)
+                    if let sourceMessageID = memory.sourceMessageID {
+                        Text("来源消息：\(sourceMessageID)").font(.caption2).foregroundStyle(.tertiary)
+                    }
+                    HStack(spacing: 12) {
                         Button("编辑") {
                             editingID = memory.id
                             subject = memory.subject
@@ -2050,7 +2054,9 @@ private struct ConfirmedMemoryView: View {
                                 Task { await model.refreshMemorySource(id: memory.id) }
                             }
                             .buttonStyle(.borderless)
+                            .accessibilityIdentifier("view-memory-source-\(memory.id)")
                         }
+                        Spacer(minLength: 4)
                         Button(role: .destructive) {
                             Task { await model.deleteMemory(memory) }
                         } label: {
@@ -2059,12 +2065,8 @@ private struct ConfirmedMemoryView: View {
                         .buttonStyle(.borderless)
                         .accessibilityLabel("删除记忆：\(memory.subject)")
                     }
-                    Text(memory.content).font(.body)
-                    Text("\(memory.category) · 用户确认").font(.caption).foregroundStyle(.secondary)
-                    if let sourceMessageID = memory.sourceMessageID {
-                        Text("来源消息：\(sourceMessageID)").font(.caption2).foregroundStyle(.tertiary)
-                    }
                 }
+                .padding(.vertical, 4)
             }
             HStack {
                 Button("刷新") { Task { await model.refreshMemories() } }
@@ -2133,6 +2135,12 @@ private struct ConfirmedMemoryView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                             ScrollView { Text(source.content).frame(maxWidth: .infinity, alignment: .leading) }
                             Text(source.createdAt).font(.caption2).foregroundStyle(.tertiary)
+                            Button("在对话中查看") {
+                                sourceMemory = nil
+                                Task { await model.openMemorySourceInChat(source) }
+                            }
+                            .accessibilityIdentifier("open-memory-source-in-chat")
+                            Spacer(minLength: 0)
                         }
                         .padding()
                     } else {
@@ -2141,14 +2149,6 @@ private struct ConfirmedMemoryView: View {
                 }
                 .navigationTitle("\(memory.subject) · 来源")
                 .toolbar {
-                    ToolbarItem(placement: .secondaryAction) {
-                        if let source = model.memorySource {
-                            Button("在对话中查看") {
-                                sourceMemory = nil
-                                Task { await model.openMemorySourceInChat(source) }
-                            }
-                        }
-                    }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("完成") { sourceMemory = nil }
                     }
