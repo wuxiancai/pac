@@ -77,6 +77,13 @@
 
 # 2026-11-10：阶段 6 本机全量门禁复核
 
+### 2026-11-10：D-014 离线候选重复资源观察
+
+- 在 12 条合成记忆、24 条中英改写题、12 条精确词面控制及 12 条无相关项负例上运行三个独立严格离线进程。三轮质量指标一致：Embedding 改写 top-1 23/24、top-3 24/24；词面控制 12/12；负例候选 12/12 均返回（当前无拒答阈值）；FTS5 改写 0/24、词面 12/12、负例 0/12。
+- `/usr/bin/time -l` real time：2.03、1.57、1.48 秒；user CPU：1.69、1.70、1.68 秒；system CPU：0.34、0.20、0.21 秒；maximum RSS：911,540,224、909,656,064、910,770,176 bytes。该负载 real 中位数 1.57 秒；maximum RSS 范围 909,656,064–911,540,224 bytes。
+- 命令：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp HF_HOME=.poc-data/hf-home HF_HUB_CACHE=.poc-data/hf-home/hub XDG_CACHE_HOME=.poc-data/xdg-cache HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 /usr/bin/time -l uv run --locked --extra phase0-embedding python scripts/run_local_embedding_eval.py`（工作目录 `backend/`）。没有网络或下载。
+- 边界：权重缓存已存在，后续进程可能受 OS 文件缓存影响；未测量冷缓存启动、并发、能耗或产品规模资源目标。候选是 384 维，当前 POC 只用 Python `float` tuple 暂存于内存，没有确定产品存储格式。Embedding 仍关闭；更大、独立复核的平衡人工标注集仍待建设。
+
 ### 2026-11-10：B3 聊天消息列表渲染分配优化
 
 - `LocalChatMessage` 新增仅内存使用的稳定 UUID；自定义编码仍只发送 `role` 与 `content`，自定义相等比较仍只比较原有 API 字段。流式 token 替换助手消息时复用其 UUID。
