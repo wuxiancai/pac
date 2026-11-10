@@ -1525,3 +1525,9 @@
 - 已确认记忆表单从本地 SQLCipher 会话列表选择来源会话，显示最近 100 条稳定 ID 消息，并通过显式按钮按 keyset cursor 加载更早记录；用户可选“不关联聊天消息”。保存仍由用户明确确认，数据不发给 Provider。现有已关联来源继续支持只读查看并跳回原会话定位消息。
 - 验证：后端新增跨会话记忆来源 API 回归，确认读取返回所选来源会话标题/内容；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 341 passed、1 条既有 Starlette/httpx 弃用警告；Ruff/mypy 通过。Swift `swift test --package-path poc/macos-audio` → 60 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。未在 GUI 中操作已有持久化会话；新来源选择、分页和跳转需要用户实机验收。
 - 后续竞态修正：会话选择变更时递增来源加载代次，旧请求即使晚到也不能覆盖当前会话消息/错误状态；新的来源页读取可立即开始。修正后 Swift 全量 60 passed、Beta target build 成功，`git diff --check` 通过。
+
+### 2026-11-10：清除后端核心模块 mypy 类型错误
+
+- 将并发 ASR/模型探针的局部 `measure` 函数改为独立泛型，修复两个异构 Callable 被误判为同一类型的问题；为 FastEmbed 候选引擎定义结构化协议，并在可注入工厂边界显式收窄类型。
+- 验证：`UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked mypy pac_poc` → 37 个模块无错误；Ruff 两个修改模块通过；定向 `tests/test_concurrent_asr_llm_probe.py tests/test_local_embedding_poc.py` → 9 passed；后端全量同离线设置运行 `uv run --locked --all-extras --all-groups pytest -q` → 341 passed，1 条既有 Starlette/httpx 弃用警告。
+- 影响范围：仅类型注解与静态协议，运行时 embedding、测量和授权行为不变。后续继续 B1/B3/B5/B6/B9 尚未完成的验收与阶段工作。

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 
 
 SUPPORTED_CANDIDATE_MODELS = frozenset(
@@ -16,6 +16,10 @@ class EmbeddingProvider(Protocol):
     model_id: str
 
     def embed(self, texts: list[str]) -> list[tuple[float, ...]]: ...
+
+
+class _EmbeddingEngine(Protocol):
+    def embed(self, texts: list[str]) -> Iterable[Sequence[float]]: ...
 
 
 class FastEmbedCandidate:
@@ -39,11 +43,14 @@ class FastEmbedCandidate:
             from fastembed import TextEmbedding
 
             engine_factory = TextEmbedding
-        self._engine = engine_factory(
-            model_name=model_id,
-            cache_dir=str(self.cache_dir),
-            local_files_only=not allow_download,
-            threads=2,
+        self._engine = cast(
+            _EmbeddingEngine,
+            engine_factory(
+                model_name=model_id,
+                cache_dir=str(self.cache_dir),
+                local_files_only=not allow_download,
+                threads=2,
+            ),
         )
 
     def embed(self, texts: list[str]) -> list[tuple[float, ...]]:

@@ -10,6 +10,7 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
+V = TypeVar("V")
 
 
 @dataclass(frozen=True)
@@ -36,7 +37,7 @@ def run_concurrently(
     """Start two independent POC workloads together and measure their actual overlap."""
     start_barrier = Barrier(2)
 
-    def measure(work: Callable[[], T]) -> WorkSample[T]:
+    def measure(work: Callable[[], V]) -> WorkSample[V]:
         start_barrier.wait()
         started_at = perf_counter()
         value = work()
