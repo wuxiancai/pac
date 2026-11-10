@@ -232,6 +232,18 @@ class TaskTransitionRequest(BaseModel):
     error_code: str | None = Field(default=None, max_length=64)
 
 
+class CalendarEventAuditRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    trace_id: UUID
+    resource_id: UUID
+    decision: Literal["ATTEMPTED", "SUCCEEDED", "FAILED", "CANCELLED", "DENIED"]
+    reason_code: Literal[
+        "user_approved", "event_created", "event_creation_failed",
+        "audit_finalization_failed", "user_cancelled", "permission_denied",
+    ]
+
+
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -715,6 +727,38 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 for record in usage_ledger.list_records(limit=limit)
             ],
         }
+
+    @router.post("/security-audit/calendar-event", status_code=201)
+    async def record_calendar_event_audit(
+        payload: CalendarEventAuditRequest,
+    ) -> dict[str, bool]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="security audit storage is unavailable")
+        allowed_reason_by_decision = {
+            "ATTEMPTED": {"user_approved"},
+            "SUCCEEDED": {"event_created"},
+            "FAILED": {"event_creation_failed", "audit_finalization_failed"},
+            "CANCELLED": {"user_cancelled"},
+            "DENIED": {"permission_denied"},
+        }
+        if payload.reason_code not in allowed_reason_by_decision[payload.decision]:
+            raise HTTPException(status_code=422, detail="calendar audit status is invalid")
+        try:
+            persistent_store.record_security_audit_event(
+                trace_id=str(payload.trace_id),
+                action="calendar_event_create",
+                resource_id=str(payload.resource_id),
+                decision=payload.decision,
+                reason_code=payload.reason_code,
+                data_sensitivity=DataLevel.L2.value,
+                provider_id="eventkit",
+                model_id="calendar",
+                region="macos-default-calendar",
+                purpose="v3-calendar-event-create",
+            )
+        except Exception:
+            raise HTTPException(status_code=503, detail="security audit storage is unavailable") from None
+        return {"recorded": True}
 
     @router.get("/model-capabilities")
     async def get_model_capabilities(

@@ -161,3 +161,8 @@ swift test --package-path poc/macos-audio
 
 - 专业角色及综合层现要求不编造用户未提供的日期、时长、数量、预算，信息缺失时标记待确认。定向 API 回归 1 passed；Ruff、mypy 通过；后端全量 346 passed、1 条既有弃用警告。
 - 科技节同题 GUI 复测未再出现臆造时长，但综合把明确要求的“场地清洁”改为“工具铺好现场”，且观点仍有超长；仅观察到单题变化，不能证明约束稳定。B9 继续 IN PROGRESS。
+
+### 2026-11-10 V3 日历事件逐次审批范围
+
+- 用户指定第一个外部写入只创建一个非重复事件到 macOS 默认日历。用户手动填事件、确认预览后逐次批准；多 Agent 与 Skills 不能触发 EventKit 写入。目标日历可能由 macOS 账户同步，UI 必须清楚披露。
+- B10 已增加认证审计 API，按固定路由/原因码把 `ATTEMPTED` 和终态写入 SQLCipher；请求体不含标题、时间等事件内容。若审批前审计失败，客户端必须阻止写入。EventKit 服务和 UI 尚未实现；D-022 与工作证据见 `docs/DECISIONS.md`、`docs/HANDOFF.md`。

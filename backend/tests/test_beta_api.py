@@ -978,6 +978,53 @@ def test_cloud_context_limit_rejection_is_audited_before_provider_access(tmp_pat
     store.close()
 
 
+def test_calendar_event_audit_is_metadata_only_and_status_scoped(tmp_path: Path) -> None:
+    store = EncryptedApplicationStore(
+        path=(tmp_path / "calendar-event-audit.db").resolve(), key=b"a" * 32
+    )
+    store.open()
+    app = create_beta_api(
+        session=LocalAPISession(token="calendar-audit-token"), persistence_store=store
+    )
+    headers = {
+        "authorization": "Bearer calendar-audit-token",
+        "host": "127.0.0.1",
+    }
+    trace_id = str(uuid4())
+    resource_id = str(uuid4())
+    with TestClient(app) as client:
+        denied = client.post(
+            "/security-audit/calendar-event",
+            headers=headers,
+            json={"trace_id": trace_id, "resource_id": resource_id,
+                  "decision": "SUCCEEDED", "reason_code": "user_approved"},
+        )
+        attempted = client.post(
+            "/security-audit/calendar-event",
+            headers=headers,
+            json={"trace_id": trace_id, "resource_id": resource_id,
+                  "decision": "ATTEMPTED", "reason_code": "user_approved"},
+        )
+        succeeded = client.post(
+            "/security-audit/calendar-event",
+            headers=headers,
+            json={"trace_id": trace_id, "resource_id": resource_id,
+                  "decision": "SUCCEEDED", "reason_code": "event_created"},
+        )
+        usage = client.get("/usage", headers=headers)
+
+    assert denied.status_code == 422
+    assert attempted.status_code == 201 and attempted.json() == {"recorded": True}
+    assert succeeded.status_code == 201
+    events = usage.json()["audit_events"]
+    assert [event["decision"] for event in events[:2]] == ["SUCCEEDED", "ATTEMPTED"]
+    assert all(event["action"] == "calendar_event_create" for event in events)
+    assert all(event["provider_id"] == "eventkit" for event in events)
+    assert all(event["data_sensitivity"] == "L2" for event in events)
+    assert not any("title" in event or "start" in event or "notes" in event for event in events)
+    store.close()
+
+
 def test_completed_task_and_security_audit_retention_cleanup_runs_periodically() -> None:
     class StoreStub:
         task_purges = 0

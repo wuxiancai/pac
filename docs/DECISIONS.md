@@ -47,7 +47,8 @@
 | D-018 | V2 本机任务状态迁移 | **Accepted（2026-11-10）**：采用当前已实现迁移图。`PENDING→READY/CANCELLED`；`READY→RUNNING/PAUSED/CANCELLED`；`RUNNING→WAITING/PARTIAL/COMPLETED/FAILED/CANCELLED`；`WAITING→READY/RUNNING/PAUSED/CANCELLED`；`PAUSED→READY/CANCELLED`；`PARTIAL→READY/COMPLETED/FAILED/CANCELLED`；`FAILED→READY/CANCELLED`；`COMPLETED` 与 `CANCELLED` 为终态。相同状态提交幂等，不自动执行任务或后台重试。 |
 | D-019 | V3 首版 Skills 权限范围 | **Accepted（2026-11-10）**：首版仅本机保存的固定提示模板，用户逐次显式选择是否附加到当前请求；不注册工具、不执行代码、不做外部写。 |
 | D-020 | V2 EventKit 提醒事项读取 | **Accepted（2026-11-10）**：用户接受系统完整提醒事项权限，应用代码保持只读；仅在用户点击后读取到期日为未来 30 天内的未完成提醒及无到期日条目，不创建、修改、完成或删除，不持久化或发送给 Provider。 |
-| D-021 | V3 多 Agent 协作边界 | **Accepted / Implemented（2026-11-10）**：仅用户点击触发，在本机 Ollama 上顺序运行用户选择的固定专业助理，再由总助理汇总；云 Provider、后台执行、跨会话记忆读取、工具和外部写均不启用。中间专业助理输出只在单次运行内存中传递。 |
+| D-021 | V3 多 Agent 协作边界 | **Accepted / Implemented（2026-11-10）**：仅用户点击触发，在本机 Ollama 上顺序运行用户选择的固定专业助理，再由总助理汇总；云 Provider、后台执行、跨会话记忆读取、工具和外部写均不启用。中间专业助理输出只在单次运行内存中传递。D-022 的事件创建能力独立于多 Agent；协作角色不能直接执行该写操作。 |
+| D-022 | V3 首个外部写操作：创建日历事件 | **Accepted（2026-11-10）**：仅支持用户主动打开表单后创建单个非重复事件到 macOS 当前默认日历；用户输入标题/开始/结束时间，可选地点/备注。每次必须显示确切预览并二次确认；无参会者、邀请、重复规则、提醒、读取/修改/删除或后台执行。采用 EventKit write-only 权限；若已有 full access 则复用。明确提示系统可能按该日历账户设置同步。SQLite 加密审计必须在写入前记录 ATTEMPTED，失败关闭；完成后记 SUCCEEDED/FAILED，仅记录 metadata，不写事件内容。多 Agent 不得自动调用。 |
 
 ## ADR 状态
 

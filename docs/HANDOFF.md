@@ -1,3 +1,10 @@
+# 2026-11-10：B10 日历事件审计 API
+
+- 按用户指定的 V3 首个写入范围（仅创建日历事件）新增认证 `POST /security-audit/calendar-event`。仅接受固定 decision/reason 组合，常量 action/provider/model/region/purpose，L2；请求体只含 trace/resource UUID 和状态码，不接收标题、时间、地点或备注。SQLCipher 不可用时返回 503，客户端必须据此拒绝执行写入。
+- 验证：窄回归 1 passed；Ruff 与 `mypy pac_poc/beta_api.py` 通过；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 347 passed，1 条既有 Starlette/httpx 弃用警告。
+- D-022 已记录为当前接受范围；下一段继续 EventKit write-only 服务与逐次预览/确认 UI。尚未触发任何真实日历写入。
+- API 依据：[EventKit access model](https://developer.apple.com/documentation/eventkit/accessing-the-event-store)、[write-only purpose string](https://developer.apple.com/documentation/BundleResources/Information-Property-List/NSCalendarsWriteOnlyAccessUsageDescription)、[saving events](https://developer.apple.com/documentation/EventKit/EKEventStore/save%28_%3Aspan%3Acommit%3A%29)。
+
 # 2026-11-10：模型预设旧格式迁移
 
 - `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。
