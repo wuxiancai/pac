@@ -4,8 +4,11 @@ version = "0.1.0"
 description = "Local-only Phase 0 proof of concept"
 requires-python = ">=3.11,<3.14"
 dependencies = [
+    "alembic>=1.13,<2",
     "fastapi==0.159.1",
     "httpx==0.28.1",
+    "sqlalchemy>=2.0,<3",
+    "sqlcipher3==0.6.3",
     "sherpa-onnx==2.0.1",
     "sounddevice==0.5.6",
     "uvicorn==0.54.0",
@@ -13,11 +16,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-phase0-security = [
-    "alembic>=1.13,<2",
-    "sqlalchemy>=2.0,<3",
-    "sqlcipher3==0.6.3",
-]
 phase0-embedding = [
     "fastembed==0.9.1",
 ]

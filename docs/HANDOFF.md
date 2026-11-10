@@ -1,3 +1,10 @@
+# 2026-11-10：B3 SQLCipher 持久化基础切片
+
+- 将 SQLAlchemy/Alembic/SQLCipher 纳入后端默认依赖；新增加密应用数据库入口、私有 Application Support 路径、0700 目录/0600 数据库文件、WAL/foreign-key 配置、错误密钥安全拒绝与打包 Alembic 初始迁移。
+- schema 覆盖 conversations/turns/messages + FTS、V2 tasks、仅用户确认 claim 的 memory_items/versions + ACTIVE 检索 FTS。FTS 触发器随更新/归档/软删除同步；会话 FK cascade。当前尚未把该 store 注入 BetaAPI 或 UI，也没有 Keychain 密钥生成/传递、CRUD、删除调度、备份/恢复。
+- `tests/test_persistence.py` → 9 passed；后端全量 → 291 passed、1 条既有 Starlette/httpx 弃用警告；Ruff/mypy、`uv lock --check` 通过；构建 wheel 并确认 migration 包入 wheel。Python SBOM 更新为 63/63 非根锁定依赖，默认依赖闭包现为 28 包，其中 27 wheel 有许可文件、sherpa-onnx-core metadata 标注 Apache-2.0；SQLCipher Community attribution 仍需随产品发行材料落实。
+- 更新 `docs/beta/persistent-storage.md`、TASKS、PROJECT_CONTEXT、阶段 0 traceability、0G SBOM/许可审查和 HANDOFF。没有读写 Keychain、真实用户数据或 Provider；本地测试数据仅写 `.poc-data`。
+
 # 2026-11-10：D-006 备份口令与跨机目标补充
 
 - 用户确认每份手动加密备份使用独立口令。恢复时系统认证并输入该份口令，先为当前数据做预备份。口令 KDF/参数、是否允许记住口令、是否支持跨机器恢复尚未决定/验证。RPO 按最近一次成功手动备份。

@@ -7,7 +7,7 @@
 - 固定权重来自 `Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q` revision `faf4aa4225822f3bc6376869cb1164e8e3feedd0`。该 revision 的 [Hugging Face 模型页](https://huggingface.co/Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q/tree/faf4aa4225822f3bc6376869cb1164e8e3feedd0) 标注 `apache-2.0`。
 - 对应上游 [Sentence Transformers 模型页](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2) 也标注 `apache-2.0`。
 - 本机固定安装 FastEmbed `0.9.1` 的 Python package metadata 标注 `Apache-2.0`；通过 `uv run --locked --extra phase0-embedding` 读取。
-- 以上建立了模型候选与直接运行库的初步线索。Python 锁定依赖 CycloneDX SBOM 已于 2026-11-09 按更新后的 `uv.lock` 重生成，55/55 个非根依赖均纳入，见 [`phase0-python-sbom.md`](phase0-python-sbom.md)。该导出没有内嵌许可证字段；既有 54 个锁定包有 metadata、随包 LICENSE 或精确版本 PyPI 页面等初步线索，新增 `websockets==17.4` 的精确 PyPI 发布记录标注 BSD-3-Clause。许可证适用范围、通知义务、原生依赖和随包内容仍需审查。模型权重/词表和模型随包依赖也不在此 SBOM 内。D-014 仍待产品负责人决定；目前没有把该模型设为默认或纳入产品 schema。
+- 以上建立了模型候选与直接运行库的初步线索。Python 锁定依赖 CycloneDX SBOM 已于 2026-11-10 按更新后的 `uv.lock` 重生成，63/63 个非根依赖均纳入，见 [`phase0-python-sbom.md`](phase0-python-sbom.md)。该导出没有内嵌许可证字段；既有 54 个锁定包有 metadata、随包 LICENSE 或精确版本 PyPI 页面等初步线索，新增 `websockets==17.4` 的精确 PyPI 发布记录标注 BSD-3-Clause。许可证适用范围、通知义务、原生依赖和随包内容仍需审查。模型权重/词表和模型随包依赖也不在此 SBOM 内。Embedding 是否启用、型号/维度/格式仍待产品负责人决定；目前没有把该模型设为默认或写入产品 schema。
 - 2026-11-07 新增三次离线重复：每次 4 个合成 query 均 top-1 命中 4/4；wall 0.81–1.19 秒；`/usr/bin/time -l` observed maximum RSS 883,130,368–883,490,816 bytes。仅为固定小型合成集和本机进程观察，不代表检索质量、产品资源目标或稳定分布。
 
 ## 中文 ASR 候选
@@ -71,10 +71,10 @@
 
 - `poc/macos-audio/Package.swift` 声明了 POC 自身的 targets，没有 SwiftPM `.package` 外部依赖；仓库也没有该 package 的 `Package.resolved`。源码导入 Foundation、SwiftUI、AVFoundation、LocalAuthentication、Security、Darwin、Observation 等 Apple SDK 模块，没有在 SwiftPM 声明第三方 framework。此项只描述当前源码/构建配置，不是未来产品发布物清单。
 - 当前 lifecycle demo 启动脚本从 `backend/.venv/bin/python` 启动仓库后端，Python 环境独立于 Swift app bundle；Python 依赖以 `backend/uv.lock` 和 `phase0-python-sbom.md` 为准。POC 启动脚本使用本机已准备的环境，不能证明生产安装器会如何携带 Python、wheel、模型或原生库。
-- 2026-11-09 按 `backend/pyproject.toml` 和 `uv.lock` 单独核对 Beta 默认 Python 依赖图：基础依赖闭包为 23 个锁定包，包括 FastAPI/HTTPX/Uvicorn/WebSockets、`sherpa-onnx==2.0.1` 和 `sounddevice==0.5.6`。`phase0-embedding`（FastEmbed、ONNX Runtime、Pillow）及 `phase0-security`（SQLAlchemy、Alembic、SQLCipher）是可选 POC extras，不属于干净 `uv sync --locked` 的默认依赖选择。复核命令：`uv export --locked --format requirements-txt --all-extras --no-extra phase0-embedding --no-extra phase0-security --no-dev --no-default-groups --no-emit-project`；输出 23 个依赖。
-- 逐个读取本机 Python 3.12 arm64 `.venv` 中与这 23 个基础依赖对应的 wheel `METADATA` 和 `.dist-info/licenses/`：22 个 wheel 含随包 LICENSE 文件；`sherpa-onnx-core==2.0.1` 未带独立 LICENSE 文件，但 metadata 明确为 `Apache-2.0`。这只记录了已安装 wheel 中可见的声明/文本；没有逐项判断通知是否足以履行、第三方 native 组件的完整归属或实际发行物应携带哪些文本。
-- 该闭包只明确默认依赖解析结果，不等于当前运行进程实际加载了全部 23 个包，也不表示存在可分发 Beta 安装物。`run_beta_app.sh` 直接使用共享的 `backend/.venv/bin/python`，该虚拟环境可被测试命令同步为含 extras 的开发环境；因此其实际内容是可变的。Swift `.app` 仍从仓库目录启动后端，模型从 `.poc-data` 读取；没有隔离、重建并签名的 Beta Runtime 或最终 NOTICE 清单。
-- 这次缩小了 Beta 默认依赖的许可审查范围，但没有改变历史 POC SBOM（该 SBOM 有意覆盖所有 extras/dev，55 个依赖），也没有把可选组件许可风险视为消失：Embedding/SQLCipher 重新启用或打包前仍要按实际 wheel 审查 Pillow bundled GPL/LGPL 组件、SQLCipher attribution 和对应 native notices。
+- 2026-11-10 按 `backend/pyproject.toml` 和 `uv.lock` 复核当前 Beta 默认 Python 依赖图：基础依赖闭包为 28 个锁定包。产品 SQLCipher 持久化基础已把 `SQLAlchemy`、`Alembic`、`sqlcipher3==0.6.3` 纳入默认依赖；FastAPI/HTTPX/Uvicorn/WebSockets、`sherpa-onnx==2.0.1` 与 `sounddevice==0.5.6` 也在闭包内。仅 FastEmbed/ONNX Runtime/Pillow（`phase0-embedding`）和 pypdf（`phase4-pdf-poc`）仍为可选 extras。复核命令：`uv export --locked --format requirements-txt --no-extra phase0-embedding --no-dev --no-default-groups --no-emit-project`；去掉注释/哈希后为 28 个依赖。
+- 逐个读取本机 Python 3.12 arm64 `.venv` 中与这 28 个基础依赖对应的 wheel `METADATA` 和 `.dist-info/licenses/`：27 个 wheel 带可见许可文件；`sherpa-onnx-core==2.0.1` 未带独立 LICENSE，但 metadata 标注 `Apache-2.0`。SQLCipher Community attribution 仍需放入可访问文档并做发行物核对。该清点没有判断所有通知是否足够履行、native 组件完整归属或最终安装器应携带的文本。
+- 该闭包只明确默认依赖解析结果，不等于当前运行进程实际加载了全部 28 个包，也不表示存在可分发 Beta 安装物。`run_beta_app.sh` 直接使用共享的 `backend/.venv/bin/python`，该虚拟环境可被测试命令同步为含 extras 的开发环境；因此其实际内容是可变的。Swift `.app` 仍从仓库目录启动后端，模型从 `.poc-data` 读取；没有隔离、重建并签名的 Beta Runtime 或最终 NOTICE 清单。
+- 这次缩小了 Beta 默认依赖的许可审查范围，但没有改变历史 POC SBOM（该 SBOM 有意覆盖当前所有 extras/dev，63 个非根依赖），也没有把可选组件许可风险视为消失：Embedding 若启用或产品依赖发行前仍要按实际 wheel 审查 Pillow bundled GPL/LGPL 组件、SQLCipher attribution 和对应 native notices。
 - 因此当前 Swift 源码未发现额外 SwiftPM 第三方包许可项；macOS/Xcode SDK 与正式打包、签名、安装器、Python/native wheel、模型权重及其通知文件仍需在产品发布形态确定后另做发行物审计。当前证据不关闭 0G 的完整许可闭环。
 
 ### 本机 Python wheel 与原生组件（2026-11-08）

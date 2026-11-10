@@ -1,0 +1,210 @@
+from __future__ import annotations
+
+import shutil
+import sqlite3
+import stat
+from pathlib import Path
+from uuid import uuid4
+
+import pytest
+from sqlalchemy import text
+
+from pac_poc.persistence import (
+    DATABASE_KEY_BYTES,
+    EncryptedApplicationStore,
+    PersistentStoreError,
+    default_database_path,
+)
+
+
+@pytest.fixture
+def storage_root() -> Path:
+    root = Path(".poc-data/product-store-tests") / str(uuid4())
+    yield root
+    shutil.rmtree(root, ignore_errors=True)
+
+
+def _store(path: Path, key: bytes | None = None) -> EncryptedApplicationStore:
+    return EncryptedApplicationStore(path=path, key=key or b"p" * DATABASE_KEY_BYTES)
+
+
+def test_default_database_path_uses_private_application_support_directory() -> None:
+    path = default_database_path(Path("/Users/example"))
+    assert path == Path(
+        "/Users/example/Library/Application Support/PersonalAI/personal-assistant.db"
+    )
+
+
+def test_store_creates_encrypted_private_database_and_migrates_core_tables(
+    storage_root: Path,
+) -> None:
+    path = (storage_root / "store.db").resolve()
+    store = _store(path)
+    store.open()
+    try:
+        assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        assert path.read_bytes()[:16] != b"SQLite format 3\x00"
+        with store.connection() as connection:
+            assert str(connection.execute(text("PRAGMA cipher_status")).scalar_one()) == "1"
+            assert connection.execute(text("PRAGMA foreign_keys")).scalar_one() == 1
+            assert connection.execute(text("PRAGMA journal_mode")).scalar_one() == "wal"
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    text("SELECT name FROM sqlite_master WHERE type='table'")
+                )
+            }
+            assert {
+                "alembic_version",
+                "conversations",
+                "conversation_turns",
+                "messages",
+                "messages_fts",
+                "tasks",
+                "memory_items",
+                "memory_items_fts",
+                "memory_versions",
+            } <= tables
+    finally:
+        store.close()
+
+
+def test_message_fts_stays_in_sync_and_conversation_delete_cascades(
+    storage_root: Path,
+) -> None:
+    store = _store((storage_root / "store.db").resolve())
+    store.open()
+    conversation_id = str(uuid4())
+    message_id = str(uuid4())
+    timestamp = "2026-11-10T00:00:00Z"
+    try:
+        with store.connection() as connection, connection.begin():
+            connection.execute(
+                text("INSERT INTO conversations(id, created_at, updated_at) VALUES (:id, :ts, :ts)"),
+                {"id": conversation_id, "ts": timestamp},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO messages(id, conversation_id, role, content, created_at) "
+                    "VALUES (:id, :conversation, 'USER', :content, :ts)"
+                ),
+                {
+                    "id": message_id,
+                    "conversation": conversation_id,
+                    "content": "Project persistence sample",
+                    "ts": timestamp,
+                },
+            )
+            assert connection.execute(
+                text("SELECT count(*) FROM messages_fts WHERE messages_fts MATCH 'persistence'")
+            ).scalar_one() == 1
+
+            connection.execute(
+                text("UPDATE messages SET deleted_at=:ts WHERE id=:id"),
+                {"id": message_id, "ts": timestamp},
+            )
+            assert connection.execute(
+                text("SELECT count(*) FROM messages_fts WHERE messages_fts MATCH 'persistence'")
+            ).scalar_one() == 0
+
+            connection.execute(text("DELETE FROM conversations WHERE id=:id"), {"id": conversation_id})
+            assert connection.execute(text("SELECT count(*) FROM messages WHERE id=:id"), {"id": message_id}).scalar_one() == 0
+    finally:
+        store.close()
+
+
+def test_memory_fts_contains_only_active_non_deleted_confirmed_items(
+    storage_root: Path,
+) -> None:
+    store = _store((storage_root / "store.db").resolve())
+    store.open()
+    timestamp = "2026-11-10T00:00:00Z"
+    try:
+        with store.connection() as connection, connection.begin():
+            for memory_id, status, deleted_at in (
+                (str(uuid4()), "ACTIVE", None),
+                (str(uuid4()), "ARCHIVED", None),
+                (str(uuid4()), "ACTIVE", timestamp),
+            ):
+                connection.execute(
+                    text(
+                        "INSERT INTO memory_items "
+                        "(id, category, subject, content, claim_type, status, confirmed_at, "
+                        "created_at, updated_at, deleted_at) VALUES "
+                        "(:id, 'fact', 'confirmed subject', 'confirmed content', "
+                        "'user_confirmed_fact', :status, :ts, :ts, :ts, :deleted)"
+                    ),
+                    {"id": memory_id, "status": status, "ts": timestamp, "deleted": deleted_at},
+                )
+            assert connection.execute(
+                text("SELECT count(*) FROM memory_items_fts WHERE memory_items_fts MATCH 'confirmed'")
+            ).scalar_one() == 1
+    finally:
+        store.close()
+
+
+def test_wrong_key_is_rejected_without_exposing_key_or_database_path(storage_root: Path) -> None:
+    path = (storage_root / "store.db").resolve()
+    store = _store(path, b"a" * DATABASE_KEY_BYTES)
+    store.open()
+    store.close()
+
+    wrong_key = b"sensitive-test-key-material-1234"
+    assert len(wrong_key) == DATABASE_KEY_BYTES
+    wrong_store = _store(path, wrong_key)
+    with pytest.raises(PersistentStoreError) as error:
+        wrong_store.open()
+    assert wrong_key.hex() not in str(error.value)
+    assert str(path) not in str(error.value)
+    wrong_store.close()
+
+
+def test_store_reopens_and_migrations_are_idempotent(storage_root: Path) -> None:
+    path = (storage_root / "store.db").resolve()
+    key = b"r" * DATABASE_KEY_BYTES
+    first = _store(path, key)
+    first.open()
+    with first.connection() as connection, connection.begin():
+        connection.execute(
+            text("INSERT INTO conversations(id, created_at, updated_at) VALUES ('c1', 't', 't')")
+        )
+    first.close()
+
+    second = _store(path, key)
+    second.open()
+    try:
+        with second.connection() as connection:
+            assert connection.execute(text("SELECT count(*) FROM conversations")).scalar_one() == 1
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0001_product_store"
+    finally:
+        second.close()
+
+
+def test_store_requires_a_32_byte_key_and_absolute_path(storage_root: Path) -> None:
+    with pytest.raises(ValueError, match="32 random bytes"):
+        EncryptedApplicationStore(path=(storage_root / "store.db").resolve(), key=b"short")
+    with pytest.raises(ValueError, match="absolute"):
+        EncryptedApplicationStore(path=Path("relative.db"), key=b"p" * DATABASE_KEY_BYTES)
+
+
+def test_existing_symlink_database_is_rejected(storage_root: Path) -> None:
+    root = storage_root.resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    target = root / "target.db"
+    target.write_bytes(b"do not open")
+    link = root / "store.db"
+    link.symlink_to(target)
+
+    store = _store(link)
+    with pytest.raises(PersistentStoreError, match="owned by the current user"):
+        store.open()
+
+
+def test_encrypted_file_is_not_readable_by_plain_sqlite(storage_root: Path) -> None:
+    path = (storage_root / "store.db").resolve()
+    store = _store(path)
+    store.open()
+    store.close()
+    with pytest.raises(sqlite3.DatabaseError):
+        sqlite3.connect(path).execute("SELECT name FROM sqlite_master").fetchall()
