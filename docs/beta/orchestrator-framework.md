@@ -139,3 +139,8 @@ swift test --package-path poc/macos-audio
 
 - SQLCipher migration `0005_security_audit` 为当前 Beta 云聊天写入策略拒绝、用户确认/预算门后请求尝试和完成/失败/取消终态。审计仅保留 provider/model/region/purpose/data level/决策与固定 reason code、trace/resource UUID 和时间；不保存 Consent grant、消息正文、回复、Key/Token 或音频。
 - 写入、服务启动及认证用量查询时清理 30 天前记录；数据库密钥启动的 Beta 服务另外每 6 小时执行一次本机 SQLCipher 清理，退出时取消维护任务后关闭 store。`GET /usage` 返回最多 100 条审计事件；Swift 用量页按最近 30 天安全记录与进程内 Usage 明细分区显示。自动契约覆盖拒绝/成功路径、超期删除、周期清理循环与无正文；还没有真实 Provider 请求或 GUI 实机呈现验收。Consent 持久授权本身仍不保存，未来新增外部写或其他敏感能力时必须补充对应审计事件。
+
+### 2026-11-10 B8 单轮 Skill GUI 冒烟
+
+- 在新本机会话选择“行动项整理”，输入三项合成读书周事项；发送后 UI 从 `Skills 1` 立即变为 `Skills 0`，证明所选 Skill 不跨轮保留。
+- 本机 `qwen3.5:0.8b` 超过两分钟仍显示生成中且没有正文；用户点击停止后 run 标记已取消。不能据此判断 Skill 行为导致延迟；默认 thinking/本机服务状态仍可能影响，原因未判定。无云请求或麦克风采集，聊天保存在本机 SQLCipher。
