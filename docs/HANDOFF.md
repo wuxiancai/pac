@@ -1,3 +1,10 @@
+# 2026-11-10：阶段 6 主机与 Beta 包运行基线
+
+- 本机 `sw_vers` 显示 macOS 26.5.1（Build 25F80）；`.poc-data/personal-assistant-beta.app/Contents/Info.plist` 声明 `LSMinimumSystemVersion=14.0`。本轮 347 项 Python 与 84 项 Swift 自动回归运行于当前主机，不是 macOS 14 runtime 证据。
+- 当前 Beta bundle 的 `codesign -dv --verbose=4` 显示 `Signature=adhoc`、`TeamIdentifier=not set`；因此当前构建不能证明正式 Developer ID 签名、notarization 或安装器链路。
+- 已确认的 Info.plist 同时含麦克风、日历完整访问/只写和提醒事项用途说明；本轮没有触发这些系统权限。
+- 阶段 6 仍需 macOS 14 运行验证和正式签名/安装验证；不将当前主机测试或 ad hoc 本机 bundle 视作发布候选通过。
+
 # 2026-11-10：阶段 6 本机 CI 等价门禁复核（代码基线 a21ec3d）
 
 - 后端全量：在 `backend/` 执行 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`，结果 347 passed，1 条既有 Starlette/httpx 弃用警告。
