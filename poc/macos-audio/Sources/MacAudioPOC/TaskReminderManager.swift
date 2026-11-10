@@ -38,10 +38,8 @@ public final class TaskReminderManager {
             UserDefaults.standard.set(false, forKey: Self.preferenceKey)
             return
         }
-        let eligible = tasks.filter {
-            !["COMPLETED", "CANCELLED"].contains($0.status)
-                && $0.scheduleAt != nil
-        }
+        let now = Date()
+        let eligible = tasks.filter { Self.isEligible($0, now: now) }
         let keep = Set(eligible.map { Self.identifier(for: $0.id) })
         let pending = await center.pendingNotificationRequests()
         let stale = pending.map(\.identifier).filter {
@@ -54,12 +52,14 @@ public final class TaskReminderManager {
     }
 
     public func schedule(task: LocalTaskItem) async {
-        guard isEnabled,
-              !["COMPLETED", "CANCELLED"].contains(task.status),
+        guard isEnabled else { return }
+        guard Self.isEligible(task, now: Date()),
               let scheduledAt = task.scheduleAt,
-              let date = Self.parseDate(scheduledAt),
-              date > Date()
-        else { return }
+              let date = Self.parseDate(scheduledAt)
+        else {
+            remove(taskID: task.id)
+            return
+        }
 
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
@@ -87,6 +87,14 @@ public final class TaskReminderManager {
 
     public static func identifier(for taskID: String) -> String {
         "pac.task.\(taskID)"
+    }
+
+    static func isEligible(_ task: LocalTaskItem, now: Date) -> Bool {
+        guard !["COMPLETED", "CANCELLED"].contains(task.status),
+              let scheduledAt = task.scheduleAt,
+              let date = parseDate(scheduledAt)
+        else { return false }
+        return date > now
     }
 
     private static func parseDate(_ value: String) -> Date? {

@@ -51,6 +51,8 @@
 
 ## 当前执行顺序
 
+2026-11-10 B3 任务提醒资格边界：过期、无效或缺失时间的任务不再留在重建提醒集合；单条无效重排会撤销同 ID 旧通知。Swift 全量 61 项通过；系统通知权限/投递仍未实测。
+
 2026-11-10 B1 本机失败路径 GUI：干净新会话中发送合成短句到临时不存在的 Ollama 模型，失败消息和 run 状态正确、无云 fallback；已恢复原模型 `qwen3.5:0.8b`。本机进程停止/恢复及读超时、云 API 错误 UI 仍待验收。对话保留作本机合成记录，详见 `docs/beta/macOS-beta-chat.md`。
 
 2026-11-10 阶段 6 本机 CI 等价门禁复核：后端全量 341 passed（1 条既有 Starlette/httpx 弃用警告）；Ruff 全目录、CI mypy、compileall、`uv lock --check`、tracked-file detect-secrets、Swift 60 项和 Beta target build 均通过。扫描命中的测试口令均为合成字面量，已逐行 allowlist 并复扫通过。初次桌面状态读取失败；后续 B6 日历/提醒事项当前授权状态下只读查询 GUI 已实测，但首次授权/拒绝路径未验。B1/B3/B5 其他 GUI 验收及远端 GitHub Actions 仍未完成，阶段 6 不关闭。详见 `docs/HANDOFF.md`。

@@ -8,6 +8,7 @@
 
 ## 当前状态
 
+- 2026-11-10 B3 任务提醒边界修正：重建时只保留提醒时间可解析且仍在未来、状态未完成/未取消的任务；重新安排无效、过去或缺失时间会撤销该任务旧通知。Swift 全量 61 项通过。真实授权、拒绝和系统投递仍未验收。
 - 2026-11-10 B3 恢复抗崩溃与并发协调：子进程在恢复切换前/后硬退出后，启动恢复完整旧会话并清理 rollback、marker 和 3 类加密 staging；POSIX shared/exclusive 生命周期锁允许多个 store 正常共存，恢复需独占，其他实例仍打开时 fail closed。自动回归覆盖私有锁文件、同进程多 store 与独立子进程持锁时拒绝恢复；后端全量最新 346 passed。完整应用 GUI/Keychain 认证、断电实机和 RTO 仍待验证。
 - 2026-11-10 B1 本机错误 UI：新建本机会话中临时选择不存在的 Ollama 模型并发送合成短句，GUI 正确显示本机检查提示、本轮失败且无云 fallback；随后恢复 `qwen3.5:0.8b` 并确认服务状态恢复。测试对话保留在 SQLCipher 历史。仍需验证 Ollama 停止/恢复路径和云 API 错误 UI；详见 `docs/beta/macOS-beta-chat.md`。
 - 2026-11-10 阶段 6 本机门禁复核：后端全量 341 passed（1 条既有弃用警告），Ruff 全目录、CI mypy、compileall、`uv lock --check`、tracked-file detect-secrets、Swift 60 项和 Beta target 构建均通过；测试口令扫描误报已逐行标注并复扫通过。之后已实机验证 B6 当前授权下日历/提醒事项只读查询；首次授权/拒绝以及 B1/B3/B5 其他 GUI 验收仍未完成。未运行远端 Actions、Provider 或麦克风。阶段 6 保持开放，详见 `docs/HANDOFF.md`。
