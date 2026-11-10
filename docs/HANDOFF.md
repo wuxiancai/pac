@@ -60,6 +60,11 @@
 - 扩展日历审计 API 回归：缺少 Bearer 凭据时返回 401；`FAILED/audit_finalization_failed` 被接受并仅写入固定 metadata；状态仍限制 reason code，事件内容不进入审计。
 - 验证：定向用例 1 passed；Ruff 与 `mypy pac_poc/beta_api.py` 通过；后端全量 347 passed，1 条既有 Starlette/httpx 弃用警告。
 
+# 2026-11-10：B10 预览与写入值一致性
+
+- 精确预览改为读取创建服务的规范化草稿，地点/备注会与 EventKit 保存值使用相同的首尾空白裁剪，空白选填值统一显示“无”。默认开始/结束时间清到整分钟，和 DatePicker 及预览的显示精度一致。
+- 验证：Swift 全量 83 passed；Beta target build 成功。未请求日历权限或写入真实事件。
+
 # 2026-11-10：模型预设旧格式迁移
 
 - `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。

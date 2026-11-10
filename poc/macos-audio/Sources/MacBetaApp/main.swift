@@ -1850,8 +1850,12 @@ private struct CalendarEventCreationView: View {
     @State private var service = CalendarEventCreationService()
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
-    @State private var startDate = Date().addingTimeInterval(3_600)
-    @State private var endDate = Date().addingTimeInterval(7_200)
+    @State private var startDate = Calendar.current.date(
+        bySetting: .second, value: 0, of: Date().addingTimeInterval(3_600)
+    ) ?? Date().addingTimeInterval(3_600)
+    @State private var endDate = Calendar.current.date(
+        bySetting: .second, value: 0, of: Date().addingTimeInterval(7_200)
+    ) ?? Date().addingTimeInterval(7_200)
     @State private var location = ""
     @State private var notes = ""
     @State private var isCheckingPermission = false
@@ -1874,7 +1878,8 @@ private struct CalendarEventCreationView: View {
     }
 
     private var preview: String {
-        "标题：\(title.trimmingCharacters(in: .whitespacesAndNewlines))\n开始：\(startDate.formatted(date: .long, time: .shortened))\n结束：\(endDate.formatted(date: .long, time: .shortened))\n地点：\(location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "（无）" : location)\n备注：\(notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "（无）" : notes)\n目标：macOS 当前默认日历（该账户可能会同步此事件）"
+        let displayedDraft = (try? CalendarEventCreationService.validatedDraft(draft)) ?? draft
+        return "标题：\(displayedDraft.title)\n开始：\(displayedDraft.startDate.formatted(date: .long, time: .shortened))\n结束：\(displayedDraft.endDate.formatted(date: .long, time: .shortened))\n地点：\(displayedDraft.location ?? "（无）")\n备注：\(displayedDraft.notes ?? "（无）")\n目标：macOS 当前默认日历（该账户可能会同步此事件）"
     }
 
     var body: some View {
