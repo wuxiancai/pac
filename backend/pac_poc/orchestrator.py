@@ -85,7 +85,11 @@ class RunRegistry:
             if status not in self._TRANSITIONS.get(current.status, frozenset()):
                 raise ValueError(f"invalid run transition: {current.status} -> {status}")
             updated = RunSnapshot(
-                current.run_id, current.assistant_key, status, current.created_at, time()
+                current.run_id,
+                current.assistant_key,
+                status,
+                current.created_at,
+                max(current.updated_at, time()),
             )
             self._runs[run_id] = updated
             return updated

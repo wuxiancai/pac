@@ -791,7 +791,7 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 else:
                     current = run_registry.get(run.run_id)
                 if current is not None:
-                    completed_at = time()
+                    completed_at = current.updated_at
                     usage_ledger.record(
                         UsageRecord(
                             run_id=run.run_id,

@@ -174,6 +174,22 @@ def test_run_registry_timestamps_are_taken_after_acquiring_insertion_lock(
     assert created[0].created_at == created[0].updated_at == 123.0
 
 
+def test_run_registry_transition_timestamps_do_not_move_backward(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock_values = iter((100.0, 90.0, 80.0))
+    monkeypatch.setattr("pac_poc.orchestrator.time", lambda: next(clock_values))
+    runs = RunRegistry()
+
+    created = runs.create()
+    running = runs.transition(created.run_id, RunStatus.RUNNING)
+    completed = runs.transition(created.run_id, RunStatus.COMPLETED)
+
+    assert created.created_at == 100.0
+    assert running.updated_at == 100.0
+    assert completed.updated_at == 100.0
+
+
 def test_orchestrator_requires_exact_capability_evidence_before_gateway_call() -> None:
     gateway = RecordingGateway()
     registry = ModelCapabilityRegistry()

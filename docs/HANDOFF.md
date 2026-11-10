@@ -1164,3 +1164,11 @@
 - 现把时间戳生成与注册/容量淘汰放在同一临界区。新增并发回归，持有注册锁启动 worker，确认其必须等到获锁后才读取时间。
 - 定向 `tests/test_orchestrator.py -k run_registry`：3 passed；Ruff、`mypy pac_poc/orchestrator.py` 通过。后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：280 passed、1 条既有 Starlette/httpx 弃用警告。
 - 已更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md` 和 `docs/PROJECT_CONTEXT.md`。未调用 Provider、Keychain 或麦克风。
+
+
+### 2026-11-10：系统时钟回拨不破坏 Run 与 Usage 时间
+
+- RunRegistry 原先每次状态转换直接读取系统墙上时钟；时钟回拨可能让 `updated_at < created_at`。聊天结束时 UsageLedger 再用新的墙上时间，若 `completed_at < started_at` 会拒绝记录并令 SSE 收尾异常。
+- 状态转换现在保持 `updated_at` 不早于前一状态时间；UsageRecord 的完成时间直接使用终态 run 时间戳，run 查询与 Usage ledger 保持一致。
+- 回归模拟状态转换时钟从 100 回拨到 90/80，并将 API 完成时钟模拟为 0；终态时间不倒退，失败请求仍能写入 `completed_at >= started_at` 的 unknown usage 记录。定向 5 passed；Ruff、mypy 通过；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（工作目录 `backend/`）：281 passed、1 条既有 Starlette/httpx 弃用警告。
+- 已更新 `docs/beta/orchestrator-framework.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。没有真实 Provider/Keychain/麦克风操作。

@@ -96,3 +96,5 @@ swift test --package-path poc/macos-audio
 2026-11-10 补齐无 usage 流接口：`ModelGateway.stream()` 也在取消/迭代异常时保留原异常并尽力关闭上游，正常结束仍传播关闭异常，finally 无条件释放 lease。它与 `stream_with_usage()` 的清理语义一致。定向清理/取消回归 3 passed，Ruff/mypy 通过；后端全量 279 passed，1 条既有 Starlette/httpx 弃用警告。
 
 2026-11-10 RunRegistry 并发创建顺序：`created_at` 现在在取得注册锁后读取，与实际插入及容量淘汰的序列化顺序一致，避免线程被抢占时出现时间戳倒序。并发回归持有注册锁后启动创建线程，确认时间读取发生在锁释放后。`tests/test_orchestrator.py -k run_registry` → 3 passed；Ruff/mypy 通过；后端全量 280 passed、1 条既有弃用警告。
+
+2026-11-10 系统时钟回拨边界：RunRegistry 状态转换令 `updated_at` 不早于前一状态时间；UsageLedger 的 `completed_at` 复用终态 run 的 `updated_at`，避免实际记录完成早于创建时间而被校验拒绝。测试通过回归时将 API 模块墙上时钟模拟为 0，确认失败请求仍写入合法用量记录。定向 `tests/test_orchestrator.py tests/test_beta_api.py -k 'run_registry or local_model_error_is_sanitized'` → 5 passed；Ruff/mypy 通过；后端全量 281 passed、1 条既有弃用警告。

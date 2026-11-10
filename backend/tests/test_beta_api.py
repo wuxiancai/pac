@@ -10,6 +10,7 @@ import pytest
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
+import pac_poc.beta_api as beta_api_module
 from pac_poc.asr import ASREvent
 from pac_poc.beta_api import (
     BETA_MODEL,
@@ -858,7 +859,11 @@ def test_cloud_provider_errors_are_sanitized_and_never_fallback(
     assert run_status.json()["status"] == "failed"
 
 
-def test_local_model_error_is_sanitized_and_recorded_as_unknown_usage() -> None:
+def test_local_model_error_is_sanitized_and_recorded_as_unknown_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Simulate a wall-clock adjustment before the event stream records usage.
+    monkeypatch.setattr(beta_api_module, "time", lambda: 0.0)
     adapter = FailingLocalAdapter()
     gateway = ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy())
     app = create_beta_api(
@@ -886,6 +891,7 @@ def test_local_model_error_is_sanitized_and_recorded_as_unknown_usage() -> None:
     assert record["status"] == "failed"
     assert record["usage_state"] == "unknown"
     assert record["cost_state"] == "unknown"
+    assert record["completed_at"] >= record["started_at"]
 
 
 @pytest.mark.parametrize(
