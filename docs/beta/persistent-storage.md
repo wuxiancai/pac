@@ -61,6 +61,8 @@
 2026-11-10 面板根因与 GUI 验收：备份 sheet 中 `NSApp.keyWindow/mainWindow` 都为空，导致前次改造提示无法打开面板。改为通过 `NSViewRepresentable` 捕获 sheet 实际 `NSWindow` 并传给异步面板后，GUI 保存和打开均成功；文件名 `PAC-B3-AsyncPanel-20261110.pacbackup`，274,726 bytes。另验证取消保存保留口令。随后清空口令并删除临时文件；未执行恢复。新应用首启 Keychain 数据库密钥错误一次，点击重试后本机服务连接成功，原因未判定。
 
 2026-11-10 数据库密钥错误诊断：`DatabaseKeychainError` 现提供中文错误类别和 OSStatus，覆盖无效身份、无效存储密钥、随机数生成和 Keychain 读写失败；对无效存储密钥明确不自动换钥。描述不含密钥内容。Swift 全量 87 passed，Beta build 成功。此前 GUI 首启错误经重试恢复，尚未重现以确定具体类别/状态。
+
+2026-11-10 Keychain 生命周期自动回归：为 `DatabaseKeychainStore` 注入内部 Security 适配器 seam，并以 fake 覆盖现存 32-byte key 只读、缺失时安全随机创建及 `WhenUnlockedThisDeviceOnly` 属性、`errSecDuplicateItem` 后读取竞争胜出的已存键、malformed existing key 不尝试替换、Keychain read/random/write 失败时拒绝启动密钥交付。Swift 全量 92 passed，Beta build 成功。没有操作真实 Keychain；ACL、应用签名访问控制和休眠/重启路径仍待实机验收。
 5. 记忆来源跨会话选择/跳转的 GUI 实机验收；真实 macOS Keychain 与冻结/休眠/重启路径验收。
 6. 本机任务通知的真实系统授权、投递/过期行为及重启恢复验收；当前测试仅覆盖 stable identifier 与客户端/后端契约，不声称已验证系统投递。
 

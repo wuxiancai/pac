@@ -12,6 +12,8 @@
 
 2026-11-10 B3 数据库密钥错误诊断：`DatabaseKeychainError` 已提供不含密钥数据的中文原因和 OSStatus；没有增加自动换钥。Swift 87 项及 Beta build 通过。首启失败只观察到一次、重试恢复，根因尚未确认；保留为待回归观察。
 
+2026-11-10 B3 Keychain 生命周期回归：`DatabaseKeychainStore` 现对系统 Security API 使用内部注入 seam；5 项 fake adapter 回归验证读、创建、竞争、错误格式与失败关闭，不访问真实 Keychain。Swift 92 项和 Beta build 通过。启动时偶发 `DatabaseKeychainError error 1` 尚未重现，仍待真实设备观察；mock 证据不替代 Keychain ACL、重启/休眠和恢复验收。
+
 ## 状态和流程
 
 - `DONE`：工作包的明确完成条件已满足，证据可复核。

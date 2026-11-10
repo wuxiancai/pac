@@ -1,5 +1,11 @@
 # 2026-11-10：B3 恢复认证可取消与中文终态
 
+# 2026-11-10：B3 数据库 Keychain 生命周期自动回归
+
+- 将 `DatabaseKeychainStore` 对 Security 查询、写入和安全随机数的依赖抽成内部可注入适配器；默认仍调用系统 Security API，产品 Keychain 查询条件与 device-only 属性不变。
+- 新增自动回归：有效密钥仅读取不写入；缺失密钥只在随机数成功后创建并设置 `WhenUnlockedThisDeviceOnly`；并发重复创建后读回 Keychain 中的胜出密钥；已存密钥格式错误、Keychain 读取错误、随机数失败或 Keychain 写入失败均 fail closed，不替换已有密钥。
+- `swift test --package-path poc/macos-audio` → 92 passed；`poc/macos-audio/scripts/build_beta_app.sh` 成功；`git diff --check` 通过。所有 Keychain 行为由 fake adapter 覆盖，本轮没有读取、写入或删除真实 Keychain 项。
+
 # 2026-11-10：B3 数据库 Keychain 错误诊断信息
 
 - 为排查本轮 Beta 首启 `DatabaseKeychainError error 1` 后重试连接成功的现象，给数据库 Keychain 错误添加安全的中文 `LocalizedError` 描述：区分无效标识/已存密钥/随机数生成/Keychain 读写状态，并对 OSStatus 显示数值。无效已存密钥的提示明确没有自动换钥或改数据库；错误描述不包含密钥数据。

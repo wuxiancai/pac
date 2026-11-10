@@ -1,7 +1,43 @@
 import Foundation
+import Security
 import Testing
 import UserNotifications
 @testable import MacAudioPOC
+
+private final class FakeDatabaseKeychainAccess: DatabaseKeychainAccessing {
+    var copyResults: [(OSStatus, Data?)]
+    var addStatuses: [OSStatus]
+    var randomStatus: OSStatus = errSecSuccess
+    var randomKey = Data(repeating: 0xA5, count: DatabaseKeychainStore.keyLength)
+    private(set) var copyQueries: [[String: Any]] = []
+    private(set) var addAttributes: [[String: Any]] = []
+    private(set) var randomByteCounts: [Int] = []
+
+    init(
+        copyResults: [(OSStatus, Data?)] = [],
+        addStatuses: [OSStatus] = []
+    ) {
+        self.copyResults = copyResults
+        self.addStatuses = addStatuses
+    }
+
+    func copyMatching(query: [String: Any]) -> (OSStatus, Data?) {
+        copyQueries.append(query)
+        guard !copyResults.isEmpty else { return (errSecItemNotFound, nil) }
+        return copyResults.removeFirst()
+    }
+
+    func add(attributes: [String: Any]) -> OSStatus {
+        addAttributes.append(attributes)
+        guard !addStatuses.isEmpty else { return errSecSuccess }
+        return addStatuses.removeFirst()
+    }
+
+    func randomBytes(count: Int) -> (OSStatus, Data) {
+        randomByteCounts.append(count)
+        return (randomStatus, randomKey)
+    }
+}
 
 @Test func databaseKeychainStoreUsesStableNonemptyIdentity() {
     #expect(DatabaseKeychainStore.keyLength == 32)
@@ -30,6 +66,92 @@ import UserNotifications
         DatabaseKeychainError.keychain(operation: "create", status: -50).localizedDescription
             == "无法从本机 Keychain 保存数据库密钥（OSStatus -50）。"
     )
+}
+
+@Test func databaseKeychainStoreReturnsAnExistingValidKeyWithoutMutation() throws {
+    let key = Data(repeating: 0x37, count: DatabaseKeychainStore.keyLength)
+    let access = FakeDatabaseKeychainAccess(copyResults: [(errSecSuccess, key)])
+    let store = DatabaseKeychainStore(service: "test.service", account: "test.account", keychain: access)
+
+    #expect(try store.loadOrCreateKey() == key)
+    #expect(access.copyQueries.count == 1)
+    #expect(access.addAttributes.isEmpty)
+    #expect(access.randomByteCounts.isEmpty)
+}
+
+@Test func databaseKeychainStoreCreatesADeviceOnlyKeyWhenMissing() throws {
+    let access = FakeDatabaseKeychainAccess(
+        copyResults: [(errSecItemNotFound, nil)],
+        addStatuses: [errSecSuccess]
+    )
+    let store = DatabaseKeychainStore(service: "test.service", account: "test.account", keychain: access)
+
+    #expect(try store.loadOrCreateKey() == access.randomKey)
+    #expect(access.randomByteCounts == [DatabaseKeychainStore.keyLength])
+    #expect(access.addAttributes.count == 1)
+    #expect(access.addAttributes[0][kSecValueData as String] as? Data == access.randomKey)
+    #expect(
+        (access.addAttributes[0][kSecAttrAccessible as String] as? String)
+            == (kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String)
+    )
+}
+
+@Test func databaseKeychainStoreReadsTheWinningKeyAfterDuplicateCreateRace() throws {
+    let installedKey = Data(repeating: 0x61, count: DatabaseKeychainStore.keyLength)
+    let access = FakeDatabaseKeychainAccess(
+        copyResults: [(errSecItemNotFound, nil), (errSecSuccess, installedKey)],
+        addStatuses: [errSecDuplicateItem]
+    )
+    let store = DatabaseKeychainStore(service: "test.service", account: "test.account", keychain: access)
+
+    #expect(try store.loadOrCreateKey() == installedKey)
+    #expect(access.copyQueries.count == 2)
+    #expect(access.addAttributes.count == 1)
+    #expect(access.randomByteCounts == [DatabaseKeychainStore.keyLength])
+}
+
+@Test func databaseKeychainStoreFailsClosedForMalformedOrUnreadableExistingKey() {
+    let malformed = FakeDatabaseKeychainAccess(copyResults: [(errSecSuccess, Data([0x01]))])
+    let malformedStore = DatabaseKeychainStore(
+        service: "test.service", account: "test.account", keychain: malformed
+    )
+    #expect(throws: DatabaseKeychainError.invalidStoredKey) {
+        try malformedStore.loadOrCreateKey()
+    }
+    #expect(malformed.addAttributes.isEmpty)
+    #expect(malformed.randomByteCounts.isEmpty)
+
+    let unreadable = FakeDatabaseKeychainAccess(copyResults: [(-50, nil)])
+    let unreadableStore = DatabaseKeychainStore(
+        service: "test.service", account: "test.account", keychain: unreadable
+    )
+    #expect(throws: DatabaseKeychainError.keychain(operation: "read", status: -50)) {
+        try unreadableStore.loadOrCreateKey()
+    }
+    #expect(unreadable.addAttributes.isEmpty)
+    #expect(unreadable.randomByteCounts.isEmpty)
+}
+
+@Test func databaseKeychainStoreFailsClosedWhenSecureRandomOrKeychainWriteFails() {
+    let randomFailure = FakeDatabaseKeychainAccess(copyResults: [(errSecItemNotFound, nil)])
+    randomFailure.randomStatus = -1
+    let randomFailureStore = DatabaseKeychainStore(
+        service: "test.service", account: "test.account", keychain: randomFailure
+    )
+    #expect(throws: DatabaseKeychainError.randomGenerationFailed(-1)) {
+        try randomFailureStore.loadOrCreateKey()
+    }
+    #expect(randomFailure.addAttributes.isEmpty)
+
+    let writeFailure = FakeDatabaseKeychainAccess(
+        copyResults: [(errSecItemNotFound, nil)], addStatuses: [-50]
+    )
+    let writeFailureStore = DatabaseKeychainStore(
+        service: "test.service", account: "test.account", keychain: writeFailure
+    )
+    #expect(throws: DatabaseKeychainError.keychain(operation: "create", status: -50)) {
+        try writeFailureStore.loadOrCreateKey()
+    }
 }
 
 @available(macOS 14.0, *)

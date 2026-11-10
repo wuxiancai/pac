@@ -28,6 +28,30 @@ extension DatabaseKeychainError: LocalizedError {
     }
 }
 
+protocol DatabaseKeychainAccessing {
+    func copyMatching(query: [String: Any]) -> (OSStatus, Data?)
+    func add(attributes: [String: Any]) -> OSStatus
+    func randomBytes(count: Int) -> (OSStatus, Data)
+}
+
+private struct SystemDatabaseKeychainAccess: DatabaseKeychainAccessing {
+    func copyMatching(query: [String: Any]) -> (OSStatus, Data?) {
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        return (status, result as? Data)
+    }
+
+    func add(attributes: [String: Any]) -> OSStatus {
+        SecItemAdd(attributes as CFDictionary, nil)
+    }
+
+    func randomBytes(count: Int) -> (OSStatus, Data) {
+        var bytes = [UInt8](repeating: 0, count: count)
+        let status = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
+        return (status, Data(bytes))
+    }
+}
+
 /// Keeps the installation's SQLCipher key in the unlocked user's Keychain.
 /// The item is device-only and never requires per-launch user presence.
 public final class DatabaseKeychainStore {
@@ -37,28 +61,39 @@ public final class DatabaseKeychainStore {
 
     private let serviceName: String
     private let accountName: String
+    private let keychain: any DatabaseKeychainAccessing
 
-    public init(
+    public convenience init(
         service: String = DatabaseKeychainStore.service,
         account: String = DatabaseKeychainStore.account
     ) {
+        self.init(
+            service: service,
+            account: account,
+            keychain: SystemDatabaseKeychainAccess()
+        )
+    }
+
+    init(
+        service: String = DatabaseKeychainStore.service,
+        account: String = DatabaseKeychainStore.account,
+        keychain: any DatabaseKeychainAccessing
+    ) {
         self.serviceName = service
         self.accountName = account
+        self.keychain = keychain
     }
 
     public func loadOrCreateKey() throws -> Data {
         try validateIdentity()
         let query = baseQuery()
-        var result: CFTypeRef?
-        let readStatus = SecItemCopyMatching(
-            query.merging([
-                kSecReturnData as String: true,
-                kSecMatchLimit as String: kSecMatchLimitOne,
-            ]) { _, new in new } as CFDictionary,
-            &result
-        )
+        let readQuery = query.merging([
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]) { _, new in new }
+        let (readStatus, result) = keychain.copyMatching(query: readQuery)
         if readStatus == errSecSuccess {
-            guard let key = result as? Data, key.count == Self.keyLength else {
+            guard let key = result, key.count == Self.keyLength else {
                 throw DatabaseKeychainError.invalidStoredKey
             }
             return key
@@ -67,16 +102,14 @@ public final class DatabaseKeychainStore {
             throw DatabaseKeychainError.keychain(operation: "read", status: readStatus)
         }
 
-        var bytes = [UInt8](repeating: 0, count: Self.keyLength)
-        let randomStatus = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        let (randomStatus, key) = keychain.randomBytes(count: Self.keyLength)
         guard randomStatus == errSecSuccess else {
             throw DatabaseKeychainError.randomGenerationFailed(randomStatus)
         }
-        let key = Data(bytes)
         var insert = baseQuery()
         insert[kSecValueData as String] = key
         insert[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        let addStatus = SecItemAdd(insert as CFDictionary, nil)
+        let addStatus = keychain.add(attributes: insert)
         if addStatus == errSecSuccess { return key }
         // Another app start may win the create race. Read the installed key;
         // never replace a key that may already protect an existing database.
@@ -90,12 +123,11 @@ public final class DatabaseKeychainStore {
         var query = baseQuery()
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let (status, result) = keychain.copyMatching(query: query)
         guard status == errSecSuccess else {
             throw DatabaseKeychainError.keychain(operation: "read", status: status)
         }
-        guard let key = result as? Data, key.count == Self.keyLength else {
+        guard let key = result, key.count == Self.keyLength else {
             throw DatabaseKeychainError.invalidStoredKey
         }
         return key
