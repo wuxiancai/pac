@@ -45,6 +45,8 @@
 
 - Ollama 取消/队列对照（本机，2026-11-09）：安装版本 `0.40.15`。通过 httpx 启动一个长 `/api/chat` stream，约 2 秒后关闭 client stream，随后马上发送短句。取消后的短请求完成耗时 46.72 秒；未取消流时默认参数短句基线约 2.42 秒，显式 `think:false` 约 0.88 秒。未记录返回正文。Ollama v0.40.15 官方代码的流式路径使用无缓冲 channel，官方 issue [#17131](https://github.com/ollama/ollama/issues/17131) 描述客户端断开时可能泄漏 handler goroutine 并占住 runner semaphore；现象与本机延迟相符，但版本代码/issue 不能单独证明此次延迟由该缺陷造成。见 [v0.40.15 `server/routes.go`](https://github.com/ollama/ollama/blob/v0.40.15/server/routes.go)。这表明 PAC 发起 URLSession 取消后，即使前端立即复位，也不能保证本机 Ollama 立即可服务下一轮；客户端 keep-alive 只防止等待期间 UI 连接超时。
 
+- Ollama 取消复测（本机，2026-11-10）：版本仍为 `0.40.15`。第一次复测基线（默认 thinking）22.82 秒，首个流块后 0.10 秒即取消，后续短句 51.45 秒；取消时长与模型负载未受控，不作因果判断。第二次先做两次暖机短句（21.19 秒、28.98 秒），长流运行 2.01 秒后取消，随后短句 23.17 秒；默认模式的耗时波动仍无法区分思考/负载与取消影响。第三次显式 `think:false` 对照：短句基线 1.80 秒，长流 2.01 秒后取消，随后短句 1.31 秒，未见取消后的排队延迟。所有请求都发往 loopback，回复正文未记录。当前证据不能复现 2026-11-09 的 46.72 秒差值，也不能证明 0.40.15 的取消问题已解决；未更改产品思考策略，保留为待回修观察。
+
 - 2026-11-09 停止状态提示：本机停止显示“已停止接收回复；Ollama 可能仍在结束本机生成。”，云端停止显示“已停止接收回复；云端服务是否停止生成未知。”这描述客户端观测，不承诺上游已结束。`swift test --package-path poc/macos-audio` → 34 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。仓库脚本启动新 app 后，以本机合成长请求点击停止，GUI 显示上述本机提示。云 Provider 未调用，云文案未做 GUI 出站冒烟。
 
 - 2026-11-09 模型设置 GUI 只读复核：设置 sheet 显示本地/云端来源；检查云端时显示 OpenRouter 固定模型与区域、Keychain 状态“已保存（openrouter）”、删除入口和持续发送披露。未读取/编辑 SecureField，未点击保存或删除，未发送云请求；检查后恢复本机来源。新构建在本地设置下说明 PAC 后端与 Ollama 分开运行，要求启动 Ollama 并安装所选模型，且 PAC 后端已连接不代表 Ollama 已运行。Swift 34 项与 Beta build 通过；当前运行的 app 保留用户对话，未关闭重启来手动验收新提示，文案待下次仓库脚本启动后确认。

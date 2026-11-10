@@ -1,3 +1,9 @@
+# 2026-11-10：B1 Ollama 取消后延迟本机复测
+
+- 核实本机服务为 Ollama `0.40.15`，模型 `qwen3.5:0.8b`，全部请求限于 `127.0.0.1:11434`，不保存回复正文。首轮默认 thinking 测量：基线 22.82 秒；在首块响应后 0.10 秒取消长流；后续短句 51.45 秒。此轮取消时长太短且冷/热状态不一致，不作归因。
+- 第二轮默认 thinking：两次暖机请求为 21.19 秒与 28.98 秒；长流保持 2.01 秒后取消，后续短句 23.17 秒。第三轮显式 `think:false`：基线 1.80 秒，长流保持 2.01 秒后取消，随后短句 1.31 秒。默认策略仍存在大幅延迟波动，`think:false` 对照没有显示取消后增加排队延迟；不能据此证明 Ollama 取消问题已解决。
+- 未更改模型设置或停止语义；同步 `docs/beta/macOS-beta-chat.md`、`docs/TASKS.md`、`docs/PROJECT_CONTEXT.md`。未访问云 Provider、Keychain、GUI 或麦克风。
+
 # 2026-11-10：阶段 6 当前 HEAD 本机 CI 等价复核
 
 - 对照 `.github/workflows/ci.yml`，在当前源码复核依赖锁、Ruff、mypy、tracked-file `detect-secrets-hook`、Python compileall、Python/Swift 全量测试和 Beta 产品构建。
