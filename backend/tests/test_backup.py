@@ -10,7 +10,7 @@ from pac_poc.backup import (
     read_backup_header,
     write_backup_container,
 )
-from pac_poc.persistence import EncryptedApplicationStore
+from pac_poc.persistence import EncryptedApplicationStore, PersistentStoreError
 
 
 def test_backup_container_round_trips_payload_without_loading_it_into_memory(tmp_path: Path) -> None:
@@ -108,3 +108,127 @@ def test_live_sqlcipher_store_exports_valid_encrypted_snapshot(tmp_path: Path) -
         assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
     finally:
         connection.close()
+
+
+def test_live_sqlcipher_restore_prebacks_up_and_reencrypts_with_local_key(tmp_path: Path) -> None:
+    database_key = b"r" * 32
+    database = (tmp_path / "product.db").resolve()
+    backup = tmp_path / "snapshot.pacbackup"
+    store = EncryptedApplicationStore(path=database, key=database_key)
+    store.open()
+    original = store.get_or_create_default_conversation()
+    store.append_chat_turn(
+        conversation_id=str(original["id"]), run_id="restore-original",
+        user_content="before restore", assistant_content="old response",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    store.export_encrypted_backup(backup, password="restore passphrase")
+    store.append_chat_turn(
+        conversation_id=str(original["id"]), run_id="restore-later",
+        user_content="after backup", assistant_content="later response",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+
+    result = store.restore_encrypted_backup(backup, password="restore passphrase")
+    assert Path(result["prebackup_path"]).is_file()
+    assert Path(result["prebackup_path"]).stat().st_mode & 0o777 == 0o600
+    restored = store.load_conversation(str(original["id"]))
+    assert [message["content"] for message in restored["messages"]] == ["before restore", "old response"]
+    store.close()
+
+    prebackup = EncryptedApplicationStore._open_password_database(
+        Path(result["prebackup_path"]), database_key.hex()
+    )
+    try:
+        row = prebackup.execute("SELECT count(*) FROM messages WHERE content='after backup'").fetchone()
+        assert row == (1,)
+    finally:
+        prebackup.close()
+
+
+def test_live_sqlcipher_restore_wrong_password_leaves_database_untouched(tmp_path: Path) -> None:
+    database = (tmp_path / "product.db").resolve()
+    store = EncryptedApplicationStore(path=database, key=b"w" * 32)
+    store.open()
+    conversation = store.get_or_create_default_conversation()
+    store.append_chat_turn(
+        conversation_id=str(conversation["id"]), run_id="restore-wrong-password",
+        user_content="keep this", assistant_content="safe",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    backup = tmp_path / "snapshot.pacbackup"
+    store.export_encrypted_backup(backup, password="right password")
+    with pytest.raises(EncryptedBackupError, match="incorrect or the file is damaged"):
+        store.restore_encrypted_backup(backup, password="wrong password")
+    assert store.load_conversation(str(conversation["id"]))["messages"][0]["content"] == "keep this"
+    assert not (tmp_path / "pre-restore").exists()
+    store.close()
+
+
+def test_live_sqlcipher_restore_rolls_back_if_new_database_cannot_open(tmp_path: Path) -> None:
+    database = (tmp_path / "product.db").resolve()
+    store = EncryptedApplicationStore(path=database, key=b"t" * 32)
+    store.open()
+    conversation = store.get_or_create_default_conversation()
+    store.append_chat_turn(
+        conversation_id=str(conversation["id"]), run_id="rollback-before",
+        user_content="keep after rollback", assistant_content="safe",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    backup = tmp_path / "snapshot.pacbackup"
+    store.export_encrypted_backup(backup, password="rollback passphrase")
+    store.append_chat_turn(
+        conversation_id=str(conversation["id"]), run_id="rollback-after",
+        user_content="later state", assistant_content="still safe",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    original_open = store.open
+    fail_once = True
+
+    def fail_first_reopen() -> None:
+        nonlocal fail_once
+        if fail_once:
+            fail_once = False
+            raise PersistentStoreError("synthetic activation failure")
+        original_open()
+
+    store.open = fail_first_reopen  # type: ignore[method-assign]
+    with pytest.raises(PersistentStoreError, match="synthetic activation failure"):
+        store.restore_encrypted_backup(backup, password="rollback passphrase")
+    assert store.load_conversation(str(conversation["id"]))["messages"][-2]["content"] == "later state"
+    assert database.exists()
+    assert not list(tmp_path.glob("*.rollback"))
+    store.close()
+
+
+@pytest.mark.parametrize("database_present", [True, False])
+def test_store_open_recovers_uncommitted_restore_rollback(tmp_path: Path, database_present: bool) -> None:
+    database = (tmp_path / "product.db").resolve()
+    store = EncryptedApplicationStore(path=database, key=b"i" * 32)
+    store.open()
+    conversation = store.get_or_create_default_conversation()
+    store.append_chat_turn(
+        conversation_id=str(conversation["id"]), run_id="startup-recovery",
+        user_content="rollback should win", assistant_content="old committed state",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    rollback = database.with_name(f".{database.name}.interrupted.rollback")
+    snapshot = EncryptedApplicationStore._open_password_database(rollback, (b"i" * 32).hex())
+    connection = store.connection()
+    try:
+        source = connection.connection.driver_connection
+        assert source is not None
+        source.backup(snapshot)
+    finally:
+        snapshot.close()
+        connection.close()
+    store.delete_conversation(str(conversation["id"]))
+    store.close()
+    if not database_present:
+        database.unlink()
+
+    recovered = EncryptedApplicationStore(path=database, key=b"i" * 32)
+    recovered.open()
+    assert recovered.load_conversation(str(conversation["id"]))["messages"][0]["content"] == "rollback should win"
+    assert not rollback.exists()
+    recovered.close()

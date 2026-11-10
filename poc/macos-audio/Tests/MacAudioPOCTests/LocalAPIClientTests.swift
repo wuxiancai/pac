@@ -105,7 +105,7 @@ private final class ImportResponseURLProtocol: URLProtocol {
 private final class BackupExportCapture: @unchecked Sendable {
     static let shared = BackupExportCapture()
     private let lock = NSLock()
-    private var stored: (URLRequest, Data?)?
+    private var stored: [String: (URLRequest, Data?)] = [:]
     func record(_ request: URLRequest) {
         var body = request.httpBody
         if body == nil, let stream = request.httpBodyStream {
@@ -120,9 +120,13 @@ private final class BackupExportCapture: @unchecked Sendable {
             stream.close()
             body = Data(collected)
         }
-        lock.lock(); stored = (request, body); lock.unlock()
+        lock.lock(); stored[request.url?.path ?? ""] = (request, body); lock.unlock()
     }
-    func take() -> (URLRequest, Data?)? { lock.lock(); defer { lock.unlock() }; defer { stored = nil }; return stored }
+    func take(path: String) -> (URLRequest, Data?)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored.removeValue(forKey: path)
+    }
 }
 
 private final class BackupExportURLProtocol: URLProtocol {
@@ -133,6 +137,19 @@ private final class BackupExportURLProtocol: URLProtocol {
         let response = HTTPURLResponse(url: request.url!, statusCode: 201, httpVersion: "HTTP/1.1", headerFields: nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(#"{"created":true,"bytes_written":256}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+private final class BackupRestoreURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        BackupExportCapture.shared.record(request)
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"restored":true,"prebackup_path":"/private/pre-restore.sqlcipher"}"#.utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
     override func stopLoading() {}
@@ -520,7 +537,7 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
         destinationPath: "/tmp/fixture.pacbackup", password: "one-time-secret"
     )
     #expect(count == 256)
-    let captured = try #require(BackupExportCapture.shared.take())
+    let captured = try #require(BackupExportCapture.shared.take(path: "/backups/export"))
     let request = captured.0
     #expect(request.httpMethod == "POST")
     #expect(request.url?.path == "/backups/export")
@@ -530,6 +547,27 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     #expect(payload["destination_path"] as? String == "/tmp/fixture.pacbackup")
     #expect(payload["password"] as? String == "one-time-secret")
     #expect(payload["replace_existing"] as? Bool == false)
+}
+
+@Test func encryptedBackupRestoreSendsAuthenticatedPathAndDecodesPrebackupLocation() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [BackupRestoreURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43127")!, token: "local-token",
+        sessionConfiguration: configuration
+    )
+    let prebackupPath = try await client.restoreEncryptedBackup(
+        sourcePath: "/tmp/fixture.pacbackup", password: "one-time-secret"
+    )
+    #expect(prebackupPath == "/private/pre-restore.sqlcipher")
+    let captured = try #require(BackupExportCapture.shared.take(path: "/backups/restore"))
+    #expect(captured.0.httpMethod == "POST")
+    #expect(captured.0.url?.path == "/backups/restore")
+    #expect(captured.0.value(forHTTPHeaderField: "Authorization") == "Bearer local-token")
+    let body = try #require(captured.1)
+    let payload = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+    #expect(payload["source_path"] as? String == "/tmp/fixture.pacbackup")
+    #expect(payload["password"] as? String == "one-time-secret")
 }
 
 @Test func localUsageSnapshotDecodesUnknownProviderUsageWithoutInventingValues() throws {

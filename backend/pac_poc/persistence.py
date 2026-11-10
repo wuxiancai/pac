@@ -19,6 +19,8 @@ from sqlalchemy.engine import Engine, URL
 from .backup import (
     EncryptedBackupError,
     derive_backup_key,
+    extract_backup_payload,
+    read_backup_header,
     write_backup_container,
 )
 
@@ -50,6 +52,7 @@ class EncryptedApplicationStore:
         self._path = path
         self._key_hex = key.hex()
         self._engine: Engine | None = None
+        self._restore_in_progress = False
 
     @property
     def path(self) -> Path:
@@ -59,6 +62,8 @@ class EncryptedApplicationStore:
         if self._engine is not None:
             raise PersistentStoreError("database is already open")
         try:
+            if not self._restore_in_progress:
+                self._recover_interrupted_restore()
             self._prepare_private_file()
             url = URL.create(
                 "sqlite+pysqlcipher",
@@ -160,6 +165,129 @@ class EncryptedApplicationStore:
 
     def _database_key_bytes(self) -> bytes:
         return bytes.fromhex(self._key_hex)
+
+    def restore_encrypted_backup(self, source: Path, *, password: str) -> dict[str, str]:
+        """Authenticate, prebackup, stage under the local key, then swap databases."""
+        engine = self._require_engine()
+        if not isinstance(source, Path) or not source.is_absolute() or source.is_symlink():
+            raise ValueError("backup source must be an absolute regular file")
+        if not source.is_file() or source.resolve() == self._path.resolve():
+            raise ValueError("backup source is unavailable")
+        header, backup_key = read_backup_header(
+            source, password=password, database_key=self._database_key_bytes()
+        )
+        prebackup = self._path.parent / "pre-restore" / (
+            f"pre-restore-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+            f"-{uuid4().hex[:8]}.sqlcipher"
+        )
+        prebackup.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(prebackup.parent, 0o700)
+        prebackup_temp: Path | None = None
+        payload_temp: Path | None = None
+        restored_temp: Path | None = None
+        rollback_path = self._path.with_name(f".{self._path.name}.{uuid4().hex}.rollback")
+        swapped = False
+        try:
+            prebackup_temp = self._new_private_temp(self._path.parent, ".pac-pre-restore-", ".sqlite")
+            live_copy = self._open_password_database(prebackup_temp, self._key_hex)
+            source_connection = engine.raw_connection()
+            try:
+                live_driver = source_connection.driver_connection
+                if live_driver is None:
+                    raise PersistentStoreError("database prebackup source is unavailable")
+                live_driver.backup(live_copy)
+            finally:
+                live_copy.close()
+                source_connection.close()
+            self._verify_password_database(prebackup_temp, self._key_hex)
+            os.replace(prebackup_temp, prebackup)
+            prebackup_temp = None
+            self._fsync_parent(prebackup.parent)
+
+            payload_temp = self._new_private_temp(self._path.parent, ".pac-restore-payload-", ".sqlite")
+            extract_backup_payload(source, payload_temp, payload_offset=header.payload_offset)
+            self._verify_password_database(payload_temp, backup_key.hex())
+            restored_temp = self._new_private_temp(self._path.parent, ".pac-restore-local-", ".sqlite")
+            restored_target = self._open_password_database(restored_temp, self._key_hex)
+            restored_source = self._open_password_database(payload_temp, backup_key.hex())
+            try:
+                restored_source.backup(restored_target)
+            finally:
+                restored_source.close()
+                restored_target.close()
+            self._verify_password_database(restored_temp, self._key_hex)
+
+            with engine.connect() as connection:
+                connection.exec_driver_sql("PRAGMA wal_checkpoint(FULL)")
+            engine.dispose()
+            self._engine = None
+            for suffix in ("-wal", "-shm", "-journal"):
+                Path(f"{self._path}{suffix}").unlink(missing_ok=True)
+            self._restore_in_progress = True
+            os.replace(self._path, rollback_path)
+            os.replace(restored_temp, self._path)
+            restored_temp = None
+            swapped = True
+            self.open()
+            self._fsync_parent(self._path.parent)
+            rollback_path.unlink(missing_ok=True)
+            return {"prebackup_path": str(prebackup)}
+        except Exception as exc:
+            if self._engine is not None:
+                self.close()
+            if swapped:
+                self._path.unlink(missing_ok=True)
+            if rollback_path.exists():
+                os.replace(rollback_path, self._path)
+                try:
+                    self.open()
+                except Exception:
+                    raise PersistentStoreError("restore failed and rollback could not be reopened") from None
+            elif self._engine is None and self._path.exists():
+                try:
+                    self.open()
+                except Exception:
+                    raise PersistentStoreError("restore failed and the current database could not be reopened") from None
+            if isinstance(exc, (ValueError, EncryptedBackupError, PersistentStoreError)):
+                raise
+            raise PersistentStoreError("encrypted backup could not be restored") from None
+        finally:
+            self._restore_in_progress = False
+            for temporary in (prebackup_temp, payload_temp, restored_temp):
+                if temporary is not None:
+                    for suffix in ("", "-wal", "-shm", "-journal"):
+                        Path(f"{temporary}{suffix}").unlink(missing_ok=True)
+
+    def _recover_interrupted_restore(self) -> None:
+        candidates = sorted(self._path.parent.glob(f".{self._path.name}.*.rollback"))
+        if not candidates:
+            return
+        if len(candidates) != 1 or candidates[0].is_symlink() or not candidates[0].is_file():
+            raise PersistentStoreError("interrupted restore recovery is ambiguous")
+        rollback = candidates[0]
+        for suffix in ("-wal", "-shm", "-journal"):
+            Path(f"{self._path}{suffix}").unlink(missing_ok=True)
+        self._path.unlink(missing_ok=True)
+        try:
+            os.replace(rollback, self._path)
+            self._fsync_parent(self._path.parent)
+        except OSError:
+            raise PersistentStoreError("interrupted restore rollback could not be recovered") from None
+
+    @staticmethod
+    def _new_private_temp(directory: Path, prefix: str, suffix: str) -> Path:
+        descriptor, name = tempfile.mkstemp(prefix=prefix, suffix=suffix, dir=directory)
+        os.fchmod(descriptor, 0o600)
+        os.close(descriptor)
+        return Path(name)
+
+    @staticmethod
+    def _fsync_parent(directory: Path) -> None:
+        descriptor = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
 
     @staticmethod
     def _open_password_database(path: Path, passphrase: str):

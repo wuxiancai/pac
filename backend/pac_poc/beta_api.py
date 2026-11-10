@@ -162,6 +162,13 @@ class BackupExportRequest(BaseModel):
     replace_existing: bool = False
 
 
+class BackupRestoreRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_path: str = Field(min_length=1, max_length=4096)
+    password: SecretStr
+
+
 class ConfirmedMemoryCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -931,6 +938,27 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             raise HTTPException(status_code=503, detail="encrypted backup could not be created") from exc
         except Exception:
             raise HTTPException(status_code=503, detail="encrypted backup could not be created") from None
+
+    @router.post("/backups/restore")
+    async def restore_encrypted_backup(payload: BackupRestoreRequest) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent storage is unavailable")
+        source = Path(payload.source_path)
+        if not source.is_absolute():
+            raise HTTPException(status_code=422, detail="backup source must be absolute")
+        try:
+            result = await asyncio.to_thread(
+                persistent_store.restore_encrypted_backup,
+                source,
+                password=payload.password.get_secret_value(),
+            )
+            return {"restored": True, **result}
+        except (ValueError, EncryptedBackupError) as exc:
+            raise HTTPException(status_code=422, detail="backup could not be authenticated or validated") from exc
+        except PersistentStoreError as exc:
+            raise HTTPException(status_code=503, detail="encrypted backup could not be restored safely") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="encrypted backup could not be restored safely") from None
 
     @router.get("/chat/history")
     async def get_chat_history(conversation_id: UUID | None = None) -> dict[str, object]:

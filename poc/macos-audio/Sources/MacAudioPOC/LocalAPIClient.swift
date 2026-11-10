@@ -206,6 +206,26 @@ private struct BackupExportPayload: Encodable {
     }
 }
 
+private struct BackupRestorePayload: Encodable {
+    let sourcePath: String
+    let password: String
+
+    enum CodingKeys: String, CodingKey {
+        case password
+        case sourcePath = "source_path"
+    }
+}
+
+private struct BackupRestoreResponse: Decodable {
+    let restored: Bool
+    let prebackupPath: String
+
+    enum CodingKeys: String, CodingKey {
+        case restored
+        case prebackupPath = "prebackup_path"
+    }
+}
+
 public struct LocalTaskItem: Decodable, Identifiable, Sendable {
     public let id: String
     public let title: String
@@ -449,6 +469,24 @@ public final class LocalAPIClient: @unchecked Sendable {
             throw LocalAPIClientError.invalidResponse
         }
         return result.bytesWritten
+    }
+
+    public func restoreEncryptedBackup(sourcePath: String, password: String) async throws -> String {
+        guard sourcePath.hasPrefix("/"), sourcePath.utf8.count <= 4_096,
+              let url = URL(string: "/backups/restore", relativeTo: baseURL)?.absoluteURL
+        else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(BackupRestorePayload(sourcePath: sourcePath, password: password))
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let result = try? JSONDecoder().decode(BackupRestoreResponse.self, from: data), result.restored else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        return result.prebackupPath
     }
 
     public func createConfirmedMemory(

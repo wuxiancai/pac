@@ -524,6 +524,26 @@ final class BetaChatModel {
         }
     }
 
+    func restoreEncryptedBackup(from url: URL, password: String) async {
+        do {
+            try await TouchIDAuthorizer().authorize(reason: "恢复本机加密数据")
+            guard let client else { backupStatus = "本机服务尚未就绪。"; return }
+            let prebackupPath = try await client.restoreEncryptedBackup(sourcePath: url.path, password: password)
+            backupStatus = "恢复完成。恢复前数据已保存在本机预备份：\(URL(fileURLWithPath: prebackupPath).lastPathComponent)"
+            await refreshConversations()
+            if let selected = conversations.first(where: { $0.id == conversationID }) ?? conversations.first {
+                await selectConversation(selected)
+            } else {
+                messages = []
+                conversationID = nil
+            }
+            await refreshTasks()
+            await refreshMemories()
+        } catch {
+            backupStatus = "恢复失败：\(error.localizedDescription)"
+        }
+    }
+
     func refreshMemoryVersions(id: String) async {
         guard let client else { return }
         do {
@@ -1299,6 +1319,8 @@ private struct BackupExportView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var password = ""
     @State private var isExporting = false
+    @State private var selectedBackup: URL?
+    @State private var showingRestoreConfirmation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1310,6 +1332,15 @@ private struct BackupExportView: View {
                 .accessibilityIdentifier("backup-password-field")
             Text(model.backupStatus).font(.caption).foregroundStyle(.secondary)
             HStack {
+                Button("选择备份文件…") { chooseBackup() }
+                Text(selectedBackup?.lastPathComponent ?? "尚未选择备份")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Spacer()
+                Button(isExporting ? "处理中…" : "恢复此备份") { showingRestoreConfirmation = true }
+                    .disabled(password.isEmpty || selectedBackup == nil || isExporting || model.isStreaming)
+                    .accessibilityIdentifier("backup-restore-confirm-button")
+            }
+            HStack {
                 Button("完成") { dismiss() }
                 Spacer()
                 Button(isExporting ? "正在备份…" : "选择位置并加密备份") { chooseDestination() }
@@ -1319,6 +1350,12 @@ private struct BackupExportView: View {
             }
         }
         .padding(22)
+        .alert("恢复加密备份？", isPresented: $showingRestoreConfirmation) {
+            Button("取消", role: .cancel) {}
+            Button("认证并恢复", role: .destructive) { restoreSelectedBackup() }
+        } message: {
+            Text("将先在本机创建当前数据的预备份，再替换聊天、任务和已确认记忆。此 Mac 的系统认证和备份口令都会验证。")
+        }
     }
 
     private func chooseDestination() {
@@ -1333,6 +1370,27 @@ private struct BackupExportView: View {
         isExporting = true
         Task {
             await model.exportEncryptedBackup(to: url, password: secret, replaceExisting: replaceExisting)
+            isExporting = false
+        }
+    }
+
+    private func chooseBackup() {
+        let panel = NSOpenPanel()
+        panel.title = "选择加密备份"
+        panel.allowedContentTypes = [UTType(filenameExtension: "pacbackup") ?? .data]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK else { return }
+        selectedBackup = panel.url
+    }
+
+    private func restoreSelectedBackup() {
+        guard let selectedBackup else { return }
+        let secret = password
+        password = ""
+        isExporting = true
+        Task {
+            await model.restoreEncryptedBackup(from: selectedBackup, password: secret)
             isExporting = false
         }
     }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from threading import Event
 from time import sleep
 from uuid import UUID
@@ -1571,6 +1572,54 @@ def test_backup_export_api_requires_local_auth_and_never_returns_password(tmp_pa
         assert read_backup_header(
             destination, password="private passphrase", database_key=database_key
         )[0].source_key_fingerprint
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()
+
+
+def test_backup_restore_api_requires_local_auth_and_returns_only_prebackup_location(tmp_path) -> None:
+    from pac_poc.persistence import EncryptedApplicationStore
+
+    database_key = b"z" * 32
+    store = EncryptedApplicationStore(path=(tmp_path / "restore-api.db").resolve(), key=database_key)
+    store.open()
+    conversation = store.get_or_create_default_conversation()
+    store.append_chat_turn(
+        conversation_id=str(conversation["id"]), run_id="api-restore",
+        user_content="restore source", assistant_content="restored reply",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    backup = tmp_path / "restore-api.pacbackup"
+    store.export_encrypted_backup(backup, password="api passphrase")
+    store.append_chat_turn(
+        conversation_id=str(conversation["id"]), run_id="api-later",
+        user_content="remove this turn", assistant_content="later",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    app = create_beta_api(
+        session=LocalAPISession(token="restore-token"),
+        gateway=ModelGateway(adapters={"ollama": StubLocalAdapter()}, policy=LocalOnlyPolicy()),
+        persistence_store=store,
+    )
+
+    async def run() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            denied = await client.post("/backups/restore", json={
+                "source_path": str(backup), "password": "api passphrase",
+            })
+            restored = await client.post("/backups/restore", headers={
+                "authorization": "Bearer restore-token",
+            }, json={"source_path": str(backup), "password": "api passphrase"})
+        assert denied.status_code == 401
+        assert restored.status_code == 200
+        assert restored.json()["restored"] is True
+        assert Path(restored.json()["prebackup_path"]).is_file()
+        assert "api passphrase" not in restored.text
+        assert "remove this turn" not in str(store.load_conversation(str(conversation["id"])))
 
     try:
         asyncio.run(run())

@@ -1358,4 +1358,10 @@
 
 - 认证 `POST /backups/export` 与 macOS 保存面板导出 UI 已接通：用户选择目标文件、输入一次性口令并显式开始；口令不存储，已有文件只有经过保存面板覆盖确认后才传入替换参数。Swift 客户端错误只显示通用 HTTP 状态，不回显 API 请求正文。
 - 后端窄回归 `tests/test_backup.py tests/test_beta_api.py`：47 passed；Swift 全量 52 项通过；Ruff、mypy、`uv lock --check` 通过；`personal-assistant-beta` 构建成功。
-- 下一步：提交本段；之后继续恢复前本机预备份和恢复换钥/回滚阶段。
+- 已提交：`bc880a9 Add manual encrypted backup export`。
+
+# 2026-11-10：本机加密备份恢复、预备份与回滚
+
+- 恢复 API/UI 已接通；用户选择 `.pacbackup` 后确认破坏性操作，再通过 macOS `deviceOwnerAuthentication`（Touch ID 或设备密码）后发起恢复。服务端先验证口令、同机密钥指纹，再抽取并验证 SQLCipher 数据库；生成 `Application Support/PersonalAI/pre-restore/` 私有目录中的本机密钥加密副本，恢复库在线复制并用当前 Keychain 密钥加密，关闭连接后切换。若新库打开失败，自动将 rollback 文件复原并重开旧库；进程中断后启动时发现唯一未提交 rollback 会优先恢复旧库，多个候选则停止打开数据库。口令未保存。
+- 自动化：备份相关后端/API窄回归 12 passed，覆盖导出/恢复/错误口令不触库/预备份内容/新库激活失败回滚/启动恢复；Swift 全量 53 项通过；后端全量 312 passed，1 条既有 Starlette/httpx 弃用警告；Ruff/mypy/`uv lock --check` 通过；Beta build 成功。
+- 尚未进行真实 UI、Keychain/设备认证交互、强制退出/断电恢复验收。预备份在 Application Support 保留，当前没有自动删除策略；用户的外部备份与预备份保留期及 RTO 仍待决定。
