@@ -1493,7 +1493,13 @@
 
 # 2026-11-10：云请求最小安全审计
 
-- 按 D-003 30 天 metadata-only 保留决定及规格 §6.3 `audit_logs`、§10.3 最小审计要求，增加 Alembic `0005_security_audit`。仅审计当前云聊天的确认缺失、疑似凭据/本机资料拦截、型号/预算门拦截、出站尝试及请求终态；不持久化 Consent grant，也不写提示词、回复、API Key/Token 或音频。
+- 按 D-003 30 天 metadata-only 保留决定及规格 §6.3 `audit_logs`、§10.3 最小审计要求，增加 Alembic `0005_security_audit`。仅审计当前云聊天的确认缺失、疑似凭据/本机资料/上下文/Skill 拦截、型号/预算门拦截、出站尝试及请求终态；不持久化 Consent grant，也不写提示词、回复、API Key/Token 或音频。
 - SQLCipher 行仅含随机事件 ID、关联 trace/resource UUID、固定 action/decision/reason code、L2 数据等级、固定 Provider/model/region/purpose 和时间戳；写入及认证用量页读取时清理 30 天前记录。认证 `/usage` 最多返回 100 条；Swift 用量页另列最近 30 天事件，显示状态和去敏原因说明。
 - 自动回归覆盖缺少确认/敏感 pattern/预算达限的拒绝记录、成功请求尝试与终态关联、日志字段不含正文/密钥、L3 不允许进入日志、31 天记录清理及 Swift Codable 展示字段。未发起真实 Provider 请求，GUI 用量页实机呈现仍待确认。
-- 验证结果：后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 337 passed、1 条既有 Starlette/httpx 弃用警告；Ruff、mypy 通过；阶段追踪契约 9 passed；Swift 全量 60 项通过，`personal-assistant-beta` 构建通过；`git diff --check` 通过。提交：`ca69ade Add metadata-only cloud security audit`。工作区干净。
+- 验证结果：后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 337 passed、1 条既有 Starlette/httpx 弃用警告；Ruff、mypy 通过；阶段追踪契约 9 passed；Swift 全量 60 项通过，`personal-assistant-beta` 构建通过；`git diff --check` 通过。提交：`573b26e Add metadata-only cloud security audit`。工作区干净。
+
+# 2026-11-10：补齐云审计的本机策略拒绝事件
+
+- 云请求在本机上下文大小校验或 Skill 可用性校验处被拦截时，现在也记录固定 `DENIED` reason code；用量页提供相应中文说明。拒绝仍发生在 Provider adapter 之前。
+- 新增契约验证：上下文超限返回 413、无 Provider adapter 调用且 SQLCipher 中只出现 `context_limit_exceeded` 元数据事件。
+- 验证：后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 338 passed、1 条既有 Starlette/httpx 弃用警告；Ruff/mypy 通过；Swift 全量 60 passed，Beta target build 通过。真实 Provider 与 GUI 手动验证仍未执行。

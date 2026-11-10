@@ -1139,6 +1139,8 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 raise HTTPException(status_code=503, detail="chat history is unavailable") from exc
         total_chars = sum(len(message.content) for message in payload.messages)
         if total_chars > settings.max_context_chars:
+            if payload.provider in CLOUD_PROVIDERS:
+                record_cloud_audit_event("DENIED", "context_limit_exceeded")
             raise HTTPException(status_code=413, detail="conversation context is too long")
         if payload.provider in CLOUD_PROVIDERS and any(
             _L3_SECRET_PATTERN.search(item.content) for item in payload.messages
@@ -1177,8 +1179,12 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             if payload.skill_keys and persistent_store is None:
                 raise ValueError("skills are unavailable")
         except ValueError as exc:
+            if payload.provider in CLOUD_PROVIDERS:
+                record_cloud_audit_event("DENIED", "skill_unavailable")
             raise HTTPException(status_code=422, detail="selected Skills are unavailable") from exc
         except Exception:
+            if payload.provider in CLOUD_PROVIDERS:
+                record_cloud_audit_event("DENIED", "skill_unavailable")
             raise HTTPException(status_code=503, detail="selected Skills are unavailable") from None
         if payload.provider in CLOUD_PROVIDERS and not payload.confirmed_for_this_request:
             record_cloud_audit_event("DENIED", "user_confirmation_missing")
@@ -1216,6 +1222,8 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         model_request = orchestrator.prepare_request(turn)
         actual_context_chars = sum(len(item["content"]) for item in model_request.messages)
         if actual_context_chars > settings.max_context_chars:
+            if payload.provider in CLOUD_PROVIDERS:
+                record_cloud_audit_event("DENIED", "context_limit_exceeded")
             raise HTTPException(status_code=413, detail="conversation context is too long")
         collaboration_requests: list[tuple[str, Any]] = []
         if payload.collaborator_keys:

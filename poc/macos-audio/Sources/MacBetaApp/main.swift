@@ -1819,6 +1819,8 @@ private struct UsageHistoryView: View {
         case "local_document_blocked": "所选资料仅允许本机使用"
         case "collaboration_local_only": "多角色协作仅允许本机模型"
         case "unsupported_model": "服务商型号不在允许范围内"
+        case "context_limit_exceeded": "本机上下文长度上限已触发"
+        case "skill_unavailable": "所选本机 Skill 不可用"
         case "monthly_budget_limit": "月预算上限已触发"
         case "user_confirmed_budget_reserved": "已确认并预留预算，进入授权检查"
         case "provider_stream_completed": "服务商响应流已结束"

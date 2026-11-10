@@ -941,6 +941,42 @@ def test_cloud_budget_blocks_at_monthly_limit_before_adapter_access(tmp_path: Pa
     store.close()
 
 
+def test_cloud_context_limit_rejection_is_audited_before_provider_access(tmp_path: Path) -> None:
+    store = EncryptedApplicationStore(
+        path=(tmp_path / "cloud-context-audit.db").resolve(), key=b"c" * 32
+    )
+    store.open()
+    adapter = StubCloudAdapter()
+    app = create_beta_api(
+        session=LocalAPISession(token="context-token"),
+        remote_adapters_override={"deepseek": adapter},
+        persistence_store=store,
+        settings=BetaAPISettings(max_context_chars=800),
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/stream",
+            headers={"authorization": "Bearer context-token", "host": "127.0.0.1"},
+            json={
+                "provider": "deepseek",
+                "model": "deepseek-flash",
+                "confirmed_for_this_request": True,
+                "messages": [{"role": "user", "content": "x" * 900}],
+            },
+        )
+        usage = client.get(
+            "/usage", headers={"authorization": "Bearer context-token", "host": "127.0.0.1"}
+        )
+
+    assert response.status_code == 413
+    assert adapter.calls == 0
+    assert [event["reason_code"] for event in usage.json()["audit_events"]] == [
+        "context_limit_exceeded"
+    ]
+    store.close()
+
+
 def test_usage_snapshot_includes_in_flight_cloud_budget_reservations(tmp_path: Path) -> None:
     store = EncryptedApplicationStore(
         path=(tmp_path / "cloud-budget-reservation-summary.db").resolve(), key=b"r" * 32
