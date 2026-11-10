@@ -1263,3 +1263,10 @@
 - Beta 启动现从 `DatabaseKeychainStore` 取得 32-byte 数据库密钥，`LocalBackendSupervisor` 通过私有标准输入向固定 Python 服务发送一次性 hex 行；密钥不进入 argv、环境变量、握手或日志。后端只在 `--database-key-stdin` 模式解析精确长度密钥，并用该密钥打开默认 SQLCipher store，FastAPI shutdown 时关闭连接池。
 - 新增传递协议回归（Swift）及后端 stdin 精确长度/格式解析回归。验证：定向后端生命周期+持久化 19 passed；最终后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 292 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 46 passed；Ruff、mypy、`uv lock --check` 通过。
 - 当前产品启动会创建/迁移加密数据库，但聊天、任务、记忆 CRUD 尚未接入，所以消息内容仍不持久化。没有实际启动 Beta 或读写真实 Keychain/用户数据；真实 Keychain ACL/锁屏、重启、密钥丢失/轮换及 GUI 验收待后续。
+
+# 2026-11-10：B3 默认聊天持久化闭环
+
+- SQLCipher repository 新增默认对话创建/读取、turn 幂等写入、消息 FTS 同步、标题首条生成及物理删除。Beta API 新增认证的 `/chat/history` GET/DELETE；流式聊天带 conversation ID，并在完成、失败或取消时记录本轮用户消息与已生成回复。存储失败时不返回成功完成事件，UI 显示本机加密库保存失败的安全提示。
+- Swift 客户端启动后读取历史；发送请求带 conversation ID；历史最多取末尾 20 条作为模型上下文，但完整会话留在本地数据库；新增确认对话框后手动删除当前对话。
+- 验证：持久化与 API 定向 48 passed；全后端 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 294 passed，1 条既有 Starlette/httpx 弃用警告；Swift 全量 47 passed；Beta build 通过；Ruff/mypy/`uv lock --check` 通过。
+- 范围限制：目前只有单个默认对话；无多对话列表、分页/搜索、导出；任务、已确认记忆、30 天清理、备份/恢复未接入。未启动本地 Beta 或触碰真实 Keychain/用户数据/Provider/麦克风。

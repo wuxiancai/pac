@@ -145,6 +145,26 @@ private final class ImportRejectProbeURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class ChatHistoryURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let body = #"{"conversation_id":"11111111-1111-4111-8111-111111111111","messages":[{"role":"user","content":"persisted prompt"}]}"#
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 private final class ChatRequestCapture: @unchecked Sendable {
     static let shared = ChatRequestCapture()
     private let lock = NSLock()
@@ -282,7 +302,8 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
 
     for try await _ in client.streamChat(
         messages: [LocalChatMessage(role: "user", content: "Summarize the attached notes")],
-        importedDocumentIDs: ["11111111-1111-4111-8111-111111111111"]
+        importedDocumentIDs: ["11111111-1111-4111-8111-111111111111"],
+        conversationID: "22222222-2222-4222-8222-222222222222"
     ) {}
 
     let captured = try #require(ChatRequestCapture.shared.take())
@@ -292,7 +313,24 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     let object = try JSONSerialization.jsonObject(with: body)
     let payload = try #require(object as? [String: Any])
     #expect(payload["import_ids"] as? [String] == ["11111111-1111-4111-8111-111111111111"])
+    #expect(payload["conversation_id"] as? String == "22222222-2222-4222-8222-222222222222")
     #expect(payload["messages"] != nil)
+}
+
+@available(macOS 12.0, *)
+@Test func chatHistoryLoadsFromAuthenticatedLocalEndpoint() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ChatHistoryURLProtocol.self]
+    let client = try LocalAPIClient(
+        baseURL: URL(string: "http://127.0.0.1:43127")!,
+        token: "history-token",
+        sessionConfiguration: configuration
+    )
+
+    let history = try await client.chatHistory()
+    #expect(history.conversationID == "11111111-1111-4111-8111-111111111111")
+    #expect(history.messages == [LocalChatMessage(role: "user", content: "persisted prompt")])
+    try await client.deleteChatHistory()
 }
 
 @available(macOS 12.0, *)

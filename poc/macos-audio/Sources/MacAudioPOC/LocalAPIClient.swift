@@ -75,6 +75,16 @@ public struct LocalImportedTextFile: Decodable, Identifiable, Sendable {
     }
 }
 
+public struct LocalChatHistory: Decodable, Sendable {
+    public let conversationID: String?
+    public let messages: [LocalChatMessage]
+
+    enum CodingKeys: String, CodingKey {
+        case conversationID = "conversation_id"
+        case messages
+    }
+}
+
 public struct LocalUsageRecord: Decodable, Identifiable, Sendable {
     public let runID: String
     public let provider: String
@@ -138,6 +148,7 @@ public struct LocalUsageSnapshot: Decodable, Sendable {
 /// Minimal native client for the authenticated, loopback-only POC health endpoint.
 @available(macOS 12.0, *)
 public final class LocalAPIClient: @unchecked Sendable {
+    public static let maximumChatMessages = 20
     private let baseURL: URL
     private let token: String
     private let session: URLSession
@@ -215,6 +226,42 @@ public final class LocalAPIClient: @unchecked Sendable {
             throw LocalAPIClientError.invalidResponse
         }
         return value.text
+    }
+
+    public func chatHistory() async throws -> LocalChatHistory {
+        guard let url = URL(string: "/chat/history", relativeTo: baseURL)?.absoluteURL else {
+            throw LocalAPIClientError.invalidEndpoint
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard httpResponse.statusCode == 200 else {
+            throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+        guard let history = try? JSONDecoder().decode(LocalChatHistory.self, from: data) else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        return history
+    }
+
+    public func deleteChatHistory() async throws {
+        guard let url = URL(string: "/chat/history", relativeTo: baseURL)?.absoluteURL else {
+            throw LocalAPIClientError.invalidEndpoint
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIClientError.invalidResponse
+        }
+        guard httpResponse.statusCode == 200 else {
+            throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode)
+        }
     }
 
     public func chatRunStatus(runID: String) async throws -> LocalChatRunStatus {
@@ -336,7 +383,8 @@ public final class LocalAPIClient: @unchecked Sendable {
         provider: String = "ollama",
         model: String = "qwen3.5:0.8b",
         confirmedForThisRequest: Bool = false,
-        importedDocumentIDs: [String] = []
+        importedDocumentIDs: [String] = [],
+        conversationID: String? = nil
     ) -> AsyncThrowingStream<LocalChatStreamItem, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -354,7 +402,8 @@ public final class LocalAPIClient: @unchecked Sendable {
                         provider: provider,
                         model: model,
                         confirmedForThisRequest: confirmedForThisRequest,
-                        importIDs: importedDocumentIDs
+                        importIDs: importedDocumentIDs,
+                        conversationID: conversationID
                     ))
                     let (bytes, response) = try await session.bytes(for: request)
                     guard let httpResponse = response as? HTTPURLResponse else {
@@ -414,6 +463,7 @@ private struct ChatRequest: Encodable {
     let model: String
     let confirmedForThisRequest: Bool
     let importIDs: [String]
+    let conversationID: String?
 
     enum CodingKeys: String, CodingKey {
         case messages
@@ -421,6 +471,7 @@ private struct ChatRequest: Encodable {
         case model
         case confirmedForThisRequest = "confirmed_for_this_request"
         case importIDs = "import_ids"
+        case conversationID = "conversation_id"
     }
 }
 

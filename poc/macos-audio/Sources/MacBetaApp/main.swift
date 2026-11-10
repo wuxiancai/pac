@@ -114,6 +114,7 @@ final class BetaChatModel {
     private let defaults = UserDefaults.standard
     private(set) var status = "正在连接本机服务…"
     private(set) var messages: [LocalChatMessage] = []
+    private(set) var conversationID: String?
     private(set) var isRecordingVoice = false
     private(set) var isTranscribingVoice = false
     private(set) var voiceSeconds = 0
@@ -190,6 +191,9 @@ final class BetaChatModel {
             }.value
             let localClient = try LocalAPIClient(baseURL: handshake.baseURL, token: handshake.token)
             guard try await localClient.health() else { throw LocalAPIClientError.invalidResponse }
+            let history = try await localClient.chatHistory()
+            conversationID = history.conversationID
+            messages = history.messages
             client = localClient
             startupFailed = false
             startupLatency = max(0, ProcessInfo.processInfo.systemUptime - processStartedAt)
@@ -246,6 +250,7 @@ final class BetaChatModel {
         let modelID = selectedModel
         let confirmedForThisRequest = usesCloud
         let importedDocumentIDs = importedTextFiles.map(\.importID)
+        let activeConversationID = conversationID
         let requestID = UUID()
         activeRequestID = requestID
         latestRunID = nil
@@ -259,7 +264,8 @@ final class BetaChatModel {
                     provider: provider,
                     model: modelID,
                     confirmedForThisRequest: confirmedForThisRequest,
-                    importedDocumentIDs: importedDocumentIDs
+                    importedDocumentIDs: importedDocumentIDs,
+                    conversationID: activeConversationID
                 ) {
                     guard let self else { return }
                     guard self.activeRequestID == requestID else { return }
@@ -413,6 +419,24 @@ final class BetaChatModel {
 
     func reportFileImportError(_ error: Error) {
         status = "无法打开所选文件：\(error.localizedDescription)"
+    }
+
+    func deleteChatHistory() async {
+        guard activeRequest == nil, let client else {
+            status = "请先停止当前生成，再删除聊天记录。"
+            return
+        }
+        do {
+            try await client.deleteChatHistory()
+            messages.removeAll()
+            conversationID = nil
+            lastAssistantResponseInterrupted = false
+            let history = try await client.chatHistory()
+            conversationID = history.conversationID
+            status = "已从本机加密数据库删除聊天记录。"
+        } catch {
+            status = "无法删除本机聊天记录：\(error.localizedDescription)"
+        }
     }
 
     func refreshUsage() async {
@@ -651,7 +675,8 @@ final class BetaChatModel {
     }
 
     private func nonemptyMessages(_ values: [LocalChatMessage]) -> [LocalChatMessage] {
-        values.filter { $0.role != "assistant" || !$0.content.isEmpty }
+        Array(values.filter { $0.role != "assistant" || !$0.content.isEmpty }
+            .suffix(LocalAPIClient.maximumChatMessages))
     }
 
     func recordPartialVisible(sequence: UInt32?) {
@@ -698,6 +723,7 @@ private struct BetaChatView: View {
     @State private var showingSettings = false
     @State private var showingFileImporter = false
     @State private var showingUsage = false
+    @State private var showingDeleteChatConfirmation = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -735,9 +761,15 @@ private struct BetaChatView: View {
                     Label("用量", systemImage: "chart.bar")
                 }
                 .accessibilityIdentifier("usage-button")
-                Text("对话不保存")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if !model.messages.isEmpty {
+                    Button(role: .destructive) {
+                        showingDeleteChatConfirmation = true
+                    } label: {
+                        Label("删除对话", systemImage: "trash")
+                    }
+                    .disabled(model.isStreaming)
+                    .accessibilityIdentifier("delete-chat-history-button")
+                }
             }
             .padding()
             Divider()
@@ -749,8 +781,8 @@ private struct BetaChatView: View {
                                 "开始一段对话",
                                 systemImage: "bubble.left.and.bubble.right",
                                 description: Text(model.usesCloud
-                                    ? "当前选择了云端模型；发送的聊天内容会直接发往所选服务商。关闭窗口后对话不会保存。"
-                                    : "文字只发送到本机 Ollama；关闭窗口后对话不会保存。")
+                                    ? "聊天记录加密保存在本机；本轮内容还会发送到所选云服务商。可随时手动删除。"
+                                    : "聊天记录加密保存在本机；文字只发送到本机 Ollama。可随时手动删除。")
                             )
                             .padding(.top, 80)
                         }
@@ -893,6 +925,18 @@ private struct BetaChatView: View {
                     .padding(.bottom, 6)
                     .accessibilityIdentifier("beta-performance-diagnostics")
             }
+        }
+        .confirmationDialog(
+            "删除本机聊天记录？",
+            isPresented: $showingDeleteChatConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("删除聊天记录", role: .destructive) {
+                Task { await model.deleteChatHistory() }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("此操作会从本机加密数据库永久删除当前对话及其消息。")
         }
         .sheet(isPresented: $showingSettings) {
             BetaModelSettingsView(model: model)

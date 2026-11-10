@@ -36,7 +36,7 @@ from .imported_text import (
     ImportRejected,
     ImportedTextRegistry,
 )
-from .persistence import EncryptedApplicationStore, default_database_path
+from .persistence import EncryptedApplicationStore, PersistentStoreError, default_database_path
 from .orchestrator import (
     ConversationTurn,
     MainAssistantOrchestrator,
@@ -137,6 +137,10 @@ class BetaAPISettings:
 DEFAULT_BETA_API_SETTINGS = BetaAPISettings()
 
 
+class ChatPersistenceUnavailable(RuntimeError):
+    """Safe marker for a local chat write failure."""
+
+
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -152,6 +156,7 @@ class StreamChatRequest(BaseModel):
     model: str = Field(default=BETA_MODEL, min_length=1, max_length=128)
     confirmed_for_this_request: bool = False
     import_ids: list[UUID] = Field(default_factory=list, max_length=4)
+    conversation_id: UUID | None = None
 
 
 class BetaVoiceTranscriber(Protocol):
@@ -222,6 +227,7 @@ class BetaAPIDependencies:
     capability_registry: ModelCapabilityRegistry | None = None
     settings: BetaAPISettings = DEFAULT_BETA_API_SETTINGS
     database_key: bytes | None = None
+    persistence_store: EncryptedApplicationStore | None = None
 
 
 CLOUD_PROVIDERS: dict[str, RemoteProviderConfig] = {
@@ -251,6 +257,7 @@ def create_beta_api(
     voice_transcriber_override: BetaVoiceTranscriber | None = None,
     settings: BetaAPISettings = DEFAULT_BETA_API_SETTINGS,
     database_key: bytes | None = None,
+    persistence_store: EncryptedApplicationStore | None = None,
 ) -> FastAPI:
     """Compatibility composition root for the injected beta app factory."""
     return create_beta_app(dependencies=BetaAPIDependencies(
@@ -261,6 +268,7 @@ def create_beta_api(
         voice_transcriber=voice_transcriber_override,
         settings=settings,
         database_key=database_key,
+        persistence_store=persistence_store,
     ))
 
 
@@ -272,7 +280,9 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
     remote_adapters_override = dependencies.remote_adapters
     voice_transcriber_override = dependencies.voice_transcriber
     settings = dependencies.settings
-    persistent_store: EncryptedApplicationStore | None = None
+    if dependencies.database_key is not None and dependencies.persistence_store is not None:
+        raise ValueError("provide either a database key or an opened persistence store")
+    persistent_store: EncryptedApplicationStore | None = dependencies.persistence_store
     capability_registry = (
         dependencies.capability_registry
         if dependencies.capability_registry is not None
@@ -628,6 +638,27 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             raise HTTPException(status_code=404, detail="import not found")
         return {"removed": True}
 
+    @router.get("/chat/history")
+    async def get_chat_history() -> dict[str, object]:
+        if persistent_store is None:
+            return {"conversation_id": None, "messages": []}
+        try:
+            snapshot = persistent_store.load_conversation()
+        except PersistentStoreError as exc:
+            raise HTTPException(status_code=503, detail="chat history is unavailable") from exc
+        return {"conversation_id": snapshot["id"], "messages": snapshot["messages"]}
+
+    @router.delete("/chat/history")
+    async def delete_chat_history() -> dict[str, bool]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent storage is unavailable")
+        try:
+            snapshot = persistent_store.load_conversation()
+            deleted = persistent_store.delete_conversation(str(snapshot["id"]))
+        except (KeyError, PersistentStoreError) as exc:
+            raise HTTPException(status_code=503, detail="chat history could not be deleted") from exc
+        return {"deleted": deleted}
+
     @router.post("/chat/stream")
     async def stream_chat(request: Request) -> StreamingResponse:
         content_type = request.headers.get("content-type")
@@ -644,6 +675,17 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             payload = StreamChatRequest.model_validate_json(bytes(request_data))
         except ValidationError as exc:
             raise RequestValidationError(exc.errors(), body=bytes(request_data)) from exc
+        conversation_id: str | None = None
+        if persistent_store is not None:
+            try:
+                snapshot = persistent_store.load_conversation(
+                    str(payload.conversation_id) if payload.conversation_id else None
+                )
+                conversation_id = str(snapshot["id"])
+            except KeyError as exc:
+                raise HTTPException(status_code=404, detail="conversation not found") from exc
+            except PersistentStoreError as exc:
+                raise HTTPException(status_code=503, detail="chat history is unavailable") from exc
         total_chars = sum(len(message.content) for message in payload.messages)
         if total_chars > settings.max_context_chars:
             raise HTTPException(status_code=413, detail="conversation context is too long")
@@ -715,6 +757,26 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
             cached_prompt_tokens: int | None = None
             cost_amount: float | None = None
             cost_currency: str | None = None
+            assistant_output: list[str] = []
+
+            def persist_turn(status: RunStatus) -> None:
+                if persistent_store is None or conversation_id is None:
+                    return
+                if payload.messages[-1].role != "user":
+                    return
+                try:
+                    persistent_store.append_chat_turn(
+                        conversation_id=conversation_id,
+                        run_id=run.run_id,
+                        user_content=payload.messages[-1].content,
+                        assistant_content="".join(assistant_output),
+                        provider=payload.provider,
+                        model=payload.model,
+                        status=status.name,
+                    )
+                except Exception:
+                    raise ChatPersistenceUnavailable from None
+
             try:
                 async for delta in _stream_with_keepalives(
                     orchestrator.stream_request_with_usage(model_request),
@@ -733,13 +795,25 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                         cost_amount = delta.cost_amount
                         cost_currency = delta.cost_currency
                     if delta.text:
+                        assistant_output.append(delta.text)
                         yield "data: " + json.dumps({"delta": delta.text}, ensure_ascii=False) + "\n\n"
+                persist_turn(RunStatus.COMPLETED)
                 run_registry.transition(run.run_id, RunStatus.COMPLETED)
                 yield "data: " + json.dumps(
                     {"done": True, "run_id": run.run_id}, separators=(",", ":")
                 ) + "\n\n"
+            except ChatPersistenceUnavailable:
+                run_registry.transition(run.run_id, RunStatus.FAILED)
+                yield "data: " + json.dumps(
+                    {"error": "无法将本轮聊天安全保存到本机加密数据库；请检查磁盘空间后重试。"},
+                    ensure_ascii=False,
+                ) + "\n\n"
             except RemoteProviderError as exc:
                 run_registry.transition(run.run_id, RunStatus.FAILED)
+                try:
+                    persist_turn(RunStatus.FAILED)
+                except Exception:
+                    pass
                 if exc.is_authentication_error:
                     message = "云端 API Key 认证失败，请检查 Keychain 中保存的密钥。"
                 elif exc.status_code == 402:
@@ -761,10 +835,18 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except CredentialUnavailable:
                 run_registry.transition(run.run_id, RunStatus.FAILED)
+                try:
+                    persist_turn(RunStatus.FAILED)
+                except Exception:
+                    pass
                 message = "本机无法从 Keychain 读取已保存的云端凭据；未能发起云端请求。"
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except httpx.RequestError as exc:
                 run_registry.transition(run.run_id, RunStatus.FAILED)
+                try:
+                    persist_turn(RunStatus.FAILED)
+                except Exception:
+                    pass
                 if payload.provider == "ollama":
                     if isinstance(
                         exc, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
@@ -785,6 +867,10 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                 yield "data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n"
             except Exception:
                 run_registry.transition(run.run_id, RunStatus.FAILED)
+                try:
+                    persist_turn(RunStatus.FAILED)
+                except Exception:
+                    pass
                 # Keep local service details and upstream error text out of the UI stream.
                 if payload.provider == "ollama":
                     message = "本机模型请求失败，请确认 Ollama 正在运行且模型已安装。"
@@ -800,6 +886,11 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
                     current = run_registry.transition(run.run_id, RunStatus.CANCELLED)
                 else:
                     current = run_registry.get(run.run_id)
+                if current is not None and current.status is RunStatus.CANCELLED:
+                    try:
+                        persist_turn(RunStatus.CANCELLED)
+                    except Exception:
+                        pass
                 if current is not None:
                     completed_at = current.updated_at
                     usage_ledger.record(

@@ -208,3 +208,32 @@ def test_encrypted_file_is_not_readable_by_plain_sqlite(storage_root: Path) -> N
     store.close()
     with pytest.raises(sqlite3.DatabaseError):
         sqlite3.connect(path).execute("SELECT name FROM sqlite_master").fetchall()
+
+
+def test_conversation_turns_load_in_order_and_manual_delete_removes_content(
+    storage_root: Path,
+) -> None:
+    store = _store((storage_root / "store.db").resolve())
+    store.open()
+    try:
+        conversation = store.get_or_create_default_conversation()
+        conversation_id = conversation["id"]
+        store.append_chat_turn(
+            conversation_id=conversation_id,
+            run_id=str(uuid4()),
+            user_content="Remember this project title",
+            assistant_content="Project Atlas",
+            provider="ollama",
+            model="local-test",
+            status="COMPLETED",
+        )
+        snapshot = store.load_conversation(conversation_id)
+        assert snapshot["title"] == "Remember this project title"
+        assert snapshot["messages"] == [
+            {"role": "user", "content": "Remember this project title"},
+            {"role": "assistant", "content": "Project Atlas"},
+        ]
+        assert store.delete_conversation(conversation_id)
+        assert store.load_conversation()["messages"] == []
+    finally:
+        store.close()

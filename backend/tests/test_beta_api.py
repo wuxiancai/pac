@@ -1369,3 +1369,49 @@ def test_voice_websocket_disconnect_aborts_and_clears_stream() -> None:
 
     assert transcriber.ended == 0
     assert transcriber.aborted == 1
+
+
+def test_persistent_chat_history_round_trips_and_can_be_manually_deleted(tmp_path) -> None:
+    from pac_poc.persistence import EncryptedApplicationStore
+
+    store = EncryptedApplicationStore(path=(tmp_path / "history.db").resolve(), key=b"h" * 32)
+    store.open()
+    adapter = StubLocalAdapter()
+    app = create_beta_api(
+        session=LocalAPISession(token="history-token"),
+        gateway=ModelGateway(adapters={"ollama": adapter}, policy=LocalOnlyPolicy()),
+        persistence_store=store,
+    )
+
+    async def run() -> None:
+        headers = {"authorization": "Bearer history-token"}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            initial = await client.get("/chat/history", headers=headers)
+            conversation_id = initial.json()["conversation_id"]
+            response = await client.post(
+                "/chat/stream",
+                headers=headers,
+                json={
+                    "conversation_id": conversation_id,
+                    "messages": [{"role": "user", "content": "记住项目标题"}],
+                },
+            )
+            history = await client.get("/chat/history", headers=headers)
+            deleted = await client.delete("/chat/history", headers=headers)
+            after_delete = await client.get("/chat/history", headers=headers)
+        assert initial.status_code == 200
+        assert response.status_code == 200
+        assert '"done":true' in response.text
+        assert history.json()["messages"] == [
+            {"role": "user", "content": "记住项目标题"},
+            {"role": "assistant", "content": "本机回答"},
+        ]
+        assert deleted.json() == {"deleted": True}
+        assert after_delete.json()["messages"] == []
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()
