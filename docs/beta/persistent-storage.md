@@ -9,7 +9,7 @@
 ## 2026-11-10：会话分页请求并发保护
 
 - SwiftUI 历史读取使用递增代际标识。开始切换会话、打开记忆来源、创建/删除会话、恢复备份或发送新消息时，之前发起的分页/选择请求会失效；响应落地前同时核对代际与会话 ID，避免迟到页面污染当前会话，或较早选择覆盖较新的会话选择。分页忙碌状态绑定请求 ID，切换时可释放旧状态，迟到旧请求不会清除新分页请求的忙碌状态。
-- 验证：`swift test --package-path poc/macos-audio` → 66 项通过；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。Beta 窗口本轮 CUA 连接超时，未做 GUI 并发点验；旧版本 GUI 来源跳转按钮验收及临时合成记忆清理仍待完成。该修复针对客户端竞态，不改变 SQLCipher 分页/API 契约。
+- 验证：`swift test --package-path poc/macos-audio` → 68 项通过，新增两条协调器自动回归；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。Beta 窗口本轮 CUA 连接超时，未做 GUI 并发点验；旧版本 GUI 来源跳转按钮验收及临时合成记忆清理仍待完成。该修复针对客户端竞态，不改变 SQLCipher 分页/API 契约。
 
 用户已选择本地保存聊天、任务和经确认的记忆；聊天/记忆由用户手动删除，完成任务保留 30 天后清理。用户还选择 SQLCipher 与随机数据库密钥存 macOS Keychain。密钥通过 `DatabaseKeychainStore` 使用系统随机源首次生成并存入 `WhenUnlockedThisDeviceOnly` 项。启动协议不在参数/环境/握手中放密钥，仅从专用子进程标准输入读取精确 32-byte hex 行；Keychain ACL 的实机验证、轮换与丢失恢复尚未完成。
 

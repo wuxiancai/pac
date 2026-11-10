@@ -53,7 +53,7 @@
 
 2026-11-10 阶段 6 当前 HEAD `0e109f9` 本机 CI 等价门禁：`uv lock --check`、Ruff、CI mypy、tracked-file `detect-secrets-hook`、compileall、后端全量 346 passed、Swift 全量 66 passed 和 `personal-assistant-beta` 构建均通过（后端仅 1 条既有 Starlette/httpx 弃用警告）。远端 Actions 未运行，阶段 6 仍开放。
 
-2026-11-10 B3 客户端历史读取并发保护：SwiftUI 为分页、会话选择、记忆来源跳转和聊天历史刷新增加代际校验、会话 ID 核对和分页请求 ID，阻止失效的迟到响应覆盖当前会话、追加到错误会话或清除新分页请求状态。Swift 全量 66 项、Beta target build 通过；并发 GUI 复测尚未完成。来源跳转按钮 GUI 点验及临时合成记忆清理仍待 Beta 窗口恢复后执行。
+2026-11-10 B3 客户端历史读取并发保护：SwiftUI 为分页、会话选择、记忆来源跳转和聊天历史刷新增加代际校验、会话 ID 核对和分页请求 ID，阻止失效的迟到响应覆盖当前会话、追加到错误会话或清除新分页请求状态。Swift 全量 68 项（含分页代际及加载态竞争回归）、Beta target build 通过；并发 GUI 复测尚未完成。来源跳转按钮 GUI 点验及临时合成记忆清理仍待 Beta 窗口恢复后执行。
 
 2026-11-10 阶段 6 本地门禁复核：后端全量 346 passed（1 条既有 Starlette/httpx 弃用警告），Swift 62 passed，Ruff、37 模块 mypy、CI mypy、tracked-file secret scan、锁文件/compileall 和 Beta target build 均通过；未运行远端 GitHub Actions，阶段 6 不关闭。精确命令及边界见 `docs/HANDOFF.md`。
 
