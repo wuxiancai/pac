@@ -51,7 +51,7 @@
 
 ### 阶段 6 本机门禁复核（2026-11-10，仍开放）
 
-- 当前 `62b9f99`：后端 347 passed（1 条既有弃用警告），Swift 83 passed；Ruff、CI mypy、`uv lock --check`、Python compileall、tracked-file detect-secrets 和 Beta target build 全部通过。
+- 在代码基线 `a21ec3d` 复核：后端 all-extras/all-groups pytest 347 passed（1 条既有弃用警告），Swift 83 passed；Ruff、CI mypy、`uv lock --check`、Python compileall、tracked-file detect-secrets 和 Beta target build 全部通过。
 - 2026-11-10 完成一条合成 EventKit 事件创建及成功审计 GUI 验收。远端 GitHub Actions、真实 Provider、麦克风、备份恢复和其他 GUI/系统门禁仍未齐，不能关闭阶段 6。
 
 ## 阶段 0 证据状态（已结束；延期项保留原状态）

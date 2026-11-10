@@ -12,7 +12,7 @@
 - 2026-11-10 V1.1 模型预设：可在本机命名保存/应用/删除模型来源、型号和白名单 Provider 选择，兼容早期 UserDefaults 预设格式；不包含凭据，云预设继续使用既有安全/预算/审计边界。GUI 已实测本机预设保存、还原型号及删除测试预设；未切换云端。
 - 2026-11-10 V1.1 本机朗读预设：模型设置新增较慢/标准/较快三档，默认系统标准值并保存在本机，仅传给本机 TTS；GUI 已实测切换且恢复标准，真实声学体验仍待设备验收。
 - 2026-11-10 V1.1 快捷指令：聊天页“新对话”支持 `⌘N`，`⌘L` 聚焦消息输入，发送沿用既有 `⌘↩`；GUI 已确认 `⌘N` 打开空会话、`⌘L` 聚焦输入框，不发送、不启动语音。
-- 2026-11-10 代码基线 `62b9f99` 阶段 6 本机 CI 等价门禁：后端全量 347 passed、1 条既有 Starlette/httpx 弃用警告；Swift 83 passed，Beta target build、Ruff、CI mypy、`uv lock --check`、tracked-file detect-secrets、compileall 全通过。此后提交为验收记录文档；远端 GitHub Actions、macOS 14 runtime/正式安装器未验收，阶段 6 保持开放。
+- 2026-11-10 代码基线 `a21ec3d` 阶段 6 本机 CI 等价门禁：后端全量 347 passed、1 条既有 Starlette/httpx 弃用警告；Swift 83 passed，Beta target build、Ruff、CI mypy、`uv lock --check`、tracked-file detect-secrets、compileall 全通过。此后提交为验收记录文档；远端 GitHub Actions、macOS 14 runtime/正式安装器未验收，阶段 6 保持开放。
 - 2026-11-10 B3 历史读取竞态保护：切换会话、恢复备份、创建/删除、发送和来源跳转都会使先前分页/选择请求失效；迟到响应需同时匹配历史代际与当前会话 ID 才可写入消息数组；分页忙碌态另绑定请求 ID，避免旧请求迟到清除新分页状态。Swift 68 项通过（含分页请求协调器的两项新回归），Beta target 构建通过；并发 GUI 和长历史渲染压力尚未完成。已实测已保存记忆来源跳转到对应会话并清理临时记忆。另按 D-018 实测无提醒临时任务 `PENDING→READY→RUNNING→COMPLETED` 后删除，未请求通知权限。
 - 2026-11-10 B3 任务提醒边界修正：重建时只保留提醒时间可解析且仍在未来、状态未完成/未取消的任务；重新安排无效、过去或缺失时间会撤销该任务旧通知。用户拒绝授权或系统授权失效时，关闭提醒偏好并移除 PAC 待发通知。Swift 全量 62 项通过，含拒绝/撤销 mock 清理用例。真实授权与系统投递仍未验收。
 - 2026-11-10 B3 恢复抗崩溃与并发协调：子进程在恢复切换前/后硬退出后，启动恢复完整旧会话并清理 rollback、marker 和 3 类加密 staging；POSIX shared/exclusive 生命周期锁允许多个 store 正常共存，恢复需独占，其他实例仍打开时 fail closed。自动回归覆盖私有锁文件、同进程多 store 与独立子进程持锁时拒绝恢复；后端全量最新 346 passed。完整应用 GUI/Keychain 认证、断电实机和 RTO 仍待验证。

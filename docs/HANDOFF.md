@@ -1,3 +1,9 @@
+# 2026-11-10：阶段 6 本机 CI 等价门禁复核
+
+- 代码基线 `a21ec3d`：在 `backend/` 执行 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 347 passed，1 条既有 Starlette/httpx 弃用警告；`uv lock --check`、`uv run --locked ruff check pac_poc tests scripts`、`uv run --locked mypy`、`python3 -m compileall -q pac_poc scripts tests`、tracked-file `detect-secrets-hook --baseline ../.secrets.baseline` 均通过。
+- `swift test --package-path poc/macos-audio` → 83 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 成功。
+- 初次静态门禁使用环境未提供的 `python` 命令，compileall 步骤退出 127；用系统 `python3` 重跑后全通过。未运行远端 GitHub Actions、真实 Provider 或麦克风；macOS 14 runtime/正式安装器及其余系统验收仍未完成，阶段 6 保持开放。
+
 # 2026-11-10：B3 本机任务状态迁移 GUI 验收
 
 - 在“本机任务”新建无截止时间、无提醒的 `PAC 临时状态迁移 GUI 验收 2026-11-10`，界面显示 PENDING。按 D-018 允许项依次变更为 READY、RUNNING、COMPLETED；每步均在任务卡片状态文字确认。
