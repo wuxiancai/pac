@@ -31,8 +31,8 @@
 
 # 2026-11-10：阶段 6 本机全量门禁复核
 
-- 在当前 HEAD `c07df4e` 对照 `.github/workflows/ci.yml` 运行本机门禁：后端 all-extras/all-groups pytest、Ruff（含 scripts）、CI mypy、锁文件、compileall、tracked-file detect-secrets hook、Swift 全量与 Beta target build。
-- 结果：后端 347 passed，1 条既有 Starlette/httpx 弃用警告；Ruff、mypy（3 个 CI 目标文件）、`uv lock --check`、compileall、detect-secrets hook 均通过；Swift 82 passed；Beta target 构建成功。
+- 在当前 HEAD `b2ad0c7` 对照 `.github/workflows/ci.yml` 运行本机门禁：后端 all-extras/all-groups pytest、Ruff（含 scripts）、CI mypy、锁文件、compileall、tracked-file detect-secrets hook、Swift 全量与 Beta target build。
+- 结果：后端 347 passed，1 条既有 Starlette/httpx 弃用警告；Ruff、mypy（3 个 CI 目标文件）、`uv lock --check`、compileall、detect-secrets hook 均通过；Swift 83 passed；Beta target 构建成功。
 - 该验证没有触发远端 GitHub Actions、真实 Provider 请求、麦克风、系统日历授权/写入或备份恢复。阶段 6 仍开放；GUI 授权/错误路径、Keychain/恢复实机和剩余用户操作须依各工作包逐项验收。
 
 # 2026-11-10：B10 审批 UI 关闭保护

@@ -51,7 +51,7 @@
 
 ### 阶段 6 本机门禁复核（2026-11-10，仍开放）
 
-- 当前 `c07df4e`：后端 347 passed（1 条既有弃用警告），Swift 82 passed；Ruff、CI mypy、`uv lock --check`、Python compileall、tracked-file detect-secrets 和 Beta target build 全部通过。
+- 当前 `b2ad0c7`：后端 347 passed（1 条既有弃用警告），Swift 83 passed；Ruff、CI mypy、`uv lock --check`、Python compileall、tracked-file detect-secrets 和 Beta target build 全部通过。
 - 没有运行远端 GitHub Actions、真实 Provider、麦克风、EventKit 权限/创建或备份恢复。GUI 与系统级验收未齐，不能关闭阶段 6。
 
 ## 阶段 0 证据状态（已结束；延期项保留原状态）
