@@ -1,3 +1,10 @@
+# 2026-11-10：B3 加密备份 GUI 恢复尝试与保存名修正
+
+- 先在已运行约 85 分钟的 Beta 中测试，保存/打开面板按钮没有显示系统面板；旧实例正常退出后，按 `poc/macos-audio/scripts/run_beta_app.sh` 重建启动，TXT 选择器和备份 NSSavePanel 均能正常打开。旧实例状态与失败相关，但具体根因未证实。
+- 新构建导出 `.poc-data/PAC-B3-Restore-Roundtrip.pacbackup`，大小 274,726 bytes；在同一界面重新选择该文件并进入确认。点击“认证并恢复”后按钮持续显示“处理中…”，没有可见系统认证界面或完成/失败反馈。关闭界面并退出 Beta 后核对：SQLCipher 数据库修改时间仍为 21:14:45，`Application Support/PersonalAI/pre-restore/pre-restore.sqlcipher` 未创建，证明本轮没有进入备份切换；不能声称恢复通过。临时备份已删除，未留测试口令。
+- 保存面板先前默认名显示为 `PersonalAssistant.pacbackup.pacbackup`。已将 `NSSavePanel.nameFieldStringValue` 改为不含后缀的 `PersonalAssistant`；新构建面板实测默认显示单后缀 `PersonalAssistant.pacbackup`。`swift test --package-path poc/macos-audio` → 84 passed；Beta target build 成功。
+- 恢复的 macOS 设备认证/错误反馈仍待验收；此前恢复请求停留处理中后已退出应用，以确保认证迟到时不会继续操作。当前已重新启动修复后的 Beta，未输入口令或产生新备份。
+
 # 2026-11-10：B3 加密备份恢复 GUI 重试未能打开保存面板
 
 - 在 Beta“备份”页输入一次性测试口令并点击“选择位置并加密备份”，无 NSSavePanel/系统文件面板出现。随后分别用 accessibility 按钮和截图坐标重试，界面仍停留在原表单；没有选择路径、没有调用导出 API。按 `find .poc-data -maxdepth 2 -type f` 检查，未发现本轮命名的 B3/roundtrip 文件。

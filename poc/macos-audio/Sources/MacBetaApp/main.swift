@@ -1756,7 +1756,8 @@ private struct BackupExportView: View {
     private func chooseDestination() {
         let panel = NSSavePanel()
         panel.title = "保存加密备份"
-        panel.nameFieldStringValue = "PersonalAssistant.pacbackup"
+        // NSSavePanel appends the allowed content type's extension.
+        panel.nameFieldStringValue = "PersonalAssistant"
         panel.allowedContentTypes = [UTType(filenameExtension: "pacbackup") ?? .data]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let replaceExisting = FileManager.default.fileExists(atPath: url.path)
