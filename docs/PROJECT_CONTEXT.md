@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-- 2026-11-10 V1.1 模型预设：可在本机命名保存/应用/删除模型来源、型号和白名单 Provider 选择；不包含凭据，云预设继续使用既有安全/预算/审计边界。GUI 验收状态见 `docs/HANDOFF.md`。
+- 2026-11-10 V1.1 模型预设：可在本机命名保存/应用/删除模型来源、型号和白名单 Provider 选择，兼容早期 UserDefaults 预设格式；不包含凭据，云预设继续使用既有安全/预算/审计边界。GUI 验收状态见 `docs/HANDOFF.md`。
 - 2026-11-10 V1.1 本机朗读预设：模型设置新增较慢/标准/较快三档，默认系统标准值并保存在本机，仅传给本机 TTS；GUI/声学体验待验收，见 `docs/HANDOFF.md`。
 - 2026-11-10 V1.1 快捷指令：聊天页“新对话”支持 `⌘N`，`⌘L` 聚焦消息输入，发送沿用既有 `⌘↩`。自动化/构建结果和 GUI 实机点验状态见 `docs/HANDOFF.md`。
 - 2026-11-10 阶段 6 代码提交 `35d6644` 本机 CI 等价门禁：后端全量 346 passed、1 条既有 Starlette/httpx 弃用警告；Swift 68 passed，Beta target build、Ruff、CI mypy、`uv lock --check`、tracked-file detect-secrets、compileall 全通过。远端 GitHub Actions 未运行，macOS 14 runtime/正式安装器也未验收；阶段 6 保持开放。

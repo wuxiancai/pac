@@ -1,3 +1,8 @@
+# 2026-11-10：模型预设旧格式迁移
+
+- `LocalModelPresetStore` 现可读取初版预设字段（`source`/`cloudProvider`），本机来源迁移为 `ollama`；重写时统一序列化为当前字段名。加载时丢弃空名、超长名或未知路由配置，避免失效偏好进入当前选择流程。
+- 新增旧格式迁移回归；`swift test --package-path poc/macos-audio` → 73 passed，Beta target build 成功。
+
 # 2026-11-10：模型预设 Provider 白名单
 
 - `LocalModelPresetStore` 保存前校验来源与固定 Provider ID：本地只接受 `ollama`，云端只接受当前三个固定 Provider；未知来源/服务商直接拒绝。这样 tampered/stale preference 不会成为路由输入。

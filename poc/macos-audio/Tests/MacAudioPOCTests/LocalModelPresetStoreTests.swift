@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import MacAudioPOC
 
@@ -48,4 +49,21 @@ import Testing
     store.delete(id: removedID)
 
     #expect(store.presets.map(\.name) == ["two"])
+}
+
+@Test func modelPresetStoreMigratesPreviouslySavedPresetFields() throws {
+    let legacy = #"""
+    [{"id":"c6916cb8-54c1-4d8c-94c8-8ca22d704d4e","name":"旧本机预设","source":"local","localModel":"qwen3.5:0.8b","cloudProvider":"qwen-app"}]
+    """#
+    let store = LocalModelPresetStore(serializedData: Data(legacy.utf8))
+
+    #expect(store.presets.count == 1)
+    #expect(store.presets[0].sourceID == "local")
+    #expect(store.presets[0].localModel == "qwen3.5:0.8b")
+    #expect(store.presets[0].providerID == "ollama")
+    let migrated = store.serializedData()
+    #expect(migrated != nil)
+    if let migrated {
+        #expect(String(decoding: migrated, as: UTF8.self).contains("sourceID"))
+    }
 }
