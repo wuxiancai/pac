@@ -64,6 +64,8 @@
 
 ## 当前执行顺序
 
+2026-11-10 B3 备份恢复表单复核：打开备份页时恢复按钮禁用且未选择文件；只确认空选择不会触发恢复。页面仍显示此前导出成功提示，本轮未创建/读取备份、未输入口令或修改数据。用户自选位置、错误口令、系统认证和恢复故障 GUI 验收仍待完成，详见 `docs/HANDOFF.md`。
+
 2026-11-10 阶段 6 用量面板 GUI 复核：刷新后显示 1 条 Ollama L0 完成请求，输入/输出 token、未知费用与缓存命中状态清楚；月估算 ¥0/¥100、¥80 提示线和估算说明可见。两条 EventKit 审计仅呈现 L2 元数据，没有事件内容。空记录与加载失败状态仍待独立验收；无云请求或系统权限操作。详见 `docs/HANDOFF.md`。
 
 2026-11-10 阶段 6 代码提交 `35d6644` 本机 CI 等价门禁：`uv lock --check`、Ruff、CI mypy、tracked-file `detect-secrets-hook`、compileall、后端全量 346 passed、Swift 全量 68 passed 和 `personal-assistant-beta` 构建均通过（后端仅 1 条既有 Starlette/httpx 弃用警告）。远端 Actions 未运行，阶段 6 仍开放。
