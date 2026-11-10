@@ -1,3 +1,9 @@
+# 2026-11-10：D-006 版本化备份容器核心
+
+- 新增 `pac_poc.backup`：scrypt 派生（N=32768/r=8/p=1，16-byte random salt、32-byte 输出）、版本化严格头部、HMAC 校验、当前安装数据库密钥 SHA-256 指纹绑定，以及 1 MiB 缓冲的流式容器写入/提取。目标文件使用同目录临时文件、0600 权限、fsync 与原子替换；口令或密钥不写日志/文件头。
+- 验证：`tests/test_backup.py` 4 passed；后端全量 304 passed，1 条既有 Starlette/httpx 弃用警告；Ruff/mypy/`uv lock --check` 通过。该段尚未调用 SQLCipher backup/restore，也未接入 UI/API。
+- 继续保留待完成项：SQLCipher 在线备份、same-Mac 恢复和目标数据库换钥、恢复前用户可见预备份、失败回滚及 Touch ID/设备认证。
+
 # 2026-11-10：D-006 备份口令格式决策补充
 
 - 用户确认 scrypt 参数 N=32768、r=8、p=1；每个文件生成独立 16-byte random salt，派生 32-byte SQLCipher 备份密钥。不保存口令，不支持跨 Mac 恢复；恢复后要使用当前 Mac Keychain 数据库密钥重新加密。
