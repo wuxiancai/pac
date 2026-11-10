@@ -134,14 +134,35 @@ def test_live_sqlcipher_restore_prebacks_up_and_reencrypts_with_local_key(tmp_pa
     assert Path(result["prebackup_path"]).stat().st_mode & 0o777 == 0o600
     restored = store.load_conversation(str(original["id"]))
     assert [message["content"] for message in restored["messages"]] == ["before restore", "old response"]
+    first_prebackup = EncryptedApplicationStore._open_password_database(
+        Path(result["prebackup_path"]), database_key.hex()
+    )
+    try:
+        assert first_prebackup.execute(
+            "SELECT count(*) FROM messages WHERE content='after backup'"
+        ).fetchone() == (1,)
+    finally:
+        first_prebackup.close()
+    store.append_chat_turn(
+        conversation_id=str(original["id"]), run_id="restore-second-later",
+        user_content="after second restore", assistant_content="latest response",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    second_result = store.restore_encrypted_backup(backup, password="restore passphrase")
+    assert second_result["prebackup_path"] == result["prebackup_path"]
+    assert list((tmp_path / "pre-restore").glob("*.sqlcipher")) == [Path(result["prebackup_path"])]
     store.close()
 
     prebackup = EncryptedApplicationStore._open_password_database(
         Path(result["prebackup_path"]), database_key.hex()
     )
     try:
-        row = prebackup.execute("SELECT count(*) FROM messages WHERE content='after backup'").fetchone()
-        assert row == (1,)
+        assert prebackup.execute(
+            "SELECT count(*) FROM messages WHERE content='after backup'"
+        ).fetchone() == (0,)
+        assert prebackup.execute(
+            "SELECT count(*) FROM messages WHERE content='after second restore'"
+        ).fetchone() == (1,)
     finally:
         prebackup.close()
 

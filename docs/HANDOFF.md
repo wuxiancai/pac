@@ -1448,3 +1448,10 @@
 - 在临时 SQLCipher 数据库新增 120 条消息的长会话 keyset 分页回归，跨越默认 100 条页长，逐页完整遍历并核对总数、唯一性和覆盖。窄测 2 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q`（`backend/`）326 passed，1 条既有 Starlette/httpx 弃用警告。仅验证持久层分页，不覆盖 SwiftUI 长会话或极大消息渲染。
 - 用户补充确认 D-005：缺少请求级实际费用/usage 或汇率时，按版本化公开价估算、清楚标为估算，累计估算达限即拦截；D-006：恢复前加密预备份只保留最近一份，新份创建时替换旧份；D-014：先做离线候选评测，再决定产品启用；D-015：暂缓通用数据导出，继续只提供加密备份/恢复。已同步更新 `DECISIONS.md`、`TASKS.md`、`PROJECT_CONTEXT.md` 与持久化报告。
 - 后续优先实现并回归 D-006 预备份安全轮替；D-014 只运行离线候选评测，不自动启用 Embedding。
+
+
+# 2026-11-10：D-006 恢复前预备份轮替
+
+- 按用户决策改为 `Application Support/PersonalAI/pre-restore/pre-restore.sqlcipher` 固定路径。先在受限目录生成并验证临时 SQLCipher 快照；仅在恢复库成功切换、重新打开后原子替换旧副本。恢复失败路径仍保留既有预备份。
+- `tests/test_backup.py` 10 passed；连续两次恢复验证只有一个 `.sqlcipher` 文件，且新副本包含最新恢复前数据。Ruff、`mypy pac_poc/persistence.py` 通过。后端全量 326 passed，1 条既有 Starlette/httpx 弃用警告。断电/强制终止实机验证仍未完成。
+- 已更新 D-006、B3 队列及持久化工作包报告。

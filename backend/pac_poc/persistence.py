@@ -177,19 +177,19 @@ class EncryptedApplicationStore:
         header, backup_key = read_backup_header(
             source, password=password, database_key=self._database_key_bytes()
         )
-        prebackup = self._path.parent / "pre-restore" / (
-            f"pre-restore-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
-            f"-{uuid4().hex[:8]}.sqlcipher"
-        )
-        prebackup.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        os.chmod(prebackup.parent, 0o700)
+        prebackup_directory = self._path.parent / "pre-restore"
+        prebackup = prebackup_directory / "pre-restore.sqlcipher"
+        prebackup_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(prebackup_directory, 0o700)
         prebackup_temp: Path | None = None
         payload_temp: Path | None = None
         restored_temp: Path | None = None
         rollback_path = self._path.with_name(f".{self._path.name}.{uuid4().hex}.rollback")
         swapped = False
         try:
-            prebackup_temp = self._new_private_temp(self._path.parent, ".pac-pre-restore-", ".sqlite")
+            prebackup_temp = self._new_private_temp(
+                prebackup_directory, ".pac-pre-restore-", ".sqlite"
+            )
             live_copy = self._open_password_database(prebackup_temp, self._key_hex)
             source_connection = engine.raw_connection()
             try:
@@ -201,10 +201,6 @@ class EncryptedApplicationStore:
                 live_copy.close()
                 source_connection.close()
             self._verify_password_database(prebackup_temp, self._key_hex)
-            os.replace(prebackup_temp, prebackup)
-            prebackup_temp = None
-            self._fsync_parent(prebackup.parent)
-
             payload_temp = self._new_private_temp(self._path.parent, ".pac-restore-payload-", ".sqlite")
             extract_backup_payload(source, payload_temp, payload_offset=header.payload_offset)
             self._verify_password_database(payload_temp, backup_key.hex())
@@ -231,6 +227,11 @@ class EncryptedApplicationStore:
             swapped = True
             self.open()
             self._fsync_parent(self._path.parent)
+            # Publish the validated prebackup only after the restored database is live.
+            # Atomic replacement keeps the previous recovery copy intact on failure.
+            os.replace(prebackup_temp, prebackup)
+            prebackup_temp = None
+            self._fsync_parent(prebackup_directory)
             rollback_path.unlink(missing_ok=True)
             return {"prebackup_path": str(prebackup)}
         except Exception as exc:
