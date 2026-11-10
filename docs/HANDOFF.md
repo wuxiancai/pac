@@ -1583,3 +1583,10 @@
 - 增加独立 Python 子进程持有 SQLCipher store 的故障用例。父进程尝试恢复时必须因无法取得生命周期独占锁而 fail closed；原库可读，restore marker 与三类 staging 均被清理。释放子进程后，重新打开的 store 可以成功取得独占锁并完成恢复。
 - 验证：`tests/test_backup.py` 15 passed；后端全量 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 346 passed、1 条既有 Starlette/httpx 弃用警告；`mypy pac_poc` 37 个模块通过；`ruff check pac_poc tests scripts` 通过。
 - 自动进程锁用例不代表真实断电/介质故障；B3 仍待 GUI Keychain 认证、RTO 和物理故障验收。
+
+
+### 2026-11-10：B3 记忆来源与表单退出 GUI 验收
+
+- Beta 记忆中心显示本机确认记忆为 0 条；当前合成会话的用户消息出现在来源消息选择器并可选中。没有打开其他会话或保存记忆。
+- 初次发现表单没有可见完成按钮，导致空草稿只能退出应用。已为 `ConfirmedMemoryView` 增加“完成”按钮；空草稿直接关闭，主题/正文非空时先询问“继续编辑/放弃草稿”。确认放弃后表单关闭，重新打开确认计数仍为 0。
+- 验证：`swift test --package-path poc/macos-audio` → 60 项通过（含 Beta target 编译）；通过仓库 `./poc/macos-audio/scripts/run_beta_app.sh` 重启后实机验证完成/放弃两条 GUI 路径。来源选择仅覆盖当前合成会话；跨会话选择、历史分页与跳转定位仍待验收。无云 Provider、Keychain 或麦克风操作。

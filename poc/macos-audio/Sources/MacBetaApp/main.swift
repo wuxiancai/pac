@@ -1875,6 +1875,7 @@ private struct UsageHistoryView: View {
 @available(macOS 14.0, *)
 private struct ConfirmedMemoryView: View {
     @Bindable var model: BetaChatModel
+    @Environment(\.dismiss) private var dismiss
     @State private var subject = ""
     @State private var content = ""
     @State private var category = "fact"
@@ -1888,11 +1889,28 @@ private struct ConfirmedMemoryView: View {
     @State private var sourceHistoryRequestID = UUID()
     @State private var historyMemory: LocalMemoryItem?
     @State private var sourceMemory: LocalMemoryItem?
+    @State private var showingDiscardConfirmation = false
     private let categories = ["fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"]
+
+    private var hasUnsubmittedDraft: Bool {
+        !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("已确认记忆").font(.title2.bold())
+            HStack {
+                Text("已确认记忆").font(.title2.bold())
+                Spacer()
+                Button("完成") {
+                    if hasUnsubmittedDraft {
+                        showingDiscardConfirmation = true
+                    } else {
+                        dismiss()
+                    }
+                }
+                .accessibilityIdentifier("close-memory-center-button")
+            }
             Text("仅保存你在此处明确确认的内容；不会自动从对话提取。")
                 .font(.caption).foregroundStyle(.secondary)
             Text(model.memoryStatus).font(.caption).foregroundStyle(.secondary)
@@ -2026,6 +2044,16 @@ private struct ConfirmedMemoryView: View {
             Task { await loadSourceHistory(reset: true) }
         }
         .padding()
+        .confirmationDialog(
+            "放弃尚未保存的记忆草稿？",
+            isPresented: $showingDiscardConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("继续编辑", role: .cancel) {}
+            Button("放弃草稿", role: .destructive) { dismiss() }
+        } message: {
+            Text("未保存的主题、内容和来源选择将被丢弃。")
+        }
         .sheet(item: $historyMemory) { memory in
             NavigationStack {
                 List(model.memoryVersions) { version in
