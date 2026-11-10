@@ -116,6 +116,8 @@ final class BetaChatModel {
     private(set) var messages: [LocalChatMessage] = []
     private(set) var conversationID: String?
     private(set) var tasks: [LocalTaskItem] = []
+    private(set) var memories: [LocalMemoryItem] = []
+    private(set) var memoryStatus = ""
     private(set) var taskStatus = ""
     private(set) var isRecordingVoice = false
     private(set) var isTranscribingVoice = false
@@ -421,6 +423,39 @@ final class BetaChatModel {
 
     func reportFileImportError(_ error: Error) {
         status = "无法打开所选文件：\(error.localizedDescription)"
+    }
+
+    func refreshMemories() async {
+        guard let client else { return }
+        do {
+            memories = try await client.listMemories()
+            memoryStatus = "\(memories.count) 条用户确认记忆 · 仅保存在本机"
+        } catch {
+            memoryStatus = "无法读取本机记忆：\(error.localizedDescription)"
+        }
+    }
+
+    func saveConfirmedMemory(subject: String, content: String, category: String) async {
+        guard let client else { return }
+        do {
+            _ = try await client.createConfirmedMemory(
+                subject: subject, content: content, category: category
+            )
+            await refreshMemories()
+        } catch {
+            memoryStatus = "无法保存已确认记忆：\(error.localizedDescription)"
+        }
+    }
+
+    func deleteMemory(_ memory: LocalMemoryItem) async {
+        guard let client else { return }
+        do {
+            try await client.deleteMemory(id: memory.id)
+            memories.removeAll { $0.id == memory.id }
+            memoryStatus = "已永久删除该记忆。"
+        } catch {
+            memoryStatus = "无法删除记忆：\(error.localizedDescription)"
+        }
     }
 
     func refreshTasks() async {
@@ -768,6 +803,7 @@ private struct BetaChatView: View {
     @State private var showingUsage = false
     @State private var showingDeleteChatConfirmation = false
     @State private var showingTasks = false
+    @State private var showingMemories = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -798,6 +834,13 @@ private struct BetaChatView: View {
                     Label("模型设置", systemImage: "gearshape")
                 }
                 .accessibilityIdentifier("model-settings-button")
+                Button {
+                    showingMemories = true
+                    Task { await model.refreshMemories() }
+                } label: {
+                    Label("记忆", systemImage: "brain.head.profile")
+                }
+                .accessibilityIdentifier("memories-button")
                 Button {
                     showingTasks = true
                     Task { await model.refreshTasks() }
@@ -992,6 +1035,10 @@ private struct BetaChatView: View {
         .sheet(isPresented: $showingSettings) {
             BetaModelSettingsView(model: model)
         }
+        .sheet(isPresented: $showingMemories) {
+            ConfirmedMemoryView(model: model)
+                .frame(minWidth: 520, minHeight: 520)
+        }
         .sheet(isPresented: $showingTasks) {
             TaskBoardView(model: model)
                 .frame(minWidth: 480, minHeight: 420)
@@ -1095,6 +1142,64 @@ private struct UsageHistoryView: View {
         }
         let kind = record.costState == "actual" ? "实扣" : "估算"
         return "\(kind) \(amount.formatted()) \(currency)"
+    }
+}
+
+@available(macOS 14.0, *)
+private struct ConfirmedMemoryView: View {
+    @Bindable var model: BetaChatModel
+    @State private var subject = ""
+    @State private var content = ""
+    @State private var category = "fact"
+    private let categories = ["fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("已确认记忆").font(.title2.bold())
+            Text("仅保存你在此处明确确认的内容；不会自动从对话提取。")
+                .font(.caption).foregroundStyle(.secondary)
+            Text(model.memoryStatus).font(.caption).foregroundStyle(.secondary)
+            TextField("主题", text: $subject).textFieldStyle(.roundedBorder)
+            Picker("类别", selection: $category) {
+                ForEach(categories, id: \.self) { Text($0).tag($0) }
+            }
+            TextEditor(text: $content)
+                .frame(minHeight: 90)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+            Button("确认并保存这条记忆") {
+                let cleanSubject = subject.trimmingCharacters(in: .whitespacesAndNewlines)
+                let cleanContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !cleanSubject.isEmpty, !cleanContent.isEmpty else { return }
+                Task { await model.saveConfirmedMemory(subject: cleanSubject, content: cleanContent, category: category) }
+                subject = ""
+                content = ""
+            }
+            .disabled(subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            List(model.memories) { memory in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(memory.subject).font(.headline)
+                        Spacer()
+                        Button(role: .destructive) {
+                            Task { await model.deleteMemory(memory) }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("删除记忆：\(memory.subject)")
+                    }
+                    Text(memory.content).font(.body)
+                    Text("\(memory.category) · 用户确认").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            HStack {
+                Button("刷新") { Task { await model.refreshMemories() } }
+                Spacer()
+                Text("记忆保留至手动删除；Embedding 未启用。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding()
     }
 }
 

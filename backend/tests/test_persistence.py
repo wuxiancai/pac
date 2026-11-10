@@ -279,3 +279,26 @@ def test_task_lifecycle_is_idempotent_and_completed_tasks_expire_after_30_days(
         assert [item["id"] for item in store.list_tasks()] == [task["id"]]
     finally:
         store.close()
+
+
+def test_confirmed_memory_search_version_and_delete_lifecycle(storage_root: Path) -> None:
+    store = _store((storage_root / "memories.db").resolve())
+    store.open()
+    try:
+        memory = store.create_confirmed_memory(
+            subject="Project Atlas",
+            content="Use a local encrypted archive",
+            category="decision",
+        )
+        assert memory["claim_type"] == "user_confirmed_fact"
+        assert store.search_memories("encrypted archive")[0]["id"] == memory["id"]
+        with store.connection() as connection:
+            assert connection.execute(
+                text("SELECT count(*) FROM memory_versions WHERE memory_id=:id"),
+                {"id": memory["id"]},
+            ).scalar_one() == 1
+        assert store.delete_memory(str(memory["id"]))
+        assert store.search_memories("encrypted archive") == []
+        assert store.list_memories() == []
+    finally:
+        store.close()

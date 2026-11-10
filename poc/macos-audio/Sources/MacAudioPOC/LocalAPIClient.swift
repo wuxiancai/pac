@@ -75,6 +75,25 @@ public struct LocalImportedTextFile: Decodable, Identifiable, Sendable {
     }
 }
 
+public struct LocalMemoryItem: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let category: String
+    public let subject: String
+    public let content: String
+    public let claimType: String
+    public let confirmedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, category, subject, content
+        case claimType = "claim_type"
+        case confirmedAt = "confirmed_at"
+    }
+}
+
+private struct LocalMemoryList: Decodable {
+    let memories: [LocalMemoryItem]
+}
+
 public struct LocalTaskItem: Decodable, Identifiable, Sendable {
     public let id: String
     public let title: String
@@ -248,6 +267,50 @@ public final class LocalAPIClient: @unchecked Sendable {
             throw LocalAPIClientError.invalidResponse
         }
         return value.text
+    }
+
+    public func listMemories() async throws -> [LocalMemoryItem] {
+        guard let url = URL(string: "/memories", relativeTo: baseURL)?.absoluteURL else {
+            throw LocalAPIClientError.invalidEndpoint
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let list = try? JSONDecoder().decode(LocalMemoryList.self, from: data) else { throw LocalAPIClientError.invalidResponse }
+        return list.memories
+    }
+
+    public func createConfirmedMemory(subject: String, content: String, category: String) async throws -> LocalMemoryItem {
+        guard let url = URL(string: "/memories", relativeTo: baseURL)?.absoluteURL else {
+            throw LocalAPIClientError.invalidEndpoint
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(ConfirmedMemoryPayload(
+            subject: subject, content: content, category: category, confirmed: true
+        ))
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 201 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
+        guard let memory = try? JSONDecoder().decode(LocalMemoryItem.self, from: data) else { throw LocalAPIClientError.invalidResponse }
+        return memory
+    }
+
+    public func deleteMemory(id: String) async throws {
+        guard let memoryID = UUID(uuidString: id),
+              let url = URL(string: "/memories/\(memoryID.uuidString.lowercased())", relativeTo: baseURL)?.absoluteURL
+        else { throw LocalAPIClientError.invalidEndpoint }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw LocalAPIClientError.requestFailed(statusCode: httpResponse.statusCode) }
     }
 
     public func listTasks(includeCompleted: Bool = true) async throws -> [LocalTaskItem] {
@@ -622,4 +685,11 @@ private struct TaskCreatePayload: Encodable {
 
 private struct TaskTransitionPayload: Encodable {
     let status: String
+}
+
+private struct ConfirmedMemoryPayload: Encodable {
+    let subject: String
+    let content: String
+    let category: String
+    let confirmed: Bool
 }

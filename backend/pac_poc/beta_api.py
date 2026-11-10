@@ -141,6 +141,18 @@ class ChatPersistenceUnavailable(RuntimeError):
     """Safe marker for a local chat write failure."""
 
 
+class ConfirmedMemoryCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str = Field(min_length=1, max_length=512)
+    content: str = Field(min_length=1, max_length=20_000)
+    category: Literal[
+        "fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"
+    ]
+    confirmed: bool
+    source_message_id: UUID | None = None
+
+
 class TaskCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -657,6 +669,55 @@ def create_beta_app(*, dependencies: BetaAPIDependencies) -> FastAPI:
         if not imported_text.remove(import_id):
             raise HTTPException(status_code=404, detail="import not found")
         return {"removed": True}
+
+    @router.get("/memories")
+    async def list_memories(limit: int = Query(default=200, ge=1, le=500)) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent memory storage is unavailable")
+        try:
+            return {"memories": persistent_store.list_memories(limit=limit)}
+        except Exception:
+            raise HTTPException(status_code=503, detail="memories are unavailable") from None
+
+    @router.get("/memories/search")
+    async def search_memories(q: str = Query(min_length=1, max_length=256), limit: int = Query(default=50, ge=1, le=200)) -> dict[str, object]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent memory storage is unavailable")
+        try:
+            return {"memories": persistent_store.search_memories(q, limit=limit)}
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="memory search query is invalid") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="memory search is unavailable") from None
+
+    @router.post("/memories", status_code=201)
+    async def create_memory(payload: ConfirmedMemoryCreateRequest) -> dict[str, object]:
+        if not payload.confirmed:
+            raise HTTPException(status_code=409, detail="explicit user confirmation is required")
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent memory storage is unavailable")
+        try:
+            return persistent_store.create_confirmed_memory(
+                subject=payload.subject,
+                content=payload.content,
+                category=payload.category,
+                source_message_id=str(payload.source_message_id) if payload.source_message_id else None,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="source message not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="memory details are invalid") from exc
+        except Exception:
+            raise HTTPException(status_code=503, detail="memory could not be saved") from None
+
+    @router.delete("/memories/{memory_id}")
+    async def delete_memory(memory_id: UUID) -> dict[str, bool]:
+        if persistent_store is None:
+            raise HTTPException(status_code=503, detail="persistent memory storage is unavailable")
+        try:
+            return {"deleted": persistent_store.delete_memory(str(memory_id))}
+        except Exception:
+            raise HTTPException(status_code=503, detail="memory could not be deleted") from None
 
     @router.get("/tasks")
     async def list_tasks(include_completed: bool = True, limit: int = Query(default=100, ge=1, le=500)) -> dict[str, object]:

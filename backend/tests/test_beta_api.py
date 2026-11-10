@@ -1455,3 +1455,38 @@ def test_persistent_task_api_enforces_transitions_and_requires_storage(tmp_path)
         asyncio.run(run())
     finally:
         store.close()
+
+
+def test_memory_api_requires_explicit_confirmation_and_supports_search_delete(tmp_path) -> None:
+    from pac_poc.persistence import EncryptedApplicationStore
+
+    store = EncryptedApplicationStore(path=(tmp_path / "memories.db").resolve(), key=b"m" * 32)
+    store.open()
+    app = create_beta_api(session=LocalAPISession(token="memory-token"), persistence_store=store)
+
+    async def run() -> None:
+        headers = {"authorization": "Bearer memory-token"}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            unconfirmed = await client.post("/memories", headers=headers, json={
+                "subject": "Project Atlas", "content": "Use local encryption",
+                "category": "decision", "confirmed": False,
+            })
+            created = await client.post("/memories", headers=headers, json={
+                "subject": "Project Atlas", "content": "Use local encryption",
+                "category": "decision", "confirmed": True,
+            })
+            search = await client.get("/memories/search", headers=headers, params={"q": "local encryption"})
+            listed = await client.get("/memories", headers=headers)
+            deleted = await client.delete(f"/memories/{created.json()['id']}", headers=headers)
+        assert unconfirmed.status_code == 409
+        assert created.status_code == 201
+        assert len(search.json()["memories"]) == 1
+        assert listed.json()["memories"][0]["claim_type"] == "user_confirmed_fact"
+        assert deleted.json() == {"deleted": True}
+
+    try:
+        asyncio.run(run())
+    finally:
+        store.close()

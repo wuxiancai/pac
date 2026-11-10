@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import stat
 from datetime import datetime, timedelta, timezone
@@ -91,6 +92,108 @@ class EncryptedApplicationStore:
         return self._engine.connect()
 
 
+
+
+    MEMORY_CATEGORIES = frozenset({
+        "fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"
+    })
+
+    def create_confirmed_memory(
+        self,
+        *,
+        subject: str,
+        content: str,
+        category: str,
+        source_message_id: str | None = None,
+    ) -> dict[str, object]:
+        if category not in self.MEMORY_CATEGORIES:
+            raise ValueError("memory category is invalid")
+        if not subject.strip() or len(subject) > 512:
+            raise ValueError("memory subject must contain 1 to 512 characters")
+        if not content.strip() or len(content) > 20_000:
+            raise ValueError("memory content must contain 1 to 20000 characters")
+        engine = self._require_engine()
+        now = _utc_timestamp()
+        memory_id = str(uuid4())
+        snapshot = {
+            "subject": subject.strip(),
+            "content": content.strip(),
+            "category": category,
+            "claim_type": "user_confirmed_fact",
+            "source_message_id": source_message_id,
+            "confirmed_at": now,
+        }
+        with engine.begin() as connection:
+            if source_message_id is not None:
+                source_exists = connection.execute(text(
+                    "SELECT 1 FROM messages WHERE id=:id AND deleted_at IS NULL"
+                ), {"id": source_message_id}).first()
+                if source_exists is None:
+                    raise KeyError("source message not found")
+            connection.execute(text(
+                "INSERT INTO memory_items(id,category,subject,content,claim_type,status,"
+                "source_message_id,confirmed_at,created_at,updated_at) VALUES(:id,:category,"
+                ":subject,:content,'user_confirmed_fact','ACTIVE',:source,:now,:now,:now)"
+            ), {
+                "id": memory_id, "category": category, "subject": subject.strip(),
+                "content": content.strip(), "source": source_message_id, "now": now,
+            })
+            connection.execute(text(
+                "INSERT INTO memory_versions(id,memory_id,version_no,snapshot_json,change_reason,created_at) "
+                "VALUES(:version_id,:memory_id,1,:snapshot,'user_confirmed_create',:now)"
+            ), {
+                "version_id": str(uuid4()), "memory_id": memory_id,
+                "snapshot": json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")),
+                "now": now,
+            })
+            return self.get_memory(memory_id, connection=connection)
+
+    def list_memories(self, *, limit: int = 200) -> list[dict[str, object]]:
+        if not 1 <= limit <= 500:
+            raise ValueError("memory limit is outside the supported range")
+        engine = self._require_engine()
+        with engine.connect() as connection:
+            rows = connection.execute(text(
+                "SELECT * FROM memory_items WHERE status='ACTIVE' AND deleted_at IS NULL "
+                "ORDER BY updated_at DESC LIMIT :limit"
+            ), {"limit": limit}).mappings().all()
+            return [_memory_row(row) for row in rows]
+
+    def get_memory(self, memory_id: str, *, connection=None) -> dict[str, object]:
+        engine = self._require_engine()
+        if connection is not None:
+            row = connection.execute(text(
+                "SELECT * FROM memory_items WHERE id=:id"
+            ), {"id": memory_id}).mappings().first()
+            if row is None:
+                raise KeyError("memory not found")
+            return _memory_row(row)
+        with engine.connect() as own_connection:
+            return self.get_memory(memory_id, connection=own_connection)
+
+    def search_memories(self, query: str, *, limit: int = 50) -> list[dict[str, object]]:
+        if not query.strip() or len(query) > 256 or not 1 <= limit <= 200:
+            raise ValueError("memory search query is invalid")
+        # FTS syntax is intentionally restricted to quoted tokens; raw MATCH
+        # operators are never passed through from user input.
+        tokens = [token for token in query.split() if token]
+        match_query = " AND ".join('"' + token.replace('"', '""') + '"' for token in tokens)
+        engine = self._require_engine()
+        with engine.connect() as connection:
+            rows = connection.execute(text(
+                "SELECT m.* FROM memory_items_fts f JOIN memory_items m ON m.id=f.memory_id "
+                "WHERE memory_items_fts MATCH :query AND m.status='ACTIVE' AND m.deleted_at IS NULL "
+                "ORDER BY rank LIMIT :limit"
+            ), {"query": match_query, "limit": limit}).mappings().all()
+            return [_memory_row(row) for row in rows]
+
+    def delete_memory(self, memory_id: str) -> bool:
+        engine = self._require_engine()
+        with engine.begin() as connection:
+            result = connection.execute(text(
+                "DELETE FROM memory_items WHERE id=:id"
+            ), {"id": memory_id})
+            return result.rowcount > 0
 
     TASK_TRANSITIONS = {
         "PENDING": {"READY", "CANCELLED"},
@@ -405,6 +508,20 @@ def _task_row(row) -> dict[str, object]:
         "completed_at": row["completed_at"],
         "retry_count": int(row["retry_count"]),
         "error_code": row["error_code"],
+        "created_at": str(row["created_at"]),
+        "updated_at": str(row["updated_at"]),
+    }
+
+
+def _memory_row(row) -> dict[str, object]:
+    return {
+        "id": str(row["id"]),
+        "category": str(row["category"]),
+        "subject": str(row["subject"]),
+        "content": str(row["content"]),
+        "claim_type": str(row["claim_type"]),
+        "source_message_id": row["source_message_id"],
+        "confirmed_at": str(row["confirmed_at"]),
         "created_at": str(row["created_at"]),
         "updated_at": str(row["updated_at"]),
     }
