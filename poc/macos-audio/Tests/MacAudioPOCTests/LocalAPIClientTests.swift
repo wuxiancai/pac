@@ -173,7 +173,7 @@ private final class ChatHistoryURLProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        let body = #"{"conversation_id":"11111111-1111-4111-8111-111111111111","messages":[{"role":"user","content":"persisted prompt"}]}"#
+        let body = #"{"conversation_id":"11111111-1111-4111-8111-111111111111","messages":[{"id":"33333333-3333-4333-8333-333333333333","role":"user","content":"persisted prompt"}]}"#
         let response = HTTPURLResponse(
             url: request.url!,
             statusCode: 200,
@@ -324,7 +324,7 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     )
 
     for try await _ in client.streamChat(
-        messages: [LocalChatMessage(role: "user", content: "Summarize the attached notes")],
+        messages: [LocalChatMessage(id: "33333333-3333-4333-8333-333333333333", role: "user", content: "Summarize the attached notes")],
         importedDocumentIDs: ["11111111-1111-4111-8111-111111111111"],
         conversationID: "22222222-2222-4222-8222-222222222222"
     ) {}
@@ -338,6 +338,8 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
     #expect(payload["import_ids"] as? [String] == ["11111111-1111-4111-8111-111111111111"])
     #expect(payload["conversation_id"] as? String == "22222222-2222-4222-8222-222222222222")
     #expect(payload["messages"] != nil)
+    let messages = try #require(payload["messages"] as? [[String: Any]])
+    #expect(messages[0]["id"] == nil)
 }
 
 
@@ -372,7 +374,10 @@ private final class ChatRequestCaptureURLProtocol: URLProtocol {
 
     let history = try await client.chatHistory()
     #expect(history.conversationID == "11111111-1111-4111-8111-111111111111")
-    #expect(history.messages == [LocalChatMessage(role: "user", content: "persisted prompt")])
+    #expect(history.messages == [LocalChatMessage(
+        id: "33333333-3333-4333-8333-333333333333", role: "user", content: "persisted prompt"
+    )])
+    #expect(history.messages[0].id == "33333333-3333-4333-8333-333333333333")
     try await client.deleteChatHistory(conversationID: "11111111-1111-4111-8111-111111111111")
 }
 

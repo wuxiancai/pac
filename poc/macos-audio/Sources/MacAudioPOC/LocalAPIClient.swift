@@ -27,12 +27,29 @@ extension LocalAPIClientError: LocalizedError {
 }
 
 public struct LocalChatMessage: Codable, Equatable, Sendable {
+    public let id: String?
     public let role: String
     public let content: String
 
-    public init(role: String, content: String) {
+    public init(id: String? = nil, role: String, content: String) {
+        self.id = id
         self.role = role
         self.content = content
+    }
+
+    enum CodingKeys: String, CodingKey { case id, role, content }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+        role = try container.decode(String.self, forKey: .role)
+        content = try container.decode(String.self, forKey: .content)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(role, forKey: .role)
+        try container.encode(content, forKey: .content)
     }
 }
 
@@ -100,11 +117,13 @@ public struct LocalMemoryItem: Decodable, Identifiable, Sendable {
     public let subject: String
     public let content: String
     public let claimType: String
+    public let sourceMessageID: String?
     public let confirmedAt: String
 
     enum CodingKeys: String, CodingKey {
         case id, category, subject, content
         case claimType = "claim_type"
+        case sourceMessageID = "source_message_id"
         case confirmedAt = "confirmed_at"
     }
 }
@@ -302,7 +321,9 @@ public final class LocalAPIClient: @unchecked Sendable {
         return list.memories
     }
 
-    public func createConfirmedMemory(subject: String, content: String, category: String) async throws -> LocalMemoryItem {
+    public func createConfirmedMemory(
+        subject: String, content: String, category: String, sourceMessageID: String? = nil
+    ) async throws -> LocalMemoryItem {
         guard let url = URL(string: "/memories", relativeTo: baseURL)?.absoluteURL else {
             throw LocalAPIClientError.invalidEndpoint
         }
@@ -311,7 +332,8 @@ public final class LocalAPIClient: @unchecked Sendable {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(ConfirmedMemoryPayload(
-            subject: subject, content: content, category: category, confirmed: true
+            subject: subject, content: content, category: category, confirmed: true,
+            sourceMessageID: sourceMessageID
         ))
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else { throw LocalAPIClientError.invalidResponse }
@@ -777,6 +799,12 @@ private struct ConfirmedMemoryPayload: Encodable {
     let content: String
     let category: String
     let confirmed: Bool
+    var sourceMessageID: String? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case subject, content, category, confirmed
+        case sourceMessageID = "source_message_id"
+    }
 }
 
 private struct ConversationCreatePayload: Encodable {

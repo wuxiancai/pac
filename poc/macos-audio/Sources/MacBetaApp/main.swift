@@ -303,6 +303,9 @@ final class BetaChatModel {
                 self.activeRequest = nil
                 self.activeRequestID = nil
                 if runID != nil { self.latestRunStatus = .completed }
+                if let history = try? await client.chatHistory(conversationID: activeConversationID) {
+                    self.messages = history.messages
+                }
                 await self.refreshConversations()
                 if let runID {
                     await self.refreshRunStatus(runID, client: client)
@@ -494,7 +497,10 @@ final class BetaChatModel {
         }
     }
 
-    func saveConfirmedMemory(subject: String, content: String, category: String, editingID: String? = nil) async {
+    func saveConfirmedMemory(
+        subject: String, content: String, category: String, sourceMessageID: String? = nil,
+        editingID: String? = nil
+    ) async {
         guard let client else { return }
         do {
             if let editingID {
@@ -503,7 +509,8 @@ final class BetaChatModel {
                 )
             } else {
                 _ = try await client.createConfirmedMemory(
-                    subject: subject, content: content, category: category
+                    subject: subject, content: content, category: category,
+                    sourceMessageID: sourceMessageID
                 )
             }
             memoryStatus = editingID == nil ? "已保存并确认记忆。" : "已确认修正并保存新版本。"
@@ -1277,6 +1284,7 @@ private struct ConfirmedMemoryView: View {
     @State private var content = ""
     @State private var category = "fact"
     @State private var editingID: String?
+    @State private var sourceMessageID = ""
     private let categories = ["fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"]
 
     var body: some View {
@@ -1289,6 +1297,17 @@ private struct ConfirmedMemoryView: View {
             Picker("类别", selection: $category) {
                 ForEach(categories, id: \.self) { Text($0).tag($0) }
             }
+            if editingID == nil {
+                Picker("来源消息（当前会话）", selection: $sourceMessageID) {
+                    Text("不关联聊天消息").tag("")
+                    ForEach(model.messages.filter { $0.id != nil }, id: \.id) { message in
+                        Text("\(message.role == "user" ? "我" : "助理")：\(message.content.prefix(70))")
+                            .tag(message.id ?? "")
+                    }
+                }
+            } else if !sourceMessageID.isEmpty {
+                Text("来源消息 ID：\(sourceMessageID)").font(.caption).foregroundStyle(.secondary)
+            }
             TextEditor(text: $content)
                 .frame(minHeight: 90)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
@@ -1298,10 +1317,17 @@ private struct ConfirmedMemoryView: View {
                 let cleanContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !cleanSubject.isEmpty, !cleanContent.isEmpty else { return }
                 let memoryID = editingID
-                Task { await model.saveConfirmedMemory(subject: cleanSubject, content: cleanContent, category: category, editingID: memoryID) }
+                let sourceID = sourceMessageID.isEmpty ? nil : sourceMessageID
+                Task {
+                    await model.saveConfirmedMemory(
+                        subject: cleanSubject, content: cleanContent, category: category,
+                        sourceMessageID: sourceID, editingID: memoryID
+                    )
+                }
                 subject = ""
                 content = ""
                 editingID = nil
+                sourceMessageID = ""
             }
             .disabled(subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             if editingID != nil {
@@ -1309,6 +1335,7 @@ private struct ConfirmedMemoryView: View {
                     editingID = nil
                     subject = ""
                     content = ""
+                    sourceMessageID = ""
                 }
             }
             }
@@ -1322,6 +1349,7 @@ private struct ConfirmedMemoryView: View {
                             subject = memory.subject
                             content = memory.content
                             category = memory.category
+                            sourceMessageID = memory.sourceMessageID ?? ""
                         }
                         .buttonStyle(.borderless)
                         Button(role: .destructive) {
@@ -1334,6 +1362,9 @@ private struct ConfirmedMemoryView: View {
                     }
                     Text(memory.content).font(.body)
                     Text("\(memory.category) · 用户确认").font(.caption).foregroundStyle(.secondary)
+                    if let sourceMessageID = memory.sourceMessageID {
+                        Text("来源消息：\(sourceMessageID)").font(.caption2).foregroundStyle(.tertiary)
+                    }
                 }
             }
             HStack {

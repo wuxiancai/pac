@@ -4,7 +4,7 @@ import shutil
 import sqlite3
 import stat
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import text
@@ -229,10 +229,14 @@ def test_conversation_turns_load_in_order_and_manual_delete_removes_content(
         )
         snapshot = store.load_conversation(conversation_id)
         assert snapshot["title"] == "Remember this project title"
-        assert snapshot["messages"] == [
+        assert [
+            {"role": message["role"], "content": message["content"]}
+            for message in snapshot["messages"]
+        ] == [
             {"role": "user", "content": "Remember this project title"},
             {"role": "assistant", "content": "Project Atlas"},
         ]
+        assert all(UUID(message["id"]) for message in snapshot["messages"])
         assert store.delete_conversation(conversation_id)
         assert store.load_conversation()["messages"] == []
     finally:

@@ -438,7 +438,7 @@ class EncryptedApplicationStore:
             if row is None:
                 raise KeyError("conversation not found")
             messages = connection.execute(text(
-                "SELECT role, content FROM messages WHERE conversation_id=:id "
+                "SELECT id, role, content FROM messages WHERE conversation_id=:id "
                 "AND deleted_at IS NULL ORDER BY created_at, id"
             ), {"id": row["id"]}).mappings().all()
             return {
@@ -447,7 +447,11 @@ class EncryptedApplicationStore:
                 "created_at": str(row["created_at"]),
                 "updated_at": str(row["updated_at"]),
                 "messages": [
-                    {"role": str(message["role"]).lower(), "content": str(message["content"])}
+                    {
+                        "id": str(message["id"]),
+                        "role": str(message["role"]).lower(),
+                        "content": str(message["content"]),
+                    }
                     for message in messages
                 ],
             }

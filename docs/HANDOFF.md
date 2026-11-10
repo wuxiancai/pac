@@ -1,3 +1,10 @@
+# 2026-11-10：记忆来源消息追踪
+
+- 持久聊天历史现返回稳定 message UUID；Swift 解码并保留 ID，但编码模型上下文时明确只发 role/content，不扩展聊天请求契约。生成完成后 UI 刷新当前会话历史以取得刚保存消息的 ID。
+- 记忆创建表单可选择当前会话中已有 ID 的消息作为来源；记忆列表显示来源 ID。后端校验来源存在，聊天删除遵循 FK `SET NULL`，保留记忆但清除已不存在的来源引用。编辑记忆不改动原来源。
+- 验证：`tests/test_persistence.py tests/test_beta_api.py` 54 passed，1 条既有 Starlette/httpx 弃用警告；后端全量 300 passed、同 1 条警告；Swift 全量 49 项通过；Beta build、Ruff、mypy 与 `uv lock --check` 通过。
+- 限制：仅支持当前会话来源选择，暂无跨会话检索/跳转，也暂无版本历史查看。
+
 # 2026-11-10：V1.1 已确认记忆人工修正
 
 - 记忆中心新增显式确认编辑 API 与 SwiftUI 编辑流程。每次修正更新加密数据库中的当前记忆、由 FTS 触发器同步索引，并追加 `user_confirmed_edit` 版本快照；未确认更新返回 409。删除仍会级联删除版本记录。

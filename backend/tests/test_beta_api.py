@@ -4,6 +4,7 @@ import asyncio
 import json
 from threading import Event
 from time import sleep
+from uuid import UUID
 
 import httpx
 import pytest
@@ -1399,17 +1400,30 @@ def test_persistent_chat_history_round_trips_and_can_be_manually_deleted(tmp_pat
                 },
             )
             history = await client.get("/chat/history", headers=headers)
+            source_id = history.json()["messages"][0]["id"]
+            memory = await client.post("/memories", headers=headers, json={
+                "subject": "Project title", "content": "Project Atlas",
+                "category": "fact", "confirmed": True, "source_message_id": source_id,
+            })
             deleted = await client.delete("/chat/history", headers=headers)
             after_delete = await client.get("/chat/history", headers=headers)
+            memories = await client.get("/memories", headers=headers)
         assert initial.status_code == 200
         assert response.status_code == 200
         assert '"done":true' in response.text
-        assert history.json()["messages"] == [
+        assert [
+            {"role": message["role"], "content": message["content"]}
+            for message in history.json()["messages"]
+        ] == [
             {"role": "user", "content": "记住项目标题"},
             {"role": "assistant", "content": "本机回答"},
         ]
+        assert all(UUID(message["id"]) for message in history.json()["messages"])
+        assert memory.status_code == 201
+        assert memory.json()["source_message_id"] == source_id
         assert deleted.json() == {"deleted": True}
         assert after_delete.json()["messages"] == []
+        assert memories.json()["memories"][0]["source_message_id"] is None
 
     try:
         asyncio.run(run())
