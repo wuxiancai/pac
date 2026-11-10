@@ -1073,6 +1073,7 @@ private struct BetaChatView: View {
     @State private var showingUsage = false
     @State private var showingBackup = false
     @State private var showingCalendar = false
+    @State private var showingReminders = false
     @State private var showingDeleteChatConfirmation = false
     @State private var showingTasks = false
     @State private var showingMemories = false
@@ -1185,6 +1186,10 @@ private struct BetaChatView: View {
                     Label("日历", systemImage: "calendar")
                 }
                 .accessibilityIdentifier("calendar-read-only-button")
+                Button { showingReminders = true } label: {
+                    Label("提醒事项", systemImage: "checklist")
+                }
+                .accessibilityIdentifier("reminders-read-only-button")
                 if !model.messages.isEmpty {
                     Button(role: .destructive) {
                         showingDeleteChatConfirmation = true
@@ -1426,6 +1431,10 @@ private struct BetaChatView: View {
             CalendarReadOnlyView()
                 .frame(minWidth: 520, minHeight: 420)
         }
+        .sheet(isPresented: $showingReminders) {
+            CalendarRemindersReadOnlyView()
+                .frame(minWidth: 520, minHeight: 420)
+        }
         .alert("重命名当前会话", isPresented: $showingRenameConversation) {
             TextField("会话名称", text: $renameTitle)
             Button("取消", role: .cancel) {}
@@ -1584,6 +1593,45 @@ private struct CalendarReadOnlyView: View {
                             Text("– \(event.endDate.formatted(date: .omitted, time: .shortened))")
                         }
                         Text("· \(event.calendarTitle)")
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            HStack {
+                Spacer()
+                Button("完成") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(18)
+    }
+}
+
+@available(macOS 14.0, *)
+private struct CalendarRemindersReadOnlyView: View {
+    @State private var service = CalendarRemindersReadOnlyService()
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("本机提醒事项（只读）").font(.title2.bold())
+            Text("系统需要授予提醒事项完整访问权限才能读取；应用只查询未完成项目，不会创建、修改或删除提醒，也不会保存或发送提醒内容。")
+                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Text(service.status).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(service.isLoading ? "正在读取…" : "授权并读取") {
+                    Task { await service.loadUpcomingReminders() }
+                }
+                .disabled(service.isLoading)
+                .accessibilityIdentifier("reminders-read-only-load-button")
+            }
+            List(service.reminders) { reminder in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(reminder.title).font(.body.weight(.medium))
+                    HStack {
+                        Text(reminder.dueDate?.formatted(date: .abbreviated, time: .shortened) ?? "未设到期日")
+                        Text("· \(reminder.listTitle)")
                     }
                     .font(.caption).foregroundStyle(.secondary)
                 }

@@ -21,6 +21,25 @@ private final class FakeCalendarEventReader: CalendarEventReading {
     }
 }
 
+@MainActor
+private final class FakeCalendarReminderReader: CalendarReminderReading {
+    var authorization: CalendarAccessState = .notDetermined
+    var requestCount = 0
+    var requestedEndDate: Date?
+    var fixtures: [LocalCalendarReminder] = []
+
+    func requestFullAccess() async throws -> Bool {
+        requestCount += 1
+        authorization = .fullAccess
+        return true
+    }
+
+    func incompleteReminders(dueBy end: Date) async throws -> [LocalCalendarReminder] {
+        requestedEndDate = end
+        return fixtures
+    }
+}
+
 @available(macOS 14.0, *)
 @Test @MainActor func calendarReaderRequestsPermissionOnlyAfterExplicitLoadAndLimitsToThirtyDays() async throws {
     let reader = FakeCalendarEventReader()
@@ -57,4 +76,45 @@ private final class FakeCalendarEventReader: CalendarEventReading {
     #expect(reader.requestCount == 0)
     #expect(reader.requestedRange == nil)
     #expect(service.events.isEmpty)
+}
+
+@available(macOS 14.0, *)
+@Test @MainActor func remindersReaderRequestsPermissionAfterClickAndSortsDueDates() async {
+    let reader = FakeCalendarReminderReader()
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let later = LocalCalendarReminder(
+        id: "later", title: "Review", listTitle: "Work",
+        dueDate: now.addingTimeInterval(7_200), isCompleted: false
+    )
+    let earlier = LocalCalendarReminder(
+        id: "earlier", title: "Plan", listTitle: "Work",
+        dueDate: now.addingTimeInterval(60), isCompleted: false
+    )
+    let undated = LocalCalendarReminder(
+        id: "undated", title: "Someday", listTitle: "Personal",
+        dueDate: nil, isCompleted: false
+    )
+    reader.fixtures = [later, undated, earlier]
+    let service = CalendarRemindersReadOnlyService(reader: reader)
+
+    #expect(reader.requestCount == 0)
+    await service.loadUpcomingReminders(now: now)
+
+    #expect(reader.requestCount == 1)
+    #expect(service.reminders.map(\.id) == ["earlier", "later", "undated"])
+    #expect(reader.requestedEndDate == Calendar.current.date(byAdding: .day, value: 30, to: now))
+    #expect(service.status.contains("只读"))
+}
+
+@available(macOS 14.0, *)
+@Test @MainActor func remindersReaderDoesNotFetchWhenAuthorizationIsDenied() async {
+    let reader = FakeCalendarReminderReader()
+    reader.authorization = .denied
+    let service = CalendarRemindersReadOnlyService(reader: reader)
+
+    await service.loadUpcomingReminders()
+
+    #expect(reader.requestCount == 0)
+    #expect(reader.requestedEndDate == nil)
+    #expect(service.reminders.isEmpty)
 }

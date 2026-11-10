@@ -1406,3 +1406,8 @@
 - D-019 首版现已落地：migration 创建加密本机固定 Skills 目录（风险审查、决策简报、行动项整理），提示定义版本化保存且权限 manifest 明确无工具和外部写。`GET /skills` 不返回提示正文；每轮最多选 3 个固定键，服务端拒绝未知/重复选择，客户端发送后清空选择。无动态代码、工具、后台 Agent 或外部写接口。
 - 验证：Skills/角色/存储/API 定向 6 passed；后端全量 all-extras/all-groups 321 passed、1 条既有 Starlette/httpx 弃用警告；Swift 全量 57 passed；Beta build、Ruff、相关四个 Python 模块的 mypy 均通过。首轮全量中的唯一失败是 migration 版本断言仍指向 0002，更新为 0003 后完整重跑通过。
 - 下一步继续 V3 多 Agent 协作中不涉及外部写的受控本机调度设计和必要审批 UI 边界；外部写操作仍保持关闭，直到对每类操作、预览、逐次确认和撤销/补救确定规则。
+
+# 2026-11-10：V2 EventKit 提醒事项只读视图
+
+- 用户接受提醒事项完整系统权限，应用只在用户点击后申请权限，仅读取未完成提醒及到期/清单信息，不创建、修改、完成、删除、持久化或发送给 Provider；查询未来 30 天到期条目和无到期日条目。加入独立 `NSRemindersFullAccessUsageDescription` 与本机提醒事项面板。
+- Apple 文档要求读取提醒事项时申请 full access，平台不提供只读权限；系统授权后产品代码保持只读。mock 覆盖按需请求、排序、日期边界和拒绝不读取。验证：Swift 全量 59 项通过；Beta target 与 `.app` 构建成功。没有触发真实 EventKit 权限弹窗或读取个人提醒。
