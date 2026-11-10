@@ -29,6 +29,8 @@ CI 现显式安装 `phase4-pdf-poc` extra，因此通用 Python 回归会实际�
 
 2026-11-10 macOS 资源隔离资料核对：Apple 将 App Sandbox 描述为限制应用访问文件、网络连接和硬件等系统资源的边界；官方 `os_proc_available_memory()` 说明明确将结果限定为当前 app 可用内存的建议值，数值会随生命周期变化，且调用者不是 app 时返回 0。它不能给当前 Python helper worker 提供可配置、可验证的硬内存上限。此轮没有找到可替代已失败 `setrlimit`/`ulimit` 尝试且在目标 macOS 上验证通过的公共机制；这不证明不存在其他机制。PDF 继续禁用，直到候选隔离能以超限样本证明限制和拒绝行为。[App Sandbox 文档](https://developer.apple.com/documentation/security/app-sandbox)；[`os_proc_available_memory()` 文档](https://developer.apple.com/documentation/os/os_proc_available_memory)。
 
+2026-11-10 后续候选验证：Apple SDK 确实暴露 `task_set_phys_footprint_limit`，其官方符号说明是设置 task 的物理 footprint 限额。为验证可用性，在 `.poc-data/tmp` 编译并运行独立 C 子进程探针，尝试对自身设置 256 MiB 限额；API 返回 8，SDK `mach/kern_return.h` 将其定义为 `KERN_NO_ACCESS`，因此限额未建立，探针没有进入超额分配步骤。该结果不证明 API 在所有签名/运行形态都不可用，但当前 Beta 进程形态不能使用它作为安全边界。官方 API 条目：[task_set_phys_footprint_limit](https://developer.apple.com/documentation/kernel/1538131-task_set_phys_footprint_limit)。PDF 继续禁用；剩余需要支持并可验证的隔离方案及恶意/压力语料，不能用 API 符号存在代替。
+
 ## 自动验证
 
 2026-11-10 超大附件前置拒绝：API 在 ContextBuilder 将资料 JSON 序列化前，以消息字符数与附件原始字符数之和作下限检查；明显超过上下文上限时返回 413，避免对最大尺寸的合法上传先创建大型 JSON 副本。最终上下文仍执行完整字符上限检查，以覆盖 JSON 转义和固定框架开销。回归替换 Orchestrator 为一旦构造即失败的哨兵，100,000 字符附件仍在编排前返回 413。定向 2 passed，Ruff/mypy 通过；后端全量 282 passed，1 条既有 Starlette/httpx 弃用警告。
