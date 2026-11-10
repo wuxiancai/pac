@@ -1,3 +1,8 @@
+# 2026-11-10：远端 CI 与本地分支差异核对
+
+- 只读检查 `gh run list --limit 5`、`git branch -vv` 与 `git ls-remote origin refs/heads/main`：远端 `main` 当前为 `51b9ab9c46871e7213eb18ab685a8120e1419f27`；本地 `main` 为 `cad3e01` 且 `ahead 319`。最近可见的成功 Actions run `42489738004` 也是 2026-11-08 的旧提交 `51b9ab9`，不覆盖当前代码。
+- 未推送远端。将本地 `main` 推送会一次发布其全部 319 个领先提交，不是本轮单段提交动作；远端 Actions 验收仍待处理。当前本机等价 CI 已于 `000f341` 通过，见下方阶段 6 记录。
+
 # 2026-11-10：阶段 6 当前提交本机 CI 等价门禁复核
 
 - 对当前代码提交 `000f341` 对照 `.github/workflows/ci.yml` 重跑本机门禁：后端 `UV_OFFLINE=1 UV_CACHE_DIR=.poc-data/uv-cache TMPDIR=.poc-data/tmp uv run --locked --all-extras --all-groups pytest -q` → 347 passed，1 条既有 Starlette/httpx 弃用警告；`swift test` → 94 passed；`swift build --product personal-assistant-beta` 成功。
