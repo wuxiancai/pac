@@ -1893,7 +1893,9 @@ private struct ConfirmedMemoryView: View {
     private let categories = ["fact", "preference", "goal", "event", "decision", "commitment", "relationship", "project"]
 
     private var hasUnsubmittedDraft: Bool {
-        !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        editingID != nil
+            || !sourceMessageID.isEmpty
+            || !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
