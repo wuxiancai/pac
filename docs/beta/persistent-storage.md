@@ -34,6 +34,12 @@
 
 ## 尚未完成
 
+### 2026-11-10 恢复切换安全补充
+
+恢复切换使用 POSIX 生命周期锁：普通打开的 store 持共享锁，恢复要求独占锁；其他 store 活跃时 fail closed。独占锁保护启动时 rollback 恢复及专用 staging/marker 回收。子进程在切换前后硬退出的故障注入均恢复原会话并清理 rollback、marker 和三类 staging；另覆盖锁文件私有权限及多 store 拒绝恢复。物理断电、介质故障、Keychain 设备认证、完整 GUI 流程和 RTO 仍未验收。
+
+本轮验证：后端全量 345 passed（1 条既有 Starlette/httpx 弃用警告）；`mypy pac_poc` 37 个模块、`ruff check pac_poc tests scripts`、compileall 与 tracked-file secret scan 通过。
+
 1. 删除记忆会同步删除其版本快照，FTS 由数据库触发器同步。新建记忆的来源选择目前支持本机全部会话及按需加载历史页；切换会话会使旧异步读取失效，防止迟到结果覆盖当前选择。来源读取、跨会话定位的 GUI 实机验收仍待完成。
 2. 会话历史已实现：初始最多 100 条，可通过有序 `(created_at,id)` keyset cursor 加载更早记录，SQLCipher schema 增加复合索引，SwiftUI 只在用户点击时拉取历史页并保留当前滚动锚点；已加载数据库行使用稳定消息 ID，临时流式消息使用稳定的本轮索引 ID，自动滚动与分页锚点共用同一行 ID。模型上下文仍限制最近 20 条。LazyVStack 当前对已加载消息做惰性视图创建，但尚无 SwiftUI 长会话压力与极大消息单体渲染验收。SQLCipher repository 新增 120 条消息跨 100 条分页边界的完整遍历回归（无重复/遗漏），不代表 GUI 渲染压力已通过。
 3. D-018 已确认当前任务状态迁移图：`PENDING→READY/CANCELLED`；`READY→RUNNING/PAUSED/CANCELLED`；`RUNNING→WAITING/PARTIAL/COMPLETED/FAILED/CANCELLED`；`WAITING→READY/RUNNING/PAUSED/CANCELLED`；`PAUSED→READY/CANCELLED`；`PARTIAL→READY/COMPLETED/FAILED/CANCELLED`；`FAILED→READY/CANCELLED`；`COMPLETED` 与 `CANCELLED` 为终态。API 返回当前状态的 `allowed_transitions`，任务 UI 提供这些动作。状态只表示用户维护的计划，不代表后台执行；重复状态幂等，不重置 `completed_at`。到期清理在服务启动和任务列表读取时执行，服务运行期间另有每 6 小时周期清理。

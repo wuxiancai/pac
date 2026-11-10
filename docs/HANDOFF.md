@@ -1560,3 +1560,10 @@
 - 新增 `test_process_exit_during_restore_swap_recovers_original_database`：以独立子进程打开临时 SQLCipher 数据库，在 `os.replace(live_db, rollback)` 成功后立即调用 `os._exit(91)`，不运行 Python `finally`；父进程确认退出码，重新打开 store 后原始两轮对话完整且 rollback 文件已清除。
 - 验证：`tests/test_backup.py` 11 passed；后端全量 342 passed、1 条既有 Starlette/httpx 弃用警告；修改测试 Ruff 通过。
 - 故障注入同时发现 3 个 mode 0600 的加密 staging 文件残留（`.pac-pre-restore-*.sqlite`、`.pac-restore-payload-*.sqlite`、`.pac-restore-local-*.sqlite`）。尚未实现清理，因为需要避免误删另一活动 store 的 staging；下一步先设计可跨实例判定 restore 独占/中断的协调机制，再加入无残留断言。现有自动恢复测试只证明旧库完整，不宣称 staging 生命周期闭环。
+
+### 2026-11-10：B3 恢复锁与崩溃 staging 回收
+
+- 增加数据库生命周期锁：每个打开的 store 持 POSIX 共享锁，恢复切换需非阻塞升级为独占锁；其他 store 活跃时恢复 fail closed。独占锁保护启动时恢复与残留清理，清理限定为应用命名空间下的恢复 marker、rollback 和三种 staging 文件。
+- 子进程硬退出注入覆盖切换前和切换后两处；重启均恢复原会话并清除 rollback、marker 和 staging。另覆盖新 DB 父目录/锁文件权限及并发 store 拒绝恢复。测试故障点不代表物理断电或介质故障。
+- 验证：后端全量 345 passed（1 条既有 Starlette/httpx 弃用警告）；`mypy pac_poc` 37 个模块、`ruff check pac_poc tests scripts`、compileall 和 tracked-file secret scan 通过。
+- GUI/Keychain 设备认证、真实断电、介质故障与 RTO 仍待验收；B3 保持 IN PROGRESS。

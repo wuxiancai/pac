@@ -6,11 +6,13 @@ import json
 import os
 import tempfile
 import stat
+import fcntl
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import re
-from threading import Lock
+from threading import Lock, get_ident
+from time import monotonic, sleep
 from uuid import UUID, uuid4
 
 import sqlcipher3.dbapi2 as sqlcipher
@@ -56,6 +58,11 @@ class EncryptedApplicationStore:
         self._key_hex = key.hex()
         self._engine: Engine | None = None
         self._restore_in_progress = False
+        self._restore_thread_id: int | None = None
+        self._restore_guard = Lock()
+        self._database_lock_fd: int | None = None
+        self._connection_count_lock = Lock()
+        self._active_connection_count = 0
         self._cloud_budget_lock = Lock()
 
     @property
@@ -65,10 +72,10 @@ class EncryptedApplicationStore:
     def open(self) -> None:
         if self._engine is not None:
             raise PersistentStoreError("database is already open")
+        lock_was_held = self._database_lock_fd is not None
         try:
-            if not self._restore_in_progress:
-                self._recover_interrupted_restore()
             self._prepare_private_file()
+            self._ensure_database_lock()
             url = URL.create(
                 "sqlite+pysqlcipher",
                 password=self._key_hex,
@@ -76,6 +83,8 @@ class EncryptedApplicationStore:
             )
             engine = create_engine(url, module=sqlcipher, echo=False, pool_pre_ping=True)
             event.listen(engine, "connect", self._configure_connection)
+            event.listen(engine, "checkout", self._guard_restore_checkout)
+            event.listen(engine, "checkin", self._finish_database_checkin)
             with engine.connect() as connection:
                 cipher_status = connection.execute(text("PRAGMA cipher_status")).scalar_one_or_none()
                 if str(cipher_status) != "1":
@@ -89,10 +98,14 @@ class EncryptedApplicationStore:
         except PersistentStoreError:
             if "engine" in locals():
                 engine.dispose()
+            if not lock_was_held:
+                self._release_database_lock()
             raise
         except Exception:
             if "engine" in locals():
                 engine.dispose()
+            if not lock_was_held:
+                self._release_database_lock()
             raise PersistentStoreError("unable to open encrypted application database") from None
 
     def close(self) -> None:
@@ -100,6 +113,7 @@ class EncryptedApplicationStore:
         self._engine = None
         if engine is not None:
             engine.dispose()
+        self._release_database_lock()
 
     def export_encrypted_backup(
         self, target: Path, *, password: str, replace_existing: bool = False
@@ -441,14 +455,33 @@ class EncryptedApplicationStore:
         )
         prebackup_directory = self._path.parent / "pre-restore"
         prebackup = prebackup_directory / "pre-restore.sqlcipher"
-        prebackup_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        os.chmod(prebackup_directory, 0o700)
         prebackup_temp: Path | None = None
         payload_temp: Path | None = None
         restored_temp: Path | None = None
         rollback_path = self._path.with_name(f".{self._path.name}.{uuid4().hex}.rollback")
+        restore_marker = self._restore_marker_path()
         swapped = False
+        marker_created = False
+        exclusive_lock = False
+        if not self._restore_guard.acquire(blocking=False):
+            raise PersistentStoreError("another restore operation is already active")
         try:
+            prebackup_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            os.chmod(prebackup_directory, 0o700)
+            marker_fd = os.open(
+                restore_marker,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+            )
+            try:
+                os.write(marker_fd, f"pid={os.getpid()}\n".encode("ascii"))
+                os.fsync(marker_fd)
+            finally:
+                os.close(marker_fd)
+            marker_created = True
+            self._restore_in_progress = True
+            self._restore_thread_id = get_ident()
+            self._wait_for_idle_connections()
             prebackup_temp = self._new_private_temp(
                 prebackup_directory, ".pac-pre-restore-", ".sqlite"
             )
@@ -483,6 +516,8 @@ class EncryptedApplicationStore:
             for suffix in ("-wal", "-shm", "-journal"):
                 Path(f"{self._path}{suffix}").unlink(missing_ok=True)
             self._restore_in_progress = True
+            self._upgrade_database_lock_for_restore()
+            exclusive_lock = True
             os.replace(self._path, rollback_path)
             os.replace(restored_temp, self._path)
             restored_temp = None
@@ -498,7 +533,9 @@ class EncryptedApplicationStore:
             return {"prebackup_path": str(prebackup)}
         except Exception as exc:
             if self._engine is not None:
-                self.close()
+                engine_to_close = self._engine
+                self._engine = None
+                engine_to_close.dispose()
             if swapped:
                 self._path.unlink(missing_ok=True)
             if rollback_path.exists():
@@ -517,13 +554,130 @@ class EncryptedApplicationStore:
             raise PersistentStoreError("encrypted backup could not be restored") from None
         finally:
             self._restore_in_progress = False
+            self._restore_thread_id = None
             for temporary in (prebackup_temp, payload_temp, restored_temp):
                 if temporary is not None:
                     for suffix in ("", "-wal", "-shm", "-journal"):
                         Path(f"{temporary}{suffix}").unlink(missing_ok=True)
+            if marker_created:
+                restore_marker.unlink(missing_ok=True)
+            if exclusive_lock and self._database_lock_fd is not None:
+                fcntl.flock(self._database_lock_fd, fcntl.LOCK_SH)
+            self._restore_guard.release()
+
+    def _database_lock_path(self) -> Path:
+        return self._path.with_name(f".{self._path.name}.lifecycle.lock")
+
+    def _guard_restore_checkout(
+        self, dbapi_connection: object, connection_record: object, connection_proxy: object
+    ) -> None:
+        if self._restore_in_progress and self._restore_thread_id != get_ident():
+            raise PersistentStoreError("database restore is in progress")
+        with self._connection_count_lock:
+            self._active_connection_count += 1
+
+    def _finish_database_checkin(
+        self, dbapi_connection: object, connection_record: object
+    ) -> None:
+        with self._connection_count_lock:
+            self._active_connection_count = max(0, self._active_connection_count - 1)
+
+    def _wait_for_idle_connections(self) -> None:
+        deadline = monotonic() + DATABASE_BUSY_TIMEOUT_MS / 1_000
+        while True:
+            with self._connection_count_lock:
+                active_connections = self._active_connection_count
+            if active_connections == 0:
+                return
+            if monotonic() >= deadline:
+                raise PersistentStoreError("database has active operations; restore was not started")
+            sleep(0.01)
+
+    def _restore_marker_path(self) -> Path:
+        return self._path.with_name(f".{self._path.name}.restore-in-progress")
+
+    def _ensure_database_lock(self) -> None:
+        if self._database_lock_fd is not None:
+            return
+        lock_fd = os.open(
+            self._database_lock_path(),
+            os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        lock_stat = os.fstat(lock_fd)
+        if not stat.S_ISREG(lock_stat.st_mode) or lock_stat.st_uid != os.getuid():
+            os.close(lock_fd)
+            raise PersistentStoreError("database lifecycle lock must be a private regular file")
+        os.fchmod(lock_fd, 0o600)
+        fcntl.flock(lock_fd, fcntl.LOCK_SH)
+        self._database_lock_fd = lock_fd
+        try:
+            if self._has_interrupted_restore_artifacts():
+                if not self._upgrade_database_lock_for_restore(required=False):
+                    if self._restore_marker_path().exists() or self._rollback_candidates():
+                        raise PersistentStoreError(
+                            "interrupted restore requires exclusive database access"
+                        )
+                    return
+                try:
+                    self._recover_interrupted_restore()
+                    self._cleanup_interrupted_restore_staging()
+                    self._restore_marker_path().unlink(missing_ok=True)
+                finally:
+                    fcntl.flock(lock_fd, fcntl.LOCK_SH)
+        except Exception:
+            self._release_database_lock()
+            raise
+
+    def _release_database_lock(self) -> None:
+        lock_fd = self._database_lock_fd
+        self._database_lock_fd = None
+        if lock_fd is not None:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.close(lock_fd)
+
+    def _upgrade_database_lock_for_restore(self, *, required: bool = True) -> bool:
+        lock_fd = self._database_lock_fd
+        if lock_fd is None:
+            raise PersistentStoreError("database lifecycle lock is unavailable")
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except BlockingIOError:
+            fcntl.flock(lock_fd, fcntl.LOCK_SH)
+            if required:
+                raise PersistentStoreError(
+                    "database restore requires all other instances to be closed"
+                ) from None
+            return False
+
+    def _rollback_candidates(self) -> list[Path]:
+        return sorted(self._path.parent.glob(f".{self._path.name}.*.rollback"))
+
+    def _has_interrupted_restore_artifacts(self) -> bool:
+        return (
+            self._restore_marker_path().exists()
+            or bool(self._rollback_candidates())
+            or any(self._path.parent.glob(".pac-restore-payload-*.sqlite"))
+            or any(self._path.parent.glob(".pac-restore-local-*.sqlite"))
+            or any((self._path.parent / "pre-restore").glob(".pac-pre-restore-*.sqlite"))
+        )
+
+    def _cleanup_interrupted_restore_staging(self) -> None:
+        candidates = [
+            *self._path.parent.glob(".pac-restore-payload-*.sqlite"),
+            *self._path.parent.glob(".pac-restore-local-*.sqlite"),
+            *(self._path.parent / "pre-restore").glob(".pac-pre-restore-*.sqlite"),
+        ]
+        for candidate in candidates:
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+            for suffix in ("", "-wal", "-shm", "-journal"):
+                Path(f"{candidate}{suffix}").unlink(missing_ok=True)
 
     def _recover_interrupted_restore(self) -> None:
-        candidates = sorted(self._path.parent.glob(f".{self._path.name}.*.rollback"))
+        candidates = self._rollback_candidates()
         if not candidates:
             return
         if len(candidates) != 1 or candidates[0].is_symlink() or not candidates[0].is_file():
@@ -1159,6 +1313,8 @@ class EncryptedApplicationStore:
             }
 
     def _require_engine(self) -> Engine:
+        if self._restore_in_progress and self._restore_thread_id != get_ident():
+            raise PersistentStoreError("database restore is in progress")
         if self._engine is None:
             raise PersistentStoreError("database is not open")
         return self._engine

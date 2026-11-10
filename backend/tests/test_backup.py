@@ -257,7 +257,10 @@ def test_store_open_recovers_uncommitted_restore_rollback(tmp_path: Path, databa
     recovered.close()
 
 
-def test_process_exit_during_restore_swap_recovers_original_database(tmp_path: Path) -> None:
+@pytest.mark.parametrize("exit_after_live_move", [False, True])
+def test_process_exit_during_restore_swap_recovers_original_database(
+    tmp_path: Path, exit_after_live_move: bool
+) -> None:
     database = (tmp_path / "product.db").resolve()
     backup = tmp_path / "snapshot.pacbackup"
     key = b"c" * 32
@@ -286,8 +289,11 @@ from pac_poc.persistence import EncryptedApplicationStore
 
 database, backup = Path(sys.argv[1]), Path(sys.argv[2])
 original_replace = os.replace
+exit_after_live_move = sys.argv[5] == 'after'
 
 def exit_after_moving_live_database(source, destination):
+    if Path(source) == database and Path(destination).name.endswith('.rollback') and not exit_after_live_move:
+        os._exit(92)
     original_replace(source, destination)
     if Path(source) == database and Path(destination).name.endswith('.rollback'):
         os._exit(91)
@@ -299,14 +305,18 @@ store.restore_encrypted_backup(backup, password=sys.argv[4])
 raise SystemExit('restore did not reach the injected process-exit point')
 """
     child = subprocess.run(
-        [sys.executable, "-c", child_program, str(database), str(backup), key.hex(), "process exit fixture"],
+        [
+            sys.executable, "-c", child_program, str(database), str(backup), key.hex(),
+            "process exit fixture", "after" if exit_after_live_move else "before",
+        ],
         check=False,
         capture_output=True,
         text=True,
         timeout=30,
     )
-    assert child.returncode == 91, child.stderr
-    assert list(tmp_path.glob(".product.db.*.rollback"))
+    expected_exit = 91 if exit_after_live_move else 92
+    assert child.returncode == expected_exit, child.stderr
+    assert bool(list(tmp_path.glob(".product.db.*.rollback"))) is exit_after_live_move
 
     recovered = EncryptedApplicationStore(path=database, key=key)
     recovered.open()
@@ -318,4 +328,48 @@ raise SystemExit('restore did not reach the injected process-exit point')
         "backup response",
     ]
     assert not list(tmp_path.glob(".product.db.*.rollback"))
+    assert not list(tmp_path.glob(".pac-restore-*.sqlite"))
+    assert not list((tmp_path / "pre-restore").glob(".pac-pre-restore-*.sqlite"))
+    assert not (tmp_path / ".product.db.restore-in-progress").exists()
     recovered.close()
+
+
+def test_restore_fails_closed_while_another_store_instance_is_open(tmp_path: Path) -> None:
+    database = (tmp_path / "product.db").resolve()
+    backup = tmp_path / "snapshot.pacbackup"
+    key = b"m" * 32
+    first = EncryptedApplicationStore(path=database, key=key)
+    first.open()
+    conversation = first.get_or_create_default_conversation()
+    first.append_chat_turn(
+        conversation_id=str(conversation["id"]), run_id="multi-store-restore",
+        user_content="live database remains available", assistant_content="safe",
+        provider="ollama", model="fixture", status="COMPLETED",
+    )
+    first.export_encrypted_backup(backup, password="multi store fixture")  # pragma: allowlist secret
+    second = EncryptedApplicationStore(path=database, key=key)
+    second.open()
+
+    with pytest.raises(PersistentStoreError, match="all other instances to be closed"):
+        first.restore_encrypted_backup(backup, password="multi store fixture")  # pragma: allowlist secret
+
+    assert first.load_conversation(str(conversation["id"]))["messages"][0]["content"] == (
+        "live database remains available"
+    )
+    assert not (tmp_path / ".product.db.restore-in-progress").exists()
+    assert not list(tmp_path.glob(".pac-restore-*.sqlite"))
+    assert not list((tmp_path / "pre-restore").glob(".pac-pre-restore-*.sqlite"))
+    second.close()
+    first.close()
+
+
+def test_store_creates_private_lifecycle_lock_for_new_database_parent(tmp_path: Path) -> None:
+    database = tmp_path / "new-parent" / "nested" / "product.db"
+    store = EncryptedApplicationStore(path=database, key=b"n" * 32)
+    store.open()
+
+    lock_path = database.with_name(f".{database.name}.lifecycle.lock")
+    assert lock_path.is_file()
+    assert lock_path.stat().st_mode & 0o777 == 0o600
+    assert database.parent.stat().st_mode & 0o777 == 0o700
+    store.close()
