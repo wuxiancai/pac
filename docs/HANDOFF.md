@@ -1541,4 +1541,10 @@
 
 - 当前提交基线的本机验证：后端全量 341 passed（1 条既有 Starlette/httpx 弃用警告）；`ruff check pac_poc tests scripts`、CI 配置的 `mypy`、`compileall`、`uv lock --check` 通过；Swift 全量 60 项通过，`personal-assistant-beta` 构建成功。
 - 首轮 tracked-file detect-secrets scan 报告 9 条测试口令字面量，逐条核对均为临时合成值；只在对应测试行加入 scanner 指定的局部 allowlist 注释。复跑 `git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 通过，未改动 baseline。
-- 此次没有触发远端 GitHub Actions、真实云 Provider 请求、麦克风、日历/提醒事项个人数据访问或数据库恢复操作。桌面自动化未能取得应用状态，因此 B1/B3/B5/B6 尚需 GUI 验收的项目仍保持未验证；不能据本地 CI 等价门禁关闭阶段 6。
+- 门禁复核当时没有触发远端 GitHub Actions、真实云 Provider 请求、麦克风、日历/提醒事项读取或数据库恢复操作。桌面自动化起初未能取得应用状态；随后 B6 当前授权下日历/提醒事项只读查询已实测，其他授权路径及 B1/B3/B5 GUI 项仍未验证；不能据本机 CI 等价门禁关闭阶段 6。
+
+### 2026-11-10：V2 日历与提醒事项只读 GUI 验收
+
+- 在已运行的 Beta 中分别打开“日历”和“提醒事项”面板并点击“授权并读取”。日历面板成功显示未来 30 天 2 项；提醒事项面板成功显示未来 30 天没有未完成事项。两面板均明确只读边界，操作后正常关闭回聊天界面。
+- 本轮未出现新的 macOS 授权弹窗，故仅证明当前授权状态下真实 EventKit 查询、展示路径可用；首次授权与拒绝路径仍待验收。未修改、创建、删除、持久化或发送任何日历/提醒内容，也未访问 Keychain、Provider 或麦克风。
+- 已更新 `docs/TASKS.md`、`docs/PROJECT_CONTEXT.md` 与 `docs/beta/persistent-storage.md`；B6 继续 IN PROGRESS。
