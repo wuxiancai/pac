@@ -647,6 +647,33 @@ private final class MismatchedModelCapabilityURLProtocol: URLProtocol {
     }
 }
 
+@Test func chatHTTPFailurePresentationNamesTheSelectedRouteWithoutResponseBody() {
+    struct SyntheticError: LocalizedError {
+        var errorDescription: String? { "safe synthetic error" }
+    }
+
+    let error = LocalAPIClientError.requestFailed(statusCode: 503)
+    let cloudMessage = ChatRequestFailurePresentation.message(
+        for: error, provider: "openrouter", usesCloud: true
+    )
+    let localMessage = ChatRequestFailurePresentation.message(
+        for: error, provider: "ollama", usesCloud: false
+    )
+
+    #expect(cloudMessage == "云端请求路径（openrouter）返回 HTTP 503。")
+    #expect(localMessage == "本机模型请求路径返回 HTTP 503。")
+    #expect(!cloudMessage.contains("secret-response-body"))
+    #expect(!localMessage.contains("secret-response-body"))
+    #expect(ChatRequestFailurePresentation.message(
+        for: SyntheticError(), provider: "deepseek", usesCloud: true
+    ) == "云端请求路径（deepseek）请求失败：safe synthetic error")
+    #expect(ChatRequestFailurePresentation.message(
+        for: LocalAPIStreamError(message: "云端服务错误（HTTP 503）"),
+        provider: "deepseek",
+        usesCloud: true
+    ) == "云端服务错误（HTTP 503）")
+}
+
 @available(macOS 12.0, *)
 @Test func chatStreamPreservesSanitizedServerSSEError() async throws {
     let configuration = URLSessionConfiguration.ephemeral

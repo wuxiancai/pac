@@ -1,5 +1,6 @@
 # 项目上下文
 
+- 2026-11-11 B1 HTTP 错误路径状态：聊天 UI 现在根据本轮 Provider 标明云端或本机请求路径；HTTP 错误只显示状态码，不暗示故障源，也不显示响应正文。Swift 99 项、Beta build 通过；未发起云请求，GUI 错误提示仍待实机核验。
 - 2026-11-11 B3 恢复认证等待保护：系统认证若 60 秒未返回，Beta 使本次尝试失效、调用 `LAContext.invalidate()`、恢复可见 UI 并明确“未开始恢复”；迟到成功仍受一次性门闩拒绝。新增 timeout 触发与成功认领取消 timeout 的 Swift 回归。此改动避免无限等待，但不解释此前系统认证不弹窗/不回调的原因，也未实机完成恢复。
 - 2026-11-11 阶段 6 最新 CI：提交 `07313ca` 的 Actions run `42928287580` 全绿，主 job 后端 348、Swift 98，Ruff、mypy、lock、secret scan、compileall 和 Beta `.app` build 通过；macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 98 与 Beta bundle 校验。该路径验证 deployment-target 编译，不等同于真实 macOS 14 runtime、GUI、Keychain、通知或恢复验收。
 - 2026-11-11 B3 任务提醒失败反馈：通知中心添加失败从静默忽略改为计数并显示在任务页，同时清除该任务旧通知；注入失败回归、Swift 全量 98 和 Beta build 通过。未请求真实通知授权或投递。

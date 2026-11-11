@@ -399,7 +399,9 @@ final class BetaChatModel: CalendarEventAuditRecording {
                 self.status = "已停止本轮生成"
             } catch {
                 guard let self, self.activeRequestID == requestID else { return }
-                self.status = "模型请求失败：\(error.localizedDescription)"
+                self.status = ChatRequestFailurePresentation.message(
+                    for: error, provider: provider, usesCloud: usesCloud
+                )
                 self.activeRequest = nil
                 self.activeRequestID = nil
                 self.latestRunStatus = nil

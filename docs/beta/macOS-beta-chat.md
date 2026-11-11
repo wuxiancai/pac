@@ -2,6 +2,8 @@
 
 状态：`IN PROGRESS`。首个可运行 macOS SwiftUI 测试版已接入当前受认证 Loopback 服务，并通过本机 Ollama 流式文本 API。
 
+2026-11-11 HTTP 错误呈现：`requestFailed` 不再统一声称本机服务失败；聊天状态按本轮请求快照标记云端 Provider 路径或本机模型路径，显示 HTTP 状态码，不展示响应正文。显示的是错误返回路径，不断定故障由 Provider 或本机服务造成。Swift 定向回归 1 passed、全量 99 passed，Beta build 通过；没有真实云请求，运行 GUI 的错误呈现仍需实机核验。
+
 ## 当前范围
 
 - SwiftUI 应用由 `poc/macos-audio/scripts/run_beta_app.sh` 构建并启动；后端继续由固定 supervisor 进程管理，退出时经私有管道停止。
