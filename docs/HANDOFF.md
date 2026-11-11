@@ -2,6 +2,7 @@
 
 - 在 Ollama 本机回环 `127.0.0.1` 对 `qwen3.5:0.8b` 重复 3 次相同虚构科技节任务拆解请求。前两次完整保留设备检查、场地清洁、海报张贴顺序，未编造时间/预算；第三次把三项泛化成“项目执行 / 现场筹备 / 内容发布”，遗漏具体任务含义。
 - 这是单角色直接模型探针，不是 Beta 多助理整条链路或独立语料评测；样本仅用于复现不稳定性，不能据此宣称改进/通过。无云请求、麦克风、Keychain 或应用聊天历史写入。B9 仍 IN PROGRESS；见 `docs/beta/orchestrator-framework.md`。
+- 记录提交 `d533066` 对应 Actions run `42936569855` 两个 job 全通过：后端 348 passed（1 条既有弃用警告）、Swift 108 passed；Ruff、mypy、`uv lock --check`、tracked-file secret scan、compileall、Beta `.app` build 和 macOS 14 deployment-target job 均成功。这仅验证代码构建/回归，不会提升模型质量证据。
 
 # 2026-11-11：B1 失败提示使用发送时路由快照
 

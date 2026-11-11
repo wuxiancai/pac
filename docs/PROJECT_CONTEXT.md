@@ -1,5 +1,6 @@
 # 项目上下文
 
+- 2026-11-11 B9 离线探针记录提交 `d533066` 对应 Actions run `42936569855` 全绿：Python 348、Swift 108，静态/依赖/secret scan、Beta build 和 macOS 14 deployment-target job 均通过。CI 仅验证代码；本机模型探针仅三次单角色合成输入，B9 输出质量仍不保证。
 - 2026-11-11 B9 本机离线同题探针 `qwen3.5:0.8b` 三次中两次逐项遵守、一次将任务泛化并丢失原义；仅单角色直接请求，不代表多助理 E2E。B9 内容可靠性仍不通过/不作承诺。
 - 2026-11-11 B1 路由快照修复提交 `38fe56e` 已由 Actions run `42935534112` 完整验证：Python 348、Swift 108，静态/依赖/secret scan、Beta build 与 macOS 14 deployment-target job 均通过。没有真实云请求；GUI 文案仍需实机检查。
 - 2026-11-11 B1 将失败提示绑定发送时的 `ChatRequestRoute` 快照，避免用户切换 Provider 后旧请求错误标成本地/云端另一条路径；新增回归，Swift 108 项、Beta target 通过。未发真实云请求，GUI 仍待验收。
