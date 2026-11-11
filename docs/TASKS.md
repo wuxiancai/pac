@@ -12,6 +12,7 @@
 2026-11-11 B3 恢复调用协调：将本机认证与 restore API 顺序抽为 `EncryptedBackupRestoreCoordinator`；授权拒绝、用户取消、60 秒超时或迟到的认证成功都不会调用恢复端点。超时/取消现在立刻结束等待中的 UI 操作，不依赖 LAContext 必须按时回调。协调器定向 4 passed、Swift 全量 106 passed、Beta target 与 `.app` build 通过；仅 fake authorizer/restorer，真实系统认证提示问题与恢复实机验收仍开放。
 2026-11-11 B3 恢复 API 失败分支：补充认证成功后本机 restore API 返回失败的协调器回归，确认错误传回 UI 调用层且不会误报成功；定向 5 passed、Swift 全量 107 passed、Beta target build 通过。仅 fake restorer，不触发真实恢复。
 2026-11-11 B1 失败路由快照：修复流式请求失败时读取可变当前 Provider 的竞态，现使用发送时冻结的 Provider/型号/云端标记；切换选择后迟到错误仍按原请求路径提示。新增定向 1 passed、Swift 全量 108 passed、Beta target build 通过；未发真实云请求，GUI 待验收。
+2026-11-11 B9 本机模型重复探针：同一虚构科技节任务向本机 `qwen3.5:0.8b` 发送三次，前两次逐项保留原义，第三次泛化导致三个事项均失去具体含义。只测单角色直连，不是 Beta 多助理 E2E；作为波动证据记录，不作质量通过。详情见 `docs/beta/orchestrator-framework.md`。
 
 2026-11-10 B5/PDF：追加核对本机 `launchd.plist(5)` 的 `ResidentSetSize` 资源项。其文档只说明内存紧张时系统优先从超过申报 RSS 的进程回收内存，尚未证明超限必拒绝或 worker 隔离有效；不能满足 D-012 硬内存上限门槛。PDF 继续禁用，保持查找并实测候选隔离方案；见 `docs/beta/file-import.md`。
 
