@@ -83,6 +83,7 @@
 
 ### 阶段 6 门禁复核（2026-11-11，仍开放）
 
+- B9 提示强化提交 `f433c45` 对应 Actions run `42937988251` 两 job 全成功：后端 348 passed（1 条既有弃用警告）、Swift 108 passed；Ruff、mypy、lock、tracked-file secret scan、compileall、Beta build 与 macOS 14 deployment-target job 均通过。该 CI 不评估模型输出质量，也不代表真实 macOS 14 runtime。
 - B9 评估记录提交 `d533066` 对应 Actions run `42936569855` 两个 job 全成功：后端 348、Swift 108；Ruff、mypy、lock、tracked-file secret scan、compileall、Beta build 和 macOS 14 deployment-target job 通过。该结果不评估模型输出质量；B9 仍开放。
 - B1 路由快照提交 `38fe56e` 对应 Actions run `42935534112` 两 job 全部通过：Python 348 passed（1 条既有警告）、Swift 108 passed；Ruff、mypy、lock、tracked-file secret scan、compileall、Beta build 与 macOS 14 deployment-target job 均成功。未执行 Provider 请求或真实 macOS 14 runtime/GUI 验收。
 - B3 恢复 API 失败分支提交 `3708284` 对应 Actions run `42934773830` 两个 job 全部通过：后端 348 passed（1 条既有弃用警告）、Swift 107 passed；Ruff、mypy、lock、tracked-file secret scan、compileall 与 Beta `.app` build 均通过。macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 107 与 bundle 校验。自动化不替代真实恢复/Keychain/认证 GUI。

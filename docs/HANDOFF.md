@@ -3,6 +3,7 @@
 - 本机离线比较发现，旧提示在三次同题中有一次把明确任务泛化并漏掉原义。试验约束“用户事项名称原文保留”及“逐项填满要求字段、未知值写待确认”；第二版三次均保留三个原任务名且未编造时间/预算，但一次将待确认写作待定，格式和负责人建议仍有变化。
 - 已把约束同时加入每个专业角色和综合提示；API 合同测试确认两层提示均包含要求。定向 `uv run --project backend --locked pytest backend/tests/test_beta_api.py -k multi_agent_collaboration_runs_selected_local_roles_sequentially` → 1 passed；Ruff、CI 配置下 mypy 通过；后端全量 `uv run --locked pytest`（backend 目录）→ 348 passed、1 条既有 Starlette/httpx 弃用警告。
 - 证据仅为 6 次同一虚构提示的本机单角色直连探针，不能证明多助理输出稳定或满足质量保证。未发云请求、未写入 PAC 聊天历史。
+- 提交 `f433c45` 对应 Actions run `42937988251` 两个 job 全通过：后端 348 passed（1 条既有弃用警告）、Swift 108 passed；Ruff、CI mypy、锁文件、tracked-file secret scan、compileall、Beta `.app` build 与 macOS 14 deployment-target job 均成功。该 CI 不评估模型输出质量；最低部署目标 job 仍运行于 macOS 15。
 
 # 2026-11-11：B9 本机单角色输出重复探针
 
