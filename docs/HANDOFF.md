@@ -10,7 +10,7 @@
 
 # 2026-11-11：B10 首次日历权限拒绝回归
 
-- 新增 fake writer 回归，模拟用户拒绝首次 EventKit write-only 权限请求，确认服务保持未就绪、不调用事件保存，并提供未授权状态文案。该测试不访问系统日历或触发权限对话框。
+- 新增 fake writer 回归，模拟用户拒绝首次 EventKit write-only 权限请求，确认服务保持未就绪、不调用事件保存，并提供可操作的 macOS 系统设置隐私与安全性指引。该测试不访问系统日历或触发权限对话框。
 - 验证：`swift test --package-path poc/macos-audio --filter calendarCreationRequestDenialFailsClosedWithActionableStatus` → 1 passed；Swift 全量 → 100 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。真实首次授权/拒绝 GUI 仍未验收。
 
 # 2026-11-11：任务提醒部分失败隔离通过远端门禁

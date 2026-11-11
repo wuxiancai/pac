@@ -107,7 +107,7 @@ private actor FakeCalendarEventAudit: CalendarEventAuditRecording {
     #expect(writer.requestCount == 1)
     #expect(writer.saves.isEmpty)
     #expect(!service.isReadyToCreate)
-    #expect(service.status == "尚未获得日历创建授权。")
+    #expect(service.status == "未获得日历创建授权；如需启用，请在 macOS 系统设置的隐私与安全性中检查日历权限。")
 }
 
 @available(macOS 14.0, *)

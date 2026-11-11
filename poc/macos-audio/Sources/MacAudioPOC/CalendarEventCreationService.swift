@@ -115,7 +115,7 @@ public final class CalendarEventCreationService {
                 break
             case .notDetermined:
                 guard try await writer.requestWriteOnlyAccess() else {
-                    status = "尚未获得日历创建授权。"
+                    status = "未获得日历创建授权；如需启用，请在 macOS 系统设置的隐私与安全性中检查日历权限。"
                     return false
                 }
             case .denied, .restricted:
