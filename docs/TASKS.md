@@ -81,11 +81,12 @@
 
 ### 阶段 6 门禁复核（2026-11-11，仍开放）
 
+- B1 路由快照提交 `38fe56e` 对应 Actions run `42935534112` 两 job 全部通过：Python 348 passed（1 条既有警告）、Swift 108 passed；Ruff、mypy、lock、tracked-file secret scan、compileall、Beta build 与 macOS 14 deployment-target job 均成功。未执行 Provider 请求或真实 macOS 14 runtime/GUI 验收。
 - B3 恢复 API 失败分支提交 `3708284` 对应 Actions run `42934773830` 两个 job 全部通过：后端 348 passed（1 条既有弃用警告）、Swift 107 passed；Ruff、mypy、lock、tracked-file secret scan、compileall 与 Beta `.app` build 均通过。macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 107 与 bundle 校验。自动化不替代真实恢复/Keychain/认证 GUI。
 - 最新远端 run `42933947731` 检查提交 `a551b4a`（代码基线 `e7141af`）：两个 job 均成功。主 job 后端 348 passed（1 条既有弃用警告）、Swift 106 passed；Ruff、CI mypy、锁文件、tracked-file secret scan、compileall 和 Beta `.app` build 均通过。macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 106 与 Beta bundle 校验。该自动门禁不替代真实 macOS 14 runtime、系统 GUI/Keychain/通知或备份恢复验收。
 - 最低系统自动覆盖：SwiftPM 明确声明 `.macOS(.v14)`，独立 GitHub job 在当前受支持的 `macos-15` runner 上执行 `swift test` 与 Beta `.app` 打包脚本；打包脚本校验 `LSMinimumSystemVersion=14.0`、Bundle ID、Face ID 用途键与签名。提交 `11e3564` 对应 Actions run `42930393914` 已通过：后端 348、Swift 102、Ruff、mypy、lock、secret scan、compileall 与 Beta build 全绿，macOS 15 job 另通过 Swift 102 与 `.app` 校验。首次 run `42920718612` 的 macOS 14 job 因镜像于 2026-11-02 退役而无法分配。deployment-target 构建不代替真实 macOS 14 设备 GUI/Keychain/通知/恢复验收。
 
-- 当前代码提交 `3708284`：Actions run `42934773830` 主 job 与最低部署目标 job 全部通过。阶段 6 仍开放：Provider 真实计费、麦克风、真实恢复认证、真实 macOS 14 runtime、签名/分发与其他系统/GUI 门禁未齐。详见最新 `docs/HANDOFF.md`。
+- 当前代码提交 `38fe56e`：Actions run `42935534112` 主 job 与最低部署目标 job 全部通过。阶段 6 仍开放：Provider 真实计费、麦克风、真实恢复认证、真实 macOS 14 runtime、签名/分发与其他系统/GUI 门禁未齐。详见最新 `docs/HANDOFF.md`。
 - 用户授权后已将当时领先远端的 319 个提交推送；随后修正 workflow 未定义的 `phase0-security` extra 并推送 `541ad6a`。run `42836663902` attempt 2 全部门禁通过：Python 347、Swift 94、lint/typecheck/secret scan/lock/compileall/Beta build 成功。attempt 1 的 APFS-128 用例间歇失败，隔离重跑和远端 attempt 2 通过，原因未判定。阶段 6 其他系统/产品验收仍开放。
 - 最新基线 `58c771d`：后端 all-extras/all-groups 347 passed（1 条既有 Starlette/httpx 弃用警告），Swift 84 passed；Ruff、CI mypy、`uv lock --check`、compileall、tracked-file detect-secrets、Beta target、`.app` 打包和 `NSFaceIDUsageDescription` plist 校验均通过。无远端 Actions/Provider/麦克风运行；系统认证及恢复仍未验。
 - 在代码基线 `a21ec3d` 复核：后端 all-extras/all-groups pytest 347 passed（1 条既有弃用警告），Swift 83 passed；Ruff、CI mypy、`uv lock --check`、Python compileall、tracked-file detect-secrets 和 Beta target build 全部通过。

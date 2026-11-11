@@ -2,6 +2,7 @@
 
 - 修复请求中途切换 Provider 后的提示竞态：发送时保存不可变 `ChatRequestRoute`（Provider、型号、云端标记），HTTP 失败呈现使用该快照，不再读可变的当前选择。响应仍只报告请求路径和 HTTP 状态码，不显示响应正文或推断故障来源。
 - 新增回归检查旧云端请求在当前选择切成本机后仍显示云端路径。`swift test --package-path poc/macos-audio --filter chatRequestFailure` → 1 passed；Swift 全量 → 108 passed；Beta target build、`git diff --check` 通过。未发真实云请求；GUI 仍待验收。
+- 提交 `38fe56e` 对应 Actions run `42935534112` 两 job 全通过：后端 348 passed（1 条既有弃用警告）、Swift 108 passed；Ruff、CI mypy、`uv lock --check`、tracked-file secret scan、compileall、Beta `.app` build 与 macOS 14 deployment-target job 成功。macOS 14 job 使用 macOS 15 runner；无真实云请求。
 
 # 2026-11-11：B3 恢复 API 失败路径回归
 
