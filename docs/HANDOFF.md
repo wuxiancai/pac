@@ -1,3 +1,8 @@
+# 2026-11-11：任务提醒重建支持部分失败
+
+- 扩展通知失败注入回归：一条 READY 任务添加通知失败时，清除其旧同 ID 请求、计入失败数，并继续成功安排后续任务；其他应用待发通知保留。证明重建采取逐项失败隔离，不让一个系统通知错误阻断其他任务。
+- 验证：`swift test --package-path poc/macos-audio --filter taskReminderReconcileReportsNotificationSchedulingFailure` → 1 passed；Swift 全量 → 98 passed；Beta 产品构建通过。未请求真实通知授权或发送系统通知。
+
 # 2026-11-11：阶段 6 远端 CI 与 macOS 14 部署目标通过
 
 - 在提交 `dc36dda` 上，Actions run `42926997195` 两个 job 全部通过。主 job 后端 348 passed、Swift 98 passed；Ruff、CI mypy、依赖锁、tracked-file secret scan、Python compileall 与 Beta `.app` build 均成功。最低部署目标 job 在 macOS 15 runner 上按 macOS 14 deployment target 运行 Swift 98 项并通过 `.app` 校验。
