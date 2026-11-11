@@ -29,6 +29,7 @@ private final class DeferredAuthorizer: CancellableSensitiveActionAuthorizing {
 }
 
 private enum TestAuthorizationFailure: Error { case denied }
+private enum TestRestoreFailure: Error { case invalidBackup }
 private let restoreFixtureValue = "fixture-only-value"
 
 private actor FakeBackupRestorer: EncryptedBackupRestoreCalling {
@@ -41,6 +42,15 @@ private actor FakeBackupRestorer: EncryptedBackupRestoreCalling {
 
     func callCount() -> Int { calls.count }
     func lastCall() -> (String, String)? { calls.last }
+}
+
+private actor FailingBackupRestorer: EncryptedBackupRestoreCalling {
+    private(set) var callCount = 0
+
+    func restoreEncryptedBackup(sourcePath: String, password: String) async throws -> String {
+        callCount += 1
+        throw TestRestoreFailure.invalidBackup
+    }
 }
 
 @available(macOS 14.0, *)
@@ -93,6 +103,30 @@ private actor FakeBackupRestorer: EncryptedBackupRestoreCalling {
 
     await #expect(throws: TestAuthorizationFailure.denied) { try await operation.value }
     #expect(await restorer.callCount() == 0)
+}
+
+@available(macOS 14.0, *)
+@Test @MainActor func backupRestoreCoordinatorPropagatesRestoreFailureAfterAuthentication() async {
+    let authorizer = DeferredAuthorizer()
+    let restorer = FailingBackupRestorer()
+    let coordinator = EncryptedBackupRestoreCoordinator(authorizer: authorizer, restorer: restorer)
+    var authenticationCompleted = false
+
+    let operation = Task {
+        try await coordinator.restore(
+            sourcePath: "/tmp/synthetic.pacbackup",
+            password: restoreFixtureValue,
+            timeout: .seconds(2),
+            onTimeout: {},
+            onAuthenticationCompleted: { authenticationCompleted = true }
+        )
+    }
+    while authorizer.reason == nil { await Task.yield() }
+    authorizer.succeed()
+
+    await #expect(throws: TestRestoreFailure.invalidBackup) { try await operation.value }
+    #expect(authenticationCompleted)
+    #expect(await restorer.callCount == 1)
 }
 
 @available(macOS 14.0, *)

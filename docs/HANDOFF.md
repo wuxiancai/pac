@@ -1,3 +1,8 @@
+# 2026-11-11：B3 恢复 API 失败路径回归
+
+- 增加认证成功后的本机恢复 API 失败用例：fake restorer 返回容器无效错误时，协调器将错误传给调用者、已认证回调只发生在 API 前，且失败不会被报告为成功恢复。该测试不访问文件、Keychain 或系统认证。
+- 验证：`swift test --package-path poc/macos-audio --filter backupRestoreCoordinator` → 5 passed；`swift test --package-path poc/macos-audio` → 107 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 与 `git diff --check` 通过。
+
 # 2026-11-11：B3 恢复授权与 API 调用协调
 
 - 抽出 `EncryptedBackupRestoreCoordinator` 统一控制系统认证、取消/超时和本机 restore API 调用。只有当前认证尝试成功才能进入 API；拒绝、用户取消、60 秒超时和迟到成功均不调用恢复端点。超时和取消会立即结束外层等待任务并更新 UI，即使 LAContext 的回调没有及时返回，也不再让表单卡在“正在恢复”。

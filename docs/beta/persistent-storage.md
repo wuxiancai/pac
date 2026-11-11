@@ -2,6 +2,8 @@
 
 最后核对：2026-11-11（Asia/Shanghai）
 
+2026-11-11 B3 恢复 API 失败路径：新增 fake restorer 回归，确认认证成功后 API 抛错会传回调用层、不会返回预备份成功结果；协调器窄回归 5 passed、Swift 全量 107 passed、Beta target build 通过。没有触发真实恢复；错误口令、服务端失败后的数据库/预备份状态及 GUI 提示仍需实机验收。
+
 2026-11-11 恢复认证/API 协调：`EncryptedBackupRestoreCoordinator` 只在当前系统认证尝试成功后调用本机 restore API；拒绝、取消、超时或迟到成功均 fail closed。60 秒 watchdog 和用户取消会立即结束外层 UI 操作，不依赖可能迟到或缺失的 LAContext 回调。协调器 4 项 fake 测试、Swift 全量 106 项、Beta target 与 `.app` build 通过；没有触发真实认证/恢复，提示不出现的系统根因仍待查。
 
 2026-11-11 本机提醒失败处理：通知中心拒绝添加任务提醒时，协调器汇总失败数供 UI 显示；删除该任务已有通知以避免旧计划继续触发，保留其他应用通知。注入失败回归、Swift 全量 98 项及 Beta 产品构建通过。真实系统通知行为仍待验收。
