@@ -42,6 +42,11 @@ public protocol SensitiveActionAuthorizing: AnyObject {
     func authorize(reason: String) async throws
 }
 
+@MainActor
+public protocol CancellableSensitiveActionAuthorizing: SensitiveActionAuthorizing {
+    func cancel()
+}
+
 public enum SensitiveActionAuthorizationError: Error {
     case authenticationUnavailable
     /// Kept for source compatibility with the earlier biometric-only POC.
@@ -63,7 +68,7 @@ public enum DeviceAuthenticationFailureMessage {
 }
 
 @MainActor
-public final class TouchIDAuthorizer: SensitiveActionAuthorizing {
+public final class TouchIDAuthorizer: CancellableSensitiveActionAuthorizing {
     static let authenticationPolicy: LAPolicy = .deviceOwnerAuthentication
 
     private let evaluator: any DeviceAuthenticationEvaluating

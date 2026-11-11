@@ -4,6 +4,7 @@
 - 2026-11-11 B10 首次 EventKit write-only 权限拒绝现明确引导用户到 macOS 系统设置的隐私与安全性检查日历权限；拒绝后仍 fail closed。Swift 102 项和 Beta build 通过；fake writer 未触发真实系统授权，拒绝 GUI 仍待实机验收。
 - 2026-11-11 B6 首次日历/提醒事项读取权限被拒绝时，状态改为说明去 macOS 系统设置的隐私与安全性检查对应权限；fake reader 回归确保不读取内容。GUI 首次授权/拒绝仍未验收。
 - 2026-11-11 B3 恢复认证等待保护：系统认证若 60 秒未返回，Beta 使本次尝试失效、调用 `LAContext.invalidate()`、恢复可见 UI 并明确“未开始恢复”；迟到成功仍受一次性门闩拒绝。新增 timeout 触发与成功认领取消 timeout 的 Swift 回归。此改动避免无限等待，但不解释此前系统认证不弹窗/不回调的原因，也未实机完成恢复。
+- 2026-11-11 B3 恢复授权顺序抽为 `EncryptedBackupRestoreCoordinator`：只有授权成功才能调用 restore API；拒绝、取消、超时及迟到成功均不触发恢复。超时/取消现在立即完成等待中的 UI 操作，不会因 LAContext 回调迟迟未返回而一直显示恢复中。4 项协调器回归；Swift 全量 106 项、Beta target 和 `.app` build 通过。系统认证提示根因和实机恢复仍未验收。
 - 2026-11-11 阶段 6 最新 CI：提交 `11e3564` 的 Actions run `42930393914` 全绿，主 job 后端 348、Swift 102，Ruff、mypy、lock、secret scan、compileall 和 Beta `.app` build 通过；macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 102 与 Beta bundle 校验。该路径验证 deployment-target 编译，不等同于真实 macOS 14 runtime、GUI、Keychain、通知或恢复验收。
 - 2026-11-11 B3 任务提醒失败反馈：通知中心添加失败从静默忽略改为计数并显示在任务页，同时清除该任务旧通知；注入失败回归、Swift 全量 98 和 Beta build 通过。未请求真实通知授权或投递。
 - 2026-11-10 Keychain 重复授权提示：Beta 原来把未重签名的 SwiftPM binary 装入 bundle，ad-hoc identifier 是哈希且 designated requirement 为 cdhash。构建脚本现可按 Bundle ID 重签/校验 bundle，并支持 `PAC_BETA_SIGNING_IDENTITY`。默认签名仍 ad-hoc、无 Team ID，不能保证授权持久；稳定签名和用户本人首次授权/重启验收待完成。用户密码未写入项目；建议自行更换已在对话暴露的系统密码。详见最新 HANDOFF。

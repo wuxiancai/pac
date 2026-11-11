@@ -2,6 +2,8 @@
 
 最后核对：2026-11-11（Asia/Shanghai）
 
+2026-11-11 恢复认证/API 协调：`EncryptedBackupRestoreCoordinator` 只在当前系统认证尝试成功后调用本机 restore API；拒绝、取消、超时或迟到成功均 fail closed。60 秒 watchdog 和用户取消会立即结束外层 UI 操作，不依赖可能迟到或缺失的 LAContext 回调。协调器 4 项 fake 测试、Swift 全量 106 项、Beta target 与 `.app` build 通过；没有触发真实认证/恢复，提示不出现的系统根因仍待查。
+
 2026-11-11 本机提醒失败处理：通知中心拒绝添加任务提醒时，协调器汇总失败数供 UI 显示；删除该任务已有通知以避免旧计划继续触发，保留其他应用通知。注入失败回归、Swift 全量 98 项及 Beta 产品构建通过。真实系统通知行为仍待验收。
 
 2026-11-11 B6 首次 EventKit 读取授权拒绝：日历和提醒事项读取服务现在分别提示用户到 macOS 系统设置的隐私与安全性检查对应权限；两个 fake-reader 回归确认拒绝后不查询内容。Swift 全量 102 项、Beta target 构建通过。真实首次授权/拒绝 GUI 仍待验收。
