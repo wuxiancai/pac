@@ -2,6 +2,7 @@
 
 - 增加认证成功后的本机恢复 API 失败用例：fake restorer 返回容器无效错误时，协调器将错误传给调用者、已认证回调只发生在 API 前，且失败不会被报告为成功恢复。该测试不访问文件、Keychain 或系统认证。
 - 验证：`swift test --package-path poc/macos-audio --filter backupRestoreCoordinator` → 5 passed；`swift test --package-path poc/macos-audio` → 107 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 与 `git diff --check` 通过。
+- 提交 `3708284` 对应 Actions run `42934773830` 两个 job 全通过：后端 348 passed（1 条既有弃用警告）、Swift 107 passed；Ruff、CI mypy、`uv lock --check`、tracked-file secret scan、compileall、Beta `.app` build 和 macOS 14 deployment-target job 均成功。最低部署目标 job 使用 macOS 15 runner，不能当作真实 macOS 14 runtime 证据。
 
 # 2026-11-11：B3 恢复授权与 API 调用协调
 
