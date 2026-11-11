@@ -1,3 +1,8 @@
+# 2026-11-11：任务提醒部分失败隔离通过远端门禁
+
+- 提交 `07313ca` 的 Actions run `42928287580` 两个 job 均成功：主 job 后端 348 passed、Swift 98 passed；Ruff、CI mypy、锁文件、tracked-file secret scan、compileall 与 Beta `.app` build 通过。macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 98 与 Beta bundle 校验。
+- 该 run 不提供 macOS 14 真机 runtime、系统通知投递、Keychain/LocalAuthentication 或 Provider 端到端证据；对应阶段门禁仍开放。
+
 # 2026-11-11：任务提醒重建支持部分失败
 
 - 扩展通知失败注入回归：一条 READY 任务添加通知失败时，清除其旧同 ID 请求、计入失败数，并继续成功安排后续任务；其他应用待发通知保留。证明重建采取逐项失败隔离，不让一个系统通知错误阻断其他任务。
