@@ -5,14 +5,15 @@ import Testing
 @MainActor
 private final class FakeCalendarEventReader: CalendarEventReading {
     var authorization: CalendarAccessState = .notDetermined
+    var requestResult = true
     var requestCount = 0
     var requestedRange: (Date, Date)?
     var fixtures: [LocalCalendarEvent] = []
 
     func requestFullAccess() async throws -> Bool {
         requestCount += 1
-        authorization = .fullAccess
-        return true
+        if requestResult { authorization = .fullAccess }
+        return requestResult
     }
 
     func events(from start: Date, to end: Date) -> [LocalCalendarEvent] {
@@ -24,14 +25,15 @@ private final class FakeCalendarEventReader: CalendarEventReading {
 @MainActor
 private final class FakeCalendarReminderReader: CalendarReminderReading {
     var authorization: CalendarAccessState = .notDetermined
+    var requestResult = true
     var requestCount = 0
     var requestedEndDate: Date?
     var fixtures: [LocalCalendarReminder] = []
 
     func requestFullAccess() async throws -> Bool {
         requestCount += 1
-        authorization = .fullAccess
-        return true
+        if requestResult { authorization = .fullAccess }
+        return requestResult
     }
 
     func incompleteReminders(dueBy end: Date) async throws -> [LocalCalendarReminder] {
@@ -79,6 +81,20 @@ private final class FakeCalendarReminderReader: CalendarReminderReading {
 }
 
 @available(macOS 14.0, *)
+@Test @MainActor func calendarReaderRequestDenialExplainsHowToEnablePermission() async {
+    let reader = FakeCalendarEventReader()
+    reader.requestResult = false
+    let service = CalendarReadOnlyService(reader: reader)
+
+    await service.loadUpcomingEvents()
+
+    #expect(reader.requestCount == 1)
+    #expect(reader.requestedRange == nil)
+    #expect(service.events.isEmpty)
+    #expect(service.status.contains("系统设置的隐私与安全性"))
+}
+
+@available(macOS 14.0, *)
 @Test @MainActor func remindersReaderRequestsPermissionAfterClickAndSortsDueDates() async {
     let reader = FakeCalendarReminderReader()
     let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -117,4 +133,18 @@ private final class FakeCalendarReminderReader: CalendarReminderReading {
     #expect(reader.requestCount == 0)
     #expect(reader.requestedEndDate == nil)
     #expect(service.reminders.isEmpty)
+}
+
+@available(macOS 14.0, *)
+@Test @MainActor func remindersReaderRequestDenialExplainsHowToEnablePermission() async {
+    let reader = FakeCalendarReminderReader()
+    reader.requestResult = false
+    let service = CalendarRemindersReadOnlyService(reader: reader)
+
+    await service.loadUpcomingReminders()
+
+    #expect(reader.requestCount == 1)
+    #expect(reader.requestedEndDate == nil)
+    #expect(service.reminders.isEmpty)
+    #expect(service.status.contains("系统设置的隐私与安全性"))
 }

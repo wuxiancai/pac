@@ -98,7 +98,7 @@ public final class CalendarReadOnlyService {
             case .notDetermined:
                 guard try await reader.requestFullAccess() else {
                     events = []
-                    status = "尚未获得日历访问授权。"
+                    status = "未获得日历读取授权；如需启用，请在 macOS 系统设置的隐私与安全性中检查日历权限。"
                     return
                 }
             case .writeOnly, .denied, .restricted:
@@ -210,7 +210,7 @@ public final class CalendarRemindersReadOnlyService {
             case .notDetermined:
                 guard try await reader.requestFullAccess() else {
                     reminders = []
-                    status = "尚未获得提醒事项访问授权。"
+                    status = "未获得提醒事项读取授权；如需启用，请在 macOS 系统设置的隐私与安全性中检查提醒事项权限。"
                     return
                 }
             case .writeOnly, .denied, .restricted:

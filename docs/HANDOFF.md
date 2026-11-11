@@ -13,6 +13,11 @@
 - 新增 fake writer 回归，模拟用户拒绝首次 EventKit write-only 权限请求，确认服务保持未就绪、不调用事件保存，并提供可操作的 macOS 系统设置隐私与安全性指引。该测试不访问系统日历或触发权限对话框。
 - 验证：`swift test --package-path poc/macos-audio --filter calendarCreationRequestDenialFailsClosedWithActionableStatus` → 1 passed；Swift 全量 → 100 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。真实首次授权/拒绝 GUI 仍未验收。
 
+# 2026-11-11：B6 首次读取权限拒绝提示
+
+- 首次日历或提醒事项完整读取权限请求返回拒绝时，状态现在引导用户前往 macOS 系统设置的隐私与安全性检查对应权限。新增两项 fake-reader 回归验证拒绝后不会继续查询日历或提醒内容。
+- 验证：两个定向测试各 1 passed；Swift 全量 → 102 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。真实权限提示与拒绝 GUI 仍未验收。
+
 # 2026-11-11：任务提醒部分失败隔离通过远端门禁
 
 - 提交 `07313ca` 的 Actions run `42928287580` 两个 job 均成功：主 job 后端 348 passed、Swift 98 passed；Ruff、CI mypy、锁文件、tracked-file secret scan、compileall 与 Beta `.app` build 通过。macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 98 与 Beta bundle 校验。
