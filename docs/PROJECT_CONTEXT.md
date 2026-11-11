@@ -2,7 +2,7 @@
 
 - 2026-11-11 B1 HTTP 错误路径状态：聊天 UI 现在根据本轮 Provider 标明云端或本机请求路径；HTTP 错误只显示状态码，不暗示故障源，也不显示响应正文。Swift 99 项、Beta build 通过；未发起云请求，GUI 错误提示仍待实机核验。
 - 2026-11-11 B3 恢复认证等待保护：系统认证若 60 秒未返回，Beta 使本次尝试失效、调用 `LAContext.invalidate()`、恢复可见 UI 并明确“未开始恢复”；迟到成功仍受一次性门闩拒绝。新增 timeout 触发与成功认领取消 timeout 的 Swift 回归。此改动避免无限等待，但不解释此前系统认证不弹窗/不回调的原因，也未实机完成恢复。
-- 2026-11-11 阶段 6 最新 CI：提交 `07313ca` 的 Actions run `42928287580` 全绿，主 job 后端 348、Swift 98，Ruff、mypy、lock、secret scan、compileall 和 Beta `.app` build 通过；macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 98 与 Beta bundle 校验。该路径验证 deployment-target 编译，不等同于真实 macOS 14 runtime、GUI、Keychain、通知或恢复验收。
+- 2026-11-11 阶段 6 最新 CI：提交 `8473bba` 的 Actions run `42929341823` 全绿，主 job 后端 348、Swift 99，Ruff、mypy、lock、secret scan、compileall 和 Beta `.app` build 通过；macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 99 与 Beta bundle 校验。该路径验证 deployment-target 编译，不等同于真实 macOS 14 runtime、GUI、Keychain、通知或恢复验收。
 - 2026-11-11 B3 任务提醒失败反馈：通知中心添加失败从静默忽略改为计数并显示在任务页，同时清除该任务旧通知；注入失败回归、Swift 全量 98 和 Beta build 通过。未请求真实通知授权或投递。
 - 2026-11-10 Keychain 重复授权提示：Beta 原来把未重签名的 SwiftPM binary 装入 bundle，ad-hoc identifier 是哈希且 designated requirement 为 cdhash。构建脚本现可按 Bundle ID 重签/校验 bundle，并支持 `PAC_BETA_SIGNING_IDENTITY`。默认签名仍 ad-hoc、无 Team ID，不能保证授权持久；稳定签名和用户本人首次授权/重启验收待完成。用户密码未写入项目；建议自行更换已在对话暴露的系统密码。详见最新 HANDOFF。
 - 2026-11-10 远端 Actions run `42836663902` attempt 2 在当前提交 `541ad6a` 全部通过：后端 347、Swift 94、静态/依赖门禁和 Beta build 成功。attempt 1 的 APFS-128 ENOSPC POC 曾间歇返回通用 RuntimeError；本机窄重跑通过，根因未判定。详见最新 HANDOFF。
@@ -110,7 +110,7 @@
 
 ## 架构和安全边界
 
-- 2026-11-11 阶段 6 CI 更新：Actions run `42928287580` 在常规 macOS runner 和 macOS 15 最低目标 runner 全部通过（后端 348、Swift 98；最低目标 `.app` 校验通过）。SwiftPM 部署目标为 macOS 14。该结果不等同于真实 macOS 14 设备 GUI/权限/Keychain/通知/备份恢复验收；阶段 6 仍开放。远端 APFS-128 ENOSPC POC 曾间歇失败、同一最终 run 和本机隔离复跑通过，原因未判定。
+- 2026-11-11 阶段 6 CI 更新：Actions run `42929341823` 在常规 macOS runner 和 macOS 15 最低目标 runner 全部通过（后端 348、Swift 99；最低目标 `.app` 校验通过）。SwiftPM 部署目标为 macOS 14。该结果不等同于真实 macOS 14 设备 GUI/权限/Keychain/通知/备份恢复验收；阶段 6 仍开放。远端 APFS-128 ENOSPC POC 曾间歇失败、同一最终 run 和本机隔离复跑通过，原因未判定。
 
 - UI 通过本机 Loopback API 与后端通信；服务由 Swift supervisor 固定启动，不经任意 shell 命令。
 - Model Gateway 使用 Adapter 和精确 Provider/Model capability registry；未知能力默认不支持。

@@ -3,6 +3,11 @@
 - `LocalAPIClientError.requestFailed` 原先统一写“本机服务请求失败”，即使这轮选择的是云 Provider。现改为中性的 HTTP 服务错误；聊天状态按本轮快照区分“云端请求路径（Provider）”与“本机模型请求路径”，保留 HTTP 状态码且不暴露响应正文。文案只说明失败从哪个请求路径返回，不推断错误一定来自 Provider 或本机服务。
 - 验证：`swift test --package-path poc/macos-audio --filter chatHTTPFailurePresentationNamesTheSelectedRouteWithoutResponseBody` → 1 passed；Swift 全量 → 99 passed；Beta 产品构建通过。没有发起云请求；GUI 文案尚待手动复核。
 
+# 2026-11-11：B1 错误路径改动远端 CI 通过
+
+- 提交 `8473bba` 的 Actions run `42929341823` 两个 job 均成功：主 job 后端 348 passed、Swift 99 passed；Ruff、CI mypy、锁文件、tracked-file secret scan、compileall 与 Beta `.app` build 通过。macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 99 与 Beta bundle 校验。
+- 此结果不覆盖 GUI 错误提示呈现；真实 macOS 14 runtime、系统通知、Keychain/恢复与云 Provider 仍待各自授权和验收。
+
 # 2026-11-11：任务提醒部分失败隔离通过远端门禁
 
 - 提交 `07313ca` 的 Actions run `42928287580` 两个 job 均成功：主 job 后端 348 passed、Swift 98 passed；Ruff、CI mypy、锁文件、tracked-file secret scan、compileall 与 Beta `.app` build 通过。macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 98 与 Beta bundle 校验。
