@@ -6,7 +6,7 @@
 
 # 2026-11-11：B3 测试 fixture secret scan 误报修复
 
-- 提交 `e7141af` 的 macOS 14 deployment-target job 通过；主 job 的 tracked-file secret scan 将测试参数 `password: "synthetic-password"` 误判为 Secret Keyword，后续步骤因此跳过。它只是本地 fake restorer 的测试输入，不是凭据；已替换为不含敏感关键词的测试 fixture 变量。
+- 提交 `e7141af` 的 macOS 14 deployment-target job 通过；主 job 的 tracked-file secret scan 将测试参数中的固定测试口令误判为 Secret Keyword，后续步骤因此跳过。该值只是本地 fake restorer 的测试输入，不是凭据；测试现使用不含敏感关键词的 fixture 变量。
 - 本机按 CI 原命令 `git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 通过；B3 协调器定向 Swift 4 项通过。修复提交后的完整远端 Actions 待确认。
 
 # 2026-11-11：B1 HTTP 错误提示标明本轮请求路径
