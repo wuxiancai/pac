@@ -2,7 +2,7 @@
 
 状态：`IN PROGRESS`。首个可运行 macOS SwiftUI 测试版已接入当前受认证 Loopback 服务，并通过本机 Ollama 流式文本 API。
 
-2026-11-11 HTTP 错误呈现：`requestFailed` 不再统一声称本机服务失败；聊天状态按本轮请求快照标记云端 Provider 路径或本机模型路径，显示 HTTP 状态码，不展示响应正文。显示的是错误返回路径，不断定故障由 Provider 或本机服务造成。Swift 定向回归 1 passed、全量 99 passed，Beta build 通过；没有真实云请求，运行 GUI 的错误呈现仍需实机核验。
+2026-11-11 HTTP 错误呈现：`requestFailed` 不再统一声称本机服务失败；聊天状态按本轮请求快照标记云端 Provider 路径或本机模型路径，显示 HTTP 状态码，不展示响应正文。显示的是错误返回路径，不断定故障由 Provider 或本机服务造成。Swift 定向回归 1 passed、全量 99 passed，Beta build 通过；没有真实云请求，运行 GUI 的错误呈现仍需实机核验。2026-11-11 CUA `getState` 两次连续 30 秒超时并重置 kernel，无法检查运行窗口；原因归为桌面自动化读状态不可用，不作为应用 GUI 验收结果。
 
 ## 当前范围
 

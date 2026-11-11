@@ -1,7 +1,7 @@
 # 2026-11-11：B1 HTTP 错误提示标明本轮请求路径
 
 - `LocalAPIClientError.requestFailed` 原先统一写“本机服务请求失败”，即使这轮选择的是云 Provider。现改为中性的 HTTP 服务错误；聊天状态按本轮快照区分“云端请求路径（Provider）”与“本机模型请求路径”，保留 HTTP 状态码且不暴露响应正文。文案只说明失败从哪个请求路径返回，不推断错误一定来自 Provider 或本机服务。
-- 验证：`swift test --package-path poc/macos-audio --filter chatHTTPFailurePresentationNamesTheSelectedRouteWithoutResponseBody` → 1 passed；Swift 全量 → 99 passed；Beta 产品构建通过。没有发起云请求；GUI 文案尚待手动复核。
+- 验证：`swift test --package-path poc/macos-audio --filter chatHTTPFailurePresentationNamesTheSelectedRouteWithoutResponseBody` → 1 passed；Swift 全量 → 99 passed；Beta 产品构建通过。没有发起云请求；GUI 文案尚待手动复核。2026-11-11 CUA `getState` 连续两次在 30 秒后超时并重置 kernel，未返回窗口状态；该工具故障不构成产品 GUI 通过或失败证据。
 
 # 2026-11-11：B1 错误路径改动远端 CI 通过
 
