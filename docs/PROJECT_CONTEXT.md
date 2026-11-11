@@ -1,5 +1,6 @@
 # 项目上下文
 
+- 2026-11-11 B3 认证恢复协调提交 `e7141af` 已由远端 Actions run `42933947731` 完整验证；后续仅文档提交 `db5c9b4`、`a551b4a` 修复 secret scan 测试夹具误报。最终 run 两个 job 全通过：Python 348、Swift 106；Ruff、mypy、依赖锁、tracked-file secret scan、compileall、Beta `.app` build 与 macOS 14 deployment-target job 全绿。测试在 macOS 15 runner 执行，不能替代真实 macOS 14 runtime、GUI、Keychain 或恢复验收。
 - 2026-11-11 B1 HTTP 错误路径状态：聊天 UI 现在根据本轮 Provider 标明云端或本机请求路径；HTTP 错误只显示状态码，不暗示故障源，也不显示响应正文。Swift 99 项、Beta build 通过；未发起云请求，GUI 错误提示仍待实机核验。
 - 2026-11-11 B10 首次 EventKit write-only 权限拒绝现明确引导用户到 macOS 系统设置的隐私与安全性检查日历权限；拒绝后仍 fail closed。Swift 102 项和 Beta build 通过；fake writer 未触发真实系统授权，拒绝 GUI 仍待实机验收。
 - 2026-11-11 B6 首次日历/提醒事项读取权限被拒绝时，状态改为说明去 macOS 系统设置的隐私与安全性检查对应权限；fake reader 回归确保不读取内容。GUI 首次授权/拒绝仍未验收。

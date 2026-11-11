@@ -4,10 +4,15 @@
 - 新增 4 项 fake authorizer/restorer 回归：验证授权前不调用 API、拒绝关闭恢复、超时立即返回且迟到成功无效、用户取消立即返回且迟到成功无效。`swift test --package-path poc/macos-audio --filter backupRestoreCoordinator` → 4 passed；`swift test --package-path poc/macos-audio` → 106 passed；Beta target build、`poc/macos-audio/scripts/build_beta_app.sh` 和 `git diff --check` 通过。
 - 本次未触发真实系统认证、Keychain、备份恢复或文件操作。该改动不解释 LocalAuthentication 提示不出现/回调不返回的根因；真实系统认证及恢复闭环仍待 GUI 验收。
 
+# 2026-11-11：B3 恢复改动与扫描修复通过远端 CI
+
+- Actions run `42933947731` 检查代码提交 `e7141af` 及后续扫描说明提交 `db5c9b4`、`a551b4a`，两个 job 均成功。主 job：后端 348 passed（1 条既有 Starlette/httpx 弃用警告）、Swift 106 passed；Ruff、CI mypy、`uv lock --check`、tracked-file secret scan、compileall 与 Beta `.app` build 均通过。macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 106 与 bundle 校验。
+- 前两个尝试因测试 fixture 的 secret scan 关键词误报在主 job 失败；夹具使用中性值且 HANDOFF 不再重复该词后，远端扫描通过。没有检测到实际凭据。完整 CI 不涵盖真实系统认证提示、Keychain 权限、备份恢复 GUI 或 macOS 14 runtime。
+
 # 2026-11-11：B3 测试 fixture secret scan 误报修复
 
 - 提交 `e7141af` 的 macOS 14 deployment-target job 通过；主 job 的 tracked-file secret scan 将测试参数中的固定测试口令误判为 Secret Keyword，后续步骤因此跳过。该值只是本地 fake restorer 的测试输入，不是凭据；测试现使用不含敏感关键词的 fixture 变量。
-- 本机按 CI 原命令 `git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 通过；B3 协调器定向 Swift 4 项通过。修复提交后的完整远端 Actions 待确认。
+- 本机按 CI 原命令 `git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 通过；B3 协调器定向 Swift 4 项通过。最终 Actions run `42933947731` 已完成且两 job 全通过，见本交接文档最新 CI 记录。
 
 # 2026-11-11：B1 HTTP 错误提示标明本轮请求路径
 
