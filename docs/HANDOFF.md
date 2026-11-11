@@ -8,6 +8,11 @@
 - 提交 `8473bba` 的 Actions run `42929341823` 两个 job 均成功：主 job 后端 348 passed、Swift 99 passed；Ruff、CI mypy、锁文件、tracked-file secret scan、compileall 与 Beta `.app` build 通过。macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 99 与 Beta bundle 校验。
 - 此结果不覆盖 GUI 错误提示呈现；真实 macOS 14 runtime、系统通知、Keychain/恢复与云 Provider 仍待各自授权和验收。
 
+# 2026-11-11：B10 首次日历权限拒绝回归
+
+- 新增 fake writer 回归，模拟用户拒绝首次 EventKit write-only 权限请求，确认服务保持未就绪、不调用事件保存，并提供未授权状态文案。该测试不访问系统日历或触发权限对话框。
+- 验证：`swift test --package-path poc/macos-audio --filter calendarCreationRequestDenialFailsClosedWithActionableStatus` → 1 passed；Swift 全量 → 100 passed；`swift build --package-path poc/macos-audio --product personal-assistant-beta` 通过。真实首次授权/拒绝 GUI 仍未验收。
+
 # 2026-11-11：任务提醒部分失败隔离通过远端门禁
 
 - 提交 `07313ca` 的 Actions run `42928287580` 两个 job 均成功：主 job 后端 348 passed、Swift 98 passed；Ruff、CI mypy、锁文件、tracked-file secret scan、compileall 与 Beta `.app` build 通过。macOS 14 deployment-target job 在 macOS 15 runner 上通过 Swift 98 与 Beta bundle 校验。

@@ -98,6 +98,19 @@ private actor FakeCalendarEventAudit: CalendarEventAuditRecording {
 }
 
 @available(macOS 14.0, *)
+@Test @MainActor func calendarCreationRequestDenialFailsClosedWithActionableStatus() async {
+    let writer = FakeCalendarEventWriter()
+    writer.requestResult = false
+    let service = CalendarEventCreationService(writer: writer)
+
+    #expect(!(await service.prepareForEventCreation()))
+    #expect(writer.requestCount == 1)
+    #expect(writer.saves.isEmpty)
+    #expect(!service.isReadyToCreate)
+    #expect(service.status == "尚未获得日历创建授权。")
+}
+
+@available(macOS 14.0, *)
 @Test @MainActor func calendarCreationPropagatesSaveFailureWithoutRetrying() async throws {
     let writer = FakeCalendarEventWriter()
     writer.authorization = .fullAccess
