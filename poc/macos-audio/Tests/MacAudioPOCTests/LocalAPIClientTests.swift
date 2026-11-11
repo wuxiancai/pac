@@ -653,11 +653,13 @@ private final class MismatchedModelCapabilityURLProtocol: URLProtocol {
     }
 
     let error = LocalAPIClientError.requestFailed(statusCode: 503)
+    let cloudRoute = ChatRequestRoute(provider: "openrouter", model: "fixture-cloud", usesCloud: true)
+    let localRoute = ChatRequestRoute(provider: "ollama", model: "fixture-local", usesCloud: false)
     let cloudMessage = ChatRequestFailurePresentation.message(
-        for: error, provider: "openrouter", usesCloud: true
+        for: error, route: cloudRoute
     )
     let localMessage = ChatRequestFailurePresentation.message(
-        for: error, provider: "ollama", usesCloud: false
+        for: error, route: localRoute
     )
 
     #expect(cloudMessage == "云端请求路径（openrouter）返回 HTTP 503。")
@@ -665,13 +667,24 @@ private final class MismatchedModelCapabilityURLProtocol: URLProtocol {
     #expect(!cloudMessage.contains("secret-response-body"))
     #expect(!localMessage.contains("secret-response-body"))
     #expect(ChatRequestFailurePresentation.message(
-        for: SyntheticError(), provider: "deepseek", usesCloud: true
+        for: SyntheticError(),
+        route: ChatRequestRoute(provider: "deepseek", model: "fixture-cloud", usesCloud: true)
     ) == "云端请求路径（deepseek）请求失败：safe synthetic error")
     #expect(ChatRequestFailurePresentation.message(
         for: LocalAPIStreamError(message: "云端服务错误（HTTP 503）"),
-        provider: "deepseek",
-        usesCloud: true
+        route: ChatRequestRoute(provider: "deepseek", model: "fixture-cloud", usesCloud: true)
     ) == "云端服务错误（HTTP 503）")
+}
+
+@Test func chatRequestFailureUsesTheRouteCapturedWhenTheRequestStarted() {
+    let routeAtSend = ChatRequestRoute(provider: "deepseek", model: "deepseek-flash", usesCloud: true)
+    let laterSelectedRoute = ChatRequestRoute(provider: "ollama", model: "qwen3.5:0.8b", usesCloud: false)
+    let failure = LocalAPIClientError.requestFailed(statusCode: 503)
+
+    #expect(ChatRequestFailurePresentation.message(for: failure, route: routeAtSend)
+        == "云端请求路径（deepseek）返回 HTTP 503。")
+    #expect(ChatRequestFailurePresentation.message(for: failure, route: laterSelectedRoute)
+        == "本机模型请求路径返回 HTTP 503。")
 }
 
 @available(macOS 12.0, *)

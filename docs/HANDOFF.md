@@ -1,3 +1,8 @@
+# 2026-11-11：B1 失败提示使用发送时路由快照
+
+- 修复请求中途切换 Provider 后的提示竞态：发送时保存不可变 `ChatRequestRoute`（Provider、型号、云端标记），HTTP 失败呈现使用该快照，不再读可变的当前选择。响应仍只报告请求路径和 HTTP 状态码，不显示响应正文或推断故障来源。
+- 新增回归检查旧云端请求在当前选择切成本机后仍显示云端路径。`swift test --package-path poc/macos-audio --filter chatRequestFailure` → 1 passed；Swift 全量 → 108 passed；Beta target build、`git diff --check` 通过。未发真实云请求；GUI 仍待验收。
+
 # 2026-11-11：B3 恢复 API 失败路径回归
 
 - 增加认证成功后的本机恢复 API 失败用例：fake restorer 返回容器无效错误时，协调器将错误传给调用者、已认证回调只发生在 API 前，且失败不会被报告为成功恢复。该测试不访问文件、Keychain 或系统认证。

@@ -26,17 +26,29 @@ extension LocalAPIClientError: LocalizedError {
     }
 }
 
+public struct ChatRequestRoute: Equatable, Sendable {
+    public let provider: String
+    public let model: String
+    public let usesCloud: Bool
+
+    public init(provider: String, model: String, usesCloud: Bool) {
+        self.provider = provider
+        self.model = model
+        self.usesCloud = usesCloud
+    }
+}
+
 public enum ChatRequestFailurePresentation {
-    public static func message(for error: Error, provider: String, usesCloud: Bool) -> String {
+    public static func message(for error: Error, route: ChatRequestRoute) -> String {
         if error is LocalAPIStreamError {
             return error.localizedDescription
         }
-        let route = usesCloud ? "云端请求路径（\(provider)）" : "本机模型请求路径"
+        let routeDescription = route.usesCloud ? "云端请求路径（\(route.provider)）" : "本机模型请求路径"
         if let clientError = error as? LocalAPIClientError,
            case let .requestFailed(statusCode) = clientError {
-            return "\(route)返回 HTTP \(statusCode)。"
+            return "\(routeDescription)返回 HTTP \(statusCode)。"
         }
-        return "\(route)请求失败：\(error.localizedDescription)"
+        return "\(routeDescription)请求失败：\(error.localizedDescription)"
     }
 }
 

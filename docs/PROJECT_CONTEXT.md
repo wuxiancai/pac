@@ -1,5 +1,6 @@
 # 项目上下文
 
+- 2026-11-11 B1 将失败提示绑定发送时的 `ChatRequestRoute` 快照，避免用户切换 Provider 后旧请求错误标成本地/云端另一条路径；新增回归，Swift 108 项、Beta target 通过。未发真实云请求，GUI 仍待验收。
 - 2026-11-11 B3 恢复 API 失败路径回归提交 `3708284` 已由 Actions run `42934773830` 全部门禁验证：后端 348、Swift 107，secret scan、Ruff、mypy、lock、compileall、Beta build 与 macOS 14 deployment-target job 均通过；macOS 14 目标仍是在 macOS 15 runner 上编译/测试，不能替代真实设备验收。
 - 2026-11-11 B3 认证恢复协调提交 `e7141af` 已由远端 Actions run `42933947731` 完整验证；后续仅文档提交 `db5c9b4`、`a551b4a` 修复 secret scan 测试夹具误报。最终 run 两个 job 全通过：Python 348、Swift 106；Ruff、mypy、依赖锁、tracked-file secret scan、compileall、Beta `.app` build 与 macOS 14 deployment-target job 全绿。测试在 macOS 15 runner 执行，不能替代真实 macOS 14 runtime、GUI、Keychain 或恢复验收。
 - 2026-11-11 B1 HTTP 错误路径状态：聊天 UI 现在根据本轮 Provider 标明云端或本机请求路径；HTTP 错误只显示状态码，不暗示故障源，也不显示响应正文。Swift 99 项、Beta build 通过；未发起云请求，GUI 错误提示仍待实机核验。

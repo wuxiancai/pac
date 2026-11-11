@@ -333,6 +333,11 @@ final class BetaChatModel: CalendarEventAuditRecording {
         let provider = selectedProvider
         let modelID = selectedModel
         let confirmedForThisRequest = usesCloud
+        let requestRoute = ChatRequestRoute(
+            provider: provider,
+            model: modelID,
+            usesCloud: confirmedForThisRequest
+        )
         let importedDocumentIDs = importedTextFiles.map(\.importID)
         let activeConversationID = conversationID
         let collaboratorKeysForRequest = selectedCollaboratorKeys
@@ -398,7 +403,7 @@ final class BetaChatModel: CalendarEventAuditRecording {
             } catch {
                 guard let self, self.activeRequestID == requestID else { return }
                 self.status = ChatRequestFailurePresentation.message(
-                    for: error, provider: provider, usesCloud: usesCloud
+                    for: error, route: requestRoute
                 )
                 self.activeRequest = nil
                 self.activeRequestID = nil
