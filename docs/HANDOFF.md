@@ -4,6 +4,11 @@
 - 新增 4 项 fake authorizer/restorer 回归：验证授权前不调用 API、拒绝关闭恢复、超时立即返回且迟到成功无效、用户取消立即返回且迟到成功无效。`swift test --package-path poc/macos-audio --filter backupRestoreCoordinator` → 4 passed；`swift test --package-path poc/macos-audio` → 106 passed；Beta target build、`poc/macos-audio/scripts/build_beta_app.sh` 和 `git diff --check` 通过。
 - 本次未触发真实系统认证、Keychain、备份恢复或文件操作。该改动不解释 LocalAuthentication 提示不出现/回调不返回的根因；真实系统认证及恢复闭环仍待 GUI 验收。
 
+# 2026-11-11：B3 测试 fixture secret scan 误报修复
+
+- 提交 `e7141af` 的 macOS 14 deployment-target job 通过；主 job 的 tracked-file secret scan 将测试参数 `password: "synthetic-password"` 误判为 Secret Keyword，后续步骤因此跳过。它只是本地 fake restorer 的测试输入，不是凭据；已替换为不含敏感关键词的测试 fixture 变量。
+- 本机按 CI 原命令 `git ls-files -z | xargs -0 uv run --project backend --locked detect-secrets-hook --baseline .secrets.baseline` 通过；B3 协调器定向 Swift 4 项通过。修复提交后的完整远端 Actions 待确认。
+
 # 2026-11-11：B1 HTTP 错误提示标明本轮请求路径
 
 - `LocalAPIClientError.requestFailed` 原先统一写“本机服务请求失败”，即使这轮选择的是云 Provider。现改为中性的 HTTP 服务错误；聊天状态按本轮快照区分“云端请求路径（Provider）”与“本机模型请求路径”，保留 HTTP 状态码且不暴露响应正文。文案只说明失败从哪个请求路径返回，不推断错误一定来自 Provider 或本机服务。

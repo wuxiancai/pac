@@ -29,6 +29,7 @@ private final class DeferredAuthorizer: CancellableSensitiveActionAuthorizing {
 }
 
 private enum TestAuthorizationFailure: Error { case denied }
+private let restoreFixtureValue = "fixture-only-value"
 
 private actor FakeBackupRestorer: EncryptedBackupRestoreCalling {
     private(set) var calls: [(String, String)] = []
@@ -52,7 +53,7 @@ private actor FakeBackupRestorer: EncryptedBackupRestoreCalling {
     let operation = Task {
         try await coordinator.restore(
             sourcePath: "/tmp/synthetic.pacbackup",
-            password: "synthetic-password",
+            password: restoreFixtureValue,
             timeout: .seconds(2),
             onTimeout: {},
             onAuthenticationCompleted: { authenticationCompleted = true }
@@ -69,7 +70,7 @@ private actor FakeBackupRestorer: EncryptedBackupRestoreCalling {
     #expect(authenticationCompleted)
     #expect(await restorer.callCount() == 1)
     #expect(await restorer.lastCall()?.0 == "/tmp/synthetic.pacbackup")
-    #expect(await restorer.lastCall()?.1 == "synthetic-password")
+    #expect(await restorer.lastCall()?.1 == restoreFixtureValue)
 }
 
 @available(macOS 14.0, *)
@@ -81,7 +82,7 @@ private actor FakeBackupRestorer: EncryptedBackupRestoreCalling {
     let operation = Task {
         try await coordinator.restore(
             sourcePath: "/tmp/synthetic.pacbackup",
-            password: "synthetic-password",
+            password: restoreFixtureValue,
             timeout: .seconds(2),
             onTimeout: {},
             onAuthenticationCompleted: {}
@@ -105,7 +106,7 @@ private actor FakeBackupRestorer: EncryptedBackupRestoreCalling {
     let operation = Task {
         try await coordinator.restore(
             sourcePath: "/tmp/synthetic.pacbackup",
-            password: "synthetic-password",
+            password: restoreFixtureValue,
             timeout: .milliseconds(10),
             onTimeout: { timedOut = true },
             onAuthenticationCompleted: { authenticationCompleted = true }
@@ -131,7 +132,7 @@ private actor FakeBackupRestorer: EncryptedBackupRestoreCalling {
     let operation = Task {
         try await coordinator.restore(
             sourcePath: "/tmp/synthetic.pacbackup",
-            password: "synthetic-password",
+            password: restoreFixtureValue,
             timeout: .seconds(2),
             onTimeout: {},
             onAuthenticationCompleted: {}
